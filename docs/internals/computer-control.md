@@ -48,4 +48,12 @@ Sleep, missing workspaces, and replacement recovery remain LEO-284 / LEO-399. Th
 - A rejected input drops the local lease, releases it on the server, and re-reads state. The action is never replayed.
 - The lease cannot be renewed. The client times it on its own clock from the grant, so skew with a remote server cannot end it early. Local expiry, disconnect, and a stopped or ended computer all read as stopped, matching the server gate.
 
-The web client (`apps/web/src/components/computer/`) subscribes to `computer.events` only while the viewer is open, the page is visible, the environment is connected, and the computer is not stopped. It opens from the bot details panel and from pending human-input prompts in bot and group chats. Electron uses the same web surface. Mobile renders `ComputerDesktopNotice` while the computer is ready or human-controlled and does not stream frames.
+The web client (`apps/web/src/components/computer/`) subscribes to `computer.events` only while the viewer is open, the page is visible, the environment is connected, and the computer is not stopped. It opens only from the bot details panel. Electron uses the same web surface.
+
+The mobile client (`apps/mobile/src/features/computer/`) runs the same controller through its own hook. `ComputerNotice` in the thread shows a Watch button while the computer is ready or human-controlled, and opens the viewer as a full-screen modal. The viewer follows these AppState rules:
+
+- `inactive` (app switcher, Control Center, notification pull) covers the frame and keeps the stream and any control.
+- `background` calls `hide`, which closes the stream and releases the lease, so the bot resumes. The paused state shows on return.
+- Back to `active`, the cover stays until a frame newer than the last pre-cover frame arrives, and the user taps Resume watching.
+
+Frames stay in memory only (`cachePolicy="none"`). On Android the viewer sets `FLAG_SECURE` through `expo-screen-capture`.
