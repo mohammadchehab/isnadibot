@@ -23,11 +23,13 @@ it.layer(Layer.mergeAll(NodeSqliteClient.layerMemory()))("079_ProjectionGroupHop
       const columns = yield* sql<{ readonly name: string }>`
         PRAGMA table_info(projection_groups)
       `;
+
       assert.equal(columns.filter((column) => column.name === "hop_budget").length, 1);
 
       const rows = yield* sql<{ readonly hopBudget: number | null }>`
         SELECT hop_budget AS "hopBudget" FROM projection_groups WHERE group_id = 'group-1'
       `;
+
       assert.deepEqual(rows, [{ hopBudget: null }]);
     }),
   );
