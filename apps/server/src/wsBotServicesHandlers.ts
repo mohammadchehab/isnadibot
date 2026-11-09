@@ -103,9 +103,12 @@ export const createWsBotServicesHandlers = ({
             });
           }
 
-          const options = input.since === undefined ? {} : { since: input.since };
-
-          const summary = yield* botUsageLedger.summarize(input.botId, options).pipe(
+          // No `since` means one argument, so a plain read stays distinguishable from a windowed one.
+          const summary = yield* (
+            input.since === undefined
+              ? botUsageLedger.summarize(input.botId)
+              : botUsageLedger.summarize(input.botId, { since: input.since })
+          ).pipe(
             Effect.mapError(
               (cause) =>
                 new IsnadiBotUsageReadError({
