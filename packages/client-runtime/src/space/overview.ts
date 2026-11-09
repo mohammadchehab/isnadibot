@@ -1,4 +1,5 @@
 import type { RoutineLifecycle } from "@isnadi/contracts";
+import * as DateTime from "effect/DateTime";
 
 import type { Decision } from "../decisions.ts";
 
@@ -110,6 +111,41 @@ export function spaceActivity<
     .slice(0, limit);
 }
 
+/** One member bot's answer for the space's usage window. */
+export type SpaceUsageAnswer =
+  | { readonly status: "ready"; readonly turns: number }
+  | { readonly status: "pending" }
+  | { readonly status: "failed" };
+
+/**
+ * What the Usage tile shows. A partial sum is not a final number, so the caller
+ * renders pending and failed answers instead of a total that looks settled.
+ */
+export interface SpaceUsageSummary {
+  readonly turns: number;
+  readonly isPending: boolean;
+  readonly hasError: boolean;
+}
+
+/** Sums the members' turns over the space's usage window. */
+export function spaceUsageTurns(answers: Iterable<SpaceUsageAnswer>): SpaceUsageSummary {
+  let turns = 0;
+  let isPending = false;
+  let hasError = false;
+
+  for (const answer of answers) {
+    if (answer.status === "ready") {
+      turns += answer.turns;
+    } else if (answer.status === "pending") {
+      isPending = true;
+    } else {
+      hasError = true;
+    }
+  }
+
+  return { turns, isPending, hasError };
+}
+
 function zoneParts(instant: number, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -178,5 +214,5 @@ export function weekStart(now: Date, timeZone: string, locale?: string): string 
   const guess = wallStart - zoneOffsetMs(wallStart, timeZone);
   const instant = wallStart - zoneOffsetMs(guess, timeZone);
 
-  return new Date(instant).toISOString();
+  return DateTime.formatIso(DateTime.makeUnsafe(instant));
 }

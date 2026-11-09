@@ -7,6 +7,7 @@ import {
   spaceDecisions,
   spaceMembers,
   spaceRoutines,
+  spaceUsageTurns,
   weekStart,
   type SpaceGroup,
   type SpaceRoutine,
@@ -58,7 +59,7 @@ describe("space overview", () => {
     const routine = (over: Partial<SpaceRoutine>): SpaceRoutine => ({
       botId: "a",
       enabled: true,
-      lifecycle: "active",
+      lifecycle: "enabled",
       nextRunAt: "2026-11-07T09:00:00.000Z",
       ...over,
     });
@@ -115,5 +116,27 @@ describe("space overview", () => {
     expect(weekStart(now, "UTC", "en-GB")).toBe("2026-11-02T00:00:00.000Z");
     expect(weekStart(now, "UTC", "not a locale")).toBe("2026-11-02T00:00:00.000Z");
     expect(weekStart(now, "UTC")).toBe("2026-11-02T00:00:00.000Z");
+  });
+
+  it("sums the members' turns over the usage window", () => {
+    expect(
+      spaceUsageTurns([
+        { status: "ready", turns: 4 },
+        { status: "ready", turns: 0 },
+        { status: "pending" },
+      ]),
+    ).toEqual({ turns: 4, isPending: true, hasError: false });
+  });
+
+  it("reports failures next to a partial total", () => {
+    expect(spaceUsageTurns([{ status: "ready", turns: 7 }, { status: "failed" }])).toEqual({
+      turns: 7,
+      isPending: false,
+      hasError: true,
+    });
+  });
+
+  it("shows zero turns for a space with no answered members", () => {
+    expect(spaceUsageTurns([])).toEqual({ turns: 0, isPending: false, hasError: false });
   });
 });
