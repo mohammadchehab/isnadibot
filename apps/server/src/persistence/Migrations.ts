@@ -92,6 +92,7 @@ import Migration0076 from "./Migrations/076_ProjectionTurnTrigger.ts";
 import Migration0077 from "./Migrations/077_ProjectionThreadHopBudget.ts";
 import Migration0078 from "./Migrations/078_ProjectionBotSkills.ts";
 import Migration0079 from "./Migrations/079_ProjectionGroupHopBudget.ts";
+import Migration0080 from "./Migrations/080_ProjectionWorkItems.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -183,6 +184,7 @@ export const migrationEntries = [
   [77, "ProjectionThreadHopBudget", Migration0077],
   [78, "ProjectionBotSkills", Migration0078],
   [79, "ProjectionGroupHopBudget", Migration0079],
+  [80, "ProjectionWorkItems", Migration0080],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
