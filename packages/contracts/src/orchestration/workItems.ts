@@ -141,11 +141,10 @@ export function toWorkItemSummary(item: WorkItem): WorkItemSummary {
   return { ...rest, briefPreview: briefPreview(brief) };
 }
 
-const ActorBotId = Schema.optional(BotId);
-
 /**
- * `actorBotId` is set when a bot issues the command; user commands omit it and
- * are authorized by the dispatching actor instead.
+ * A client command carries no bot identity. A client is always dispatched as a
+ * person; a bot acts through `BotWorkItemCommand`, which the server builds
+ * itself after resolving the bot from its own session.
  */
 export const WorkItemCreateCommand = Schema.Struct({
   type: Schema.Literal("work-item.create"),
@@ -157,7 +156,6 @@ export const WorkItemCreateCommand = Schema.Struct({
   kind: WorkItemKind,
   role: Schema.optional(TrimmedNonEmptyString),
   trackerLink: Schema.optional(TrackerLink),
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemAssignCommand = Schema.Struct({
@@ -165,7 +163,6 @@ export const WorkItemAssignCommand = Schema.Struct({
   commandId: CommandId,
   workItemId: WorkItemId,
   ownerBotId: Schema.NullOr(BotId),
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemUpdateCommand = Schema.Struct({
@@ -177,7 +174,6 @@ export const WorkItemUpdateCommand = Schema.Struct({
   state: Schema.optional(WorkItemProgressState),
   threadId: Schema.optional(ThreadId),
   prUrl: Schema.optional(TrimmedNonEmptyString),
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemBlockCommand = Schema.Struct({
@@ -185,14 +181,12 @@ export const WorkItemBlockCommand = Schema.Struct({
   commandId: CommandId,
   workItemId: WorkItemId,
   blockedOn: WorkItemBlockedOn,
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemUnblockCommand = Schema.Struct({
   type: Schema.Literal("work-item.unblock"),
   commandId: CommandId,
   workItemId: WorkItemId,
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemCloseCommand = Schema.Struct({
@@ -200,14 +194,12 @@ export const WorkItemCloseCommand = Schema.Struct({
   commandId: CommandId,
   workItemId: WorkItemId,
   resolution: WorkItemResolution,
-  actorBotId: ActorBotId,
 });
 
 export const WorkItemReopenCommand = Schema.Struct({
   type: Schema.Literal("work-item.reopen"),
   commandId: CommandId,
   workItemId: WorkItemId,
-  actorBotId: ActorBotId,
 });
 
 export const ClientWorkItemCommand = Schema.Union([
@@ -221,6 +213,21 @@ export const ClientWorkItemCommand = Schema.Union([
 ]);
 
 export type ClientWorkItemCommand = typeof ClientWorkItemCommand.Type;
+
+/**
+ * Server-internal: a bot runs one work-item command. The server resolves
+ * `actorBotId` from the bot's own session, so a client can never claim to be a
+ * bot. Not client-dispatchable; it stays out of `ClientOrchestrationCommand`.
+ */
+export const BotWorkItemCommand = Schema.Struct({
+  type: Schema.Literal("work-item.bot-act"),
+  commandId: CommandId,
+  actorBotId: BotId,
+  command: ClientWorkItemCommand,
+  createdAt: IsoDateTime,
+});
+
+export type BotWorkItemCommand = typeof BotWorkItemCommand.Type;
 
 /** Every work-item event but `deleted` carries the whole item as it is after the change. */
 export const WorkItemChangedPayload = Schema.Struct({ workItem: WorkItem });

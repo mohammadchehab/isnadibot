@@ -1,7 +1,9 @@
 import {
   AuthSessionId,
+  BotId,
   CommandId,
   WorkItemId,
+  type ClientWorkItemCommand,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type WorkItem,
@@ -51,6 +53,18 @@ const makeModel = (items: ReadonlyArray<WorkItem>) => ({
 
 const cmd = (command: OrchestrationCommand) => command;
 
+/**
+ * A bot acts only through the server-built wrapper: the server stamps the bot id
+ * from the bot's own session, so a client command can never claim to be a bot.
+ */
+const botCmd = (actorBotId: BotId, command: ClientWorkItemCommand): OrchestrationCommand => ({
+  type: "work-item.bot-act",
+  commandId: CommandId.make("cmd-work-item.bot-act"),
+  actorBotId,
+  command,
+  createdAt: NOW,
+});
+
 const decide = Effect.fn("decide")(function* (
   command: OrchestrationCommand,
   items: ReadonlyArray<WorkItem>,
@@ -80,7 +94,7 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
   it.effect("creates a queued item with the group aggregate", () =>
     Effect.gen(function* () {
       const events = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.create",
           commandId: CommandId.make("cmd-work-item.create"),
           workItemId: ITEM_ID,
@@ -88,7 +102,6 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
           title: "Fix the thing",
           brief: "It is broken.",
           kind: "bug",
-          actorBotId: BOSS_ID,
         }),
         [],
       );
@@ -132,12 +145,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
   it.effect("assigns to a member and records the assigning bot", () =>
     Effect.gen(function* () {
       const events = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.assign",
           commandId: CommandId.make("cmd-work-item.assign"),
           workItemId: ITEM_ID,
           ownerBotId: SPECIALIST_ID,
-          actorBotId: BOSS_ID,
         }),
         [makeItem()],
       );
@@ -171,12 +183,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
   it.effect("returns an item to queued when the owner is cleared", () =>
     Effect.gen(function* () {
       const events = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.assign",
           commandId: CommandId.make("cmd-work-item.assign"),
           workItemId: ITEM_ID,
           ownerBotId: null,
-          actorBotId: BOSS_ID,
         }),
         [makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID })],
       );
@@ -189,12 +200,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
   it.effect("rejects an owner outside the group", () =>
     fails(
       decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.assign",
           commandId: CommandId.make("cmd-work-item.assign"),
           workItemId: ITEM_ID,
           ownerBotId: OTHER_SPECIALIST_ID,
-          actorBotId: BOSS_ID,
         }),
         [makeItem()],
       ),
@@ -203,12 +213,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
 
   it.effect("moves to in-progress only from assigned, in-progress, review or blocked", () =>
     Effect.gen(function* () {
-      const update = cmd({
+      const update = botCmd(SPECIALIST_ID, {
         type: "work-item.update",
         commandId: CommandId.make("cmd-work-item.update"),
         workItemId: ITEM_ID,
         state: "in-progress",
-        actorBotId: SPECIALIST_ID,
       });
 
       const events = yield* decide(update, [
@@ -227,12 +236,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
   it.effect("unblocks to the state the item was blocked from", () =>
     Effect.gen(function* () {
       const blocked = yield* decide(
-        cmd({
+        botCmd(SPECIALIST_ID, {
           type: "work-item.block",
           commandId: CommandId.make("cmd-work-item.block"),
           workItemId: ITEM_ID,
           blockedOn: { by: "user", note: "Need the API key" },
-          actorBotId: SPECIALIST_ID,
         }),
         [makeItem({ state: "in-progress", ownerBotId: SPECIALIST_ID })],
       );
@@ -244,11 +252,10 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       });
 
       const unblocked = yield* decide(
-        cmd({
+        botCmd(SPECIALIST_ID, {
           type: "work-item.unblock",
           commandId: CommandId.make("cmd-work-item.unblock"),
           workItemId: ITEM_ID,
-          actorBotId: SPECIALIST_ID,
         }),
         [changed(blocked)],
       );
@@ -264,12 +271,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       const owned = makeItem({ state: "review", ownerBotId: SPECIALIST_ID });
 
       const done = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.close",
           commandId: CommandId.make("cmd-work-item.close"),
           workItemId: ITEM_ID,
           resolution: "done",
-          actorBotId: BOSS_ID,
         }),
         [owned],
       );
@@ -279,12 +285,11 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       expect(changed(done).doneAt).toBeDefined();
 
       const dropped = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.close",
           commandId: CommandId.make("cmd-work-item.close"),
           workItemId: ITEM_ID,
           resolution: "dropped",
-          actorBotId: BOSS_ID,
         }),
         [owned],
       );
@@ -293,11 +298,10 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       expect(changed(dropped).closedAt).toBeDefined();
 
       const reopened = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.reopen",
           commandId: CommandId.make("cmd-work-item.reopen"),
           workItemId: ITEM_ID,
-          actorBotId: BOSS_ID,
         }),
         [changed(done)],
       );
@@ -306,11 +310,10 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       expect(changed(reopened).doneAt).toBeUndefined();
 
       const reopenedUnowned = yield* decide(
-        cmd({
+        botCmd(BOSS_ID, {
           type: "work-item.reopen",
           commandId: CommandId.make("cmd-work-item.reopen"),
           workItemId: ITEM_ID,
-          actorBotId: BOSS_ID,
         }),
         [changed(dropped)].map((item) => {
           const { ownerBotId: _owner, ...rest } = item;
@@ -323,17 +326,111 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
     }),
   );
 
-  it.effect("lets a bot change only the items it owns, and the boss change anything", () =>
+  it.effect("rejects a reopen once the space has 200 open items", () =>
     Effect.gen(function* () {
-      const item = makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID });
+      const open = Array.from({ length: 200 }, (_, index) =>
+        makeItem({ id: WorkItemId.make(`open-${index}`) }),
+      );
 
-      const update = (actorBotId: typeof BOSS_ID) =>
-        cmd({
+      const done = makeItem({ state: "done", doneAt: NOW });
+
+      const exit = yield* Effect.exit(
+        decide(
+          botCmd(BOSS_ID, {
+            type: "work-item.reopen",
+            commandId: CommandId.make("cmd-work-item.reopen"),
+            workItemId: ITEM_ID,
+          }),
+          [...open, done],
+        ),
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      expect(JSON.stringify(exit)).toContain("This space has 200 open items. Close some first.");
+    }),
+  );
+
+  it.effect("refuses a member bot the boss's commands, including on its own item", () =>
+    Effect.gen(function* () {
+      const owned = makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID });
+      const finished = makeItem({ state: "review", ownerBotId: SPECIALIST_ID });
+
+      yield* fails(
+        decide(
+          botCmd(SPECIALIST_ID, {
+            type: "work-item.create",
+            commandId: CommandId.make("cmd-work-item.create"),
+            workItemId: ITEM_ID,
+            groupId: GROUP_ID,
+            title: "Mine now",
+            brief: "A member bot cannot open work.",
+            kind: "task",
+          }),
+          [owned],
+        ),
+      );
+
+      yield* fails(
+        decide(
+          botCmd(SPECIALIST_ID, {
+            type: "work-item.assign",
+            commandId: CommandId.make("cmd-work-item.assign"),
+            workItemId: ITEM_ID,
+            ownerBotId: OTHER_SPECIALIST_ID,
+          }),
+          [owned],
+        ),
+      );
+
+      yield* fails(
+        decide(
+          botCmd(SPECIALIST_ID, {
+            type: "work-item.close",
+            commandId: CommandId.make("cmd-work-item.close"),
+            workItemId: ITEM_ID,
+            resolution: "done",
+          }),
+          [finished],
+        ),
+      );
+
+      yield* fails(
+        decide(
+          botCmd(SPECIALIST_ID, {
+            type: "work-item.reopen",
+            commandId: CommandId.make("cmd-work-item.reopen"),
+            workItemId: ITEM_ID,
+          }),
+          [makeItem({ state: "done", ownerBotId: SPECIALIST_ID, doneAt: NOW })],
+        ),
+      );
+    }),
+  );
+
+  it.effect("refuses the bot wrapper for a bot outside the group", () =>
+    fails(
+      decide(
+        botCmd(OTHER_SPECIALIST_ID, {
           type: "work-item.update",
           commandId: CommandId.make("cmd-work-item.update"),
           workItemId: ITEM_ID,
           title: "Renamed",
-          actorBotId,
+        }),
+        [makeItem({ state: "assigned", ownerBotId: OTHER_SPECIALIST_ID })],
+      ),
+    ),
+  );
+
+  it.effect("lets a bot change only the items it owns, and the boss change anything", () =>
+    Effect.gen(function* () {
+      const item = makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID });
+
+      const update = (actorBotId: BotId) =>
+        botCmd(actorBotId, {
+          type: "work-item.update",
+          commandId: CommandId.make("cmd-work-item.update"),
+          workItemId: ITEM_ID,
+          title: "Renamed",
         });
 
       yield* decide(update(SPECIALIST_ID), [item]);

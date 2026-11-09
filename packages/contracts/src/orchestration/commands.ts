@@ -11,7 +11,7 @@ import {
   TurnId,
 } from "../baseSchemas.ts";
 import { IsnadiDelegationRecord } from "../isnadiDelegation.ts";
-import { ClientWorkItemCommand } from "./workItems.ts";
+import { BotWorkItemCommand, ClientWorkItemCommand } from "./workItems.ts";
 import { ClientRoutineCommand, InternalRoutineCommand } from "../routines.ts";
 import { ChatAttachment } from "./attachments.ts";
 import {
@@ -364,6 +364,7 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadTitleRegenerationCompleteCommand,
   DelegationCreateCommand,
   DelegationStateSetCommand,
+  BotWorkItemCommand,
 ]);
 
 export type InternalOrchestrationCommand = typeof InternalOrchestrationCommand.Type;

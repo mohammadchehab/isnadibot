@@ -119,6 +119,8 @@ export function itemForCommand(
       case "work-item.close":
       case "work-item.reopen":
         return `work-item:${command.workItemId}`;
+      case "work-item.bot-act":
+        return `work-item:${command.command.workItemId}`;
       default:
         return `thread:${command.threadId}`;
     }

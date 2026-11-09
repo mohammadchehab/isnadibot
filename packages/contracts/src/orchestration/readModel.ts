@@ -223,6 +223,9 @@ export const OrchestrationShellStreamEvent = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("work-item-removed"),
     sequence: NonNegativeInt,
+    // The id alone cannot tell a scoped client which space it lost the item from,
+    // so a removal carries the same groupId its upsert did.
+    groupId: GroupId,
     workItemId: WorkItemId,
   }),
   Schema.Struct({

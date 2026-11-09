@@ -24,6 +24,9 @@ const closedId = WorkItemId.make("work-item-2");
 
 const deletedId = WorkItemId.make("work-item-3");
 
+/** A different space, so the removal assertion proves groupId comes from the event, not the item. */
+const otherGroupId = GroupId.make("group-2");
+
 const openItem: WorkItem = {
   id: workItemId,
   groupId: GroupId.make("group-1"),
@@ -66,7 +69,7 @@ it.layer(NodeServices.layer)("shell stream work items", (it) => {
         {
           ...envelope(3, deletedId),
           type: "work-item.deleted",
-          payload: { workItemId: deletedId, groupId: openItem.groupId, deletedAt: now },
+          payload: { workItemId: deletedId, groupId: otherGroupId, deletedAt: now },
         } satisfies Extract<OrchestrationEvent, { type: "work-item.deleted" }>,
       ];
 
@@ -92,8 +95,18 @@ it.layer(NodeServices.layer)("shell stream work items", (it) => {
 
       assert.deepEqual(Array.from(items), [
         { kind: "work-item-upserted", sequence: 1, workItem: toWorkItemSummary(openItem) },
-        { kind: "work-item-removed", sequence: 2, workItemId: closedId },
-        { kind: "work-item-removed", sequence: 3, workItemId: deletedId },
+        {
+          kind: "work-item-removed",
+          sequence: 2,
+          groupId: openItem.groupId,
+          workItemId: closedId,
+        },
+        {
+          kind: "work-item-removed",
+          sequence: 3,
+          groupId: otherGroupId,
+          workItemId: deletedId,
+        },
       ]);
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );

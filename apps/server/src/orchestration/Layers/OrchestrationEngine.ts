@@ -133,6 +133,11 @@ function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateR
         aggregateKind: "work-item",
         aggregateId: command.workItemId,
       };
+    case "work-item.bot-act":
+      return {
+        aggregateKind: "work-item",
+        aggregateId: command.command.workItemId,
+      };
     case "routine.create-approved":
     case "routine.draft":
     case "routine.approve":

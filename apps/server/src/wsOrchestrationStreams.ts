@@ -126,6 +126,7 @@ export const createWsOrchestrationStreams = ({
             ? Option.some({
                 kind: "work-item-removed" as const,
                 sequence: event.sequence,
+                groupId: workItem.groupId,
                 workItemId: workItem.id,
               })
             : Option.some({
@@ -141,6 +142,7 @@ export const createWsOrchestrationStreams = ({
           Option.some({
             kind: "work-item-removed" as const,
             sequence: event.sequence,
+            groupId: event.payload.groupId,
             workItemId: event.payload.workItemId,
           }),
         );

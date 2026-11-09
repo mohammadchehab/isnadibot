@@ -2,7 +2,8 @@ import {
   isGroupBotMember,
   WORK_ITEM_OPEN_LIMIT,
   type BotId,
-  type OrchestrationCommand,
+  type ClientWorkItemCommand,
+  type CommandId,
   type OrchestrationGroup,
   type OrchestrationReadModel,
   type WorkItem,
@@ -15,7 +16,22 @@ import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine
 import { requireGroup, requireGroupWorkItemMutationAuthorized } from "../commandInvariants.ts";
 import { type PlannedOrchestrationEvent, nowIso, withEventBase } from "./eventBase.ts";
 
-type WorkItemCommand = Extract<OrchestrationCommand, { readonly type: `work-item.${string}` }>;
+/**
+ * Who is issuing the command. A client is always a person; a bot arrives only
+ * through the server-built `work-item.bot-act` wrapper, never from a payload.
+ */
+type WorkItemActor =
+  | { readonly kind: "user"; readonly dispatch: OrchestrationDispatchActor | undefined }
+  | { readonly kind: "bot"; readonly botId: BotId };
+
+type WorkItemCommand = ClientWorkItemCommand;
+
+/** A member bot may only move its own item forward; everything else is the boss's call. */
+const MEMBER_BOT_COMMANDS: ReadonlySet<WorkItemCommand["type"]> = new Set([
+  "work-item.update",
+  "work-item.block",
+  "work-item.unblock",
+]);
 
 const isOpen = (item: WorkItem) => item.state !== "done" && item.state !== "closed";
 
@@ -46,18 +62,26 @@ function isGroupMemberBot(group: OrchestrationGroup, botId: BotId) {
   return group.members.some((member) => isGroupBotMember(member) && member.botId === botId);
 }
 
-/** A bot changes only its own items; the boss changes anything; a user needs group access. */
+/**
+ * A bot changes only its own items, and a member only by moving them through
+ * `update`, `block` and `unblock`; the boss changes anything. A person needs
+ * group access.
+ */
 function requireActorAllowed(input: {
   readonly command: WorkItemCommand;
   readonly group: OrchestrationGroup;
   readonly item: WorkItem | undefined;
-  readonly actor: OrchestrationDispatchActor | undefined;
+  readonly actor: WorkItemActor;
 }) {
-  const botId = input.command.actorBotId;
-
-  if (botId === undefined) {
-    return requireGroupWorkItemMutationAuthorized(input);
+  if (input.actor.kind === "user") {
+    return requireGroupWorkItemMutationAuthorized({
+      command: input.command,
+      group: input.group,
+      actor: input.actor.dispatch,
+    });
   }
+
+  const botId = input.actor.botId;
 
   if (!isGroupMemberBot(input.group, botId)) {
     return Effect.fail(
@@ -65,20 +89,31 @@ function requireActorAllowed(input: {
     );
   }
 
-  if (
-    botId === input.group.bossBotId ||
-    input.item === undefined ||
-    input.item.ownerBotId === botId
-  ) {
-    return Effect.void;
+  if (botId === input.group.bossBotId) return Effect.void;
+
+  if (!MEMBER_BOT_COMMANDS.has(input.command.type)) {
+    return Effect.fail(
+      reject(
+        input.command,
+        `Only the boss of group '${input.group.id}' can run '${input.command.type}'.`,
+      ),
+    );
   }
 
-  return Effect.fail(
-    reject(
-      input.command,
-      `Bot '${botId}' neither owns work item '${input.item.id}' nor is its boss.`,
-    ),
-  );
+  if (input.item === undefined) {
+    return Effect.fail(reject(input.command, `Bot '${botId}' has no work item to change.`));
+  }
+
+  if (input.item.ownerBotId !== botId) {
+    return Effect.fail(
+      reject(
+        input.command,
+        `Bot '${botId}' neither owns work item '${input.item.id}' nor is its boss.`,
+      ),
+    );
+  }
+
+  return Effect.void;
 }
 
 /** The item's carried-over fields; each transition decides which of owner, block and finish data survive. */
@@ -110,12 +145,15 @@ function carry(
 
 export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
   command,
+  commandId,
   readModel,
   actor,
 }: {
   readonly command: WorkItemCommand;
+  /** The dispatched command's id; a bot wrapper tags its events with its own id. */
+  readonly commandId: CommandId;
   readonly readModel: OrchestrationReadModel;
-  readonly actor?: OrchestrationDispatchActor;
+  readonly actor: WorkItemActor;
 }): Effect.fn.Return<
   ReadonlyArray<PlannedOrchestrationEvent>,
   OrchestrationCommandInvariantError | PlatformError.PlatformError,
@@ -131,7 +169,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       aggregateKind: "work-item",
       aggregateId: workItem.id,
       occurredAt,
-      commandId: command.commandId,
+      commandId,
     });
 
     // SAFETY: every non-deleted work-item event type carries `{ workItem }`, which is what `type` is limited to here.
@@ -193,7 +231,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       return yield* changed("work-item.assigned", {
         ...cleared,
         ownerBotId: command.ownerBotId,
-        ...(command.actorBotId !== undefined ? { assignedByBotId: command.actorBotId } : {}),
+        ...(actor.kind === "bot" ? { assignedByBotId: actor.botId } : {}),
         state: "assigned",
         ...touch,
       });
@@ -258,6 +296,17 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
     case "work-item.reopen": {
       if (isOpen(item))
         return yield* reject(command, "Only a done or closed item can be reopened.");
+
+      if (
+        (readModel.workItems ?? []).filter(
+          (candidate) => candidate.groupId === group.id && isOpen(candidate),
+        ).length >= WORK_ITEM_OPEN_LIMIT
+      ) {
+        return yield* reject(
+          command,
+          `This space has ${WORK_ITEM_OPEN_LIMIT} open items. Close some first.`,
+        );
+      }
 
       return yield* changed("work-item.reopened", {
         ...carry(item, { finish: true }),

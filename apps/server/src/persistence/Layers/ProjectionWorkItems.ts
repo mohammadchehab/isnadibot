@@ -91,11 +91,18 @@ const makeProjectionWorkItemRepository = Effect.gen(function* () {
 
   const get = (input: WorkItemGetInput) =>
     Effect.gen(function* () {
-      const [row] = yield* sql<{ readonly record_json: string }>`
-        SELECT record_json FROM projection_work_items WHERE work_item_id = ${input.workItemId}
+      const [row] = yield* sql<{
+        readonly record_json: string;
+        readonly group_id: string | null;
+      }>`
+        SELECT record_json, group_id FROM projection_work_items WHERE work_item_id = ${input.workItemId}
       `;
 
-      if (row === undefined) return yield* Effect.fail({ message: "Work item not found." });
+      // An item with no owning space is not readable; the read stays id-based until
+      // member scoping lands. Member scope: TASK-164 narrows this by `row.group_id`.
+      if (row === undefined || row.group_id === null) {
+        return yield* Effect.fail({ message: "Work item not found." });
+      }
 
       return yield* decodeWorkItem(row.record_json);
     }).pipe(

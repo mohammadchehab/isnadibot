@@ -38,6 +38,7 @@ describe("applyShellStreamEvent", () => {
       const removed = applyShellStreamEvent(replaced, {
         kind: "work-item-removed",
         sequence: 3,
+        groupId: item.groupId,
         workItemId: item.id,
       });
 
