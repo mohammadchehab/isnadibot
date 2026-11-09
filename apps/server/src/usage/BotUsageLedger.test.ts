@@ -410,4 +410,138 @@ it.layer(layer)("BotUsageLedger", (it) => {
       ]);
     }),
   );
+
+  it.effect("counts every turn in the window past the entry list cap", () =>
+    Effect.gen(function* () {
+      const ledger = yield* BotUsageLedger;
+      const botId = BotId.make("bot-window-cap");
+      const createdAt = "2026-08-30T20:00:00.000Z";
+
+      // 250 entries against 90 turns: 90 carry a turn id and 160 do not, so the
+      // windowed turn count must come from SQL rather than the 200-entry list.
+      yield* Effect.forEach(
+        Array.from({ length: 250 }, (_, index) => index),
+        (index) =>
+          Effect.gen(function* () {
+            const reservation = yield* ledger.reserve(
+              reserveInput(`cap-${index}`, {
+                botId,
+                turnId: index < 90 ? TurnId.make(`turn-${index}`) : null,
+                maximumTokens: 10,
+                createdAt,
+              }),
+            );
+
+            yield* ledger.settle({
+              reservationId: reservation.reservationId,
+              state: "reported",
+              inputTokens: 4,
+              outputTokens: 1,
+              reasoningTokens: null,
+              settledAt: "2026-08-30T20:01:00.000Z",
+            });
+          }),
+      );
+
+      const summary = yield* ledger.summarize(botId, { since: "2026-08-01T00:00:00.000Z" });
+
+      assert.equal(summary.entries.length, 200);
+      assert.deepEqual(summary.window, {
+        since: "2026-08-01T00:00:00.000Z",
+        turns: 90,
+        tokens: 1_250,
+      });
+    }),
+  );
+
+  it.effect("omits the window when the reader does not ask for one", () =>
+    Effect.gen(function* () {
+      const ledger = yield* BotUsageLedger;
+      const summary = yield* ledger.summarize(BotId.make("bot-no-window"));
+
+      assert.equal(summary.window, undefined);
+    }),
+  );
+
+  it.effect("excludes entries created before the window opens", () =>
+    Effect.gen(function* () {
+      const ledger = yield* BotUsageLedger;
+      const botId = BotId.make("bot-window-cutoff");
+
+      yield* Effect.forEach(
+        [
+          { key: "cutoff-before", turn: "turn-before", createdAt: "2026-08-01T00:00:00.000Z" },
+          { key: "cutoff-boundary", turn: "turn-boundary", createdAt: "2026-08-10T00:00:00.000Z" },
+          { key: "cutoff-after", turn: "turn-after", createdAt: "2026-08-20T00:00:00.000Z" },
+        ],
+        (seed) =>
+          Effect.gen(function* () {
+            const reservation = yield* ledger.reserve(
+              reserveInput(seed.key, {
+                botId,
+                turnId: TurnId.make(seed.turn),
+                maximumTokens: 10,
+                createdAt: seed.createdAt,
+              }),
+            );
+
+            yield* ledger.settle({
+              reservationId: reservation.reservationId,
+              state: "reported",
+              inputTokens: 4,
+              outputTokens: 1,
+              reasoningTokens: null,
+              settledAt: seed.createdAt,
+            });
+          }),
+      );
+
+      const summary = yield* ledger.summarize(botId, { since: "2026-08-10T00:00:00.000Z" });
+
+      assert.equal(summary.window?.turns, 2);
+      assert.equal(summary.window?.tokens, 10);
+    }),
+  );
+
+  it.effect("normalises an offset instant before comparing", () =>
+    Effect.gen(function* () {
+      const ledger = yield* BotUsageLedger;
+      const botId = BotId.make("bot-window-offset");
+
+      const reservation = yield* ledger.reserve(
+        reserveInput("offset-entry", {
+          botId,
+          turnId: TurnId.make("turn-offset"),
+          maximumTokens: 10,
+          createdAt: "2026-08-10T00:00:00.000Z",
+        }),
+      );
+
+      yield* ledger.settle({
+        reservationId: reservation.reservationId,
+        state: "reported",
+        inputTokens: 4,
+        outputTokens: 1,
+        reasoningTokens: null,
+        settledAt: "2026-08-10T00:00:00.000Z",
+      });
+
+      const summary = yield* ledger.summarize(botId, { since: "2026-08-10T02:00:00.000+02:00" });
+
+      assert.equal(summary.window?.since, "2026-08-10T00:00:00.000Z");
+      assert.equal(summary.window?.turns, 1);
+    }),
+  );
+
+  it.effect("rejects a since that is not an instant", () =>
+    Effect.gen(function* () {
+      const ledger = yield* BotUsageLedger;
+
+      const exit = yield* ledger
+        .summarize(BotId.make("bot-window-invalid"), { since: "yesterday" })
+        .pipe(Effect.exit);
+
+      assert.equal(exit._tag, "Failure");
+    }),
+  );
 });

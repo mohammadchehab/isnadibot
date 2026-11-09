@@ -108,5 +108,13 @@ export interface BotUsageLedgerShape {
   readonly recordStart: (
     input: Omit<ReserveBotUsageInput, "maximumTokens">,
   ) => Effect.Effect<IsnadiUsageEntry, BotUsageLedgerError>;
-  readonly summarize: (botId: BotId) => Effect.Effect<IsnadiBotUsageSummary, BotUsageLedgerError>;
+  /**
+   * Reads one bot's usage. `since` adds a `window` of turn and token totals
+   * counted in SQL, so a busy bot reports its full window even though `entries`
+   * stops at the newest 200.
+   */
+  readonly summarize: (
+    botId: BotId,
+    options?: { readonly since?: string },
+  ) => Effect.Effect<IsnadiBotUsageSummary, BotUsageLedgerError>;
 }

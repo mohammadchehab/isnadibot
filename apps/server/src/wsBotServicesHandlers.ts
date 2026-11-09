@@ -103,7 +103,9 @@ export const createWsBotServicesHandlers = ({
             });
           }
 
-          const summary = yield* botUsageLedger.summarize(input.botId).pipe(
+          const options = input.since === undefined ? {} : { since: input.since };
+
+          const summary = yield* botUsageLedger.summarize(input.botId, options).pipe(
             Effect.mapError(
               (cause) =>
                 new IsnadiBotUsageReadError({
