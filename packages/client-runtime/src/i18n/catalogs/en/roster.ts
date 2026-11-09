@@ -356,4 +356,9 @@ export const rosterCatalog = {
   "Skills for this space show here.": "Skills for this space show here.",
   "Files you add to this space show here.": "Files you add to this space show here.",
   "Group chat": "Group chat",
+  "{count} active": "{count} active",
+  "this week": "this week",
+  "{count} turn": "{count} turn",
+  "{count} turns": "{count} turns",
+  "Some bots could not report usage": "Some bots could not report usage",
 } as const;

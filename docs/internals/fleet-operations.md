@@ -200,9 +200,11 @@ The space view's Overview tab adds no server read model. Every tile derives from
 
 - **Decisions** come from `useDecisions`, filtered to the space.
 - **Routines** come from the shell snapshot's `routines`.
+- **Usage** sums each member's `bot.usage` window (`{ since, turns, tokens }`, read once the week
+  starts), and shows a placeholder while any member has not answered rather than a partial total.
 - **Activity** comes from thread shells, so rows show chat titles and not message text.
 
-The Tasks tile and board wait for TASK-87. The Usage tile waits for the bounded usage window, because a tile must never count loaded items.
+The Tasks tile and board wait for TASK-87.
 
 ## Contracts
 

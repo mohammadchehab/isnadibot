@@ -8,6 +8,7 @@ export interface SpaceGroup {
   readonly id: string;
   readonly bossBotId: string | null;
   readonly members: ReadonlyArray<{ readonly kind?: string; readonly botId?: string }>;
+  readonly updatedAt: string;
 }
 
 /** The parts of a routine the Overview reads. */
@@ -109,6 +110,21 @@ export function spaceActivity<
       return waiting !== 0 ? waiting : b.updatedAt.localeCompare(a.updatedAt);
     })
     .slice(0, limit);
+}
+
+/**
+ * When the space last moved: the group's own stamp or the newest decision or chat on it,
+ * whichever is later.
+ */
+export function spaceUpdatedAt(
+  group: SpaceGroup,
+  decisions: ReadonlyArray<{ readonly updatedAt: string }>,
+  activity: ReadonlyArray<{ readonly updatedAt: string }>,
+): string {
+  return [...decisions, ...activity].reduce(
+    (latest, item) => (Date.parse(item.updatedAt) > Date.parse(latest) ? item.updatedAt : latest),
+    group.updatedAt,
+  );
 }
 
 /** One member bot's answer for the space's usage window. */

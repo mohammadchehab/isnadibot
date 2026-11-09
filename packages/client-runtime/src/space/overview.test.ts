@@ -7,6 +7,7 @@ import {
   spaceDecisions,
   spaceMembers,
   spaceRoutines,
+  spaceUpdatedAt,
   spaceUsageTurns,
   weekStart,
   type SpaceGroup,
@@ -17,6 +18,7 @@ const group: SpaceGroup = {
   id: "g1",
   bossBotId: "boss",
   members: [{ kind: "bot", botId: "boss" }, { kind: "bot", botId: "a" }, { kind: "person" }],
+  updatedAt: "2026-11-01T00:00:00.000Z",
 };
 
 const decision = (botId: string | null, groupId: string | null): Decision => {
@@ -90,6 +92,20 @@ describe("space overview", () => {
     expect(result).toHaveLength(20);
     expect(result[0]?.id).toBe("t0");
     expect(result[1]?.id).toBe("t29");
+  });
+
+  it("takes the newest stamp from the group, a decision, or a chat", () => {
+    expect(spaceUpdatedAt(group, [], [])).toBe("2026-11-01T00:00:00.000Z");
+    expect(
+      spaceUpdatedAt(group, [decision("boss", "g1")], [{ updatedAt: "2026-11-07T10:00:00.000Z" }]),
+    ).toBe("2026-11-07T10:00:00.000Z");
+    expect(
+      spaceUpdatedAt(
+        { ...group, updatedAt: "2026-11-09T00:00:00.000Z" },
+        [decision("a", null)],
+        [],
+      ),
+    ).toBe("2026-11-09T00:00:00.000Z");
   });
 
   it("starts the week at Monday 00:00 local across a DST change", () => {

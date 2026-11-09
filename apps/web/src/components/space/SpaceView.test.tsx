@@ -25,6 +25,13 @@ function render(tab: SpaceTab) {
 }
 
 describe("SpaceView", () => {
+  it("carries the space name and the tabs in one top bar", () => {
+    const html = render("overview");
+
+    expect(html).toContain("Launch");
+    expect(html.indexOf("Launch")).toBeLessThan(html.indexOf("overview-body"));
+  });
+
   it("lists the four tabs", () => {
     const html = render("chat");
 
