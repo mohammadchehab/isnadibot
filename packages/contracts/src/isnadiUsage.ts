@@ -57,6 +57,22 @@ export const IsnadiUsageEntry = Schema.Struct({
 
 export type IsnadiUsageEntry = typeof IsnadiUsageEntry.Type;
 
+/**
+ * Totals over every ledger entry created at or after `since`, counted from the
+ * database rather than from the bounded `entries` list. Absent when the reader
+ * did not ask for a window.
+ */
+export const IsnadiBotUsageWindow = Schema.Struct({
+  /** Normalised UTC instant echoed back from the request. */
+  since: IsoDateTime,
+  /** Turns with at least one entry in the window. Entries with no turn are skipped. */
+  turns: NonNegativeInt,
+  /** Input plus output tokens reported in the window. */
+  tokens: NonNegativeInt,
+});
+
+export type IsnadiBotUsageWindow = typeof IsnadiBotUsageWindow.Type;
+
 export const IsnadiBotUsageSummary = Schema.Struct({
   botId: BotId,
   consumedTokens: NonNegativeInt,
@@ -68,11 +84,17 @@ export const IsnadiBotUsageSummary = Schema.Struct({
     reflector: Schema.Struct({ tokens: NonNegativeInt, unavailableEntries: NonNegativeInt }),
   }),
   entries: Schema.Array(IsnadiUsageEntry),
+  /** Present only when the request carried `since`, so older clients still decode. */
+  window: Schema.optional(IsnadiBotUsageWindow),
 });
 
 export type IsnadiBotUsageSummary = typeof IsnadiBotUsageSummary.Type;
 
-export const IsnadiBotUsageInput = Schema.Struct({ botId: BotId });
+export const IsnadiBotUsageInput = Schema.Struct({
+  botId: BotId,
+  /** Inclusive UTC instant as an ISO 8601 string. Asks for a windowed summary. */
+  since: Schema.optional(IsoDateTime),
+});
 
 export type IsnadiBotUsageInput = typeof IsnadiBotUsageInput.Type;
 

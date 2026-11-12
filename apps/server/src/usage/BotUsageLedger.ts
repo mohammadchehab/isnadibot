@@ -5,6 +5,7 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
@@ -485,8 +486,22 @@ const make = Effect.gen(function* () {
         ),
     );
 
-  const summarize: BotUsageLedgerShape["summarize"] = (botId) =>
+  const summarize: BotUsageLedgerShape["summarize"] = (botId, options) =>
     Effect.gen(function* () {
+      const windowSince =
+        options?.since === undefined
+          ? null
+          : yield* Option.match(DateTime.make(options.since), {
+              onNone: () =>
+                Effect.fail(
+                  new PersistenceSqlError({
+                    operation: "BotUsageLedger.summarize",
+                    detail: "since must be an ISO 8601 instant.",
+                  }),
+                ),
+              onSome: (since) => Effect.succeed(DateTime.formatIso(since)),
+            });
+
       const balances = yield* sql<{
         readonly consumedTokens: number;
         readonly reservedTokens: number;
@@ -535,8 +550,29 @@ const make = Effect.gen(function* () {
         FROM isnadi_bot_usage_entries WHERE bot_id = ${botId}
       `;
 
+      const windowed =
+        windowSince === null
+          ? []
+          : yield* sql<{ readonly turns: number; readonly tokens: number }>`
+              SELECT
+                COUNT(DISTINCT turn_id) AS "turns",
+                COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0)
+                  AS "tokens"
+              FROM isnadi_bot_usage_entries
+              WHERE bot_id = ${botId} AND created_at >= ${windowSince}
+            `;
+
       const entries = yield* Effect.forEach(rows, decodeEntry);
       const totals = measurements[0]!;
+
+      const window =
+        windowSince === null
+          ? null
+          : {
+              since: windowSince,
+              turns: windowed[0]?.turns ?? 0,
+              tokens: windowed[0]?.tokens ?? 0,
+            };
 
       return yield* decodeUsageSummary({
         botId,
@@ -558,10 +594,12 @@ const make = Effect.gen(function* () {
           },
         },
         entries,
+        ...(window === null ? {} : { window }),
       }).pipe(Effect.mapError(toPersistenceDecodeError("BotUsageLedger.summarize")));
     }).pipe(
       Effect.mapError((cause) =>
-        Predicate.isTagged(cause, "PersistenceDecodeError")
+        Predicate.isTagged(cause, "PersistenceDecodeError") ||
+        Predicate.isTagged(cause, "PersistenceSqlError")
           ? cause
           : toPersistenceSqlError("BotUsageLedger.summarize")(cause),
       ),
