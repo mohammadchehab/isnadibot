@@ -1,19 +1,25 @@
 import * as NodeNet from "node:net";
 
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import type { EgressOpenFrame } from "@isnadi/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
+import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
 import * as Predicate from "effect/Predicate";
 import * as Stream from "effect/Stream";
 
 import { serveEgressControl, toEgressTarget } from "./DesktopEgress.ts";
 import { denyAllHostPolicy as denyAll } from "./EgressDialer.ts";
+import * as EgressGrantStore from "./EgressGrantStore.ts";
 import type { EgressRevocation } from "./EgressGrantStore.ts";
 import { INBOUND_CHUNK_CAPACITY } from "./EgressLimits.ts";
 import type { EgressSocketLink } from "./EgressWebSocket.ts";
+
+const INSTANCE = "primary";
 
 const encode = (value: EgressOpenFrame | { readonly type: "nonsense" }) =>
   new TextEncoder().encode(JSON.stringify(value));
@@ -39,6 +45,18 @@ const makeControl = (frames: ReadonlyArray<Uint8Array>) => {
 };
 
 const openStream = () => Effect.die("no stream should open");
+
+const withStore = <A, E, R>(
+  body: (store: EgressGrantStore.DesktopEgressGrants["Service"]) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fileSystem.makeTempDirectoryScoped();
+    const store = yield* EgressGrantStore.make(path.join(directory, "egress-grants.json"));
+
+    return yield* body(store);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
 describe("serveEgressControl", () => {
   it.effect("refuses a host with no grant before any TCP", () =>
@@ -84,6 +102,70 @@ describe("serveEgressControl", () => {
 
       assert.deepStrictEqual(sent, []);
     }),
+  );
+
+  // The store's subscription is taken here, before the connection is served, so a revocation
+  // published while the connection is up still reaches it.
+  it.effect("a real binding drop ends the served connection", () =>
+    withStore((store) =>
+      Effect.gen(function* () {
+        yield* store.grant("p", { kind: "exact", host: "example.com" });
+        yield* store.setBinding(INSTANCE, ["p"]);
+
+        const dialed = yield* Deferred.make<void>();
+
+        const control: EgressSocketLink = {
+          send: () => Effect.void,
+          // The steps run from here so each one waits on the previous effect, never on a count of
+          // yields: open a stream, wait for its target, drop the profile, then stay open so only
+          // the revocation can end the connection.
+          run: (onMessage) =>
+            Effect.gen(function* () {
+              yield* onMessage(
+                encode({
+                  type: "open",
+                  streamId: "s1",
+                  ticket: "t1",
+                  host: "example.com",
+                  port: 443,
+                  profileId: "p",
+                }),
+                true,
+              );
+              yield* Deferred.await(dialed);
+              yield* store.setBinding(INSTANCE, []).pipe(Effect.orDie);
+
+              return yield* Effect.never;
+            }),
+          close: Effect.void,
+        };
+
+        const subscription = yield* store.subscribe;
+
+        // Returns only if the drop ended the served connection; otherwise the test times out.
+        yield* serveEgressControl({
+          control,
+          hostPolicy: store.policyFor(INSTANCE),
+          revocations: Stream.fromSubscription(subscription),
+          dial: () =>
+            Effect.sync(() => {
+              Deferred.doneUnsafe(dialed, Effect.void);
+
+              return {
+                run: () => Effect.never,
+                write: () => Effect.void,
+                destroy: Effect.void,
+              };
+            }),
+          openStream: () =>
+            Effect.succeed({
+              send: () => Effect.void,
+              run: () => Effect.never,
+              close: Effect.void,
+            }),
+        });
+      }),
+    ),
   );
 });
 
