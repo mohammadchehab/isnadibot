@@ -361,6 +361,9 @@ importers:
       expo-quick-actions:
         specifier: ^6.0.2
         version: 6.0.2(expo@56.0.12)(typescript@6.0.3)
+      expo-screen-capture:
+        specifier: ~56.0.5
+        version: 56.0.5(expo@56.0.12)(react@19.2.3)
       expo-secure-store:
         specifier: ~56.0.4
         version: 56.0.4(expo@56.0.12)
@@ -8503,6 +8506,12 @@ packages:
         optional: true
       react-server-dom-webpack:
         optional: true
+
+  expo-screen-capture@56.0.5:
+    resolution: {integrity: sha512-Ufp4okMwV17k2Zhgg/S3MPFkziuFmtJ9gr4Wd2QfhfH9vQbsxk0BbttEwzcD+YTUp63X+fbeiSSJlXuvrKMBWQ==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
 
   expo-secure-store@56.0.4:
     resolution: {integrity: sha512-hjEi/gmpdFFJ9lYbdp3k3p/WchV7Gi0Qt8jt/m/0WJadqQrskafHAlDxbZkII1cN3Yd7zp9Lvkeq3UfGhSwirQ==}
@@ -22036,6 +22045,11 @@ snapshots:
       - react-native-worklets
       - supports-color
     optional: true
+
+  expo-screen-capture@56.0.5(expo@56.0.12)(react@19.2.3):
+    dependencies:
+      expo: 56.0.12(8895228379997a2a064f9644cda56ed0)
+      react: 19.2.3
 
   expo-secure-store@56.0.4(expo@56.0.12):
     dependencies:
