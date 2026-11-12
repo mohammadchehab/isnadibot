@@ -179,9 +179,12 @@ today.
 | S4    | Mobile: member home, reduced Settings, and the member's own pairing screen                                                                                                                                       | F4 ×5 states, F8 (seven `PairingPanel` states) | F4 light; **F8 not drawn**          |
 | S5    | Group people list naming the full-access bots, the acknowledgement before an assign, the three reverse cases, the member's own leave                                                                             | G2, G3                                         | **not drawn**; G3 waits decision-54 |
 
+Mohammad is creating the S1 and S2 cards; this table is what each card will say.
+
 S1 and S2 can start now, because every frame they need is drawn in light. S3, S4's pairing screen and
-S5 wait for the designer, who is blocked on Figma MCP in her session rather than on the file. When
-S1 lands its dev principal bar, S4's home can start on F4 in parallel; only its pairing screen waits.
+S5 wait for the designer, who is blocked on Figma MCP in her session rather than on the file. F6 and
+F7 come first: they are what S3 cannot start without. When S1 lands its dev principal bar, S4's home
+can start on F4 in parallel; only its pairing screen waits.
 
 S2 and S3 split where they do on purpose. The earlier sketch had the bot presentation subset in S2,
 which would have held the whole member shell on F5. F5's states — waiting on an approval a member
@@ -221,12 +224,12 @@ Each slice's fixtures cover every state in that slice's frames and nothing beyon
 ### What PR 1a waits for
 
 PR 1a is `feat/session-principal`: contracts, the principal on links and sessions, the migration, and
-no UI. It needs no frame. Four things stand between it and a branch today, and only the first is a
-decision.
+no UI. It needs no frame. Four things stood between it and a branch; the first is now settled and the
+other three are logistics.
 
-1. **The screens-first gate (Q2).** Decision-53 holds it like any other contracts and migration PR,
-   and the default in this plan is that it waits. An exception is Mohammad's to give, and it belongs
-   in a board decision, like decision-45 and decision-46, rather than in a queue note.
+1. **The screens-first gate (Q2, answered).** No exception. Decision-53 holds PR 1a like any other
+   contracts and migration PR, so it waits behind the screens-first go and needs no decision of its
+   own.
 2. **The work already written.** `.claude/worktrees/per-person-scoping` holds 27 uncommitted files
    against the contracts and the `EnvironmentAuth*` family (~550 lines) on a base at #144, and
    `feat/session-principal` exists with no commits ahead of main. Engineer-2 lands or drops that
@@ -274,8 +277,9 @@ any invite-a-person UI (decision-46).
 
 - **Q1** (Mohammad): may a member answer approvals (including `ask_user` questions) in their groups?
   Answered by decision-45: no, and S3 draws it that way.
-- **Q2** (Mohammad): does PR 1a get an exception from the screens-first gate, or wait? Default: wait.
-  [What PR 1a waits for](#what-pr-1a-waits-for) lists the rest.
+- **Q2** (Mohammad): does PR 1a get an exception from the screens-first gate, or wait? Answered: no
+  exception; decision-53 stands and PR 1a waits behind the screens-first go. No board decision is
+  being drafted for it. [What PR 1a waits for](#what-pr-1a-waits-for) lists the rest.
 - **Q3** (security-architect, already accepted): assigning a person into a group with a full-access
   bot warns and requires an acknowledgement naming those bots, and the same acknowledgement applies
   to adding a full-access bot to a group with people and to switching a group bot to full access.
