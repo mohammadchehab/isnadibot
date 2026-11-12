@@ -156,6 +156,10 @@
       "types": "./src/state/computerViewer.ts",
       "default": "./src/state/computerViewer.ts"
     },
+    "./state/computer-viewer-cover": {
+      "types": "./src/state/computerViewerCover.ts",
+      "default": "./src/state/computerViewerCover.ts"
+    },
     "./state/computer-viewer-controller": {
       "types": "./src/state/computerViewerController.ts",
       "default": "./src/state/computerViewerController.ts"
