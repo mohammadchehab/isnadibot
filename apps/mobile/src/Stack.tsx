@@ -17,6 +17,7 @@ import { getCompactBrandHeaderOptions } from "./components/CompactBrandTitle";
 import { useAgentNotificationNavigation } from "./features/agent-awareness/notificationNavigation";
 import { AdaptiveWorkspaceLayout } from "./features/layout/AdaptiveWorkspaceLayout";
 import { HardwareKeyboardCommandProvider } from "./features/keyboard/HardwareKeyboardCommandProvider";
+import { ComputerViewerRouteScreen } from "./features/computer/ComputerViewerRouteScreen";
 import { ThreadRouteScreen } from "./features/threads/ThreadRouteScreen";
 import { ConnectionsRouteScreen } from "./features/connection/ConnectionsRouteScreen";
 import { ConnectionsNewRouteScreen } from "./features/connection/ConnectionsNewRouteScreen";
@@ -51,6 +52,7 @@ const THREAD_LINKING_PREFIX = "threads/:environmentId/:threadId";
 // influence the adaptive workspace layout: opening Settings over Home should
 // not flip the sidebar in or change the active thread.
 const WORKSPACE_OVERLAY_ROUTES = new Set([
+  "ComputerViewer",
   "Connections",
   "ConnectionsNew",
   "NewTaskSheet",
@@ -225,6 +227,18 @@ export const RootStack = createNativeStackNavigator({
               sheetAllowedDetents: [0.7, 0.92],
               sheetGrabberVisible: true,
             }),
+      },
+    }),
+    ComputerViewer: createNativeStackScreen({
+      screen: ComputerViewerRouteScreen,
+      options: {
+        gestureEnabled: true,
+        headerShown: false,
+        // A computer is watched full screen on both platforms; there is nothing behind it to
+        // read while the viewer is open.
+        ...(Platform.OS === "android"
+          ? { presentation: "card" as const }
+          : { presentation: "fullScreenModal" as const }),
       },
     }),
     SettingsLegal: createNativeStackScreen({

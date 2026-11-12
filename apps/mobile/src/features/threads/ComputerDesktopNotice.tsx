@@ -1,10 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useNavigation } from "@react-navigation/native";
 import type { BotId, EnvironmentId, ThreadId } from "@isnadi/contracts";
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
+import { ControlPill } from "../../components/ControlPill";
+import { DEV_FIXTURES_ENABLED } from "../../dev-fixtures";
 import { useMobileI18n } from "../../lib/i18n";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { environmentBotsAtom } from "../../state/bots";
@@ -12,8 +15,8 @@ import { computerEnvironment } from "../../state/computer";
 import { useEnvironmentQuery } from "../../state/query";
 
 /**
- * Mobile does not stream or control a bot's computer. When one is running it
- * says so and points to the desktop and web clients, which own the viewer.
+ * Shows that a bot's computer is running, with the way into the phone's live view. The bar takes
+ * the place of the composer's usual notice only while there is a computer to watch.
  */
 export function ComputerDesktopNotice(props: {
   readonly environmentId: EnvironmentId;
@@ -23,6 +26,7 @@ export function ComputerDesktopNotice(props: {
   readonly turnActivity: string;
 }) {
   const { t } = useMobileI18n();
+  const navigation = useNavigation();
   const iconColor = useThemeColor("--color-icon-subtle");
   const bots = useAtomValue(environmentBotsAtom(props.environmentId));
   const bot = props.botId === null ? null : bots.find((entry) => entry.id === props.botId);
@@ -48,16 +52,26 @@ export function ComputerDesktopNotice(props: {
   if (!bot || (state?.status !== "ready" && state?.status !== "human")) return null;
 
   return (
-    <View className="mx-4 mb-2 flex-row items-start gap-2 rounded-xl border border-border-subtle bg-card px-3 py-2">
+    <View className="mx-4 mb-2 flex-row items-center gap-2 rounded-xl border border-border-subtle bg-card px-3 py-2">
       <SymbolView name="desktopcomputer" size={14} tintColor={iconColor} type="monochrome" />
-      <View className="flex-1">
-        <Text className="text-sm font-t3-medium text-foreground">
-          {t("{name}'s computer is running", { name: bot.name })}
-        </Text>
-        <Text className="text-xs text-foreground-muted">
-          {t("Open IsnadiBot on a desktop or in a web browser to watch or take control of it.")}
-        </Text>
-      </View>
+      <Text className="flex-1 text-sm font-t3-medium text-foreground" numberOfLines={2}>
+        {t("{name}'s computer is running", { name: bot.name })}
+      </Text>
+      {/* The live view still runs on fixture frames (decision-53), so a release build has no way
+          in and does not offer one. */}
+      {DEV_FIXTURES_ENABLED ? (
+        <ControlPill
+          variant="primary"
+          label={t("Watch")}
+          icon="play.rectangle"
+          onPress={() => {
+            navigation.navigate("ComputerViewer", {
+              threadId: props.threadId,
+              botName: bot.name,
+            });
+          }}
+        />
+      ) : null}
     </View>
   );
 }

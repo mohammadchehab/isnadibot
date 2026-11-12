@@ -5,19 +5,12 @@ import {
   type ComputerViewerState,
 } from "@isnadi/client-runtime/state/computer-viewer";
 import {
+  applyUnavailableRecheck,
+  computerViewerOutcome,
   createComputerViewerController,
   type ComputerViewerController,
-  type ComputerViewerOutcome,
 } from "@isnadi/client-runtime/state/computer-viewer-controller";
-import type { AtomCommandResult } from "@isnadi/client-runtime/state/runtime";
-import {
-  COMPUTER_SESSION_TTL_MS,
-  ComputerError,
-  type ComputerState,
-  type ScopedThreadRef,
-} from "@isnadi/contracts";
-import * as Cause from "effect/Cause";
-import * as Schema from "effect/Schema";
+import { COMPUTER_SESSION_TTL_MS, type ScopedThreadRef } from "@isnadi/contracts";
 import { useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { computerEnvironment } from "~/state/computer";
@@ -25,32 +18,8 @@ import { useEnvironmentConnectionState } from "~/state/environments";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
-const isComputerError = Schema.is(ComputerError);
-
 /** How often an open viewer asks again for a computer that has not started yet. */
 const UNAVAILABLE_RECHECK_MS = 5_000;
-
-/** Adapts an RPC command result into the controller's outcome, keeping the server's error code. */
-export function computerViewerOutcome<A, E>(
-  result: AtomCommandResult<A, E>,
-): ComputerViewerOutcome<A> {
-  if (Predicate.isTagged(result, "Success")) return { ok: true, value: result.value };
-  const error = Cause.squash(result.cause);
-
-  return { ok: false, code: isComputerError(error) ? error.code : "adapter" };
-}
-
-/**
- * Applies a recheck made while the computer looked unavailable. A recheck that
- * returns after the computer appeared is stale and must not hide it.
- */
-export function applyUnavailableRecheck(
-  controller: Pick<ComputerViewerController, "dispatch" | "getState">,
-  state: ComputerState,
-): void {
-  if (controller.getState().server?.status !== "unavailable") return;
-  controller.dispatch({ type: "server-state", state });
-}
 
 function usePageVisible(): boolean {
   return useSyncExternalStore(

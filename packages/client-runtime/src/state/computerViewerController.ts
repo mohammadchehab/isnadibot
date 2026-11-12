@@ -1,10 +1,12 @@
+import * as Cause from "effect/Cause";
 import * as Predicate from "effect/Predicate";
-import type {
-  ComputerAction,
+import * as Schema from "effect/Schema";
+import {
   ComputerError,
-  ComputerEvent,
-  ComputerSession,
-  ComputerState,
+  type ComputerAction,
+  type ComputerEvent,
+  type ComputerSession,
+  type ComputerState,
 } from "@isnadi/contracts";
 
 import {
@@ -13,6 +15,9 @@ import {
   type ComputerViewerEvent,
   type ComputerViewerState,
 } from "./computerViewer.ts";
+import type { AtomCommandResult } from "./runtime.ts";
+
+const isComputerError = Schema.is(ComputerError);
 
 export type ComputerViewerFailure = ComputerError["code"] | "transport";
 
@@ -260,4 +265,26 @@ export function createComputerViewerController(options: {
       void drain();
     },
   };
+}
+
+/** Adapts an RPC command result into the controller's outcome, keeping the server's error code. */
+export function computerViewerOutcome<A, E>(
+  result: AtomCommandResult<A, E>,
+): ComputerViewerOutcome<A> {
+  if (Predicate.isTagged(result, "Success")) return { ok: true, value: result.value };
+  const error = Cause.squash(result.cause);
+
+  return { ok: false, code: isComputerError(error) ? error.code : "adapter" };
+}
+
+/**
+ * Applies a recheck made while the computer looked unavailable. A recheck that
+ * returns after the computer appeared is stale and must not hide it.
+ */
+export function applyUnavailableRecheck(
+  controller: Pick<ComputerViewerController, "dispatch" | "getState">,
+  state: ComputerState,
+): void {
+  if (controller.getState().server?.status !== "unavailable") return;
+  controller.dispatch({ type: "server-state", state });
 }

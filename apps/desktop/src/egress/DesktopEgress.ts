@@ -11,6 +11,7 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 import { openEgressTarget, type EgressHostPolicy } from "./EgressDialer.ts";
 import * as EgressLimits from "./EgressLimits.ts";
@@ -50,24 +51,47 @@ const interfaceCidrs = (): ReadonlyArray<string> =>
     (entries ?? []).flatMap((entry) => (entry.cidr ? [entry.cidr] : [])),
   );
 
-/** Wraps a dialed socket so the provider can pump it. Reads are queued to stay in order. */
-const toEgressTarget = (socket: NodeNet.Socket): Effect.Effect<EgressProvider.EgressTarget> =>
+/**
+ * Wraps a dialed socket so the provider can pump it. Reads are queued to stay in order, and a peer
+ * that outruns the consumer stops being read once the queue is full. The queue is unbounded on
+ * purpose: a bounded one drops chunks when it is full, and a dropped chunk corrupts a TCP stream.
+ * `socket.pause()` is what bounds memory, and it bounds it to the queue's capacity.
+ */
+export const toEgressTarget = (
+  socket: NodeNet.Socket,
+): Effect.Effect<EgressProvider.EgressTarget> =>
   Effect.gen(function* () {
     const inbound = yield* Queue.unbounded<Uint8Array, Cause.Done>();
 
+    let paused = false;
+
     socket.on("data", (chunk) => {
       Queue.offerUnsafe(inbound, chunk);
+
+      // Counted, not peeked: the queue is unbounded, so its size is the buffered chunk count.
+      if (!paused && Queue.sizeUnsafe(inbound) >= EgressLimits.INBOUND_CHUNK_CAPACITY) {
+        paused = true;
+        socket.pause();
+      }
     });
     socket.once("close", () => {
       Queue.endUnsafe(inbound);
     });
     socket.on("error", () => socket.destroy());
 
+    const resumeNextChunk = Effect.sync(() => {
+      if (!paused) return;
+      paused = false;
+      socket.resume();
+    });
+
     return {
       run: (onData) =>
-        Effect.forever(Queue.take(inbound).pipe(Effect.flatMap(onData))).pipe(
-          Effect.catchIf(Cause.isDone, () => Effect.void),
-        ),
+        Effect.forever(
+          Queue.take(inbound).pipe(
+            Effect.flatMap((chunk) => resumeNextChunk.pipe(Effect.andThen(onData(chunk)))),
+          ),
+        ).pipe(Effect.catchIf(Cause.isDone, () => Effect.void)),
       write: (chunk) =>
         Effect.callback<void>((resume) => {
           socket.write(chunk, () => resume(Effect.void));
@@ -121,15 +145,36 @@ export const serveEgressControl = (input: {
 
     yield* Effect.forkScoped(provider.watchRevocations);
 
-    yield* input.control
-      .run((data, isText) => {
+    // A profile leaving the desktop's binding (a reset, an unpair) makes this connection's grants
+    // wrong, so the socket ends and the reconnect registers again from the store's current state.
+    // A single host revocation only ends that host's streams; it keeps the connection.
+    const bindingLost = input.revocations.pipe(
+      Stream.tap((revocation) =>
+        revocation.host === undefined
+          ? Effect.void
+          : Effect.logDebug("egress grant revoked; control socket kept", {
+              profileId: revocation.profileId,
+              host: revocation.host,
+            }),
+      ),
+      Stream.filter((revocation) => revocation.host === undefined),
+      Stream.runHead,
+      // A stream that ends is not a revocation, so only a real one ever ends the connection.
+      Effect.flatMap(Option.match({ onNone: () => Effect.never, onSome: () => Effect.void })),
+    );
+
+    yield* Effect.raceFirst(
+      input.control.run((data, isText) => {
         if (!isText) return Effect.void;
 
         const frame = decodeOpenFrame(Buffer.from(data).toString("utf8"));
 
         return Option.isSome(frame) ? provider.handleOpen(frame.value) : Effect.void;
-      })
-      .pipe(Effect.ensuring(provider.shutdown));
+      }),
+      bindingLost.pipe(
+        Effect.andThen(Effect.logDebug("egress control ending: a profile left the binding")),
+      ),
+    ).pipe(Effect.ensuring(provider.shutdown));
   }).pipe(Effect.scoped);
 
 const openStreamLink = (
