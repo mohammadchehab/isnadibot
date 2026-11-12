@@ -128,6 +128,7 @@ describe("DesktopEgressGrants", () => {
         // One wildcard on `github.io` would cover every unrelated site hosted there.
         for (const domain of ["github.io", "blogspot.com"]) {
           const error = yield* Effect.flip(store.grant("p", suffix(domain)));
+
           const reason = Predicate.isTagged(error, "EgressGrantInvalid")
             ? error.reason
             : error._tag;
