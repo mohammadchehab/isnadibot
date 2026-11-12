@@ -9,6 +9,7 @@ This is a living glossary for IsnadiBot. It explains what common terms mean in t
 - [Project and workspace](#project-and-workspace)
 - [Thread timeline](#thread-timeline)
 - [Roster organization](#roster-organization)
+- [Sessions and people](#sessions-and-people)
 - [Role and fleet template](#role-and-fleet-template)
 - [Orchestration](#orchestration)
 - [Channels](#channels)
@@ -86,6 +87,30 @@ It appears as a chat card and a bot inbox item, and either one decides it throug
 An automatically generated, inspectable summary of older content in one thread. It complements the
 recent complete-turn window and never acts as a writable group-wide memory store. See
 [memory architecture](memory.md).
+
+### Sessions and people
+
+#### Session principal
+
+`owner` or `member`, carried by a pairing link and copied onto the session it creates. It is separate
+from scopes: a session can hold the same two orchestration scopes whether it is the owner's phone or
+a paired person's. Owner sessions see the whole environment, exactly as before. Member sessions see
+and drive only the group chats they were added to, and those groups' bots. A link created without a
+principal is a member, and the client never negotiates the principal. See
+[person scoping](person-scoping.md).
+
+#### Person scope
+
+The resolved set (`groupIds`, `threadIds`, `botIds`) a member session may reach, computed by one
+resolver from group membership and recomputed when membership, a group or a thread changes. A
+resolver failure gives an empty scope, never owner.
+
+#### Member mode
+
+What the client renders for a member session: their groups' chats only, a bot's name, avatar, role
+and status but none of its configuration, and no owner entry points. Owner-only actions come back as
+`RpcForbidden` ("Only the owner can do this"), and a scope change ends the shell stream with
+`ShellScopeChanged` so the client resubscribes.
 
 ### Role and fleet template
 
@@ -355,6 +380,7 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 ## Related Docs
 
 - [Architecture overview][24]
+- [Environment authentication](./environment-auth.md) and [person scoping](./person-scoping.md)
 - [Provider architecture][16]
 - [Permission modes][18]
 - [Workspace layout][2]

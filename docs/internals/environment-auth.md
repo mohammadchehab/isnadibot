@@ -17,6 +17,10 @@ boundary.
 Ordinary pairing credentials grant the two orchestration scopes. Administrative credentials also
 grant both access scopes.
 
+Scopes say what a session may do, not who is behind it: the owner's own phone holds the same two
+orchestration scopes as a paired friend's. Telling the two apart, and scoping what a paired person
+may read and operate, is the session principal in [person scoping](person-scoping.md).
+
 Older builds also granted `review:write` and `terminal:operate`. Stored sessions, pairing links, and
 tokens can still carry them, and older clients can still request them. The server accepts these
 retired scopes, grants nothing for them, and drops them when it decodes scopes
