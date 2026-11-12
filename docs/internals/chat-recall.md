@@ -265,8 +265,12 @@ Same rule as the skills registry: every screen reads recall settings from one mo
 settings RPC or a download command itself. Phase 1 replaces that module's implementation; no screen
 changes.
 
-Fixtures sit behind `import.meta.env.DEV`, so a shipped build has **no Chat recall screen at all** until
-phase 1. A switch that does nothing, next to privacy copy, is worse than a screen that is not there yet.
+Fixtures follow [the skills registry's seam rule](skills-registry.md#the-one-seam): the machine and the
+fixture source are plain modules in `client-runtime` that read no platform global and take the flag as an
+argument (web and desktop pass `import.meta.env.DEV`, mobile passes `__DEV__`), and `useRecallSettings`
+returns `unavailable` when no source is registered. S2's mobile mirror therefore mounts under the same rule,
+and a shipped build has **no Chat recall screen at all** until phase 1 — the section renders nothing for
+`unavailable`. A switch that does nothing, next to privacy copy, is worse than a screen that is not there yet.
 
 ### What the fixtures must cover
 

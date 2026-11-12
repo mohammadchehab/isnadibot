@@ -258,8 +258,11 @@ Same rule as the skills registry and chat recall:
   exports the request and flow hooks plus **the three site operations once** — Check, Sign in again, Sign
   out — so the page, the palette and the inbox item call the same code.
 - No screen calls `browser-auth.*` or the egress IPC itself.
-- Fixtures sit behind `import.meta.env.DEV`. In a shipped build no card and no Signed-in sites page exists
-  until phase 1, because there is no profile to show and a lying profile row is worse than no row.
+- Fixtures follow [the skills registry's seam rule](skills-registry.md#the-one-seam): the machine and the
+  fixture source read no platform global and take the flag as an argument (web and desktop pass
+  `import.meta.env.DEV`, mobile passes `__DEV__` for S4's native sheet), and the card, the page and the palette
+  render nothing when the seam returns `unavailable`. In a shipped build no card and no Signed-in sites page
+  exists until phase 1, because there is no profile to show and a lying profile row is worse than no row.
 - The Allowed hosts sheet is a desktop-process surface even on fixtures: it reads the granted hosts, never a
   host named by the server.
 
