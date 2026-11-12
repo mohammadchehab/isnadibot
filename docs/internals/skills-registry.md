@@ -311,9 +311,18 @@ Phase 0 touches `apps/web`, `apps/mobile` and `packages/client-runtime` only.
 - Until `packages/contracts/src/skills.ts` exists, the module declares its own `RegistrySkill` type, field for
   field with [Contracts](#contracts), and a comment saying to delete it when the contract lands. The swap stays
   mechanical.
-- Fixtures are behind `import.meta.env.DEV`, on by default in dev and absent from a production bundle. A dev
-  build shows the skills screens; a shipped build shows today's product. This is not a runtime feature flag: no
-  setting reveals or hides it, and nothing persists.
+- **Fixtures are gated at the platform entry, never inside `client-runtime`.** Phase 0 has mobile screens here
+  (S4) and in the other two screens-first features, and `packages/client-runtime` is shared with React Native,
+  which has no `import.meta.env`. So the seam is built in two parts. The machine and the fixture source are
+  plain modules under `client-runtime` that read no platform global and take the flag as an argument:
+  `createSkillRegistryFixture({ dev })` returns an empty source when `dev` is false. Each platform entry passes
+  its own flag — `import.meta.env.DEV` on web and desktop, `__DEV__` on mobile — and registers the source.
+  `useSkillRegistry` and `useBotSkills` read the registered source and return `unavailable` when there is none.
+- A screen that is given `unavailable` renders nothing, and so does the navigation row that owns it: no Space
+  tab, no Settings row, no `$` entries. A dev build shows the skills screens; a shipped build shows today's
+  product, because the source is empty rather than because a screen remembers to check a flag. The gate exists
+  once per platform instead of once per screen. This is not a runtime feature flag: no setting reveals or hides
+  it, and nothing persists.
 - In dev, `$` lists the fixture registry skills **in addition to** the provider snapshot's, so the existing
   paths stay clickable while the new ones are reviewed.
 

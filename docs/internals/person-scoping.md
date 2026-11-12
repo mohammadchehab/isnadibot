@@ -165,10 +165,12 @@ for this feature starts until Mohammad has clicked through and said go. Frames a
 | 4     | PR 2 `feat/member-scope`: resolver, shell filter and stream, member table, command gate, work items, assets, recall, HTTP routes | security review; must land before invite UX |
 | 5     | PR 3 `feat/member-client`: web, desktop and mobile screens replace the fixture source                                            | PR 2                                        |
 
-Fixtures are `import.meta.env.DEV` only: the S2–S4 screens must not exist in a production bundle
-while there is no enforcement behind them, because a switch that does nothing next to security copy
-is worse than an absent screen. A dev-only picker drives the fixture principal, so every frame state
-in TASK-171 is reachable without a server.
+Fixtures follow [the skills registry's seam rule](skills-registry.md#the-one-seam), so S4's mobile screens
+gate the same way S1's web screens do: the machine and the fixture source take the flag as an argument and
+each platform entry passes its own (web and desktop `import.meta.env.DEV`, mobile `__DEV__`). The S2–S4
+screens must not exist in a production bundle while there is no enforcement behind them, because a switch
+that does nothing next to security copy is worse than an absent screen. A dev-only picker drives the fixture
+principal, so every frame state in TASK-171 is reachable without a server.
 
 **One conflict to settle.** PR 1a is already assigned (TASK-164 notes, 2026-11-09) and predates the
 screen gate in its current queue position. It changes no behaviour, since every session migrates to

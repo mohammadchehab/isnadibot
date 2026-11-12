@@ -16,6 +16,7 @@ This is a living glossary for IsnadiBot. It explains what common terms mean in t
 - [Browser sign-in](#browser-sign-in)
 - [Fleet operations](#fleet-operations)
 - [Skills](#skills)
+- [Fixture seam](#fixture-seam)
 - [Provider runtime](#provider-runtime)
 - [Subscription provider](#subscription-provider)
 - [Image provider](#image-provider)
@@ -341,6 +342,16 @@ ones are approved. See [skill security](./skills-security.md).
 A skill folder the scan finds with no stored record: written by a clone, a sync client or another process rather
 than by Add skill. It is left out of every index and refused by both tools until the user adds it, which is how a
 Community skill's approval cannot be laundered by copying its files. See [skill security](./skills-security.md).
+
+### Fixture seam
+
+The one module a screens-first feature reads its data from while the server half does not exist yet. The machine
+and the fixture source live in `packages/client-runtime` and take the dev flag as an argument; each platform
+entry passes its own — `import.meta.env.DEV` on web and desktop, `__DEV__` on mobile — because the package is
+shared with React Native and must read no platform global. The seam reports `unavailable` when no source is
+registered, and a screen given `unavailable` renders nothing, navigation row included, so a shipped build shows
+today's product. Phase 1 replaces the seam's implementation and no screen changes. See
+[the skills registry](./skills-registry.md#the-one-seam).
 
 ## Provider runtime
 
