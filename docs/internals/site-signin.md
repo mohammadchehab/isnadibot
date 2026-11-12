@@ -47,16 +47,17 @@ creates an egress grant (TASK-34 AC5).
 ### The request (server state)
 
 The decider owns these. There is no `cancelled` state: Cancel on a bot's request returns it to `asking`,
-and Not now is the only decline.
+Cancel on an owner-started request ends it as `dismissed` (no bot is waiting on those), and Not now is the
+only decline.
 
-| State         | Meaning                                                        | Terminal |
-| ------------- | -------------------------------------------------------------- | -------- |
-| `asking`      | the owner has been asked; no flow has started                  | no       |
-| `in_progress` | one flow exists, with `startedBy`; carries a `submitting` flag | no       |
-| `signed_in`   | a profile was saved at `generation + 1`                        | yes      |
-| `failed`      | the flow ended with a failure class                            | yes      |
-| `dismissed`   | the owner pressed Not now                                      | yes      |
-| `expired`     | nobody answered, or the turn that was waiting ended            | yes      |
+| State         | Meaning                                                                    | Terminal |
+| ------------- | -------------------------------------------------------------------------- | -------- |
+| `asking`      | the owner has been asked; no flow has started                              | no       |
+| `in_progress` | one flow exists, named by `flowId`, with `startedBy`; carries `submitting` | no       |
+| `signed_in`   | a profile was saved at `generation + 1`                                    | yes      |
+| `failed`      | the flow ended with a failure class                                        | yes      |
+| `dismissed`   | the owner pressed Not now, or cancelled a request of their own             | yes      |
+| `expired`     | nobody answered, or the turn that was waiting ended                        | yes      |
 
 `kind` is `sign-in` (no usable profile) or `access` (a signed-in profile exists that this bot and thread do
 not cover; the card is a question with Allow and Not now, no form). The row also carries `requested_by`,
@@ -87,18 +88,19 @@ largest element and is shown as the normalized registrable domain, with an IDN a
 
 ### Transitions
 
-| From          | To            | Trigger                                                                   | Guard                                                            |
-| ------------- | ------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `asking`      | `in_progress` | Sign in                                                                   | compare-and-set on `asking`; one in-progress per request         |
-| `in_progress` | `in_progress` | a second client's Sign in                                                 | joins the existing flow as Continue sign-in, never a new one     |
-| `in_progress` | `in_progress` | flow reaches submitting                                                   | Cancel is refused from here on                                   |
-| `in_progress` | `asking`      | Cancel, or the flow is abandoned                                          | not submitting; the asking clock resumes, it does not restart    |
-| `in_progress` | `signed_in`   | the save at `generation + 1` is accepted                                  | the save is a compare-and-set on the generation                  |
-| `in_progress` | `failed`      | the flow ends with a class                                                | `in-use`, `signed-out-meanwhile`, `vault-disabled`, `signed-out` |
-| `asking`      | `dismissed`   | Not now                                                                   | any client                                                       |
-| `asking`      | `expired`     | the wait limit, turn end, interrupt, thread delete, bot archive or delete | never cuts a flow                                                |
-| `failed`      | `in_progress` | Sign in again                                                             | same compare-and-set as a first start                            |
-| `signed_in`   | —             | sign out                                                                  | writes the tombstone, see below                                  |
+| From          | To            | Trigger                                                                   | Guard                                                                       |
+| ------------- | ------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `asking`      | `in_progress` | Sign in                                                                   | compare-and-set on `asking`; one in-progress per request                    |
+| `in_progress` | `in_progress` | a second client's Sign in                                                 | joins the existing flow as Continue sign-in, never a new one                |
+| `in_progress` | `in_progress` | flow reaches submitting                                                   | Cancel is refused from here on                                              |
+| `in_progress` | `asking`      | Cancel on a bot's request, or the flow is abandoned                       | not submitting; the asking clock resumes, it does not restart               |
+| `in_progress` | `dismissed`   | Cancel on an owner-started request                                        | not submitting; no bot is waiting, so there is no asking state to return to |
+| `in_progress` | `signed_in`   | the save at `generation + 1` is accepted                                  | the save is a compare-and-set on the generation                             |
+| `in_progress` | `failed`      | the flow ends with a class                                                | `in-use`, `signed-out-meanwhile`, `vault-disabled`, `signed-out`            |
+| `asking`      | `dismissed`   | Not now                                                                   | any client                                                                  |
+| `asking`      | `expired`     | the wait limit, turn end, interrupt, thread delete, bot archive or delete | never cuts a flow                                                           |
+| `failed`      | `in_progress` | Sign in again                                                             | same compare-and-set as a first start                                       |
+| `signed_in`   | —             | sign out                                                                  | writes the tombstone, see below                                             |
 
 The precedence rule is the important half:
 
@@ -106,6 +108,15 @@ The precedence rule is the important half:
   profile is saved, and the bot is told the owner declined or did not answer.
 - **`submitting` beats Cancel.** Once the form is submitted the result stands, even if Not now was pressed on
   another client; the card shows Finishing sign-in rather than pretending to have stopped.
+- **One flow per request, and a completion belongs to its flow.** A start is compare-and-set on `asking`, so
+  two clients pressing Sign in produce one flow: the second joins it as Continue sign-in and is never a
+  second flow over one profile. Every completion names the `flowId` it was started for and is applied only
+  while that id is the request's current flow. After Cancel ended that flow the request is back at `asking`
+  with no current flow, so its late completion is dropped, and a later Start's flow is never satisfied by
+  an earlier flow's result.
+- **`submitting` is a window, not a lock.** It clears on the submit's result, or when the flow service's
+  step timeout dispatches `submit-settled`, whichever comes first; Cancel works again afterwards, and a
+  completion that arrives after a timed-out settle and a Cancel is dropped by the same `flowId` match.
 - **An in-progress flow is never cut by expiry.** Turn end, interrupt and thread delete expire `asking`
   requests only. A flow that finishes after its turn ended still saves the profile and posts a settled line
   in the chat, because the owner chose to sign in; the bot is not resumed.
