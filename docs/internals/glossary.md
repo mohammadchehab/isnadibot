@@ -254,6 +254,18 @@ The short list of skill names and one-line descriptions joined into a Mastra bot
 A skill added from a GitHub URL or a .zip. It reaches no bot until the user approves it, and the approval is
 pinned to its content hash, so a changed skill needs approval again (D28).
 
+#### Registry access
+
+The per-bot `skillRegistryAccess` switch, off by default. On, the bot's index also carries every approved skill in
+the registry; off, only the skills switched on for that bot. It widens which skills a bot may see, never which
+ones are approved. See [skill security](./skills-security.md).
+
+#### Unmanaged skill
+
+A skill folder the scan finds with no stored record: written by a clone, a sync client or another process rather
+than by Add skill. It is left out of every index and refused by both tools until the user adds it, which is how a
+Community skill's approval cannot be laundered by copying its files. See [skill security](./skills-security.md).
+
 ## Provider runtime
 
 The live backend agent implementation and its event stream. Desktop turns cross [AgentController][25]. Codex, Claude, Grok, Kimi, and OpenCode Go use Isnadi's Mastra Core controller, custom workspace and MCP tools, exact-instance server-owned access, and normalized Mastra runtime events. Standard OpenCode remains the explicit compatibility runtime because its API exposes an OpenCode-owned agent session rather than a raw model transport. The adapter contract is [ProviderAdapter.ts][15], and the overview is in [providers.md][16].

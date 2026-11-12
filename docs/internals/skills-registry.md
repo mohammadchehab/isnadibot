@@ -244,7 +244,9 @@ RegistrySkill {
 ## Security
 
 Threat: a skill's text becomes instructions for a bot that may hold browser sessions, signed-in sites and the
-user's files. The security-architect reviews:
+user's files. [Skill security requirements](./skills-security.md) (TASK-180) holds the full threat model, the
+registry-access switch, the path guard, provenance and signature rules, and the review checklists. The
+security-architect reviews:
 
 - the `read_skill_file` path guard, and that the index never lists a skill the bot cannot see (TASK-123.6);
 - the GitHub fetch and the archive unpacking (TASK-123.7);
