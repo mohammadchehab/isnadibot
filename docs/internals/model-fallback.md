@@ -92,13 +92,13 @@ Classification moves to one pure function, `classifyModelFailure`, in
 handler fills the optional fields from `event.error` when it is an AI SDK `APICallError`, before the
 error becomes a string. `accountLimits.ts` keeps its exports and delegates to the shared pattern.
 
-| Class         | Signals                                                             | Moves the turn | Pause                                |
-| ------------- | ------------------------------------------------------------------- | -------------- | ------------------------------------ |
-| `rate-limit`  | 429, "too many requests", "rate limit", declared window full        | yes            | `Retry-After`, else backoff          |
-| `usage-limit` | quota and plan messages that `LIMIT_PATTERN` matches                | yes            | parsed reset time, else backoff      |
-| `overloaded`  | 500, 502, 503, 504, 529, connection reset or timeout                | yes            | backoff                              |
-| `unavailable` | 401, 403, unknown model                                             | yes            | until the instance's settings change |
-| `request`     | other 4xx, context too long, content refused, anything unclassified | no             | none                                 |
+| Class         | Signals                                                             | Moves the turn     | Pause                                |
+| ------------- | ------------------------------------------------------------------- | ------------------ | ------------------------------------ |
+| `rate-limit`  | 429, "too many requests", "rate limit", declared window full        | yes                | `Retry-After`, else backoff          |
+| `usage-limit` | quota and plan messages that `LIMIT_PATTERN` matches                | yes                | parsed reset time, else backoff      |
+| `overloaded`  | 500, 502, 503, 504, 529, connection reset or timeout                | yes                | backoff                              |
+| `unavailable` | 401, 403, unknown model                                             | same instance only | until the instance's settings change |
+| `request`     | other 4xx, context too long, content refused, anything unclassified | no                 | none                                 |
 
 Backoff is 10 minutes × 2^(failures − 1), capped at 2 hours. A parsed reset time or `Retry-After` wins
 when present, capped at 24 hours. A successful turn on the model clears its record.
@@ -106,7 +106,44 @@ when present, capped at 24 hours. A successful turn on the model clears its reco
 `request` and unknown failures stay as they are today. Another model would most likely fail the same way,
 and moving would hide a real problem.
 
+**`unavailable` never crosses provider instances.** A 401, a 403 and an unknown model are configuration
+faults the user has to fix — a broken key, a revoked sign-in, a model that no longer exists. Moving the
+turn would hide the fault in the chat, and it would send the conversation to another vendor on the
+strength of a matched error string. The rule is in `fallbackAllowedOnFailure`
+(`provider/engineFallbackPolicy.ts`):
+
+- The failed attempt may move to another entry on the **instance it ran on**. The chain may offer that:
+  two models on the same instance are a real case (a cheap one and a strong one).
+- The comparison is with the instance that **failed**, not the one the chain started on. A chain that has
+  already moved is judged from where it is now, so entry B failing cannot move the turn back to the
+  primary on another instance.
+- With no entry left on that instance, the turn fails with the provider's error and the existing chat
+  line.
+- `rate-limit`, `usage-limit` and `overloaded` keep crossing instances as before, and
+  `historyConsent` still gates every cross-instance move to a Custom API host or an unreported instance.
+  This rule narrows moves; it does not replace consent.
+- A 401 or 403 status classifies as `unavailable` before the body is read, because the body is written by
+  whichever endpoint answered. A host cannot turn an auth failure into a cross-instance move by writing
+  "quota" in its error text.
+- There is no per-bot opt-in. If auth failures ever need to switch providers, the add-on is a setting that
+  is off by default.
+
+Two caps keep the classifier cheap on input an endpoint chooses:
+
+- **2000 characters.** `classifyModelFailure` reads the head of `${message} ${errorType}`, because the
+  error type is provider-supplied too. A limit phrase past the cut does not classify. Every pattern in
+  `modelFailure.ts` also bounds its quantifiers (`.{0,80}`, `[^.]{0,80}`), so no pattern can run
+  super-linearly even on the uncapped path — `accountLimits.ts` matches the raw message.
+- **24 hours.** `retryAfterMsFrom` reads a `Retry-After` of ASCII digits as seconds, or an HTTP-date.
+  Anything else — an array, a boolean, hex, an exponent, surrounding whitespace, a date that has passed,
+  zero — gives no value, so the pause uses its backoff, and nothing throws. The result is capped after
+  multiplying, so no arithmetic overflow can produce a non-finite pause.
+
 ### When a turn may move
+
+Two checks, in this order. `fallbackAllowedOnFailure` decides whether this entry may be tried at all for
+this failure class and instance (above); this section decides whether the attempt may move, given what it
+already did. Both must pass.
 
 An attempt may move only when no tool started and no assistant text streamed. 429s and quota errors come
 back before the first token, so this covers the common case. A failure after a tool ran (a file written, a
@@ -284,7 +321,9 @@ Each slice is one PR and leaves main shippable.
    and fails with `models_exhausted`. Make `ActiveSession` instance fields mutable. Add the chat lines.
    This is the first slice users notice.
 5. **Move on failure.** Add `toolCallsStarted`, keep the message on `ActiveTurn`, move in the `error`
-   handler, and add the `FallbackPolicy` seam.
+   handler, and add the `FallbackPolicy` seam. The class-and-instance rule it calls,
+   `fallbackAllowedOnFailure`, is already on main with its tests (TASK-119); this slice calls it from the
+   `error` handler and passes the instance the attempt ran on.
 6. **Declared limits.** Add the Custom API `requestsPerMinute`/`requestsPerDay` settings, the counting
    `fetch`, presets, and the daily count in the health store.
 
