@@ -13,6 +13,17 @@ Both require a session whose scopes are exactly `[egress:provide]`. It is grante
 
 `open` fails closed with `ProviderGone` when no control socket is registered or when it drops mid-stream. Each `open` mints a stream id and a ticket: single-use, ten seconds, bound to (owner, stream id). The server's host, port, and profile are advisory.
 
+## Rules for the first `open` caller
+
+`EgressBroker.open` has no caller yet; TASK-41's loopback proxy is the first. The broker, its two routes and the desktop checks below them were reviewed on 2026-11-12 against these rules. They are security requirements for that caller, not tuning, and the review of its PR checks them one by one.
+
+- **The owner comes from the session, never from a request.** `/egress` and `/egress/stream` take the owner from `session.subject` and require scopes exactly `[egress:provide]`. Today `open` takes the owner as an argument, so nothing in the type stops a consumer from passing a value that came from a client frame, a bot or a page: the caller must take it from the same session, and TASK-192 closes the opening in the signature itself.
+- **No direct dial path.** A destination reaches the broker and nothing else. The consumer never resolves, dials, or falls back to the network when the broker is down; `ProviderGone` is the answer, and it is the fail-closed state the interface shows.
+- **Host, port and profile stay advisory.** The server enforces no grant and keeps no "checked" state: the desktop re-checks the profile binding, the port (80 or 443), the granted host and the address class on every open, before any DNS or TCP. A caller that assumes the server already checked is the bug.
+- **The consumer bounds its own concurrency.** The 64-stream and 5 MiB/s limits are desktop-side, so they refuse at the far end; the broker does not cap streams per owner (TASK-192). A consumer that opens a stream per navigation caps per owner and profile itself.
+- **The listener is loopback, with per-session credentials.** `127.0.0.1` only, never `0.0.0.0` or `::`, and a connection without valid credentials is refused before any destination is parsed.
+- **Logs carry host, port and decision only.** Never a URL, path, query or header. The ticket rides in the stream route's query string and is kept out of traces (`egressTicketRedactionLayer`); nothing logs a request line.
+
 ## Desktop: `EgressProvider`
 
 Every `open` goes through `openEgressTarget` (`EgressDialer`), so a blocked address is refused before any TCP. Limits: 64 streams per session, five minutes idle, 5 MiB/s token bucket (`EgressLimits`).
