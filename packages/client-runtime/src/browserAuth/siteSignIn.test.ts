@@ -223,6 +223,7 @@ describe("applySiteSignInAction", () => {
 
   it("keeps a second client's Sign in on the flow that already exists", () => {
     const started = applySiteSignInAction(record(), { type: "start", now: T0 });
+
     const joined = step(
       started,
       { type: "submit", now: T0 + 1_000 },
