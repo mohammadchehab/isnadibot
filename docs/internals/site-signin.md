@@ -190,6 +190,67 @@ has been `ok` again, no further automatic attempt happens, so a wrong password c
 Without a saved password the owner is asked, with the normal card. Sign out deletes the password, which is
 the way out.
 
+## The tables and the events
+
+TASK-26 adds five tables; three that the original story asked for are deliberately absent. The columns live on that
+card (its consolidated table list supersedes the older one in the same brief); what is decided here is what exists,
+what a row is for, and which constraints are load-bearing.
+
+| Table                               | One row per            | Load-bearing                                                                                                                                                                                                                                                  |
+| ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projection_browser_profiles`       | site                   | `UNIQUE(site)`; a tombstone is the same row at `g+1`, reused on re-sign-in, never a second row; holds generation, status, health, route, `auth_hosts`, `last_write_id`; no ciphertext and no path                                                             |
+| `projection_browser_auth_requests`  | request                | no `expires_at` and no `cancelled`; `requested_by` is `bot` or `owner`, and a bot request must carry bot, thread and `tool_call_id`; carries `kind`, `start_url`, `failure_class`, `submitting`, `flow_id`, `asking_elapsed_ms`, `asking_since`, `settled_at` |
+| `projection_browser_session_grants` | (profile, bot, thread) | `UNIQUE(profile_id, bot_id, thread_id)`, so an approval cannot stack; expiry is derived from `last_used_at`; no FK to bots or threads, the projector deletes them on archive, delete, group removal and thread delete                                         |
+| `browser_profile_leases`            | profile                | `fencing_token` only ever grows, and release keeps the row                                                                                                                                                                                                    |
+| `browser_profile_checks`            | profile                | the last `result` plus the `expiry_episode` and `auto_resign_episode` counters                                                                                                                                                                                |
+
+**What is deliberately not a table**, and why:
+
+- **`connections`**: the story's "auth connections" are Kernel Managed Auth, which no card in this stack uses. It
+  gets a table with its first user.
+- **`flows`**: a flow's live state — the page's fields and the answers typed into them — is in memory only
+  (TASK-35, TASK-36). What persists is the request and its state. A flow table would be the one place a typed value
+  could reach a row.
+- **`egress_providers`**: the provider is the desktop's existing egress-provider pairing grant, whose token is
+  already hashed there. The server holds no egress token, so a profile only records its `route`.
+- **`events`**: browser-auth changes are orchestration events like every other kind, not their own log. The chat
+  line for a settled request is a thread activity, not a shell field.
+
+Ciphertext is on disk, never in a row: `<stateDir>/browser-profiles/<profileId>.<generation>.enc`, with the path
+derived from the brand-checked id and the generation — which is why no url, cookie, token, key or path column exists
+anywhere (TASK-26 AC1). The migration takes the next free number at build time; `080_ProjectionWorkItems` is the
+latest on main today, so it is `081`.
+
+### The events
+
+Every accepted browser-auth command appends exactly one orchestration event, named with the existing dotted
+`noun.verb` kinds, and the projector writes the rows above from them.
+
+| Event                             | Carries                                                                |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `browser-auth.request.created`    | requestId, site, kind, state; threadId and botId on a bot request only |
+| `browser-auth.request.started`    | requestId, flowId, startedByClient                                     |
+| `browser-auth.request.submitting` | requestId                                                              |
+| `browser-auth.request.reopened`   | requestId (back to `asking`; `asking_since` resumes)                   |
+| `browser-auth.request.settled`    | requestId, state, site, failureClass when failed                       |
+| `browser-profile.saved`           | profileId, site, generation, status                                    |
+| `browser-profile.signed-out`      | profileId, generation                                                  |
+| `browser-profile.deleted`         | profileId                                                              |
+| `browser-profile.health-recorded` | profileId, result — only when the value changed                        |
+| `browser-profile.route-changed`   | profileId, from, to                                                    |
+| `browser-session-grant.created`   | grantId, profileId, botId, threadId, site                              |
+| `browser-session-grant.revoked`   | grantId                                                                |
+
+The payload rule is the one the card states and a schema test enforces: ids, site, state, route names and
+timestamps only. No URL with a query, no cookie, no typed value, no path, and the auth-check URL appears in no event
+except the profile save that stores it. A settled request also appends one thread activity,
+`browser-auth.request.settled { requestId, state, site }`, so the chat card keeps its final state after the request
+leaves the shell.
+
+There is no `AuditKind` on main yet (TASK-95 is unstarted), so nothing here invents one: the names are chosen to map
+1:1 onto the audit kinds TASK-95 will define — `browser-profile.route-changed` becomes `profile.route-changed`, and
+so on — so no rename is needed later.
+
 ## What must not change
 
 - The vault boundary: no typed value, cookie or storage state in an event, transcript, tool result, log,
