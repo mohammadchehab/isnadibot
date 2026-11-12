@@ -171,24 +171,92 @@ One card per slice, in this order. Each is reviewable on its own: Mohammad click
 next can start while he looks. Frames are TASK-171's, and the state column is what exists in Figma
 today.
 
-| Slice | Ships                                                                                                                                                                                                            | Frames                                         | Drawn                               |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------- |
-| S1    | Owner side: "Your device / Another person" in the pairing dialog, the principal on each Connections row, the change action both ways, the one-time review banner                                                 | F1a–F1e, F2 rows and confirms, G1              | light; dark and RTL outstanding     |
-| S2    | Member shell, web and desktop: their groups' chats only, reduced Settings (device and app), no owner entry points, no owner palette actions                                                                      | F3 ×5 states, member settings                  | light; dark and RTL outstanding     |
-| S3    | A member where the owner acts: bot presentation subset, an approval waiting that they cannot answer, "Only the owner can do this" inline and as a toast, the access-changed notice, a chat leaving and appearing | F5, F6, F7                                     | **not drawn**                       |
-| S4    | Mobile: member home, reduced Settings, and the member's own pairing screen                                                                                                                                       | F4 ×5 states, F8 (seven `PairingPanel` states) | F4 light; **F8 not drawn**          |
-| S5    | Group people list naming the full-access bots, the acknowledgement before an assign, the three reverse cases, the member's own leave                                                                             | G2, G3                                         | **not drawn**; G3 waits decision-54 |
+| Slice | Ships                                                                                                                                                                                                            | Frames                                         | Drawn                                     |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------- |
+| S1    | Owner side: "Your device / Another person" in the pairing dialog, the principal on each Connections row, the change action both ways, the one-time review banner                                                 | F1a–F1e, F2 rows and confirms, G1              | light; dark and RTL outstanding           |
+| S2    | Member shell, web and desktop: their groups' chats only, reduced Settings (device and app), no owner entry points, no owner palette actions                                                                      | F3 ×5 states, member settings                  | light; dark and RTL outstanding           |
+| S3    | A member where the owner acts: bot presentation subset, an approval waiting that they cannot answer, "Only the owner can do this" inline and as a toast, the access-changed notice, a chat leaving and appearing | F5, F6, F7                                     | light; dark and RTL outstanding           |
+| S4    | Mobile: member home, reduced Settings, and the member's own pairing screen                                                                                                                                       | F4 ×5 states, F8 (seven `PairingPanel` states) | F4 and F8 light; dark and RTL outstanding |
+| S5    | Group people list naming the full-access bots, the acknowledgement before an assign, the three reverse cases, the member's own leave                                                                             | G2, G3                                         | **not drawn**; G3 waits decision-54       |
 
 Mohammad is creating the S1 and S2 cards; this table is what each card will say.
 
-S1 and S2 can start now, because every frame they need is drawn in light. S3, S4's pairing screen and
-S5 wait for the designer, who is blocked on Figma MCP in her session rather than on the file. F6 and
-F7 come first: they are what S3 cannot start without. When S1 lands its dev principal bar, S4's home
-can start on F4 in parallel; only its pairing screen waits.
+Every frame S1, S2, S3 and S4 needs now exists in light, so all four can start; dark and RTL are still
+outstanding everywhere, and **G2** is the only light frame left to draw (G3 waits decision-54, so S5
+still cannot start). S3's frames landed in the order asked for — F6 and F7 first, then F5 — which is
+what let S3 begin before the member shell was finished. When S1 lands its dev principal bar, S4 can
+start on F4 in parallel.
 
 S2 and S3 split where they do on purpose. The earlier sketch had the bot presentation subset in S2,
 which would have held the whole member shell on F5. F5's states — waiting on an approval a member
 cannot answer, unreachable — are refusal states, and they belong beside F6.
+
+### S3 in detail: what a member sees when the owner acts
+
+S3 is the slice where a member meets something that is not theirs. It runs on fixtures like S1 and S2;
+it needs no server principal and no contract change.
+
+**The bot presentation subset.** The shell snapshot carries one entry per bot in the member's groups:
+`{ botId, name, avatarUrl, roleId, status }`. It is an allowlist contract, not a projection of the bot
+record: a field added to the bot engine later is absent for a member by default, and the test that
+walks the struct is what keeps it absent. Instructions, access mode, model and fallback config,
+skills, channel bindings, connectors and usage describe the owner's machine, not the member's
+conversation, and never enter it.
+
+**The approval a member cannot answer is the sharp edge.** Today's pending approval
+(`packages/client-runtime/src/pendingRequests.ts`) carries `detail`, `toolName` and raw `args`, filled
+from the provider runtime's `request.opened` payload
+(`packages/contracts/src/providerRuntime/requestEvents.ts:21`). `args` is often `{ command: "…" }`: the
+owner's command line, and through it paths, hosts and sometimes credentials. A member's copy of the
+thread therefore cannot be the owner's copy with the buttons hidden.
+
+The rule: **redact where the event is projected, never in the screen.** The one seam is
+`apps/server/src/orchestration/ActivityPayloadProjection.ts`, which already projects activities once
+for the wire; it becomes principal-aware there, and `packages/contracts` declares the member-projected
+activity payload as a **field allowlist** — the same rule the `environment` methods follow, so a field
+added later is hidden for a member by default. A screen cannot be trusted to hide what reached its
+socket: a hand-built client reads whatever the server sent, so UI-only hiding is fail-open. The
+member's card reads "<Bot> is waiting for the owner to approve an action" with no answer controls; the
+owner's card is unchanged.
+
+The leak is wider than the approval. `tool.started` and `tool.updated` activities carry the command
+line (`data.command`), absolute changed paths (`data.files`) and `data.rawOutput`, and
+`pendingRequests.ts:160,195` merges `data.args ?? { command: data.command }` from `tool.started` into
+the approval by request id — so redacting the approval activity alone still leaves the member's card
+reading the command. **The member projection carries no `requestKind` either**: telling `command` from
+`file-read` from `file-change` is a side channel on the owner's work in a group whose members cannot
+act on it (decision-45). The member's card says "the owner is needed here" from a client-side constant
+over the projected record; going finer later is one field. This is TASK-190, severity HIGH, and its
+redaction is a **merge gate on the PR that makes `subscribeThread` member-reachable** — not live today,
+because no member principal exists yet.
+
+**A refusal must not be an oracle.** `RpcForbidden { method }` is the typed refusal, and it must be
+identical for a thread id that exists but is out of scope and for one that never existed. Answering
+NotFound for the second and Forbidden for the first hands a member an id-enumeration oracle over the
+owner's chats. One shape, one status, on the WS and HTTP entry points alike. In the UI the inline
+reason ("Only the owner can do this") sits on the control that refused; an attempt against a stale
+control ends as a toast. Both read from `memberScope`'s selectors, never from a screen parsing an
+error.
+
+**The access-changed notice has to be reversible.** A scope change ends the stream with
+`ShellScopeChanged`, the client resubscribes through its existing reconnect path, and the notice says
+what changed in the owner's words with the way back to their shell home. Three reverse states S3 owes:
+a chat removed while it was open renders the removed-elsewhere state with the way back rather than a
+stale thread; a chat that appears does not steal focus or reorder under the member's cursor; and a
+member whose access is restored sees the group again without a reload.
+
+**Fixture states.** S2's dev principal bar gains the states S3 is judged on:
+`member-pending-approval` (a request opened on an in-scope thread), `member-refused` (a control the
+member may not use) and `member-scope-changed` (removed while open), beside the existing owner, member
+and member-removed. Each is a fixed tick with no timers, so a screenshot comparison is stable.
+
+**Not in S3:** inviting people, the group people list, full access and its acknowledgement (S5), the
+member's own leave (decision-54, G3), and anything that needs the server principal (PR 2).
+
+**Tested by:** the redacted member projection (a `request.opened` reaching a member carries no `args`,
+`detail` or `toolName`), the refusal shape for a nonexistent id matching the one for an out-of-scope
+id, and the resubscribe path on `ShellScopeChanged`. Contract and projection tests live with PR 2; S3
+carries the fixture and rendering tests.
 
 ### The fixture seam
 
@@ -272,6 +340,14 @@ any invite-a-person UI (decision-46).
   payload is refused.
 - **Perf:** a member shell over 5k threads and 10 groups is within 10% of the owner's snapshot p95,
   and the per-event filter cost is measured in the existing shell perf test.
+- **Member thread projection** (TASK-190, PR 2 review checklist). `subscribeThread` and every snapshot
+  derived from it project activities through the member allowlist before serialization. With a member
+  principal, nothing in the frame carries `tool.started` / `tool.updated` `data.command`, `data.args`,
+  `data.files` or `data.rawOutput`, nor `approval.requested` `payload.args`, `detail`, `toolName` or
+  `requestKind`. Assert on the serialized frame, not the view, for four cases: a command turn, a
+  file-change turn, the pending approval as `derivePendingRequests` builds it (its args arrive from
+  `tool.started`), and a product-feedback or routine approval whose args are decoded structures. Owner
+  frames stay byte-identical to today.
 
 ## Open questions
 
