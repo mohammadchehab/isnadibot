@@ -7,6 +7,7 @@ import { View } from "react-native";
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { ControlPill } from "../../components/ControlPill";
+import { DEV_FIXTURES_ENABLED } from "../../dev-fixtures";
 import { useMobileI18n } from "../../lib/i18n";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { environmentBotsAtom } from "../../state/bots";
@@ -56,17 +57,21 @@ export function ComputerDesktopNotice(props: {
       <Text className="flex-1 text-sm font-t3-medium text-foreground" numberOfLines={2}>
         {t("{name}'s computer is running", { name: bot.name })}
       </Text>
-      <ControlPill
-        variant="primary"
-        label={t("Watch")}
-        icon="play.rectangle"
-        onPress={() => {
-          navigation.navigate("ComputerViewer", {
-            threadId: props.threadId,
-            botName: bot.name,
-          });
-        }}
-      />
+      {/* The live view still runs on fixture frames (decision-53), so a release build has no way
+          in and does not offer one. */}
+      {DEV_FIXTURES_ENABLED ? (
+        <ControlPill
+          variant="primary"
+          label={t("Watch")}
+          icon="play.rectangle"
+          onPress={() => {
+            navigation.navigate("ComputerViewer", {
+              threadId: props.threadId,
+              botName: bot.name,
+            });
+          }}
+        />
+      ) : null}
     </View>
   );
 }
