@@ -152,30 +152,99 @@ Member mode is a rendering decision over the same contracts. In `packages/client
 for this feature starts until Mohammad has clicked through and said go. Frames are TASK-171
 (designer).
 
-| Phase | Ships                                                                                                                            | Gate                                        |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| 0 S1  | Owner side: pairing choice, principal on Connections rows, change action, one-time review banner                                 | click through                               |
-| 0 S2  | Member shell, web and desktop: their group chats only, bot presentation subset, hidden owner entry points                        | click through                               |
-| 0 S3  | Refusal and scope change: "Only the owner can do this", access-changed notice, chat leaving and appearing                        | click through                               |
-| 0 S4  | Mobile: member home, member pairing screen                                                                                       | click through                               |
-| 0 S5  | Owner side: group people list, full-access warning and acknowledgement; member leaves a group (decision-54)                      | click through                               |
-| 1     | **Go** from Mohammad                                                                                                             | —                                           |
-| 2     | PR 1a `feat/session-principal`: contracts, server, migration; Connections keeps sending `principal: 'owner'` and there is no UI  | security-architect review                   |
-| 3     | PR 1b: the Connections UI from S1, wired to the real commands                                                                    | S1 frames                                   |
-| 4     | PR 2 `feat/member-scope`: resolver, shell filter and stream, member table, command gate, work items, assets, recall, HTTP routes | security review; must land before invite UX |
-| 5     | PR 3 `feat/member-client`: web, desktop and mobile screens replace the fixture source                                            | PR 2                                        |
+| Phase | Ships                                                                                                                             | Gate                                        |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 0 S1  | Owner side: pairing choice, principal on Connections rows, change action, one-time review banner                                  | click through                               |
+| 0 S2  | Member shell, web and desktop: their group chats only, reduced Settings, hidden owner entry points                                | click through                               |
+| 0 S3  | What a member sees when something is the owner's: bot presentation subset, refusal, access-changed notice, chats coming and going | click through                               |
+| 0 S4  | Mobile: member home, member pairing screen                                                                                        | click through                               |
+| 0 S5  | Owner side: group people list, full-access warning and acknowledgement; member leaves a group (decision-54)                       | click through                               |
+| 1     | **Go** from Mohammad                                                                                                              | —                                           |
+| 2     | PR 1a `feat/session-principal`: contracts, server, migration; Connections keeps sending `principal: 'owner'` and there is no UI   | security-architect review                   |
+| 3     | PR 1b: the Connections UI from S1, wired to the real commands                                                                     | S1 frames                                   |
+| 4     | PR 2 `feat/member-scope`: resolver, shell filter and stream, member table, command gate, work items, assets, recall, HTTP routes  | security review; must land before invite UX |
+| 5     | PR 3 `feat/member-client`: web, desktop and mobile screens replace the fixture source                                             | PR 2                                        |
 
-Fixtures follow [the skills registry's seam rule](skills-registry.md#the-one-seam), so S4's mobile screens
-gate the same way S1's web screens do: the machine and the fixture source take the flag as an argument and
-each platform entry passes its own (web and desktop `import.meta.env.DEV`, mobile `__DEV__`). The S2–S4
-screens must not exist in a production bundle while there is no enforcement behind them, because a switch
-that does nothing next to security copy is worse than an absent screen. A dev-only picker drives the fixture
-principal, so every frame state in TASK-171 is reachable without a server.
+### Phase 0 slices
 
-**One conflict to settle.** PR 1a is already assigned (TASK-164 notes, 2026-11-09) and predates the
-screen gate in its current queue position. It changes no behaviour, since every session migrates to
-owner, but it is a contracts and migration PR. Either Mohammad grants it an explicit exception, or
-it waits behind phase 1 like everything else. The default in this plan is that it waits.
+One card per slice, in this order. Each is reviewable on its own: Mohammad clicks one through, and the
+next can start while he looks. Frames are TASK-171's, and the state column is what exists in Figma
+today.
+
+| Slice | Ships                                                                                                                                                                                                            | Frames                                         | Drawn                               |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| S1    | Owner side: "Your device / Another person" in the pairing dialog, the principal on each Connections row, the change action both ways, the one-time review banner                                                 | F1a–F1e, F2 rows and confirms, G1              | light; dark and RTL outstanding     |
+| S2    | Member shell, web and desktop: their groups' chats only, reduced Settings (device and app), no owner entry points, no owner palette actions                                                                      | F3 ×5 states, member settings                  | light; dark and RTL outstanding     |
+| S3    | A member where the owner acts: bot presentation subset, an approval waiting that they cannot answer, "Only the owner can do this" inline and as a toast, the access-changed notice, a chat leaving and appearing | F5, F6, F7                                     | **not drawn**                       |
+| S4    | Mobile: member home, reduced Settings, and the member's own pairing screen                                                                                                                                       | F4 ×5 states, F8 (seven `PairingPanel` states) | F4 light; **F8 not drawn**          |
+| S5    | Group people list naming the full-access bots, the acknowledgement before an assign, the three reverse cases, the member's own leave                                                                             | G2, G3                                         | **not drawn**; G3 waits decision-54 |
+
+Mohammad is creating the S1 and S2 cards; this table is what each card will say.
+
+S1 and S2 can start now, because every frame they need is drawn in light. S3, S4's pairing screen and
+S5 wait for the designer, who is blocked on Figma MCP in her session rather than on the file. F6 and
+F7 come first: they are what S3 cannot start without. When S1 lands its dev principal bar, S4's home
+can start on F4 in parallel; only its pairing screen waits.
+
+S2 and S3 split where they do on purpose. The earlier sketch had the bot presentation subset in S2,
+which would have held the whole member shell on F5. F5's states — waiting on an approval a member
+cannot answer, unreachable — are refusal states, and they belong beside F6.
+
+### The fixture seam
+
+`packages/client-runtime/src/auth/memberScope.ts` is the only place a screen learns who is looking.
+It exports `useSessionPrincipal()` (returning `owner`, `member` or `unavailable`) and the selectors
+the shell reads: the member's groups, their chats, the bot presentation subset, and whether a member
+may do a given thing. No screen reads the principal from anywhere else. Phase 0 has no server
+principal, so the module's source is a fixture, and PR 3 replaces the source without touching a screen.
+
+Until `packages/contracts/src/auth.ts` carries `AuthPrincipal`, the module declares its own `Principal`
+type, field for field with [Principal on links and sessions](#principal-on-links-and-sessions), and a
+comment saying to delete it when PR 1a lands. The swap stays mechanical.
+
+The gate follows [the skills registry's seam rule](skills-registry.md#the-one-seam), which S4's mobile
+screens need as much as S1's web ones: the machine and the fixture source are plain modules that read
+no platform global and take the dev flag as an argument. `createMemberScopeFixture({ dev })` returns
+an empty source when `dev` is false; web and desktop pass `import.meta.env.DEV` and mobile passes
+`__DEV__`; `useSessionPrincipal` reports `unavailable` when no source is registered.
+
+**A screen given `unavailable` renders nothing, and so does the navigation row that owns it.** The
+same goes for S1's owner-side additions: the pairing dialog shows today's dialog, unchanged. Nothing
+a member can see and no security copy reaches a shipped build while nothing enforces them, because a
+switch that does nothing is worse than an absent screen.
+
+**The dev principal bar** is the one piece of chrome the slices add that is in no frame: a small chip
+reading `dev · owner` that cycles `owner → member (in groups) → member (removed from a group) → owner`,
+and with the middle two a switch that makes the next action return a refusal. It sits under the seam,
+not in a screen, never appears in a frame, and disappears with the fixture source in PR 3. It is what
+makes every frame state reachable without a server, and S1 is where it gets built.
+
+Each slice's fixtures cover every state in that slice's frames and nothing beyond them.
+
+### What PR 1a waits for
+
+PR 1a is `feat/session-principal`: contracts, the principal on links and sessions, the migration, and
+no UI. It needs no frame. Four things stood between it and a branch; the first is now settled and the
+other three are logistics.
+
+1. **The screens-first gate (Q2, answered).** No exception. Decision-53 holds PR 1a like any other
+   contracts and migration PR, so it waits behind the screens-first go and needs no decision of its
+   own.
+2. **The work already written.** `.claude/worktrees/per-person-scoping` holds 27 uncommitted files
+   against the contracts and the `EnvironmentAuth*` family (~550 lines) on a base at #144, and
+   `feat/session-principal` exists with no commits ahead of main. Engineer-2 lands or drops that
+   worktree after TASK-181; a second pass before then collides with it.
+3. **The migration number.** The card's notes say 078 is the last migration on main. Main is at 080
+   (`080_ProjectionWorkItems.ts`) and 081 is claimed by the shard-4 SQLite repair, so PR 1a takes
+   whatever is next free when it starts.
+4. **The audit.** `auth.session.principal-changed` is a kind reserved on TASK-95, which is Backlog.
+   `setPrincipal` must not depend on an audit service that does not exist: it either emits the kind
+   through the existing event log or leaves the call site marked for TASK-95. The card's "once TASK-95
+   is on main" clause already covers the assign and unassign pair the same way.
+
+PR 1b does need frames — F1 and F2, which are drawn in light, so it waits on Mohammad's click-through
+of S1, not on the designer. PR 2 needs 1a and the security-architect's review, and must land before
+any invite-a-person UI (decision-46).
 
 ## What must not change
 
@@ -207,8 +276,10 @@ it waits behind phase 1 like everything else. The default in this plan is that i
 ## Open questions
 
 - **Q1** (Mohammad): may a member answer approvals (including `ask_user` questions) in their groups?
-  Default until answered: no.
-- **Q2** (Mohammad): does PR 1a get an exception from the screens-first gate, or wait? Default: wait.
+  Answered by decision-45: no, and S3 draws it that way.
+- **Q2** (Mohammad): does PR 1a get an exception from the screens-first gate, or wait? Answered: no
+  exception; decision-53 stands and PR 1a waits behind the screens-first go. No board decision is
+  being drafted for it. [What PR 1a waits for](#what-pr-1a-waits-for) lists the rest.
 - **Q3** (security-architect, already accepted): assigning a person into a group with a full-access
   bot warns and requires an acknowledgement naming those bots, and the same acknowledgement applies
   to adding a full-access bot to a group with people and to switching a group bot to full access.
