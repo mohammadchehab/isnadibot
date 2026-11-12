@@ -5,7 +5,14 @@ import type {
   OrchestrationThreadActivity,
   OrchestrationThreadDetailSnapshot,
 } from "@isnadi/contracts";
-import { IsnadiPluginSearchResult } from "@isnadi/contracts";
+import {
+  IsnadiPluginSearchResult,
+  MEMBER_ACTIVITY_DATA_FIELDS,
+  MEMBER_ACTIVITY_ITEM_FIELDS,
+  MEMBER_ACTIVITY_PAYLOAD_FIELDS,
+  MEMBER_APPROVAL_REQUESTED_SUMMARY,
+  MEMBER_APPROVAL_RESOLVED_SUMMARY,
+} from "@isnadi/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { asRecord, asTrimmedString, projectBoundedValue } from "./ActivityPayloadBounds.ts";
@@ -119,7 +126,7 @@ function projectPluginSearchResult(value: ActivityValue): IsnadiPluginSearchResu
  * Removes activity payload fields that no current client reads while retaining
  * the full payload in persistence and the event store.
  */
-export function projectActivityPayload(
+function projectPayloadForOwner(
   activity: OrchestrationThreadActivity,
 ): OrchestrationThreadActivity {
   const payload = asRecord(activity.payload);
@@ -213,8 +220,100 @@ export function projectActivityPayload(
   };
 }
 
+/**
+ * Who the frame is for. Activities describe the owner's work on the owner's
+ * machine: a member reads the conversation, never the command line, the changed
+ * paths, the tool output or the owner's approval arguments. Redacting here, at
+ * the one seam every surface projects through, is what makes that fail-closed —
+ * a screen cannot hide what its socket already sent.
+ */
+export type ActivityViewer = "owner" | "member";
+
+function pickFields(record: ActivityRecord, fields: ReadonlyArray<string>): ActivityRecord {
+  const picked: ActivityRecord = {};
+
+  for (const field of fields) {
+    if (record[field] !== undefined) {
+      picked[field] = record[field];
+    }
+  }
+
+  return picked;
+}
+
+function memberActivitySummary(kind: string, summary: string): string {
+  if (kind === "approval.requested") {
+    return MEMBER_APPROVAL_REQUESTED_SUMMARY;
+  }
+
+  if (kind === "approval.resolved") {
+    return MEMBER_APPROVAL_RESOLVED_SUMMARY;
+  }
+
+  return summary;
+}
+
+/**
+ * The owner's activity reduced to the contracts allowlist
+ * (`MEMBER_ACTIVITY_PAYLOAD_FIELDS`). Nothing here names a field to hide: a
+ * field added to an activity later is absent for a member until contracts
+ * allows it, which is what keeps a new leak from shipping by default.
+ */
+function projectPayloadForMember(
+  activity: OrchestrationThreadActivity,
+): OrchestrationThreadActivity {
+  const projected: OrchestrationThreadActivity = {
+    ...activity,
+    summary: memberActivitySummary(activity.kind, activity.summary),
+  };
+
+  const payload = asRecord(activity.payload);
+
+  if (!payload) {
+    return projected;
+  }
+
+  const memberPayload = pickFields(payload, MEMBER_ACTIVITY_PAYLOAD_FIELDS);
+  // `data` is a container: it is rebuilt from the nested allowlist below and
+  // never copied across, so a field the nested allowlist drops cannot ride
+  // along inside the owner's `data` object.
+  delete memberPayload.data;
+  const data = asRecord(payload.data);
+
+  if (data) {
+    const memberData = pickFields(data, MEMBER_ACTIVITY_DATA_FIELDS);
+    const item = asRecord(memberData.item);
+
+    if (item) {
+      const memberItem = pickFields(item, MEMBER_ACTIVITY_ITEM_FIELDS);
+
+      if (Object.keys(memberItem).length > 0) {
+        memberData.item = memberItem;
+      } else {
+        delete memberData.item;
+      }
+    }
+
+    if (Object.keys(memberData).length > 0) {
+      memberPayload.data = memberData;
+    }
+  }
+
+  return { ...projected, payload: memberPayload };
+}
+
+export function projectActivityPayload(
+  activity: OrchestrationThreadActivity,
+  viewer: ActivityViewer = "owner",
+): OrchestrationThreadActivity {
+  const projected = projectPayloadForOwner(activity);
+
+  return viewer === "member" ? projectPayloadForMember(projected) : projected;
+}
+
 export function projectThreadDetailSnapshot(
   snapshot: OrchestrationThreadDetailSnapshot,
+  viewer: ActivityViewer = "owner",
 ): OrchestrationThreadDetailSnapshot {
   return {
     ...snapshot,
@@ -222,22 +321,33 @@ export function projectThreadDetailSnapshot(
       ...snapshot.thread,
       activities: dropSupersededToolUpdatedActivities(
         dropStaleContextWindowActivities(snapshot.thread.activities),
-      ).map(projectActivityPayload),
+      ).map((activity) => projectActivityPayload(activity, viewer)),
     },
   };
 }
 
 // Published events are immutable and shared by every live subscriber. Project
 // each one once so subscribers share the projected object, which also lets the
-// live stream budget reuse its serialized-size measurement.
-const projectedActivityEvents = new WeakMap<OrchestrationEvent, OrchestrationEvent>();
+// live stream budget reuse its serialized-size measurement. One cache per
+// viewer: the owner's frame and a member's frame are different objects.
+const projectedActivityEvents: Record<
+  ActivityViewer,
+  WeakMap<OrchestrationEvent, OrchestrationEvent>
+> = {
+  owner: new WeakMap(),
+  member: new WeakMap(),
+};
 
-export function projectActivityEvent(event: OrchestrationEvent): OrchestrationEvent {
+export function projectActivityEvent(
+  event: OrchestrationEvent,
+  viewer: ActivityViewer = "owner",
+): OrchestrationEvent {
   if (event.type !== "thread.activity-appended") {
     return event;
   }
 
-  const cached = projectedActivityEvents.get(event);
+  const cache = projectedActivityEvents[viewer];
+  const cached = cache.get(event);
 
   if (cached !== undefined) {
     return cached;
@@ -247,13 +357,13 @@ export function projectActivityEvent(event: OrchestrationEvent): OrchestrationEv
     ...event,
     payload: {
       ...event.payload,
-      activity: projectActivityPayload(event.payload.activity),
+      activity: projectActivityPayload(event.payload.activity, viewer),
     },
   };
 
-  projectedActivityEvents.set(event, projected);
+  cache.set(event, projected);
   // Mark the result as already projected so a repeat call returns it unchanged.
-  projectedActivityEvents.set(projected, projected);
+  cache.set(projected, projected);
 
   return projected;
 }
