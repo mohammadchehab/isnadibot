@@ -153,16 +153,21 @@ Requirements, each of which is a TASK-127 acceptance test:
 
 Scopes say what a credential _can_ do; the principal says who is holding it. Both apply to everything here.
 
-- `browserAuth.flow.watch`, `flow.submit`, `flow.start` and `flow.cancel` are at `orchestration:operate`, and are
-  **owner-only**. A member session sees the card in In progress with no Sign in and no Continue. The rule is
-  enforced in the same exhaustive table as scopes (`RPC_MEMBER_ACCESS`, one entry per RPC, new RPCs owner-only until
-  someone classifies them), so a new flow RPC cannot quietly default open.
+- `browserAuth.flow.watch` and `browserAuth.flow.submit` are the only flow RPCs, at `orchestration:operate`.
+  Starting, cancelling and dismissing a sign-in are orchestration commands (`browser-auth.request.start` /
+  `.start-owner` / `.cancel` / `.dismiss` / `.allow`), not RPCs, so a start is one audited state change. Both
+  surfaces are **owner-only for a member principal**. A member session sees the card in In progress with no Sign in
+  and no Continue. The rule is enforced in the same exhaustive table as scopes (`RPC_MEMBER_ACCESS`, one entry per
+  RPC, new RPCs owner-only until someone classifies them), so a new flow RPC cannot quietly default open, and the
+  commands are owner-only in the decider's principal check.
 - **Owner is the session principal, not `access:write`.** The owner's phone pairs with standard scopes; keying this
   on `access:write` would take Continue away from the one place people actually sign in.
 - `browser-auth.request.start-owner` exists for Settings, the palette and the inbox. It creates a request with no bot
   and no thread, and Cancel on it is terminal — no bot is waiting, so there is nothing to return to.
-- `browser-auth.grant.revoke` is a client command for the owner. `grant.create` stays internal. The decider refuses a
-  bot principal revoking a grant it does not hold.
+- `browser-auth.request.allow` is the only client path to a grant: the owner allows an `access` request, and the
+  decider turns it into one grant for that (profile, bot, thread). `grant.create` stays internal, so no client can
+  mint a grant for a pair it was not shown. `browser-auth.grant.revoke` is a client command for the owner. The
+  decider refuses a bot principal revoking a grant it does not hold.
 - Sign-out, check and the three site actions are dispatched by a client through one shared module
   (`packages/client-runtime/src/browserAuth/siteActions.ts`), so the page, the palette and the inbox cannot drift into
   three different orderings of the same decision.
@@ -178,7 +183,7 @@ These are the properties a user is entitled to assume, with the numbers.
   turn end, interrupt, thread delete, and bot archive or delete. The clock pauses while a flow is open and resumes —
   it does not restart — so repeated Cancels cannot extend a bot's wait. A start on an expired request is refused
   server-side, and the bot is told "owner did not answer".
-- **Only one flow per request.** `flow.start` is a compare-and-set on `asking`. A second client's Sign in joins the
+- **Only one flow per request.** `browser-auth.request.start` is a compare-and-set on `asking`. A second client's Sign in joins the
   existing flow. The card shows Continue sign-in, not a second Sign in.
 - **The first terminal event wins.** Cancel is refused while `submitting` (the card says "Finishing sign-in…"), so a
   hung submit cannot be cancelled out from under a finished step; `submitting` clears on the submit's result or at the
@@ -226,7 +231,8 @@ TASK-130 PR 1 — the card, the form and the integration tests:
 - [ ] The reason renders as plain text (a `<script>` and a URL in it are inert), and the bot name comes from the
       record.
 - [ ] `deriveSignInCard` is a table test over every request state, and no state is reachable only in the UI.
-- [ ] A member session is refused `flow.watch` and `flow.start`; the owner's standard-scope phone session can join.
+- [ ] A member session is refused `flow.watch` and `browser-auth.request.start`; the owner's standard-scope phone
+      session can join.
 
 TASK-131 — Signed-in sites:
 

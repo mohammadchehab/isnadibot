@@ -50,14 +50,14 @@ The decider owns these. There is no `cancelled` state: Cancel on a bot's request
 Cancel on an owner-started request ends it as `dismissed` (no bot is waiting on those), and Not now is the
 only decline.
 
-| State         | Meaning                                                                    | Terminal |
-| ------------- | -------------------------------------------------------------------------- | -------- |
-| `asking`      | the owner has been asked; no flow has started                              | no       |
-| `in_progress` | one flow exists, named by `flowId`, with `startedBy`; carries `submitting` | no       |
-| `signed_in`   | a profile was saved at `generation + 1`                                    | yes      |
-| `failed`      | the flow ended with a failure class                                        | yes      |
-| `dismissed`   | the owner pressed Not now, or cancelled a request of their own             | yes      |
-| `expired`     | nobody answered, or the turn that was waiting ended                        | yes      |
+| State         | Meaning                                                                     | Terminal |
+| ------------- | --------------------------------------------------------------------------- | -------- |
+| `asking`      | the owner has been asked; no flow has started                               | no       |
+| `in_progress` | one flow exists, named by `flowId`, with `startedBy`; carries `submitting`  | no       |
+| `signed_in`   | a profile was saved at `generation + 1`, or an `access` request was allowed | yes      |
+| `failed`      | the flow ended with a failure class                                         | yes      |
+| `dismissed`   | the owner pressed Not now, or cancelled a request of their own              | yes      |
+| `expired`     | nobody answered, or the turn that was waiting ended                         | yes      |
 
 `kind` is `sign-in` (no usable profile) or `access` (a signed-in profile exists that this bot and thread do
 not cover; the card is a question with Allow and Not now, no form). The row also carries `requested_by`,
@@ -120,6 +120,72 @@ The precedence rule is the important half:
 - **An in-progress flow is never cut by expiry.** Turn end, interrupt and thread delete expire `asking`
   requests only. A flow that finishes after its turn ended still saves the profile and posts a settled line
   in the chat, because the owner chose to sign in; the bot is not resumed.
+
+## The command and RPC surface
+
+Two surfaces, split by what they carry. A **request** is durable state, so it changes by orchestration command:
+the decider owns the state machine, every change is audited, and a replay is refused. A **flow** is the live form,
+so it is an RPC: it streams page state and carries typed answers that must never reach an event, a transcript or a
+log. Nothing else writes either one (TASK-27; the client seam is `packages/client-runtime/src/browserAuth/`).
+
+### Client commands
+
+All are dispatched through `orchestration.dispatchCommand` at `orchestration:operate`, and all are **owner-only for
+a member principal**: owner is the session principal, not `access:write`.
+
+| Command                                                 | Does                                                                                                        | Refused when                                                      |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `browser-auth.request.start { requestId }`              | `asking` → `in_progress`, compare-and-set, mints the flow id                                                | not `asking`; an expired request; a flow is open                  |
+| `browser-auth.request.start-owner { site, profileId? }` | creates the owner's own request (no bot, no thread) and opens its flow                                      | the site already has an open request                              |
+| `browser-auth.request.cancel { requestId }`             | back to `asking` with the clock resumed; an owner-started request is dismissed instead                      | `submitting`                                                      |
+| `browser-auth.request.dismiss { requestId }`            | Not now: the only decline                                                                                   | a flow is open                                                    |
+| `browser-auth.request.allow { requestId }`              | kind `access` only: the decider writes the session grant for (profile, bot, thread) and settles `signed_in` | kind `sign-in`; the grant already exists; the profile is not live |
+| `browser-auth.grant.revoke { grantId }`                 | revoke one bot's access                                                                                     | a bot principal, or a grant it does not hold                      |
+| `browser-profile.sign-out { profileId }`                | the tombstone at `generation + 1`                                                                           | —                                                                 |
+| `browser-profile.delete { profileId }`                  | remove the row and its ciphertext                                                                           | a flow is open on that profile                                    |
+
+**Allow is the only client path to a grant.** `browser-auth.grant.create` stays internal, next to
+`browser-auth.request.create`, `.complete`, `.fail`, `.expire`, `browser-profile.save` and `.health-recorded`: they
+are not in `ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a
+request it was shown and the decider resolves that into a grant. One request yields at most one grant; a replayed
+Allow is refused.
+
+### RPCs
+
+Only the live form is an RPC, plus the one server-side routing decision. All are registered in TASK-27 with their
+input schemas and `RPC_REQUIRED_SCOPES` entries, owner-only in `RPC_MEMBER_ACCESS`, and the `WS_METHODS`
+enumeration test fails if one is missing.
+
+| RPC                               | Scope                   | Handler lands in |
+| --------------------------------- | ----------------------- | ---------------- |
+| `browserAuth.flow.watch` (stream) | `orchestration:operate` | TASK-35          |
+| `browserAuth.flow.submit`         | `orchestration:operate` | TASK-36          |
+| `browserAuth.setProfileRoute`     | `access:write`          | TASK-27          |
+
+There is no `flow.start` and no `flow.cancel` RPC: starting and cancelling are the commands above, so a start is one
+audited state change rather than a second write path with its own authorization. A flow RPC never creates a profile,
+a grant or a host grant; it only moves a flow the decider already opened. `submitting` is set by the internal command
+the submit handler dispatches, so the decider stays the only writer.
+
+### The request view
+
+The view the card reads is the record `deriveSiteSignInCard` takes, and the server schema is the same shape
+(camelCase over the columns named above):
+`requestId`, `threadId`, `botId`, `site`, `kind`, `state`, `reason`, `startUrl`, `submitting`, `failureClass`,
+`hasSavedPassword`, `pcRouted`, `egress`, `checkFailed`, `askingElapsedMs`, `askingSince`, `settledAt`, and
+`profileId` on an owner-started request (so the inbox item in TASK-133 can match an open request to its profile). No
+`expiresAt`: expiry is computed from `askingSince` and `askingElapsedMs` by the rules below, and a second stored
+deadline would be a second clock. No cookie, typed value, profile path or generation is in it.
+
+### Site identity
+
+`site` is the registrable domain of the host, already punycode when it is an IDN, computed by one shared function in
+`@isnadi/shared/siteDomain` that every surface calls: TASK-26's `UNIQUE(site)` column, TASK-27's decider, the
+`startUrl` check, TASK-34's cookie filter, TASK-50's health check and the desktop's egress store. It must resolve
+public suffixes with private domains included (`getDomain(host, { allowPrivateDomains: true })`), so `foo.github.io`
+and `bar.github.io` are two sites and neither collapses into `github.io`. Today's exports there are `normalizeHost`
+and `hasRegistrableDomain` only; TASK-140 AC7 owns adding the identity function, and it lands before TASK-27, which
+reuses it rather than growing a second copy.
 
 ## The profile and the session
 
