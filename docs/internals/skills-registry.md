@@ -244,7 +244,9 @@ RegistrySkill {
 ## Security
 
 Threat: a skill's text becomes instructions for a bot that may hold browser sessions, signed-in sites and the
-user's files. The security-architect reviews:
+user's files. [Skill security requirements](./skills-security.md) (TASK-180) holds the full threat model, the
+registry-access switch, the path guard, provenance and signature rules, and the review checklists. The
+security-architect reviews:
 
 - the `read_skill_file` path guard, and that the index never lists a skill the bot cannot see (TASK-123.6);
 - the GitHub fetch and the archive unpacking (TASK-123.7);
@@ -263,6 +265,87 @@ user's files. The security-architect reviews:
   tools and `$`.
 - Standard OpenCode: `client.app.skills()` lists exactly the bot's enabled skills.
 - Web and mobile are verified in isolated clients ([verification.md](./verification.md)).
+
+## Build order: screens first
+
+Decision-53 (accepted, Mohammad, 2026-11-09) overrides the wave order in the TASK-123 plan for every slice not
+already merged: **build a feature's screens on fixture data before any server, contract or backend PR for it**,
+let Mohammad click through the flow, and start the backend only when he says go.
+
+Merged before the decision, and unaffected: TASK-123.1 (this spec) and TASK-123.5's contract, decider,
+migration and panel 3b. Phase 1 builds the registry underneath what already exists.
+
+### The gate
+
+| Phase | What ships                                                              | Starts                        |
+| ----- | ----------------------------------------------------------------------- | ----------------------------- |
+| 0     | Every screen of all four milestones, on fixtures, in dev                | now                           |
+| —     | **Mohammad clicks through the whole flow and says go**                  | after phase 0                 |
+| 1     | The registry service and `skills.list`, swapped in behind the same seam | on his go                     |
+| 2     | The index and the two tools, add/remove, D28, `$` end to end            | after phase 1, existing order |
+| 3     | Standard OpenCode's managed folder and the connector checks             | as the existing order allows  |
+
+No `packages/contracts` change, no `apps/server` change and no migration in phase 0. Nothing in phase 0 changes
+what a user can do today: fixtures are dev-only.
+
+### Phase 0: the screens, split out of the existing cards
+
+| #   | Card                     | Screen                                                                                       | Needs |
+| --- | ------------------------ | -------------------------------------------------------------------------------------------- | ----- |
+| S1  | TASK-123.2 (screen half) | Space Skills tab (3a), Settings › Skills, the filters and the row menu (3c), web and desktop | 123.3 |
+| S2  | TASK-123.7 (screen half) | Add skill dialog, D28 approval dialog, Needs-approval row state                              | 123.3 |
+| S3  | TASK-123.5 (follow-up)   | Bot skills panel (3b) reading the seam, plus its reverse states                              | —     |
+| S4  | TASK-123.4 (screen half) | Mobile Settings › Skills list and the bot skills sheet                                       | S1    |
+| S5  | TASK-123.9 (screen half) | `$` listing registry skills in the chat, the group chat, a new task draft and mobile         | —     |
+
+S1, S2, S4 and S5 are splits of existing cards; the server half of each stays on the same card and is only
+started after the go. The project manager splits them on the board.
+
+### The one seam
+
+Phase 0 touches `apps/web`, `apps/mobile` and `packages/client-runtime` only.
+
+- Every screen reads skills from one module, `packages/client-runtime/src/skills/skillRegistry.ts`, exporting
+  `useSkillRegistry` and `useBotSkills`. **No screen calls `skills.list` or `bot.update` itself.** Phase 1
+  replaces that module's implementation and no screen changes.
+- Until `packages/contracts/src/skills.ts` exists, the module declares its own `RegistrySkill` type, field for
+  field with [Contracts](#contracts), and a comment saying to delete it when the contract lands. The swap stays
+  mechanical.
+- **Fixtures are gated at the platform entry, never inside `client-runtime`.** Phase 0 has mobile screens here
+  (S4) and in the other two screens-first features, and `packages/client-runtime` is shared with React Native,
+  which has no `import.meta.env`. So the seam is built in two parts. The machine and the fixture source are
+  plain modules under `client-runtime` that read no platform global and take the flag as an argument:
+  `createSkillRegistryFixture({ dev })` returns an empty source when `dev` is false. Each platform entry passes
+  its own flag — `import.meta.env.DEV` on web and desktop, `__DEV__` on mobile — and registers the source.
+  `useSkillRegistry` and `useBotSkills` read the registered source and return `unavailable` when there is none.
+- A screen that is given `unavailable` renders nothing, and so does the navigation row that owns it: no Space
+  tab, no Settings row, no `$` entries. A dev build shows the skills screens; a shipped build shows today's
+  product, because the source is empty rather than because a screen remembers to check a flag. The gate exists
+  once per platform instead of once per screen. This is not a runtime feature flag: no setting reveals or hides
+  it, and nothing persists.
+- In dev, `$` lists the fixture registry skills **in addition to** the provider snapshot's, so the existing
+  paths stay clickable while the new ones are reviewed.
+
+### What the fixtures must cover
+
+Every state Mohammad needs to click, so phase 1 has no surprises:
+
+- All five sources and the badge that shows which one won a shared name.
+- A Community skill that needs approval, one approved, and one changed since approval.
+- A skill whose connector is missing, with its repair action.
+- A bot with role defaults, one with borrowed skills, one with "Use other skills" off, and a bot whose engine
+  is switched (the set does not change).
+- Empty, loading and error states of the list, and of the bot's panel.
+
+### After the go
+
+The existing order holds with the server halves in place of the screen-only slices: registry service and
+`skills.list` (123.2), then the index and the tools (123.6), then add and remove (123.7), then the D28 gate
+(123.8), then `$` end to end (123.9), then standard OpenCode (123.10) and the connector checks (123.11). Mobile
+(123.4) is wired as soon as `skills.list` exists.
+
+No user documentation changes in phase 0, because no user sees it. Each phase 1 and later slice updates
+[the composer guide](../user/composer.md) and adds the skills page described in [Clients](#clients).
 
 ## Slices
 

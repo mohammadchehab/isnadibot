@@ -9,11 +9,14 @@ This is a living glossary for IsnadiBot. It explains what common terms mean in t
 - [Project and workspace](#project-and-workspace)
 - [Thread timeline](#thread-timeline)
 - [Roster organization](#roster-organization)
+- [Sessions and people](#sessions-and-people)
 - [Role and fleet template](#role-and-fleet-template)
 - [Orchestration](#orchestration)
 - [Channels](#channels)
+- [Browser sign-in](#browser-sign-in)
 - [Fleet operations](#fleet-operations)
 - [Skills](#skills)
+- [Fixture seam](#fixture-seam)
 - [Provider runtime](#provider-runtime)
 - [Subscription provider](#subscription-provider)
 - [Image provider](#image-provider)
@@ -90,6 +93,30 @@ It appears as a chat card and a bot inbox item, and either one decides it throug
 An automatically generated, inspectable summary of older content in one thread. It complements the
 recent complete-turn window and never acts as a writable group-wide memory store. See
 [memory architecture](memory.md).
+
+### Sessions and people
+
+#### Session principal
+
+`owner` or `member`, carried by a pairing link and copied onto the session it creates. It is separate
+from scopes: a session can hold the same two orchestration scopes whether it is the owner's phone or
+a paired person's. Owner sessions see the whole environment, exactly as before. Member sessions see
+and drive only the group chats they were added to, and those groups' bots. A link created without a
+principal is a member, and the client never negotiates the principal. See
+[person scoping](person-scoping.md).
+
+#### Person scope
+
+The resolved set (`groupIds`, `threadIds`, `botIds`) a member session may reach, computed by one
+resolver from group membership and recomputed when membership, a group or a thread changes. A
+resolver failure gives an empty scope, never owner.
+
+#### Member mode
+
+What the client renders for a member session: their groups' chats only, a bot's name, avatar, role
+and status but none of its configuration, and no owner entry points. Owner-only actions come back as
+`RpcForbidden` ("Only the owner can do this"), and a scope change ends the shell stream with
+`ShellScopeChanged` so the client resubscribes.
 
 ### Role and fleet template
 
@@ -212,6 +239,56 @@ A client-local preference for interface copy. Web, Electron, and native mobile e
 
 An element pinned to left-to-right whatever the interface direction: code, diffs, the terminal, paths, URLs, model ids, and shortcut chords. In an Arabic interface the layout mirrors around them, but their content is never reordered. See [interface-translations.md](./interface-translations.md#right-to-left-languages).
 
+### Browser sign-in
+
+#### Sign-in request
+
+The durable record of one bot asking for a site, in one thread. Its state is `asking`, `in_progress`,
+`signed_in`, `failed`, `dismissed` or `expired`; there is no `cancelled`, because Cancel returns a bot's
+request to `asking` and Not now is the only decline. The decider owns the state, the first terminal event
+wins, and the card the owner sees is a view of it. See [site sign-in](./site-signin.md#states).
+
+#### Sign-in flow
+
+One attempt to sign the owner in, started by Sign in on a request and bounded by a profile lease. Its
+phases are discovering, awaiting input, external action, human, submitting and completed. A second client's
+Sign in joins the running flow instead of starting another, and a flow is never cut by request expiry.
+
+#### Profile
+
+The encrypted session IsnadiBot keeps for one site: one row per site, with the storage state sealed under a
+per-profile key derived from the vault master key. A profile is not permission for a bot to use the site;
+that is a session grant. See [credential vault](./credential-vault.md).
+
+#### Profile generation
+
+A monotonic integer on the profile row. Every write names the generation it started from and is refused if
+that is no longer current, which is what stops a late save or a health check from resurrecting a profile the
+owner signed out of. The similar-sounding lease protects exclusive use, not writes.
+
+#### Tombstone
+
+What sign-out leaves behind: the profile row at `generation + 1` with the ciphertext, grants, handles and
+saved password removed. It keeps the site in the shell for 24 hours so Check and Sign in again can say "this
+site is signed out", and a fresh sign-in starts from its generation.
+
+#### Session grant
+
+The owner's permission for one bot, in one thread, to use one signed-in profile. It ends at sign-out,
+profile delete, removal of the bot from the thread or group, bot delete, or 30 days unused. An opaque handle
+is what the bot actually holds, and it is revoked on turn end.
+
+#### Auth host
+
+A host, other than the site's own domain, that a sign-in passed through, such as an SSO provider. The owner
+approves each one at save, its cookies are kept and every other third-party cookie is dropped, and an auth
+host never creates an [egress grant](#egress-grant).
+
+#### Auth-check URL
+
+The single https URL the owner fixed at sign-in that a health check may fetch to decide whether the session
+is still good. Nothing else, and no bot, can set or change it.
+
 ### Fleet operations
 
 How a group of bots with a boss keeps working without someone driving it. See
@@ -257,6 +334,28 @@ The short list of skill names and one-line descriptions joined into a Mastra bot
 
 A skill added from a GitHub URL or a .zip. It reaches no bot until the user approves it, and the approval is
 pinned to its content hash, so a changed skill needs approval again (D28).
+
+#### Registry access
+
+The per-bot `skillRegistryAccess` switch, off by default. On, the bot's index also carries every approved skill in
+the registry; off, only the skills switched on for that bot. It widens which skills a bot may see, never which
+ones are approved. See [skill security](./skills-security.md).
+
+#### Unmanaged skill
+
+A skill folder the scan finds with no stored record: written by a clone, a sync client or another process rather
+than by Add skill. It is left out of every index and refused by both tools until the user adds it, which is how a
+Community skill's approval cannot be laundered by copying its files. See [skill security](./skills-security.md).
+
+### Fixture seam
+
+The one module a screens-first feature reads its data from while the server half does not exist yet. The machine
+and the fixture source live in `packages/client-runtime` and take the dev flag as an argument; each platform
+entry passes its own — `import.meta.env.DEV` on web and desktop, `__DEV__` on mobile — because the package is
+shared with React Native and must read no platform global. The seam reports `unavailable` when no source is
+registered, and a screen given `unavailable` renders nothing, navigation row included, so a shipped build shows
+today's product. Phase 1 replaces the seam's implementation and no screen changes. See
+[the skills registry](./skills-registry.md#the-one-seam).
 
 ## Provider runtime
 
@@ -347,8 +446,10 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 ## Related Docs
 
 - [Architecture overview][24]
+- [Environment authentication](./environment-auth.md) and [person scoping](./person-scoping.md)
 - [Provider architecture][16]
 - [Permission modes][18]
+- [Site sign-in][26]
 - [Workspace layout][2]
 
 [1]: ../../packages/contracts/src/orchestration.ts
@@ -376,3 +477,4 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 [23]: ../../apps/server/src/checkpointing/Diffs.ts
 [24]: ./overview.md
 [25]: ../../apps/server/src/provider/Services/AgentController.ts
+[26]: ./site-signin.md

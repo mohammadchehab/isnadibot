@@ -67,6 +67,10 @@ setting reads "On this environment".
     anything on its own.
   - Nothing ships in the installer. The download happens when recall is first enabled, with progress
     shown.
+  - **The download is the one network call the local default makes**, and the settings copy says so. It
+    fetches model files from `huggingface.co` and sends no chat text; it happens once, and after it the
+    local path works with the network off. The screen names the size before the button is pressed and never
+    starts on its own: a 118 MB fetch behind someone's back is the failure this rule exists to prevent.
 
 ## Providers
 
@@ -183,7 +187,34 @@ chats locally and writes only aggregate numbers, never chat text.
   - query p95 is under 150 ms at 100k chunks on the Linux box;
   - the default is the smallest model within 2 points of the best recall@10.
 
-Results are recorded below once the bench runs (S1101c).
+### What the bench has to prove
+
+The bench is the only place these claims are tested, so it answers all of them or it does not answer any:
+
+1. **The default model, not just the ranking.** Recall@10 and MRR per model, **scored separately for
+   Arabic and English**, with the pair count printed. A model that wins English and loses Arabic is not a
+   candidate: Arabic ships. The default is the cheapest setup that clears every language.
+2. **That hybrid earns its complexity.** Hybrid against FTS5 alone and against vector alone, recall@5,
+   recall@10 and MRR. If hybrid does not clear the pass bar the merge is not worth its moving parts, and
+   that verdict is a decision for the owner, not a silent keep.
+3. **The cost of the winner.** Download size, model on disk, peak worker RSS, chunks per second for
+   indexing, and vector bytes per 10k chunks. These decide whether a 300 MB model can ever be the default.
+4. **The latency we promise, on the machine that will be slowest.** p50 and p95 at 10k and 100k chunks on
+   the Linux dev box, not extrapolated from a laptop. The Mac numbers are reported but do not set the bar.
+5. **That the quantized build is enough.** int8 against the full-precision model on a subset of the pairs.
+   If int8 costs more than the pass bar allows, that changes the size on the settings screen and the
+   download.
+
+Rules for running it:
+
+- It runs against a **`VACUUM INTO` snapshot** of the owner's database, never against
+  `~/.isnadi/userdata` while a server has it open (see the snapshot procedure in `AGENTS.md`). The bench
+  reads real chats; it may only read a copy.
+- The report holds aggregate numbers and pair counts only. No chat text, no thread titles, no ids.
+- It runs on the box, through `ssh`, not on the laptop, when the numbers are for the Linux bar.
+
+Results are recorded below once the bench runs (S1101c). The chosen model then changes **one constant and
+this table**, not a design.
 
 ## Testing
 
@@ -197,6 +228,90 @@ Results are recorded below once the bench runs (S1101c).
 - API provider: plain http is refused, a redirect is refused, the key never appears in an error, and
   nothing is sent without `acknowledgedEgress`.
 - Export: the export contains no `recall_*` rows.
+
+## Build order: screens first
+
+Decision-53 (accepted, Mohammad, 2026-11-09) overrides the `After` column in [Slices](#slices) for every UI
+half: the screens are built on fixtures first, Mohammad clicks through them, and **no embed call is wired
+and no chat is embedded until he says go**. The rest of this document is the design; this section is the
+order we build it in.
+
+### The gate
+
+| Phase | What ships                                                                    | Starts         |
+| ----- | ----------------------------------------------------------------------------- | -------------- |
+| 0     | Every recall screen, on fixtures, in dev, web and desktop                     | now            |
+| —     | **Mohammad clicks through the whole flow and says go**                        | after phase 0  |
+| 1     | The settings contract, the egress gate and the real download, behind the seam | on his go      |
+| 2     | The embedding runtime, storage, exclusion, the API provider, then the bench   | existing order |
+
+No `packages/contracts` change, no `apps/server` change, no migration and no model download in phase 0.
+
+### Phase 0: the screens
+
+| #   | Card               | Screen                                                                                                                                                                                                               |
+| --- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | 74.5 (screen half) | Privacy › Chat recall: the master switch, "On this environment", the model row, the four download states, "Use an API instead" with its egress confirm, the setup switch and "Delete vectors held for the old setup" |
+| S2  | 74.5 (screen half) | Mobile: the same settings read-only, with the download state and a pointer to the desktop to change it                                                                                                               |
+| S3  | 74.6 (screen half) | "Exclude this chat from recall" on a chat, and its reverse                                                                                                                                                           |
+
+S1 and S2 are the split of 74.5; S3 is the split of 74.6. The server half of each stays on its card and is
+started only after the go. The Figma reference is node `2165-1120`.
+
+### One seam
+
+Same rule as the skills registry: every screen reads recall settings from one module,
+`packages/client-runtime/src/recall/recallSettings.ts`, exporting `useRecallSettings`. No screen calls the
+settings RPC or a download command itself. Phase 1 replaces that module's implementation; no screen
+changes.
+
+Fixtures follow [the skills registry's seam rule](skills-registry.md#the-one-seam): the machine and the
+fixture source are plain modules in `client-runtime` that read no platform global and take the flag as an
+argument (web and desktop pass `import.meta.env.DEV`, mobile passes `__DEV__`), and `useRecallSettings`
+returns `unavailable` when no source is registered. S2's mobile mirror therefore mounts under the same rule,
+and a shipped build has **no Chat recall screen at all** until phase 1 — the section renders nothing for
+`unavailable`. A switch that does nothing, next to privacy copy, is worse than a screen that is not there yet.
+
+### What the fixtures must cover
+
+Each of these is a state Mohammad has to be able to click, because each one has copy that can be wrong:
+
+- Never set up: recall on by default, the model row showing its name, size and dimensions, and a
+  **Download** button that names the size. Nothing starts without the press.
+- Downloading: progress, cancel, and what happens to indexing meanwhile.
+- Ready: the model in use, the last re-embed time, and the chunk count.
+- Download failed: the reason, retry, and the fact that recall is paused rather than partly working.
+- API mode: the Custom API instance and its origin named, and the confirm that says every indexed chat is
+  sent to that origin and `acknowledgedEgress` is unset until it is accepted. Leaving that dialog must
+  leave the local provider on.
+- Switching the model: the old setup still serving search while the new one is `building`, with progress,
+  then **Delete vectors held for the old setup**.
+- Recall switched off by the owner: what stops, and what the chat and the palette say.
+- A chat excluded from recall (S3), and the same chat put back.
+
+### After the go: the order that matters, and why
+
+1. **The settings contract and the egress gate (74.5, server half).** This needs no embedding code: the
+   switch, the disclosure and `acknowledgedEgress` are settings and one command. It is also exactly what
+   the screens already prove, so it is wired first and most of the seam disappears immediately.
+2. **74.1, the provider and the local runtime with the pinned download, and 74.2, migration 078 and
+   `VectorIndex`, in parallel.** Neither indexes a chat yet.
+3. **74.6, exclusion and redaction, before anything embeds.** The reactor in TASK-75 must be able to
+   assume the redactor exists. Nothing indexes until this is merged.
+4. **The rest of 74.5:** the download row and the re-embedding progress become real.
+5. **74.4, the openai-compatible provider.**
+6. **74.3, the bench, then the default model** as one constant plus this document's table.
+7. **TASK-75, then 76, then 77**, as today.
+
+Two invariants hold across all of it:
+
+- Nothing is embedded before the settings say so, and the settings cannot say API without
+  `acknowledgedEgress`.
+- The local path works with the network off once the model is down. That is the property that makes the
+  default defensible, and the bench's snapshot rule and the download rule both protect it.
+
+`docs/user/privacy.md` and `docs/user/memory.md` gain the Chat recall section in step 4, when a user can
+see the switch. Phase 0 changes no user documentation, because no user sees it.
 
 ## Slices
 
