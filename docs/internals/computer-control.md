@@ -57,3 +57,5 @@ The mobile client (`apps/mobile/src/features/computer/`) runs the same controlle
 - Back to `active`, the cover stays until a frame newer than the last pre-cover frame arrives, and the user taps Resume watching.
 
 Frames stay in memory only (`cachePolicy="none"`). On Android the viewer sets `FLAG_SECURE` through `expo-screen-capture`.
+
+The mobile screens currently run against fixtures (decision-53: screens first). `createFixtureComputerPort` stands in for `computer.*`, and two bundled frames stand in for the desktop stream, so the watch, take control, give back, stopped and paused screens are walkable with no server. The phases, notices and cover are the real `client-runtime` ones; only the port and the pixels are fake. Wiring the port to the environment RPC and setting `FLAG_SECURE` are follow-ups, not part of the screens PR.

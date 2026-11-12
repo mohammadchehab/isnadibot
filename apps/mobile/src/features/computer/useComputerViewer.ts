@@ -10,25 +10,12 @@ import {
   createComputerViewerController,
   type ComputerViewerController,
 } from "@isnadi/client-runtime/state/computer-viewer-controller";
-import {
-  initialComputerViewerCover,
-  reduceComputerViewerCover,
-  shouldShowComputerFrame,
-} from "@isnadi/client-runtime/state/computer-viewer-cover";
+import { shouldShowComputerFrame } from "@isnadi/client-runtime/state/computer-viewer-cover";
 import { COMPUTER_SESSION_TTL_MS, type ScopedThreadRef } from "@isnadi/contracts";
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
-import { AppState } from "react-native";
+import { useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { computerEnvironment } from "../../state/computer";
+import { useComputerViewerCover } from "./useComputerViewerCover";
 import { useEnvironmentConnectionState } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
@@ -102,34 +89,7 @@ export function useComputerViewer(threadRef: ScopedThreadRef, open: boolean): Co
 
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
 
-  // Frames carry no timestamp, so the cover counts them: "newer than the pre-cover frame" is a
-  // higher count.
-  const [cover, dispatchCover] = useReducer(reduceComputerViewerCover, initialComputerViewerCover);
-  const frameCount = useRef(0);
-  const lastFrame = useRef(state.frame);
-
-  if (state.frame !== lastFrame.current) {
-    lastFrame.current = state.frame;
-
-    if (state.frame !== null) frameCount.current += 1;
-  }
-
-  const latestFrameCount = frameCount.current;
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (status) => {
-      if (status === "active" || status === "inactive" || status === "background") {
-        dispatchCover({ type: "app-state", status, lastFrameAt: frameCount.current });
-      }
-    });
-
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (state.frame !== null) dispatchCover({ type: "frame", at: latestFrameCount });
-  }, [latestFrameCount, state.frame]);
-
+  const cover = useComputerViewerCover(state.frame);
   const visible = open && cover.streaming;
 
   useEffect(() => {
