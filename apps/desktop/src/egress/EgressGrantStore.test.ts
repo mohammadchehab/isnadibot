@@ -143,7 +143,11 @@ describe("DesktopEgressGrants", () => {
 
         assert.isTrue(policy.allows("p", "foo.github.io"));
         assert.isFalse(policy.allows("p", "bar.github.io"));
-        assert.isFalse(policy.allows("p", "github.io"));
+
+        // Only the wildcard is refused. The bare suffix host is still a host the owner can name.
+        yield* store.grant("p", exact("github.io"));
+
+        assert.isTrue(policy.allows("p", "github.io"));
       }),
     ),
   );
