@@ -46,8 +46,20 @@ export function SiteSignInFormDialog({
   const savingAgain = record.checkFailed;
   const canSubmit = email.trim() !== "" && password !== "";
 
+  // Whatever typed value the owner entered leaves this state when the form closes, however it
+  // closes: Cancel, Save, Escape or the overlay. The password never outlives the form.
+  const close = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setEmail("");
+      setPassword("");
+      setStartUrl(record.startUrl ?? "");
+    }
+
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogPopup className="max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -104,7 +116,7 @@ export function SiteSignInFormDialog({
             variant="ghost-muted"
             onClick={() => {
               onCancel();
-              onOpenChange(false);
+              close(false);
             }}
           >
             {t("Cancel")}
@@ -113,7 +125,7 @@ export function SiteSignInFormDialog({
             disabled={!canSubmit}
             onClick={() => {
               onSubmit({ email: email.trim(), password, startUrl: startUrl.trim() });
-              onOpenChange(false);
+              close(false);
             }}
           >
             {t("Sign in")}
