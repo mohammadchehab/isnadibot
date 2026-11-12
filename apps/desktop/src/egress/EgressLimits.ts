@@ -4,6 +4,12 @@ export const STREAM_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const BYTES_PER_SECOND = 5 * 1024 * 1024;
 
+/** Inbound chunks held per stream before its socket is paused, which backpressures the peer. */
+export const INBOUND_CHUNK_CAPACITY = 16;
+
+/** A resolve or connect that takes longer than this is refused instead of holding the stream. */
+export const DIAL_TIMEOUT_MS = 10_000;
+
 /**
  * Token bucket shared by every stream of one session. `take` returns how many milliseconds the
  * caller must wait before moving `bytes`; time is passed in so tests need no clock.
