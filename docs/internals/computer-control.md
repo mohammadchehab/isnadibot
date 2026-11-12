@@ -56,8 +56,8 @@ The mobile client (`apps/mobile/src/features/computer/`) runs the same controlle
 - `background` calls `hide`, which closes the stream and releases the lease, so the bot resumes. The paused state shows on return.
 - Back to `active`, the cover stays until a frame newer than the last pre-cover frame arrives, and the user taps Resume watching.
 
-Frames stay in memory only (`cachePolicy="none"`). On Android the viewer sets `FLAG_SECURE` through `expo-screen-capture`.
+Frames stay in memory only (`cachePolicy="none"`).
 
-The mobile screens currently run against fixtures (decision-53: screens first). `createFixtureComputerPort` stands in for `computer.*`, and two bundled frames stand in for the desktop stream, so the watch, take control, give back, stopped and paused screens are walkable with no server. The phases, notices and cover are the real `client-runtime` ones; only the port and the pixels are fake. Wiring the port to the environment RPC and setting `FLAG_SECURE` are follow-ups, not part of the screens PR.
+The mobile screens currently run against fixtures (decision-53: screens first). `createFixtureComputerPort` stands in for `computer.*`, and two bundled frames stand in for the desktop stream, so the watch, take control, give back, stopped and paused screens are walkable with no server. The phases, notices and cover are the real `client-runtime` ones; only the port and the pixels are fake. Wiring the port to the environment RPC and setting `FLAG_SECURE` on Android are follow-ups, not part of the screens PR: the app has no `expo-screen-capture` dependency yet, so a viewer without it can be screen-recorded.
 
 The fixtures are development-only, gated on `DEV_FIXTURES_ENABLED` (`apps/mobile/src/dev-fixtures.ts`, Metro-inlined `__DEV__`). A release build renders no way in — `ComputerDesktopNotice` drops the Watch pill — and the route renders `ComputerViewerUnavailableScreen`, which leaves immediately, instead of a fake desktop whose take-control does nothing. The route itself stays registered in `Stack.tsx`: registering it conditionally, or behind a const, collapses React Navigation's static route typing to `never` for the whole app.
