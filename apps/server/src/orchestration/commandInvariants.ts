@@ -295,7 +295,7 @@ export function requireGroup(input: {
       );
 }
 
-function requireMutationActorAuthorized(input: {
+export function requireMutationActorAuthorized(input: {
   readonly group: OrchestrationGroup;
   readonly command: OrchestrationCommand;
   readonly actor: OrchestrationDispatchActor | undefined;
@@ -316,6 +316,31 @@ function requireMutationActorAuthorized(input: {
     invariantError(
       input.command.type,
       `Person '${actor.personId}' is not a member of group '${input.group.id}'.`,
+    ),
+  );
+}
+
+/**
+ * Authorizes a command that acts on the environment itself rather than on one
+ * group: hiring a bot outside a group, changing the roster, or creating a group.
+ * A trusted internal dispatch (fleet hire, reactors) carries no actor and stays
+ * allowed; a client dispatch needs the `access:write` scope behind
+ * `canManageGroups`.
+ */
+export function requireEnvironmentManageRights(input: {
+  readonly command: OrchestrationCommand;
+  readonly actor: OrchestrationDispatchActor | undefined;
+}): Effect.Effect<void, OrchestrationCommandInvariantError> {
+  const actor = input.actor;
+
+  if (actor === undefined || actor.canManageGroups) {
+    return Effect.void;
+  }
+
+  return Effect.fail(
+    invariantError(
+      input.command.type,
+      `Person '${actor.personId}' needs 'access:write' to change the environment.`,
     ),
   );
 }

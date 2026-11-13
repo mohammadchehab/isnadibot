@@ -8,7 +8,13 @@ import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import { OrchestrationCommandInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
-import { requireBotNotArchived, requireGroup, requireGroupAbsent } from "../commandInvariants.ts";
+import {
+  requireBotNotArchived,
+  requireEnvironmentManageRights,
+  requireGroup,
+  requireGroupAbsent,
+  requireMutationActorAuthorized,
+} from "../commandInvariants.ts";
 import {
   type PlannedOrchestrationEvent,
   withEventBase,
@@ -22,6 +28,7 @@ import { clearOwnedWorkItems } from "./workItems.ts";
 export const decideGroups = Effect.fn("decideGroups")(function* ({
   command,
   readModel,
+  actor,
 }: {
   readonly command: Extract<
     OrchestrationCommand,
@@ -48,6 +55,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 > {
   switch (command.type) {
     case "group.create": {
+      yield* requireEnvironmentManageRights({ command, actor });
       yield* requireGroupAbsent({ readModel, command, groupId: command.groupId });
 
       if (command.bossBotId === undefined) {
@@ -105,7 +113,8 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
     }
 
     case "group.rename": {
-      yield* requireGroup({ readModel, command, groupId: command.groupId });
+      const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
       const occurredAt = yield* nowIso;
 
       return {
@@ -125,7 +134,8 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
     }
 
     case "group.keep-busy.set": {
-      yield* requireGroup({ readModel, command, groupId: command.groupId });
+      const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
       const occurredAt = yield* nowIso;
 
       return {
@@ -146,6 +156,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.delete": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
       const occurredAt = yield* nowIso;
 
       const deletedEvent: PlannedOrchestrationEvent = {
@@ -220,7 +231,21 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.member.assign": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
       const bot = yield* requireBotNotArchived({ readModel, command, botId: command.botId });
+
+      // A bot that already belongs to another group is pulled across a boundary, so target-group
+      // rights are not enough: this needs the same two-sided rights `bot.update` needs to move it.
+      if (bot.groupId === null) {
+        // A group-less bot belongs to the environment, not to any group, so no group's membership
+        // reaches it: only environment manage rights can put it into one. `bot.update` moves the
+        // same bot under the same rule.
+        yield* requireEnvironmentManageRights({ command, actor });
+      } else if (bot.groupId !== group.id) {
+        const sourceGroup = yield* requireGroup({ readModel, command, groupId: bot.groupId });
+
+        yield* requireMutationActorAuthorized({ group: sourceGroup, command, actor });
+      }
 
       if (command.role === "boss" && group.bossBotId !== null && group.bossBotId !== bot.id) {
         return yield* new OrchestrationCommandInvariantError({
@@ -258,6 +283,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.member.unassign": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
 
       const member = group.members
         .filter(isGroupBotMember)
@@ -319,6 +345,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.person.assign": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireEnvironmentManageRights({ command, actor });
       const occurredAt = yield* nowIso;
 
       return {
@@ -340,6 +367,16 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
     case "group.person.unassign":
     case "group.leave": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+
+      if (command.type === "group.person.unassign") {
+        // Removing someone else needs environment manage rights.
+        yield* requireEnvironmentManageRights({ command, actor });
+      } else if (actor !== undefined && command.personId !== actor.personId) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Person '${actor.personId}' can only leave a group as themselves.`,
+        });
+      }
 
       const person = group.members.find(
         (member) => member.kind === "person" && member.personId === command.personId,
@@ -372,6 +409,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.boss.set": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
+      yield* requireMutationActorAuthorized({ group, command, actor });
 
       const nextBoss = yield* requireBotNotArchived({
         readModel,

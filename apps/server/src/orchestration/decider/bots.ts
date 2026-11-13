@@ -5,6 +5,8 @@ import {
   DEFAULT_LOCAL_EXECUTION_MODE,
   DEFAULT_RUNTIME_MODE,
   isGroupBotMember,
+  type BotId,
+  type GroupId,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationReadModel,
@@ -15,11 +17,15 @@ import type * as PlatformError from "effect/PlatformError";
 import { OrchestrationCommandInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
+  findBotById,
+  findGroupById,
   requireBot,
   requireBotAbsent,
   requireBotArchived,
   requireBotNotArchived,
+  requireEnvironmentManageRights,
   requireGroup,
+  requireMutationActorAuthorized,
 } from "../commandInvariants.ts";
 import {
   type PlannedOrchestrationEvent,
@@ -33,9 +39,51 @@ import {
 } from "./eventBase.ts";
 import { clearOwnedWorkItems } from "./workItems.ts";
 
+/**
+ * Authorizes a bot command through the group the bot belongs to. A bot that
+ * belongs to no group (or whose group is gone) is an environment-level record,
+ * so it falls back to the environment manage rights.
+ */
+function authorizeBotInGroup(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly command: Extract<
+    OrchestrationCommand,
+    { type: "bot.create" | "bot.update" | "bot.archive" | "bot.restore" | "bot.delete" }
+  >;
+  readonly actor: OrchestrationDispatchActor | undefined;
+  readonly groupId: GroupId | null;
+}) {
+  const group = input.groupId === null ? undefined : findGroupById(input.readModel, input.groupId);
+
+  return group === undefined
+    ? requireEnvironmentManageRights({ command: input.command, actor: input.actor })
+    : requireMutationActorAuthorized({ group, command: input.command, actor: input.actor });
+}
+
+/** Authorizes a command through the group the bot already belongs to. */
+function authorizeExistingBot(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly command: Extract<
+    OrchestrationCommand,
+    { type: "bot.create" | "bot.update" | "bot.archive" | "bot.restore" | "bot.delete" }
+  >;
+  readonly actor: OrchestrationDispatchActor | undefined;
+  readonly botId: BotId;
+}) {
+  const bot = findBotById(input.readModel, input.botId);
+
+  return authorizeBotInGroup({
+    readModel: input.readModel,
+    command: input.command,
+    actor: input.actor,
+    groupId: bot?.groupId ?? null,
+  });
+}
+
 export const decideBots = Effect.fn("decideBots")(function* ({
   command,
   readModel,
+  actor,
 }: {
   readonly command: Extract<
     OrchestrationCommand,
@@ -51,6 +99,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
   switch (command.type) {
     case "bot.create": {
       yield* requireBotAbsent({ readModel, command, botId: command.botId });
+      yield* authorizeBotInGroup({ readModel, command, actor, groupId: command.groupId });
 
       const group =
         command.groupId === null
@@ -120,6 +169,14 @@ export const decideBots = Effect.fn("decideBots")(function* ({
 
     case "bot.update": {
       const bot = yield* requireBot({ readModel, command, botId: command.botId });
+
+      // Changing the bot needs rights where it is now, and moving it needs
+      // rights where it is going.
+      yield* authorizeBotInGroup({ readModel, command, actor, groupId: bot.groupId });
+
+      if (command.groupId != null) {
+        yield* authorizeBotInGroup({ readModel, command, actor, groupId: command.groupId });
+      }
 
       const targetGroup =
         command.groupId == null
@@ -249,6 +306,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
 
     case "bot.archive": {
       yield* requireBotNotArchived({ readModel, command, botId: command.botId });
+      yield* authorizeExistingBot({ readModel, command, actor, botId: command.botId });
       const bossGroup = readModel.groups.find((group) => group.bossBotId === command.botId);
 
       if (bossGroup) {
@@ -341,6 +399,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
 
     case "bot.restore": {
       yield* requireBotArchived({ readModel, command, botId: command.botId });
+      yield* authorizeExistingBot({ readModel, command, actor, botId: command.botId });
       const occurredAt = yield* nowIso;
 
       return {
@@ -360,6 +419,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
 
     case "bot.delete": {
       const bot = yield* requireBot({ readModel, command, botId: command.botId });
+      yield* authorizeExistingBot({ readModel, command, actor, botId: command.botId });
 
       if (command.archivedAt !== undefined && bot.archivedAt !== command.archivedAt) {
         return yield* new OrchestrationCommandInvariantError({

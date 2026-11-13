@@ -27,7 +27,7 @@ import {
 } from "./test-support/GroupDeciderFixtures.ts";
 
 it.layer(NodeServices.layer)("group membership decider", (it) => {
-  it.effect("lets paired clients configure groups but not create group-owned threads", () =>
+  it.effect("refuses group configuration and group-owned threads from an outsider", () =>
     Effect.gen(function* () {
       const outsiderId = AuthSessionId.make("person-outsider");
       const actor = { personId: outsiderId, canManageGroups: false } as const;
@@ -151,13 +151,23 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       ]);
 
       expect(results.map((result) => result._tag)).toEqual([
-        "Success",
-        "Success",
-        "Success",
-        "Success",
-        "Success",
+        "Failure",
+        "Failure",
+        "Failure",
+        "Failure",
+        "Failure",
         "Failure",
       ]);
+
+      for (const result of results) {
+        if (!Predicate.isTagged(result, "Failure")) continue;
+
+        if (!Predicate.isTagged(result.failure, "OrchestrationCommandInvariantError")) {
+          throw new Error("Expected an authorization invariant error");
+        }
+
+        expect(result.failure.detail).toContain(`Person '${outsiderId}' is not a member`);
+      }
     }),
   );
 
