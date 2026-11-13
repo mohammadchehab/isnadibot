@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   bots: [] as ReadonlyArray<Bot>,
   usage: { turns: 0, isPending: false, hasError: false },
   openChat: vi.fn(),
+  snapshot: null as ReturnType<typeof makeShellSnapshot> | null,
 }));
 
 vi.mock("../../i18n", () => ({
@@ -57,7 +58,9 @@ vi.mock("../../state/entities", () => ({
 
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => ENVIRONMENT }));
 
-vi.mock("../../state/environmentSnapshot", () => ({ useEnvironmentSnapshot: () => null }));
+vi.mock("../../state/environmentSnapshot", () => ({
+  useEnvironmentSnapshot: () => mocks.snapshot,
+}));
 
 vi.mock("../chat/useOpenChat", () => ({ useOpenChat: () => mocks.openChat }));
 
@@ -123,6 +126,7 @@ beforeEach(() => {
   mocks.threads = [];
   mocks.bots = [ada];
   mocks.usage = { turns: 0, isPending: false, hasError: false };
+  mocks.snapshot = null;
 });
 
 describe("SpaceOverview", () => {
@@ -194,5 +198,33 @@ describe("SpaceOverview", () => {
     mocks.usage = { turns: 3, isPending: false, hasError: true };
 
     expect(render()).toContain("Some bots could not report usage");
+  });
+
+  it("puts the standup above the tiles once the snapshot arrives", () => {
+    mocks.snapshot = makeShellSnapshot({
+      bots: [{ id: "bot-1", name: "Ada" }],
+      workItems: [
+        {
+          id: "w1",
+          groupId: "g1",
+          title: "Write the standup",
+          kind: "task",
+          briefPreview: "",
+          state: "queued",
+          createdAt: "2026-11-03T10:00:00.000Z",
+          updatedAt: "2026-11-03T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const html = render();
+
+    expect(html).toContain('data-testid="space-standup"');
+    expect(html).toContain("Write the standup");
+    expect(html.indexOf("Standup")).toBeLessThan(html.indexOf("Activity"));
+  });
+
+  it("leaves the standup out until the snapshot arrives", () => {
+    expect(render()).not.toContain('data-testid="space-standup"');
   });
 });

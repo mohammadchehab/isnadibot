@@ -5,7 +5,7 @@ import {
   type CapacityRow,
   type CapacityWorkItem,
 } from "@isnadi/client-runtime/fleet/capacity";
-import { type BotStatus, type BotStatusDelegation } from "@isnadi/shared/botStatus";
+import { type BotStatusDelegation } from "@isnadi/shared/botStatus";
 import {
   isGroupBotMember,
   type EnvironmentId,
@@ -20,28 +20,10 @@ import { deriveLatestContextWindowSnapshot } from "../../lib/contextWindow";
 import { useThreadActivities } from "../../state/entities";
 import { environmentSnapshotAtom } from "../../state/shell";
 import { cn } from "~/lib/utils";
-import type { MessageKey } from "@isnadi/client-runtime/i18n";
+import { BOT_STATUS_LABEL, BOT_STATUS_TONE } from "./botStatusPresentation";
 
 // SAFETY: the empty ID is an inactive-query sentinel; no environment request is sent for it.
 const NO_ENVIRONMENT = "" as EnvironmentId;
-
-const STATUS_LABEL: Readonly<Record<BotStatus, MessageKey>> = {
-  asking: "Asking",
-  held: "Held",
-  busy: "Busy",
-  idle: "Idle",
-};
-
-/**
- * The only colour a state gets: asking is what the user must act on, held is
- * what they have to unblock, and the rest stay quiet.
- */
-const STATUS_TONE: Readonly<Record<BotStatus, string>> = {
-  asking: "text-warning-foreground",
-  held: "text-caution-foreground",
-  busy: "text-foreground",
-  idle: "text-muted-foreground",
-};
 
 /**
  * Which chats belong to one bot: its own chats and the group chats it answers.
@@ -113,7 +95,9 @@ function FleetCapacityRowView({
       data-testid="fleet-capacity-row"
     >
       <span className="shrink-0 font-medium text-foreground">{row.name}</span>
-      <span className={cn("shrink-0", STATUS_TONE[row.status])}>{t(STATUS_LABEL[row.status])}</span>
+      <span className={cn("shrink-0", BOT_STATUS_TONE[row.status])}>
+        {t(BOT_STATUS_LABEL[row.status])}
+      </span>
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
         {item === null ? "—" : item.title}
         {item !== null && item.extra > 0 ? (

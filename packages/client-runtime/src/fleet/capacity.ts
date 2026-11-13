@@ -28,8 +28,11 @@ export type CapacityWorkItem = Pick<
 >;
 
 export interface CapacityInput {
-  /** The group's current boss, which sorts first. */
-  readonly bossBotId: BotId | null;
+  /**
+   * The group's current boss, which sorts first. Taken unbranded because it comes
+   * off the group a client holds; it is only ever compared with a bot's id.
+   */
+  readonly bossBotId: string | null;
   readonly bots: ReadonlyArray<CapacityBot>;
   /** The chats of every bot in the group, from the shell snapshot. */
   readonly chats: ReadonlyArray<BotStatusChat>;

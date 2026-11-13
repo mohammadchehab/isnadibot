@@ -140,6 +140,10 @@
       "types": "./src/space/workItems.ts",
       "default": "./src/space/workItems.ts"
     },
+    "./space/standup": {
+      "types": "./src/space/standup.ts",
+      "default": "./src/space/standup.ts"
+    },
     "./routines": {
       "types": "./src/routines.ts",
       "default": "./src/routines.ts"
