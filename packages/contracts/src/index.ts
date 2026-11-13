@@ -18,6 +18,8 @@ export * from "./analytics.ts";
 
 export * from "./routines.ts";
 
+export * from "./linkMonitor.ts";
+
 export * from "./auth.ts";
 
 export * from "./environment.ts";
