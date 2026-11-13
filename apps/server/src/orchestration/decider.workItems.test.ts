@@ -39,14 +39,14 @@ const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({
   ...overrides,
 });
 
-const makeModel = (items: ReadonlyArray<WorkItem>) => ({
+const makeModel = (items: ReadonlyArray<WorkItem>, group?: Parameters<typeof makeGroup>[0]) => ({
   ...makeReadModel({
     bots: [
       makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
       makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
       makeBot({ id: OTHER_SPECIALIST_ID }),
     ],
-    groups: [makeGroup()],
+    groups: [makeGroup(group)],
   }),
   workItems: items,
 });
@@ -69,10 +69,11 @@ const decide = Effect.fn("decide")(function* (
   command: OrchestrationCommand,
   items: ReadonlyArray<WorkItem>,
   actor?: { readonly personId: AuthSessionId; readonly canManageGroups: boolean },
+  group?: Parameters<typeof makeGroup>[0],
 ) {
   const result = yield* decideOrchestrationCommand({
     command,
-    readModel: makeModel(items),
+    readModel: makeModel(items, group),
     ...(actor !== undefined ? { actor } : {}),
   });
 
@@ -455,6 +456,52 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       yield* decide(update, [makeItem()], { personId: outsider, canManageGroups: true });
       yield* fails(decide(update, [makeItem()], { personId: outsider, canManageGroups: false }));
     }),
+  );
+
+  it.effect(
+    "refuses a bot's create and assign while the group has no boss, and still queues a person's",
+    () =>
+      Effect.gen(function* () {
+        const bossless = { bossBotId: null };
+
+        const create = (): ClientWorkItemCommand => ({
+          type: "work-item.create",
+          commandId: CommandId.make("cmd-work-item.create"),
+          workItemId: ITEM_ID,
+          groupId: GROUP_ID,
+          title: "Nobody's boss",
+          brief: "A bossless group has no bot that may open work.",
+          kind: "task",
+        });
+
+        const assign = (): ClientWorkItemCommand => ({
+          type: "work-item.assign",
+          commandId: CommandId.make("cmd-work-item.assign"),
+          workItemId: ITEM_ID,
+          ownerBotId: SPECIALIST_ID,
+        });
+
+        for (const command of [create(), assign()]) {
+          const exit = yield* Effect.exit(
+            decide(botCmd(SPECIALIST_ID, command), [makeItem()], undefined, bossless),
+          );
+
+          expect(Exit.isFailure(exit)).toBe(true);
+          expect(JSON.stringify(exit)).toContain(
+            `Only the boss of group '${GROUP_ID}' can run '${command.type}'`,
+          );
+        }
+
+        const queued = yield* decide(
+          create(),
+          [],
+          { personId: PERSON_ID, canManageGroups: false },
+          bossless,
+        );
+
+        expect(events0(queued)).toBe("work-item.created");
+        expect(changed(queued)).toMatchObject({ state: "queued", groupId: GROUP_ID });
+      }),
   );
 
   it.effect("deletes a group's work items with the group", () =>

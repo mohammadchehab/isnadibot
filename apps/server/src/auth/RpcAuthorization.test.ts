@@ -60,6 +60,16 @@ describe("RPC authorization scopes", () => {
     );
   });
 
+  it("lets an orchestration reader fetch work items and their briefs without the operate right", () => {
+    for (const method of [
+      WS_METHODS.workItemsList,
+      WS_METHODS.workItemsCounts,
+      WS_METHODS.workItemsGet,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationReadScope);
+    }
+  });
+
   it("rejects unknown RPC method names", () => {
     for (const method of ["server.notRegistered", "toString", "constructor"]) {
       expect(() => requiredScopeForRpcMethod(method)).toThrow(
