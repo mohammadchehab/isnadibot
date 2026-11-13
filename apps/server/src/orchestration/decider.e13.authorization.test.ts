@@ -59,6 +59,7 @@ const makeOtherGroup = (): OrchestrationGroup => ({
   name: "Ops",
   bossBotId: OTHER_BOSS_ID,
   members: [{ kind: "bot", botId: OTHER_BOSS_ID, role: "boss" }],
+  fleetTemplateId: null,
   createdAt: NOW,
   updatedAt: NOW,
 });
