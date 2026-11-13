@@ -237,6 +237,15 @@ An element pinned to left-to-right whatever the interface direction: code, diffs
 
 ### Browser sign-in
 
+#### Browser profile
+
+One site the owner is signed in to, kept between chats and reused by every bot granted access. There is one
+row per site, and its `generation` names the file that holds the encrypted storage state under
+`<stateDir>/browser-profiles/`; the row itself holds metadata only. Signing out keeps the row as a tombstone
+at the next generation, so a write that began before the sign-out is refused and the same profile comes back
+on the next sign-in. A bot reaches it through a session grant, and only one writer holds it at a time. See
+[site sign-in](./site-signin.md#the-tables-and-the-events).
+
 #### Sign-in request
 
 The durable record of one bot asking for a site, in one thread. Its state is `asking`, `in_progress`,

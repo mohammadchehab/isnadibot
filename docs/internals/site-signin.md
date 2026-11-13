@@ -287,6 +287,18 @@ derived from the brand-checked id and the generation — which is why no url, co
 anywhere (TASK-26 AC1). The migration takes the next free number at build time; `080_ProjectionWorkItems` is the
 latest on main today, so it is `081`.
 
+**Built in `081_BrowserAuth.ts`.** The tables exist in `apps/server/src/persistence/Migrations/081_BrowserAuth.ts`
+with a repository each under `persistence/Services` + `persistence/Layers`: `ProjectionBrowserProfiles`,
+`ProjectionBrowserAuthRequests`, `ProjectionBrowserSessionGrants`, `BrowserProfileLeases` and
+`BrowserProfileChecks`. The two service tables have no projector of their own yet: the lease belongs to TASK-25 and
+the check row to TASK-50. `persistence/browserAuthSchema.test.ts` fails the build if a column ever becomes a BLOB or
+takes a name that promises a secret.
+
+The ciphertext store is `apps/server/src/browserAuth/profileFiles.ts`: `browserProfileCiphertextPath` decodes the id
+before joining it, `writeBrowserProfileCiphertext` writes a temporary at 0600 in a 0700 directory, flushes and
+renames, and `reconcileBrowserProfileCiphertext` deletes every `.enc` whose profile row is gone or sitting at another
+generation. Running the reconcile at startup is TASK-24's; these tables only make the rows it reads.
+
 ### The events
 
 Every accepted browser-auth command appends exactly one orchestration event, named with the existing dotted
