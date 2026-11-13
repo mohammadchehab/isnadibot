@@ -26,7 +26,6 @@ import { SpaceStandup } from "./SpaceStandup";
 
 const row = (overrides: Partial<CapacityRow> & Pick<CapacityRow, "name">): CapacityRow => ({
   botId: BotId.make(overrides.name),
-  name: overrides.name,
   isBoss: false,
   status: "idle",
   item: null,

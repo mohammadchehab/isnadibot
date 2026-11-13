@@ -8,11 +8,14 @@ import {
   type WorkItemBlockedOn,
   type WorkItemState,
 } from "@isnadi/contracts";
-import type { BotStatusChat } from "@isnadi/shared/botStatus";
-
 import type { CapacityBot } from "../fleet/capacity.ts";
 import type { SpaceGroup } from "./overview.ts";
-import { STANDUP_QUEUE_LIMIT, spaceStandup, type StandupWorkItem } from "./standup.ts";
+import {
+  STANDUP_QUEUE_LIMIT,
+  spaceStandup,
+  type StandupChat,
+  type StandupWorkItem,
+} from "./standup.ts";
 
 const GROUP_ID = GroupId.make("g1");
 
@@ -39,7 +42,7 @@ const ROSTER: ReadonlyArray<CapacityBot> = [
   { id: OUTSIDER, name: "Outsider", archivedAt: null },
 ];
 
-function chat(overrides: Partial<BotStatusChat> = {}): BotStatusChat {
+function chat(overrides: Partial<StandupChat> = {}): StandupChat {
   return {
     id: ThreadId.make("chat-1"),
     botId: ENGINEER,
@@ -70,7 +73,7 @@ function item(
 
 function report(
   input: {
-    readonly chats?: ReadonlyArray<BotStatusChat>;
+    readonly chats?: ReadonlyArray<StandupChat>;
     readonly workItems?: ReadonlyArray<StandupWorkItem>;
   } = {},
 ) {
@@ -154,6 +157,7 @@ describe("spaceStandup", () => {
         createdAt: `2026-11-0${day}T10:00:00.000Z`,
         ...(value === undefined ? {} : { blockedOn: value }),
       });
+
     const standup = report({
       workItems: [
         blockedOn("w-user", 1, { by: "user", note: "Needs sign-in" }),
