@@ -215,6 +215,23 @@ export const ClientWorkItemCommand = Schema.Union([
 export type ClientWorkItemCommand = typeof ClientWorkItemCommand.Type;
 
 /**
+ * Server-internal: the dispatcher hands a queued item to the bot that is taking
+ * it. Unlike `work-item.assign`, which a person or the boss aims at any member,
+ * a claim succeeds only while the item is still queued and unowned, so two idle
+ * bots that read the same queue cannot both end up owning one item. The server
+ * stamps `botId`; it is never sent by a client.
+ */
+export const WorkItemClaimCommand = Schema.Struct({
+  type: Schema.Literal("work-item.claim"),
+  commandId: CommandId,
+  botId: BotId,
+  workItemId: WorkItemId,
+  createdAt: IsoDateTime,
+});
+
+export type WorkItemClaimCommand = typeof WorkItemClaimCommand.Type;
+
+/**
  * Server-internal: a bot runs one work-item command. The server resolves
  * `actorBotId` from the bot's own session, so a client can never claim to be a
  * bot. Not client-dispatchable; it stays out of `ClientOrchestrationCommand`.
