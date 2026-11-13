@@ -169,6 +169,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
           detail: `Group '${command.groupId}' still holds ${openWorkItemCount} open work item(s). Pass discardWorkItems to delete it and discard them.`,
         });
       }
+
       const occurredAt = yield* nowIso;
 
       const deletedEvent: PlannedOrchestrationEvent = {

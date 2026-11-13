@@ -8,7 +8,10 @@ import {
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
+import * as PlatformError from "effect/PlatformError";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
+import { OrchestrationCommandInvariantError } from "./Errors.ts";
 import { decideOrchestrationCommand } from "./decider.ts";
 import {
   makeReadModel,
@@ -96,12 +99,11 @@ const decide = (input: {
     actor: input.actor,
   });
 
-const failureDetail = (result: Result.Result<unknown, unknown>) =>
+const failureDetail = (
+  result: Result.Result<unknown, OrchestrationCommandInvariantError | PlatformError.PlatformError>,
+) =>
   Result.isFailure(result) &&
-  typeof result.failure === "object" &&
-  result.failure !== null &&
-  "detail" in result.failure &&
-  typeof result.failure.detail === "string"
+  Predicate.isTagged(result.failure, "OrchestrationCommandInvariantError")
     ? result.failure.detail
     : "";
 
@@ -162,6 +164,7 @@ it.layer(NodeServices.layer)("group delete authorization", (it) => {
           actor: ADMIN,
           readModel: makeGroupWithFinishedWorkOnly(),
         });
+
         const events = Array.isArray(result) ? result : [result];
 
         const deletedItemIds = events.flatMap((event) =>

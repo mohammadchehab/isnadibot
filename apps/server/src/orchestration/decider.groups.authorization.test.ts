@@ -166,7 +166,14 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
           throw new Error("Expected an authorization invariant error");
         }
 
-        expect(result.failure.detail).toContain(`Person '${outsiderId}' is not a member`);
+        // `group.delete` is environment-level, so it refuses on rights before it
+        // ever asks about membership; every other command asks about membership.
+        const expected =
+          result.failure.commandType === "group.delete"
+            ? `Person '${outsiderId}' needs 'access:write'`
+            : `Person '${outsiderId}' is not a member`;
+
+        expect(result.failure.detail).toContain(expected);
       }
     }),
   );
