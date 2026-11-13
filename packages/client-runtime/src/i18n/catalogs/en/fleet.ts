@@ -24,6 +24,8 @@ export const fleetCatalog = {
     "The model has no such reasoning level, so it starts on the model's default.",
   "The provider or model this bot picked is no longer connected.":
     "The provider or model this bot picked is no longer connected.",
+  "Every bot needs a name.": "Every bot needs a name.",
+  "Could not create the space": "Could not create the space",
 
   // Templates
   Recruiting: "Recruiting",
