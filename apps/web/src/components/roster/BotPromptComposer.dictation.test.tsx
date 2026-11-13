@@ -38,6 +38,7 @@ vi.mock("react", async (importOriginal) => {
     useMemo: reactHookHarness.useMemo,
     useRef: reactHookHarness.useRef,
     useState: reactHookHarness.useState,
+    useSyncExternalStore: reactHookHarness.useSyncExternalStore,
   };
 });
 

@@ -67,6 +67,7 @@ import {
 } from "./BotPromptMentions";
 import { useBotComposerDraft } from "./useBotComposerDraft";
 import { useBotComposerKeyboard } from "./useBotComposerKeyboard";
+import { claimComposerFocus, useComposerFocusRequest } from "./composerFocus";
 
 export {
   appendBotMention,
@@ -157,6 +158,16 @@ export function BotPromptComposer({
   );
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Steer asks this composer to take the caret: the request arrives before the
+  // chat opens, so it is claimed here, once, after the composer has mounted.
+  const steerFocusRequested = useComposerFocusRequest(draftKey);
+  useEffect(() => {
+    if (!steerFocusRequested || draftKey === undefined) return;
+
+    claimComposerFocus(draftKey);
+    window.requestAnimationFrame(() => promptInputRef.current?.focus());
+  }, [draftKey, steerFocusRequested]);
 
   const {
     draft,

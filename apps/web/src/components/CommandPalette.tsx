@@ -6,6 +6,8 @@ import {
   ArchiveIcon,
   BotIcon,
   ChartNoAxesColumnIcon,
+  CornerDownRightIcon,
+  EraserIcon,
   ImageIcon,
   LanguagesIcon,
   MessageCircleIcon,
@@ -14,6 +16,7 @@ import {
   PaletteIcon,
   PuzzleIcon,
   SettingsIcon,
+  SquareIcon,
   SunIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -51,6 +54,7 @@ import { useThreadSearch } from "../state/queries";
 import { findLatestGroupThreadIds, latestGroupThreadKey } from "./roster/botThreadRuntime.logic";
 import { useOpenChat } from "./chat/useOpenChat";
 import { useRosterStore } from "./roster/rosterStore";
+import { useBotFleetControls } from "./roster/useBotControls";
 import { resolveShortcutCommand } from "../keybindings";
 import { CommandDialog, CommandDialogPopup } from "./ui/command";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -267,8 +271,73 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
     }),
   );
 
+  // Fleet-wide bot controls. The group is only there when one of them can act,
+  // so the palette never lists a row that does nothing.
+  const fleet = useBotFleetControls();
+  const rosters = useAtomValue(allEnvironmentRostersAtom);
+
+  // Steer names the bot it corrects, so one row per running bot chat: the
+  // palette cannot open a chat and put the caret in its composer without
+  // saying whose.
+  const botNameIn = buildEnvironmentOwnerNames(rosters);
+
+  const steerItems: CommandPaletteActionItem[] = fleet.steerable.flatMap((target) => {
+    const name =
+      target.botId === null ? null : botNameIn(target.environmentId, { botId: target.botId });
+
+    if (name === null) return [];
+
+    const title = t("Send a correction to {name}", { name });
+
+    return [
+      {
+        value: `bots:steer:${target.environmentId}:${target.threadId}`,
+        searchTerms: [title, t("Steer"), "steer", "correct", "redirect", name],
+        title,
+        description: t("Opens the chat and puts the caret in the composer"),
+        icon: <CornerDownRightIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await fleet.steer(target);
+        },
+      },
+    ];
+  });
+
+  const botItems: CommandPaletteActionItem[] = [
+    ...steerItems,
+    ...(fleet.canInterruptAll
+      ? [
+          {
+            value: "bots:interrupt-all",
+            searchTerms: [t("Interrupt all bots"), "interrupt", "stop", "cancel", "all", "bots"],
+            title: t("Interrupt all bots"),
+            description: t("{count} working now", { count: fleet.running.length }),
+            icon: <SquareIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await fleet.interruptAll();
+            },
+          },
+        ]
+      : []),
+    ...(fleet.canClearAll
+      ? [
+          {
+            value: "bots:clear-all",
+            searchTerms: [t("Clear all bot contexts"), "clear", "context", "reset", "all", "bots"],
+            title: t("Clear all bot contexts"),
+            description: t("{count} idle to clear", { count: fleet.clearable.length }),
+            icon: <EraserIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await fleet.clearAll();
+            },
+          },
+        ]
+      : []),
+  ];
+
   const groups: CommandPaletteGroup[] = [
     ...(chatItems.length > 0 ? [{ value: "chat", label: t("This chat"), items: chatItems }] : []),
+    ...(botItems.length > 0 ? [{ value: "bots", label: t("Bots"), items: botItems }] : []),
     { value: "actions", label: t("Actions"), items: actionItems },
   ];
 

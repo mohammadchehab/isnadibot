@@ -1,6 +1,15 @@
 import { scopeThreadRef } from "@isnadi/client-runtime/environment";
 import { PLACEHOLDER_THREAD_TITLE, type ScopedThreadRef } from "@isnadi/contracts";
-import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, PinIcon, SettingsIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CornerDownRightIcon,
+  EraserIcon,
+  PinIcon,
+  SettingsIcon,
+  SquareIcon,
+} from "lucide-react";
 import { memo, useMemo, useRef } from "react";
 
 import { useClientSettings } from "../../hooks/useSettings";
@@ -12,7 +21,9 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { SidebarGroup } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { BotAvatarView } from "./BotAvatarView";
+import { resolveBotControlAvailability, type BotControllableShell } from "./botControls.logic";
 import { visibleBotChatMessages } from "./botConversationPresentation";
+import { useBotControlCommands } from "./useBotControls";
 import { useBotPresence } from "./botPresence";
 import { useBotRosterUnread, useChatUnread } from "../chat/useChatUnread";
 import { GroupMemberStack } from "./GroupMemberStack";
@@ -68,6 +79,7 @@ function useLatestBotMessage(
   message: RosterLastMessage | null;
   taskTitle: string | null;
   threadRef: ScopedThreadRef | null;
+  shell: BotControllableShell | null;
 } {
   const candidate = useBotThreadCandidate(botId);
   const { ref: threadRef, shell } = useBotChatTarget(botId, candidate);
@@ -85,7 +97,10 @@ function useLatestBotMessage(
   const shellTitle = shell?.title ?? null;
   const taskTitle = shellTitle === PLACEHOLDER_THREAD_TITLE ? null : shellTitle;
 
-  return useMemo(() => ({ message, taskTitle, threadRef }), [message, taskTitle, threadRef]);
+  return useMemo(
+    () => ({ message, taskTitle, threadRef, shell }),
+    [message, taskTitle, threadRef, shell],
+  );
 }
 
 const rosterFullTimestampFormatter = new Intl.DateTimeFormat(undefined, {
@@ -164,9 +179,12 @@ export const BotRosterRow = memo(function BotRosterRow({
     message: latestMessage,
     taskTitle,
     threadRef: chatRef,
+    shell: chatShell,
   } = useLatestBotMessage(bot.id, lastMessage);
 
   const unread = useBotRosterUnread(bot.id, chatRef, chatOpen);
+  const controls = resolveBotControlAvailability(chatShell);
+  const { interruptBot, clearBot, steerBot } = useBotControlCommands();
 
   return (
     <li
@@ -275,6 +293,33 @@ export const BotRosterRow = memo(function BotRosterRow({
             <MenuItem onClick={() => onOpenSettings(bot)}>
               <SettingsIcon />
               {t("Bot settings")}
+            </MenuItem>
+            <MenuItem
+              disabled={!controls.interrupt || chatRef === null}
+              onClick={() => {
+                if (chatRef !== null) void interruptBot(chatRef, chatShell);
+              }}
+            >
+              <SquareIcon />
+              {t("Interrupt")}
+            </MenuItem>
+            <MenuItem
+              disabled={!controls.steer || chatRef === null}
+              onClick={() => {
+                if (chatRef !== null) void steerBot(chatRef, chatShell);
+              }}
+            >
+              <CornerDownRightIcon />
+              {t("Steer")}
+            </MenuItem>
+            <MenuItem
+              disabled={!controls.clear || chatRef === null}
+              onClick={() => {
+                if (chatRef !== null) void clearBot(chatRef, chatShell);
+              }}
+            >
+              <EraserIcon />
+              {t("Clear context")}
             </MenuItem>
             <MenuItem onClick={() => onPin(item, !pinned)}>
               <PinIcon />

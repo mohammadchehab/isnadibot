@@ -12,6 +12,21 @@ vi.mock("../hooks/useTheme", () => ({
   useTheme: () => ({ resolvedTheme: "dark", setAppearanceMode: () => undefined }),
 }));
 
+// The Bots group needs the command runtime; this test only reads the titles.
+vi.mock("./roster/useBotControls", () => ({
+  useBotFleetControls: () => ({
+    running: [],
+    clearable: [],
+    steerable: [],
+    canInterruptAll: false,
+    canClearAll: false,
+    canSteer: false,
+    interruptAll: async () => false,
+    clearAll: async () => false,
+    steer: async () => false,
+  }),
+}));
+
 // Render the dialog shell and results as plain markup so the titles are visible.
 vi.mock("./ui/command", () => ({
   CommandDialog: ({ children }: { children: ReactNode }) => <>{children}</>,

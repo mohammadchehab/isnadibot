@@ -76,6 +76,20 @@ export function createReactHookHarness() {
 
       return slots[index] as { current: T };
     },
+    /**
+     * Reads the store once per render and does not subscribe: a component
+     * invoked as a plain function is never re-rendered by a store change, and
+     * subscribing would only leak listeners across tests. The slot is still
+     * consumed so later hooks keep the positions a real render would give them.
+     */
+    useSyncExternalStore<Snapshot>(
+      _subscribe: (listener: () => void) => () => void,
+      getSnapshot: () => Snapshot,
+    ): Snapshot {
+      nextIndex();
+
+      return getSnapshot();
+    },
     useState<T>(initialValue: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
       const index = nextIndex();
 
