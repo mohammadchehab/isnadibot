@@ -36,6 +36,10 @@
       "types": "./src/agentAwareness.ts",
       "import": "./src/agentAwareness.ts"
     },
+    "./botStatus": {
+      "types": "./src/botStatus.ts",
+      "import": "./src/botStatus.ts"
+    },
     "./git": {
       "types": "./src/git.ts",
       "import": "./src/git.ts"
