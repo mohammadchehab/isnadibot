@@ -28,6 +28,7 @@ import {
 } from "./modelSelection.ts";
 import { ChatAttachment } from "./attachments.ts";
 import { ChannelProvider, GroupHopBudget } from "./roster.ts";
+import { WorkItemId } from "./workItems.ts";
 
 export const ChannelMessageOrigin = Schema.Struct({
   provider: ChannelProvider,
@@ -243,7 +244,10 @@ const OrchestrationLatestTurnState = Schema.Literals([
 
 export type OrchestrationLatestTurnState = typeof OrchestrationLatestTurnState.Type;
 
-/** Why a group turn runs: the user message that addressed it, or a bot's mention. */
+/**
+ * Why a turn runs: the user message that addressed it, a bot's mention, or a
+ * keep-busy dispatcher handing over one queued work item.
+ */
 export const ResponderTrigger = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("user"), messageId: MessageId }),
   Schema.Struct({
@@ -251,6 +255,7 @@ export const ResponderTrigger = Schema.Union([
     sourceTurnId: TurnId,
     sourceBotId: BotId,
   }),
+  Schema.Struct({ kind: Schema.Literal("dispatcher"), workItemId: WorkItemId }),
 ]);
 
 export type ResponderTrigger = typeof ResponderTrigger.Type;

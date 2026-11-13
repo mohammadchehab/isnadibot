@@ -28,6 +28,7 @@ import { ChatAttachment, UploadChatAttachment } from "./attachments.ts";
 import { GroupHopBudget } from "./roster.ts";
 import {
   ChannelMessageOrigin,
+  ResponderTrigger,
   SourceProposedPlanReference,
   ThreadLinkedPullRequest,
 } from "./thread.ts";
@@ -251,6 +252,11 @@ export const ThreadTurnStartCommand = Schema.Struct({
   bootstrap: Schema.optional(ThreadTurnStartBootstrap),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
   respondingBotId: Schema.optional(BotId),
+  /**
+   * Why this turn runs. Server-only: absent means the user wrote it. A client
+   * command never carries this, so a client cannot forge a dispatcher brief.
+   */
+  trigger: Schema.optional(ResponderTrigger),
   addressing: Schema.optional(GroupAddressing),
   senderPersonId: Schema.optional(AuthSessionId),
   senderDisplayName: Schema.optional(TrimmedNonEmptyString),

@@ -186,6 +186,8 @@ const make = Effect.gen(function* () {
           // AC6: the chat's own runtime mode, never a raised one.
           runtimeMode: thread.runtimeMode,
           interactionMode: "default",
+          // AC6: the chat shows this brief as the dispatcher's, not the user's.
+          trigger: { kind: "dispatcher", workItemId: item.id },
           createdAt,
         })),
       ),

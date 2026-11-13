@@ -313,7 +313,8 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
           interactionMode: targetThread.interactionMode,
           ...(sourceProposedPlan !== undefined ? { sourceProposedPlan } : {}),
           respondingBotId,
-          trigger: { kind: "user", messageId: command.message.messageId },
+          // A dispatcher brief names the work item it carries; anything else is the user's own message.
+          trigger: command.trigger ?? { kind: "user", messageId: command.message.messageId },
           ...(command.timezone !== undefined ? { timezone: command.timezone } : {}),
           ...(acknowledgedDelegations.length > 0
             ? {

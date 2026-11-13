@@ -279,6 +279,7 @@ describe("FleetDispatcherReactor", () => {
           expect(h.dispatched[1]).toMatchObject({
             threadId: BOT_THREAD,
             runtimeMode: "full-access",
+            trigger: { kind: "dispatcher", workItemId: "item-1" },
             message: {
               role: "user",
               text: "Item item-1\n\nFix the thing.",
@@ -292,6 +293,40 @@ describe("FleetDispatcherReactor", () => {
               itemId: "item-1",
               botId: SPECIALIST_ID,
             },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("never raises the chat's runtime mode or interaction mode for a brief", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // The chat sits on stricter modes than the session reports; the chat's modes govern.
+          yield* Ref.set(h.model, {
+            ...idleTeamModel([workItem({ id: "item-1" })]),
+            threads: [
+              {
+                ...botThread(SPECIALIST_ID, "thread-bot-specialist"),
+                runtimeMode: "approval-required",
+                interactionMode: "plan",
+              },
+            ],
+          });
+          yield* PubSub.publish(h.events, sessionSet(1, BOT_THREAD, "running"));
+          yield* PubSub.publish(h.events, sessionSet(2, BOT_THREAD, "ready"));
+          yield* reactor.drainThrough(2);
+
+          expect(h.dispatched.filter((command) => command.type === "thread.turn.start")).toEqual([
+            expect.objectContaining({
+              runtimeMode: "approval-required",
+              interactionMode: "default",
+            }),
           ]);
         }),
       );
