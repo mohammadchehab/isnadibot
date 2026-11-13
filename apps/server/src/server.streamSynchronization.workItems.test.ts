@@ -110,4 +110,51 @@ it.layer(NodeServices.layer)("shell stream work items", (it) => {
       ]);
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
+
+  it.effect("carries only a preview of an 8000-character brief over the shell stream", () =>
+    Effect.gen(function* () {
+      const longBrief = "word ".repeat(1_600);
+      const item: WorkItem = { ...openItem, brief: longBrief };
+
+      assert.strictEqual(longBrief.length, 8_000);
+
+      yield* buildAppUnderTest({
+        layers: {
+          orchestrationEngine: {
+            latestSequence: Effect.succeed(1),
+            readEvents: () =>
+              Stream.fromIterable([
+                {
+                  ...envelope(1, workItemId),
+                  type: "work-item.created",
+                  payload: { workItem: item },
+                } satisfies Extract<OrchestrationEvent, { type: "work-item.created" }>,
+              ]),
+          },
+        },
+      });
+
+      const wsUrl = yield* getWsServerUrl("/ws");
+
+      const items = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) =>
+          client[ORCHESTRATION_WS_METHODS.subscribeShell]({ afterSequence: 0 }).pipe(
+            Stream.take(1),
+            Stream.runCollect,
+          ),
+        ),
+      );
+
+      const [event] = Array.from(items);
+
+      if (event?.kind !== "work-item-upserted") throw new Error("expected an upserted work item");
+
+      // The brief reaches the shell only as its preview; clients open the item
+      // to read the rest with `workItems.get`.
+      assert.isFalse("brief" in event.workItem);
+      assert.isAtMost(event.workItem.briefPreview.length, 280);
+      assert.isTrue(event.workItem.briefPreview.endsWith("…"));
+      assert.isTrue(longBrief.startsWith(event.workItem.briefPreview.slice(0, -1).trimEnd()));
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
 });
