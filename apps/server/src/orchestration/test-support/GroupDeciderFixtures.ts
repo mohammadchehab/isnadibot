@@ -97,7 +97,7 @@ export function makeGroup(
   return {
     id: GROUP_ID,
     name: "Product",
-    bossBotId: input.bossBotId ?? BOSS_ID,
+    bossBotId: input.bossBotId === undefined ? BOSS_ID : input.bossBotId,
     members: input.members ?? [
       { kind: "bot", botId: BOSS_ID, role: "boss" },
       { kind: "bot", botId: SPECIALIST_ID, role: "specialist" },
