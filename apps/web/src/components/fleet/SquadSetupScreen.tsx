@@ -1,7 +1,9 @@
 import { FLEET_TEMPLATES, type FleetTemplate } from "@isnadi/contracts";
+import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, MinusIcon, PlusIcon } from "lucide-react";
+import { useState } from "react";
 
 import { useI18n } from "../../i18n";
 import { Button } from "../ui/button";
@@ -10,12 +12,30 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { HireMemberRow } from "./HireMemberRow";
+import { useCreateSquad } from "./useCreateSquad";
 import { useHireDraft } from "./useHireDraft";
+
+/**
+ * Why Create is off, in the words the user can act on. The first blocker is
+ * the one the footer names; the rest stay in the list behind it.
+ */
+function BlockerNotice({ blocker }: { readonly blocker: FleetHireBlocker }) {
+  const { t } = useI18n();
+
+  switch (blocker.kind) {
+    case "no-provider":
+      return t("No provider can run this bot yet.");
+    case "empty-name":
+      return t("Every bot needs a name.");
+    case "duplicate-name":
+      return t("Two bots share that name");
+  }
+}
 
 /**
  * Screen 2 of the hire: the squad the chosen fleet creates, before it exists.
  * Every control edits the screen's draft; the draft never leaves it, so Back
- * drops the squad and Create (the next slice) is the only way one is created.
+ * drops the squad and Create is the only way one is created.
  */
 export function SquadSetupScreen({ templateId }: { readonly templateId: string }) {
   const template = FLEET_TEMPLATES.find((candidate) => candidate.id === templateId) ?? null;
@@ -52,19 +72,25 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
 
   const {
     draft,
+    blockers,
     instanceEntries,
     modelOptionsByInstance,
     pickBoss,
     pickHopBudget,
     pickModel,
     pickReasoning,
+    recordFailure,
   } = useHireDraft(template);
+
+  const createSquad = useCreateSquad();
+  const [creating, setCreating] = useState(false);
 
   const boss =
     draft.members.find((member) => member.roleId === draft.bossRoleId) ?? draft.members[0];
 
   const less = stepHopBudget(draft.hopBudget, -1);
   const more = stepHopBudget(draft.hopBudget, 1);
+  const blocker = blockers[0];
 
   return (
     <SidebarInset tone="foreground" className="h-dvh min-h-0 overflow-hidden">
@@ -152,6 +178,22 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
               </div>
             </div>
           </div>
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-6">
+          <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
+            {blocker ? <BlockerNotice blocker={blocker} /> : null}
+          </p>
+          <Button
+            disabled={creating || blocker !== undefined}
+            onClick={() => {
+              if (creating) return;
+
+              setCreating(true);
+              void createSquad(draft, recordFailure).finally(() => setCreating(false));
+            }}
+          >
+            {t("Create")}
+          </Button>
         </div>
       </div>
     </SidebarInset>

@@ -138,7 +138,7 @@ export function createBotEnvironmentAtoms<R, E>(
     // draft finishes them off because every command carries the draft's own id.
     hire: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:group:hire",
-      execute: (input: HireFleetInput) => hireFleet(input.draft),
+      execute: (input: HireFleetInput) => hireFleet(input),
       scheduler,
       concurrency: hireConcurrency,
     }),

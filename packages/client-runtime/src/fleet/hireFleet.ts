@@ -6,6 +6,8 @@ import {
   GroupHopBudget,
   GroupId,
   fleetRole,
+  type BotEngine,
+  type BotEngineChoice,
   type FleetTemplate,
   type FleetTemplateId,
   type ProviderInstanceId,
@@ -30,6 +32,13 @@ import { reasoningOptionsFor } from "./squadSeed.ts";
 export interface HireMember extends FleetHireMember {
   readonly botId: BotId;
   readonly createCommandId: CommandId;
+  /**
+   * The engine `createCommandId` was last sent with, or null while the member's
+   * create has never gone out. The server replays the stored receipt for a
+   * command id it already accepted, so a retry after an edited engine needs a
+   * fresh id: the same one would report success for an engine it never stored.
+   */
+  readonly sentEngine: BotEngine | null;
 }
 
 export interface HireDraft {
@@ -84,6 +93,7 @@ export function createHireDraft({
       ...member,
       botId: BotId.make(`bot-${makeId()}`),
       createCommandId: CommandId.make(makeId()),
+      sentEngine: null,
     }),
   );
 
@@ -239,15 +249,95 @@ export interface HireFleetResult {
 /** How the hire reaches the server as a command: the draft the screen finished. */
 export interface HireFleetInput {
   readonly draft: HireDraft;
+  /** Mints the fresh command ids an edited member needs; the web passes `crypto.randomUUID`. */
+  readonly makeId: MakeId;
+}
+
+function sameOption(
+  left: ProviderOptionSelection,
+  right: ProviderOptionSelection | undefined,
+): boolean {
+  return right !== undefined && left.id === right.id && left.value === right.value;
+}
+
+function sameChoice(left: BotEngineChoice, right: BotEngineChoice): boolean {
+  const leftOptions = left.options ?? [];
+  const rightOptions = right.options ?? [];
+
+  return (
+    left.provider === right.provider &&
+    left.model === right.model &&
+    leftOptions.length === rightOptions.length &&
+    leftOptions.every((option, index) => sameOption(option, rightOptions[index]))
+  );
+}
+
+/** Whether two engines would store the same bot, so the same command id still describes them. */
+function sameEngine(left: BotEngine | null, right: BotEngine | null): boolean {
+  if (left === null || right === null) return left === right;
+
+  return (
+    sameChoice(left, right) &&
+    left.fallbacks.length === right.fallbacks.length &&
+    left.fallbacks.every((fallback, index) => {
+      const other = right.fallbacks[index];
+
+      return other !== undefined && sameChoice(fallback, other);
+    })
+  );
+}
+
+/**
+ * The draft to send: a member whose engine changed after its create went out
+ * gets a fresh command id, so the server runs the command again and stores the
+ * engine the user picked instead of replaying a receipt for the old one.
+ */
+function withFreshCommandIds(draft: HireDraft, makeId: MakeId): HireDraft {
+  const members = draft.members.map((member) =>
+    member.sentEngine !== null && !sameEngine(member.sentEngine, member.engine)
+      ? { ...member, createCommandId: CommandId.make(makeId()) }
+      : member,
+  );
+
+  return members.every((member, index) => member === draft.members[index])
+    ? draft
+    : { ...draft, members };
+}
+
+/**
+ * The draft after a hire stopped: every member the attempt reached remembers
+ * the engine its create command carried. `withFreshCommandIds` reads that on
+ * the next Create, so an engine edited after the failure is not dropped.
+ * A blocked hire sent nothing, so every command id still describes its member.
+ */
+export function recordHireFailure(draft: HireDraft, error: HireFleetError): HireDraft {
+  if (error.step === "blocked") return draft;
+
+  const reached =
+    error.step === "group"
+      ? draft.members.length
+      : draft.members.findIndex((member) => member.roleId === error.roleId) + 1;
+
+  if (reached === 0) return draft;
+
+  return {
+    ...draft,
+    members: draft.members.map((member, index) =>
+      index < reached ? { ...member, sentEngine: member.engine } : member,
+    ),
+  };
 }
 
 /**
  * Creates the squad: one bot per member in screen order, then the group that
  * holds them under the template. Every command carries the draft's own command
  * id, so a retry after a failure replays what already landed instead of
- * creating a second bot, and a blocked draft never creates a partial squad.
+ * creating a second bot, and a blocked draft never creates a partial squad. A
+ * member edited between attempts is the exception: its create gets a fresh id,
+ * because a replayed receipt would silently keep the engine the user changed.
  */
-export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (draft: HireDraft) {
+export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (input: HireFleetInput) {
+  const draft = withFreshCommandIds(input.draft, input.makeId);
   const blocked = draftBlockers(draft)[0];
 
   if (blocked !== undefined) {

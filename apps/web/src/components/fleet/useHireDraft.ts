@@ -10,11 +10,13 @@ import {
 import {
   createHireDraft,
   draftBlockers,
+  recordHireFailure,
   setBoss,
   setHopBudget,
   setMemberModel,
   setMemberReasoning,
   type HireDraft,
+  type HireFleetError,
 } from "@isnadi/client-runtime/fleet/hire";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -94,6 +96,14 @@ export function useHireDraft(template: FleetTemplate) {
     },
     pickReasoning: (roleId: FleetRoleId, options: ReadonlyArray<ProviderOptionSelection>) => {
       edit((current) => setMemberReasoning(current, roleId, options));
+    },
+    /**
+     * Keeps the draft a failed Create hands back. The hire remembers which
+     * member's create already went out, so the next Create mints a fresh
+     * command id for a member whose engine was edited after that attempt.
+     */
+    recordFailure: (failure: HireFleetError) => {
+      edit((current) => recordHireFailure(current, failure));
     },
   };
 }
