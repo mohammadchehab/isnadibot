@@ -144,6 +144,23 @@ export {
 } from "./commands/turn.ts";
 
 export {
+  type CreateWorkItemInput,
+  type AssignWorkItemInput,
+  type UpdateWorkItemInput,
+  type BlockWorkItemInput,
+  type UnblockWorkItemInput,
+  type CloseWorkItemInput,
+  type ReopenWorkItemInput,
+  createWorkItem,
+  assignWorkItem,
+  updateWorkItem,
+  blockWorkItem,
+  unblockWorkItem,
+  closeWorkItem,
+  reopenWorkItem,
+} from "./commands/workItem.ts";
+
+export {
   type CancelDelegationInput,
   type RetryDelegationInput,
   cancelDelegation,
