@@ -74,7 +74,7 @@ export const FleetDispatchDecidedReceipt = Schema.Struct({
   itemId: Schema.optional(WorkItemId),
   botId: Schema.optional(BotId),
   reason: Schema.optional(
-    Schema.Literals(["queue-empty", "no-idle-member", "no-chat", "claim-lost"]),
+    Schema.Literals(["queue-empty", "no-idle-member", "role-holder-busy", "no-chat", "claim-lost"]),
   ),
   createdAt: IsoDateTime,
 });

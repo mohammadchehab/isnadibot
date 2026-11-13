@@ -61,6 +61,7 @@ export function makeBot(input: {
   readonly archivedAt?: OrchestrationBot["archivedAt"];
   readonly provider?: string;
   readonly model?: string;
+  readonly roleId?: OrchestrationBot["roleId"];
 }): OrchestrationBot {
   return {
     id: input.id,
@@ -72,6 +73,7 @@ export function makeBot(input: {
     skills: [],
     skillRegistryAccess: false,
     avatar: { kind: "dither", seed: input.id },
+    ...(input.roleId === undefined ? {} : { roleId: input.roleId }),
     engine:
       input.provider && input.model
         ? { provider: input.provider, model: input.model, fallbacks: [] }
