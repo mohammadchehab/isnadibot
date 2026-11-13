@@ -7,6 +7,7 @@ import {
   AuthSessionId,
   BotId,
   ChannelConnectionId,
+  FleetTemplateId,
   GroupId,
   IsoDateTime,
   MessageId,
@@ -415,6 +416,14 @@ export const OrchestrationGroup = Schema.Struct({
    * Absent means off, so a group that never set it behaves exactly as before.
    */
   keepBusy: Schema.optional(Schema.Boolean),
+  /**
+   * The fleet template this group was hired from, or null for a group someone
+   * put together by hand. Only a hired group gets a capacity view, so this is
+   * the one field that says "this is a fleet".
+   */
+  fleetTemplateId: Schema.NullOr(FleetTemplateId).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

@@ -6,6 +6,7 @@ import {
   AuthSessionId,
   BotId,
   CheckpointRef,
+  FleetTemplateId,
   GroupId,
   IsoDateTime,
   MessageId,
@@ -268,6 +269,10 @@ export const GroupCreatedPayload = Schema.Struct({
   hopBudget: Schema.optional(GroupHopBudget),
   /** Absent decodes to false so pre-existing group.created events replay unchanged. */
   keepBusy: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  // Absent on events written before hired fleets, so the default keeps them replayable.
+  fleetTemplateId: Schema.NullOr(FleetTemplateId).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

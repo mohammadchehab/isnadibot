@@ -35,6 +35,7 @@ describe("IsnadiDelegationRuntime", () => {
         { kind: "bot" as const, botId: PARENT_BOT_ID, role: "boss" as const },
         { kind: "bot" as const, botId: CHILD_BOT_ID, role: "specialist" as const },
       ],
+      fleetTemplateId: null,
       createdAt: NOW,
       updatedAt: NOW,
     };
@@ -96,6 +97,7 @@ describe("IsnadiDelegationRuntime", () => {
               { kind: "bot" as const, botId: PARENT_BOT_ID, role: "boss" as const },
               { kind: "bot" as const, botId: CHILD_BOT_ID, role: "specialist" as const },
             ],
+            fleetTemplateId: null,
             createdAt: NOW,
             updatedAt: NOW,
           },
@@ -203,6 +205,7 @@ describe("IsnadiDelegationRuntime", () => {
         { kind: "bot" as const, botId: boss, role: "boss" as const },
         { kind: "bot" as const, botId: CHILD_BOT_ID, role: "specialist" as const },
       ],
+      fleetTemplateId: null,
       createdAt: NOW,
       updatedAt: NOW,
     });
@@ -257,6 +260,7 @@ describe("IsnadiDelegationRuntime", () => {
       name: "Research",
       bossBotId: PARENT_BOT_ID,
       members: [{ kind: "bot" as const, botId: PARENT_BOT_ID, role: "boss" as const }],
+      fleetTemplateId: null,
       createdAt: NOW,
       updatedAt: NOW,
     };
