@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 1921,
+  "directMessageCount": 1939,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -94,7 +94,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "choice.label)}",
     ],
     "apps/web/src/components/roster/FleetCapacityView.tsx": [
-      "BOT_STATUS_LABEL[row.status])}",
+      "STATUS_LABEL[row.status])}</span>",
     ],
     "apps/web/src/components/roster/GroupEditor.tsx": [
       "'Delete "{name}"? Its bots stay in your roster.', { name: group.name }),",
@@ -203,9 +203,6 @@ exports[`discovered interface message coverage > covers static calls and finite 
     ],
     "apps/web/src/components/settings/useSettingsRestore.ts": [
       "label)).join(", "),",
-    ],
-    "apps/web/src/components/space/SpaceStandup.tsx": [
-      "BOT_STATUS_LABEL[row.status])}",
     ],
     "packages/client-runtime/src/botInbox.ts": [
       "MEMORY_APPROVAL_ACTIONS[approval.scope]),",
@@ -585,7 +582,6 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/sidebar/SidebarProviderUpdatePill.tsx",
     "apps/web/src/components/sidebar/SidebarUpdatePill.tsx",
     "apps/web/src/components/space/SpaceOverview.tsx",
-    "apps/web/src/components/space/SpaceStandup.tsx",
     "apps/web/src/components/space/SpaceTasks.tsx",
     "apps/web/src/components/space/SpaceView.tsx",
     "apps/web/src/components/space/TaskDialog.tsx",
