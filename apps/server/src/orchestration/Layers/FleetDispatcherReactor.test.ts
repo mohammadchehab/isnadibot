@@ -1,13 +1,15 @@
 import { it } from "@effect/vitest";
 import {
-  type BotId,
+  BotId,
   CheckpointRef,
   EventId,
+  FleetRoleId,
   ThreadId,
   TurnId,
   WorkItemId,
   type OrchestrationCommand,
   type OrchestrationEvent,
+  type OrchestrationBot,
   type OrchestrationGroup,
   type OrchestrationReadModel,
   type OrchestrationThread,
@@ -55,6 +57,52 @@ const BOT_A = makeBot({ id: "bot-a" as BotId, groupId: GROUP_ID });
 
 const BOT_B = makeBot({ id: "bot-b" as BotId, groupId: GROUP_ID });
 
+/** A team hired into roles, so an item that names a role has someone it could go to. */
+const ARCHITECT_ID = BotId.make("bot-architect");
+
+const ENGINEER_ID = BotId.make("bot-engineer");
+
+const ARCHITECT_ROLE = FleetRoleId.make("architect");
+
+const TEAM = [
+  makeBot({ id: ARCHITECT_ID, groupId: GROUP_ID, roleId: ARCHITECT_ROLE }),
+  makeBot({ id: ENGINEER_ID, groupId: GROUP_ID, roleId: FleetRoleId.make("engineer") }),
+];
+
+/**
+ * A keep-busy group of role-bearing specialists: `busy` may name a member whose turn is still
+ * running, so the role it holds is taken but the bot itself is not free.
+ */
+const roleTeamModel = (input: {
+  readonly bots: ReadonlyArray<OrchestrationBot>;
+  readonly busy?: ReadonlyArray<BotId>;
+  readonly items: ReadonlyArray<WorkItem>;
+}): OrchestrationReadModel => {
+  const busy = new Set(input.busy ?? []);
+
+  return {
+    ...makeReadModel({
+      bots: input.bots,
+      groups: [
+        keepBusyGroup({
+          bossBotId: null,
+          members: input.bots.map((bot) => ({
+            kind: "bot" as const,
+            botId: bot.id,
+            role: "specialist" as const,
+          })),
+        }),
+      ],
+      threads: input.bots.map((bot) =>
+        busy.has(bot.id)
+          ? runningThread(bot.id, `thread-${bot.id}`)
+          : botThread(bot.id, `thread-${bot.id}`),
+      ),
+    }),
+    workItems: input.items,
+  };
+};
+
 const botThread = (botId: BotId, id: string): OrchestrationThread => ({
   ...makeGroupThread(),
   id: ThreadId.make(id),
@@ -64,10 +112,25 @@ const botThread = (botId: BotId, id: string): OrchestrationThread => ({
   latestTurn: null,
 });
 
+/** A bot with a turn still running: it is not idle and cannot take anything. */
+const runningThread = (botId: BotId, id: string): OrchestrationThread => ({
+  ...botThread(botId, id),
+  session: {
+    threadId: ThreadId.make(id),
+    status: "running",
+    providerName: "codex",
+    runtimeMode: "full-access",
+    activeTurnId: TurnId.make("turn-1"),
+    lastError: null,
+    updatedAt: NOW,
+  },
+});
+
 const workItem = (input: {
   readonly id: string;
   readonly state?: WorkItem["state"];
   readonly ownerBotId?: BotId;
+  readonly role?: WorkItem["role"];
   readonly createdAt?: string;
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
@@ -77,6 +140,7 @@ const workItem = (input: {
   kind: "task",
   state: input.state ?? "queued",
   ...(input.ownerBotId === undefined ? {} : { ownerBotId: input.ownerBotId }),
+  ...(input.role === undefined ? {} : { role: input.role }),
   createdAt: input.createdAt ?? NOW,
   updatedAt: NOW,
 });
@@ -644,6 +708,204 @@ describe("FleetDispatcherReactor", () => {
           expect(yield* receipts).toMatchObject([
             { type: "fleet.dispatch.decided", kind: "skipped", reason: "no-idle-member" },
           ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("keeps an item queued while the only member holding its role is busy", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(
+        h.model,
+        roleTeamModel({
+          bots: TEAM,
+          busy: [ARCHITECT_ID],
+          items: [workItem({ id: "item-design", role: ARCHITECT_ROLE })],
+        }),
+      );
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // The engineer is free, but the item asked for the architect and the architect is not.
+          expect(h.dispatched).toEqual([]);
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "skipped",
+              reason: "role-holder-busy",
+              itemId: "item-design",
+            },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("hands a role-bearing item to the idle member that holds its role", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(
+        h.model,
+        roleTeamModel({
+          bots: TEAM,
+          items: [workItem({ id: "item-design", role: ARCHITECT_ROLE })],
+        }),
+      );
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          // The engineer sorts higher by id, but the item named the architect's role.
+          expect(h.dispatched[0]).toMatchObject({
+            botId: ARCHITECT_ID,
+            workItemId: "item-design",
+          });
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("hands an item whose role nobody holds to any idle specialist", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(
+        h.model,
+        roleTeamModel({
+          bots: TEAM,
+          items: [workItem({ id: "item-report", role: FleetRoleId.make("writer") })],
+        }),
+      );
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: ARCHITECT_ID });
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("dispatches past a role-blocked item instead of ending the group's pass", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(
+        h.model,
+        roleTeamModel({
+          bots: TEAM,
+          busy: [ARCHITECT_ID],
+          items: [
+            workItem({ id: "item-design", role: ARCHITECT_ROLE, createdAt: NOW }),
+            workItem({ id: "item-fix", createdAt: LATER }),
+          ],
+        }),
+      );
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // The design item waits for its architect; the role-less one behind it still goes out.
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({
+            botId: ENGINEER_ID,
+            workItemId: "item-fix",
+          });
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "skipped",
+              reason: "role-holder-busy",
+              itemId: "item-design",
+            },
+            {
+              type: "fleet.dispatch.decided",
+              kind: "assigned",
+              itemId: "item-fix",
+              botId: ENGINEER_ID,
+            },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("keeps a second item for the same role queued once that member is busied", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(
+        h.model,
+        roleTeamModel({
+          bots: TEAM,
+          items: [
+            workItem({ id: "item-design-1", role: ARCHITECT_ROLE, createdAt: NOW }),
+            workItem({ id: "item-design-2", role: ARCHITECT_ROLE, createdAt: LATER }),
+          ],
+        }),
+      );
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // One architect, one item: the second waits for it rather than falling to the engineer.
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({
+            botId: ARCHITECT_ID,
+            workItemId: "item-design-1",
+          });
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("lets the boss that is the group's only bot take a role-bearing item", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      const boss = makeBot({ id: BOSS_ID, groupId: GROUP_ID, roleId: ARCHITECT_ROLE });
+
+      yield* Ref.set(h.model, {
+        ...makeReadModel({
+          bots: [boss],
+          groups: [keepBusyGroup({ members: [{ kind: "bot", botId: BOSS_ID, role: "boss" }] })],
+          threads: [botThread(BOSS_ID, "thread-boss")],
+        }),
+        workItems: [workItem({ id: "item-design", role: ARCHITECT_ROLE })],
+      });
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: BOSS_ID });
         }),
       );
     }).pipe(Effect.scoped),

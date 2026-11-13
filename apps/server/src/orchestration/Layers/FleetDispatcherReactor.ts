@@ -1,6 +1,7 @@
 import {
   BotId,
   CommandId,
+  type FleetRoleId,
   GroupId,
   MessageId,
   WorkItemId,
@@ -38,7 +39,7 @@ import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts"
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 
 /** Why a group was left exactly as it was. */
-type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost";
+type SkipReason = "queue-empty" | "no-idle-member" | "role-holder-busy" | "no-chat" | "claim-lost";
 
 /** The state an item holds while its owner is expected to be working on it. */
 const HELD_ITEM_STATES: ReadonlySet<WorkItem["state"]> = new Set([
@@ -197,24 +198,38 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const waiting = queuedWorkItems(readModel, group.id);
       const busied = new Set<BotId>();
+      const reported = yield* Ref.make(false);
 
       if (waiting.length === 0)
         return yield* publishDecision(group.id, "skipped", { reason: "queue-empty" });
 
+      // One skip receipt per pass, and only while the pass has handed nothing out: the item that
+      // could not go decides the reason, and the rest of the queue is still tried.
+      const skip = (item: WorkItem, reason: SkipReason) =>
+        Ref.getAndSet(reported, true).pipe(
+          Effect.flatMap((already) =>
+            already || busied.size > 0
+              ? Effect.void
+              : publishDecision(group.id, "skipped", { itemId: item.id, reason }),
+          ),
+        );
+
       for (const item of waiting) {
-        const bot = pickIdleMember(readModel, group, busied);
+        const pick = pickIdleMember(readModel, group, {
+          ...(item.role === undefined ? {} : { role: item.role }),
+          busy: busied,
+        });
 
-        if (bot === undefined) {
-          if (busied.size === 0) {
-            yield* publishDecision(group.id, "skipped", {
-              itemId: item.id,
-              reason: "no-idle-member",
-            });
-          }
+        if (pick.kind !== "picked") {
+          yield* skip(
+            item,
+            pick.kind === "role-holder-busy" ? "role-holder-busy" : "no-idle-member",
+          );
 
-          return;
+          continue;
         }
 
+        const bot = pick.bot;
         const chat = botChat(readModel, bot.id);
 
         if (chat === undefined) {
@@ -490,24 +505,54 @@ export function isBotIdle(readModel: OrchestrationReadModel, botId: BotId): bool
     );
 }
 
+/** What the next item gets: a member to do it, or the reason there is none. */
+export type MemberPick =
+  | { readonly kind: "picked"; readonly bot: OrchestrationBot }
+  | { readonly kind: "role-holder-busy" }
+  | { readonly kind: "none" };
+
 /**
- * The member that takes the next item: any idle specialist, or the boss when it is the only bot
- * in the group. Ties go to the lowest bot id until AC7 picks the one idle longest.
+ * The member that takes the next item: an idle specialist the item's role names, or any idle
+ * specialist when the item names no role or no member holds that role.
+ *
+ * An item whose role only a busy member holds stays queued instead of going to someone the item
+ * did not ask for (`role-holder-busy`). The boss takes anything only when it is the group's only
+ * bot, so a role only the boss carries counts as a role nobody eligible holds. Ties go to the
+ * lowest bot id until AC7 picks the one idle longest.
  */
 export function pickIdleMember(
   readModel: OrchestrationReadModel,
   group: OrchestrationGroup,
-  busy: ReadonlySet<BotId> = new Set(),
-): OrchestrationBot | undefined {
+  input: { readonly role?: FleetRoleId; readonly busy?: ReadonlySet<BotId> } = {},
+): MemberPick {
+  const busy = input.busy ?? new Set<BotId>();
   const members = group.members.filter(isGroupBotMember).map((member) => member.botId);
   const specialists = members.filter((botId) => botId !== group.bossBotId);
-  const candidates = specialists.length > 0 ? specialists : members;
+  const eligible = specialists.length > 0 ? specialists : members;
+  const botOf = (botId: BotId) => readModel.bots.find((bot) => bot.id === botId);
 
-  return candidates
+  const free = eligible
     .filter((botId) => !busy.has(botId) && isBotIdle(readModel, botId))
-    .toSorted((left, right) => left.localeCompare(right))
-    .map((botId) => readModel.bots.find((bot) => bot.id === botId))
-    .find((bot): bot is OrchestrationBot => bot !== undefined);
+    .toSorted((left, right) => left.localeCompare(right));
+
+  const holders = new Set(
+    input.role === undefined ? [] : eligible.filter((botId) => botOf(botId)?.roleId === input.role),
+  );
+
+  if (holders.size > 0) {
+    const match = free.find((botId) => holders.has(botId));
+
+    if (match === undefined) return { kind: "role-holder-busy" };
+
+    const holder = botOf(match);
+
+    return holder === undefined ? { kind: "role-holder-busy" } : { kind: "picked", bot: holder };
+  }
+
+  const next = free[0];
+  const bot = next === undefined ? undefined : botOf(next);
+
+  return bot === undefined ? { kind: "none" } : { kind: "picked", bot };
 }
 
 export const FleetDispatcherReactorLive = Layer.effect(FleetDispatcherReactor, make);
