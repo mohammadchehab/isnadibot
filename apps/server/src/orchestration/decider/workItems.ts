@@ -7,6 +7,7 @@ import {
   type OrchestrationGroup,
   type OrchestrationReadModel,
   type WorkItem,
+  type WorkItemClaimCommand,
 } from "@isnadi/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -24,7 +25,7 @@ type WorkItemActor =
   | { readonly kind: "user"; readonly dispatch: OrchestrationDispatchActor | undefined }
   | { readonly kind: "bot"; readonly botId: BotId };
 
-type WorkItemCommand = ClientWorkItemCommand;
+type WorkItemCommand = ClientWorkItemCommand | WorkItemClaimCommand;
 
 /** A member bot may only move its own item forward; everything else is the boss's call. */
 const MEMBER_BOT_COMMANDS: ReadonlySet<WorkItemCommand["type"]> = new Set([
@@ -88,6 +89,10 @@ function requireActorAllowed(input: {
       reject(input.command, `Bot '${botId}' is not in group '${input.group.id}'.`),
     );
   }
+
+  // A claim is a bot taking an item nobody owns yet, so ownership cannot gate it;
+  // the claim branch decides whether the item is still takeable.
+  if (input.command.type === "work-item.claim") return Effect.void;
 
   if (botId === input.group.bossBotId) return Effect.void;
 
@@ -215,6 +220,25 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
   const touch = { updatedAt: occurredAt };
 
   switch (command.type) {
+    case "work-item.claim": {
+      if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
+
+      if (item.ownerBotId !== undefined || item.state !== "queued") {
+        return yield* reject(
+          command,
+          `Work item '${item.id}' is already ${item.ownerBotId === undefined ? item.state : `taken by '${item.ownerBotId}'`}.`,
+        );
+      }
+
+      // The bot took the item itself, so no `assignedByBotId` is recorded.
+      return yield* changed("work-item.assigned", {
+        ...carry(item, { owner: true, block: true }),
+        ownerBotId: command.botId,
+        state: "assigned",
+        ...touch,
+      });
+    }
+
     case "work-item.assign": {
       if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
 

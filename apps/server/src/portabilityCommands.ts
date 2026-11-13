@@ -118,6 +118,7 @@ export function itemForCommand(
       case "work-item.unblock":
       case "work-item.close":
       case "work-item.reopen":
+      case "work-item.claim":
         return `work-item:${command.workItemId}`;
       case "work-item.bot-act":
         return `work-item:${command.command.workItemId}`;

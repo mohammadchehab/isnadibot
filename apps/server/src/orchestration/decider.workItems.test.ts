@@ -54,6 +54,18 @@ const makeModel = (items: ReadonlyArray<WorkItem>, group?: Parameters<typeof mak
 const cmd = (command: OrchestrationCommand) => command;
 
 /**
+ * A claim is server-internal: the dispatcher stamps the bot that is taking the
+ * item, so it never travels through the `work-item.bot-act` wrapper.
+ */
+const claimCmd = (botId: BotId, commandId = "cmd-work-item.claim"): OrchestrationCommand => ({
+  type: "work-item.claim",
+  commandId: CommandId.make(commandId),
+  botId,
+  workItemId: ITEM_ID,
+  createdAt: NOW,
+});
+
+/**
  * A bot acts only through the server-built wrapper: the server stamps the bot id
  * from the bot's own session, so a client command can never claim to be a bot.
  */
@@ -210,6 +222,63 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
         [makeItem()],
       ),
     ),
+  );
+
+  it.effect("lets a bot claim a queued unowned item", () =>
+    Effect.gen(function* () {
+      const events = yield* decide(claimCmd(SPECIALIST_ID), [makeItem()]);
+
+      expect(events[0]?.type).toBe("work-item.assigned");
+      expect(changed(events)).toMatchObject({
+        state: "assigned",
+        ownerBotId: SPECIALIST_ID,
+      });
+      expect(changed(events).assignedByBotId).toBeUndefined();
+    }),
+  );
+
+  it.effect("lets only the first of two racing claims win the item", () =>
+    Effect.gen(function* () {
+      const claimed = changed(yield* decide(claimCmd(SPECIALIST_ID), [makeItem()]));
+
+      yield* fails(decide(claimCmd(OTHER_SPECIALIST_ID), [claimed]));
+      yield* fails(decide(claimCmd(SPECIALIST_ID, "cmd-work-item.claim-again"), [claimed]));
+    }),
+  );
+
+  it.effect("refuses a claim on an item that is taken, blocked, finished or owned", () =>
+    Effect.gen(function* () {
+      yield* fails(decide(claimCmd(SPECIALIST_ID), [makeItem({ state: "in-progress" })]));
+      yield* fails(decide(claimCmd(SPECIALIST_ID), [makeItem({ state: "review" })]));
+      yield* fails(
+        decide(claimCmd(SPECIALIST_ID), [
+          makeItem({
+            state: "blocked",
+            blockedFrom: "queued",
+            blockedOn: { by: "user", note: "Need the API key" },
+          }),
+        ]),
+      );
+      yield* fails(
+        decide(claimCmd(SPECIALIST_ID), [
+          makeItem({ state: "queued", ownerBotId: OTHER_SPECIALIST_ID }),
+        ]),
+      );
+      yield* fails(decide(claimCmd(SPECIALIST_ID), [makeItem({ state: "done", doneAt: NOW })]));
+      yield* fails(decide(claimCmd(SPECIALIST_ID), [makeItem({ state: "closed", closedAt: NOW })]));
+    }),
+  );
+
+  it.effect("refuses a claim from a bot outside the group", () =>
+    fails(decide(claimCmd(OTHER_SPECIALIST_ID), [makeItem()])),
+  );
+
+  it.effect("lets the boss claim too, leaving dispatcher policy to keep it out of the queue", () =>
+    Effect.gen(function* () {
+      const events = yield* decide(claimCmd(BOSS_ID), [makeItem()]);
+
+      expect(changed(events)).toMatchObject({ state: "assigned", ownerBotId: BOSS_ID });
+    }),
   );
 
   it.effect("moves to in-progress only from assigned, in-progress, review or blocked", () =>
