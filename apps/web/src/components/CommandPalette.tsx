@@ -18,9 +18,11 @@ import {
   SettingsIcon,
   SquareIcon,
   SunIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAtomValue } from "@effect/atom-react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { useTheme } from "../hooks/useTheme";
 import { isPreviewFocused } from "../lib/previewFocus";
@@ -133,6 +135,7 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   const [query, setQuery] = useState("");
   const [highlightedItemValue, setHighlightedItemValue] = useState<string | null>(null);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const navigate = useNavigate();
   const { theme, themeHalves, resolvedTheme, setAppearanceMode } = useTheme();
 
   // Names the mode you would switch to, so the row reads as a verb.
@@ -142,6 +145,24 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
     nextAppearance === "dark" ? t("Switch to dark mode") : t("Switch to light mode");
 
   const actionItems: CommandPaletteActionItem[] = [
+    {
+      value: "action:new-space",
+      searchTerms: [
+        t("New space"),
+        t("New group"),
+        "new space",
+        "new group",
+        "fleet",
+        "hire",
+        "squad",
+        "team",
+      ],
+      title: t("New space"),
+      icon: <UsersIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        void navigate({ to: "/spaces/new" });
+      },
+    },
     {
       value: "action:toggle-appearance",
       searchTerms: [appearanceTitle, "theme", "appearance", "dark", "light", "mode", "toggle"],
