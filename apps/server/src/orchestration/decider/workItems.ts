@@ -1,9 +1,11 @@
 import {
   isGroupBotMember,
+  MessageId,
   WORK_ITEM_OPEN_LIMIT,
   type BotId,
   type ClientWorkItemCommand,
   type CommandId,
+  type GroupId,
   type OrchestrationGroup,
   type OrchestrationReadModel,
   type WorkItem,
@@ -147,6 +149,93 @@ function carry(
     ...(!drop.finish && item.closedAt !== undefined ? { closedAt: item.closedAt } : {}),
   };
 }
+
+/**
+ * The owner can vanish mid-flight: an unassigned, archived or deleted bot leaves
+ * its open items unowned and back in the queue, and each item's chat says why.
+ * Finished items keep their owner for history.
+ *
+ * `groupId` narrows the sweep to the group the bot just left; without it the bot
+ * is gone from every group, so every item it owns is released. The chat line goes
+ * to the item's own chat because that is where its work happens; an item nobody
+ * picked up has no chat, so it is released silently.
+ */
+export const clearOwnedWorkItems = Effect.fn("clearOwnedWorkItems")(function* ({
+  readModel,
+  botId,
+  occurredAt,
+  commandId,
+  groupId,
+}: {
+  readonly readModel: OrchestrationReadModel;
+  readonly botId: BotId;
+  readonly occurredAt: string;
+  readonly commandId: CommandId;
+  readonly groupId?: GroupId;
+}): Effect.fn.Return<
+  ReadonlyArray<PlannedOrchestrationEvent>,
+  PlatformError.PlatformError,
+  Crypto.Crypto
+> {
+  const botName = readModel.bots.find((bot) => bot.id === botId)?.name ?? botId;
+  const events: PlannedOrchestrationEvent[] = [];
+
+  const orphaned = (readModel.workItems ?? []).filter(
+    (item) =>
+      item.ownerBotId === botId &&
+      isOpen(item) &&
+      (groupId === undefined || item.groupId === groupId),
+  );
+
+  for (const item of orphaned) {
+    events.push({
+      ...(yield* withEventBase({
+        aggregateKind: "work-item",
+        aggregateId: item.id,
+        occurredAt,
+        commandId,
+      })),
+      type: "work-item.assigned",
+      payload: {
+        workItem: {
+          ...carry(item, { owner: true, block: true }),
+          state: "queued",
+          updatedAt: occurredAt,
+        },
+      },
+    });
+
+    const thread =
+      item.threadId === undefined
+        ? undefined
+        : readModel.threads.find((candidate) => candidate.id === item.threadId);
+
+    if (thread === undefined || thread.deletedAt !== null) continue;
+
+    events.push({
+      ...(yield* withEventBase({
+        aggregateKind: "thread",
+        aggregateId: thread.id,
+        occurredAt,
+        commandId,
+      })),
+      type: "thread.message-sent",
+      payload: {
+        threadId: thread.id,
+        // Deterministic, so a retried command cannot post the line twice.
+        messageId: MessageId.make(`work-item-owner-cleared:${item.id}`),
+        role: "system",
+        text: `${botName} left, so "${item.title}" is back in the queue.`,
+        turnId: null,
+        streaming: false,
+        createdAt: occurredAt,
+        updatedAt: occurredAt,
+      },
+    });
+  }
+
+  return events;
+});
 
 export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
   command,

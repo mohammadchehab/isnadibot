@@ -31,6 +31,7 @@ import {
   delegationChildTurnId,
   type DecideOrchestrationCommandResult,
 } from "./eventBase.ts";
+import { clearOwnedWorkItems } from "./workItems.ts";
 
 export const decideBots = Effect.fn("decideBots")(function* ({
   command,
@@ -171,6 +172,16 @@ export const decideBots = Effect.fn("decideBots")(function* ({
           type: "group.member-unassigned",
           payload: { groupId: sourceGroup.id, botId: bot.id, updatedAt: occurredAt },
         });
+
+        events.push(
+          ...(yield* clearOwnedWorkItems({
+            readModel,
+            botId: bot.id,
+            occurredAt,
+            commandId: command.commandId,
+            groupId: sourceGroup.id,
+          })),
+        );
       }
 
       if (
@@ -317,7 +328,15 @@ export const decideBots = Effect.fn("decideBots")(function* ({
         });
       }
 
-      return [...pausedEvents, archivedEvent];
+      // An archived bot does no work, so nothing stays assigned to it.
+      const clearedEvents = yield* clearOwnedWorkItems({
+        readModel,
+        botId: command.botId,
+        occurredAt,
+        commandId: command.commandId,
+      });
+
+      return [...pausedEvents, ...clearedEvents, archivedEvent];
     }
 
     case "bot.restore": {
@@ -491,6 +510,15 @@ export const decideBots = Effect.fn("decideBots")(function* ({
           },
         });
       }
+
+      events.push(
+        ...(yield* clearOwnedWorkItems({
+          readModel,
+          botId: bot.id,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+      );
 
       for (const thread of liveThreads) {
         const owned = thread.botId === bot.id;

@@ -17,6 +17,7 @@ import {
   activeGroupBotIds,
   type DecideOrchestrationCommandResult,
 } from "./eventBase.ts";
+import { clearOwnedWorkItems } from "./workItems.ts";
 
 export const decideGroups = Effect.fn("decideGroups")(function* ({
   command,
@@ -280,7 +281,17 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         },
       };
 
-      return unassignedEvent;
+      // The bot leaves this group, so the work it owned here needs a new owner.
+      return [
+        unassignedEvent,
+        ...(yield* clearOwnedWorkItems({
+          readModel,
+          botId: command.botId,
+          occurredAt,
+          commandId: command.commandId,
+          groupId: group.id,
+        })),
+      ];
     }
 
     case "group.person.assign": {
