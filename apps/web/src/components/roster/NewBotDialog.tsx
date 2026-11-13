@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { readyMadeBot, type ReadyMadeBotId } from "@isnadi/contracts";
+import {
+  readyMadeBotCopy,
+  readyMadeStartSchedule,
+  readyMadeTargetProblem,
+} from "@isnadi/client-runtime/fleet/ready-made-bot";
+import type { RoutineAdapterSchedule } from "@isnadi/client-runtime/routines";
 
 import { useI18n } from "../../i18n";
 import { usePrimaryEnvironmentId } from "../../state/environments";
@@ -19,9 +26,14 @@ import {
 import { Input } from "../ui/input";
 import { AvatarColorPicker } from "./AvatarColorPicker";
 import { BotAvatarView } from "./BotAvatarView";
+import { ReadyMadeBotPicker } from "./ReadyMadeBotPicker";
+import { RoutineScheduleFields } from "./RoutineScheduleFields";
 import { BLOB_SHAPES, blobShapeLabel, randomBotAvatar } from "./roster.logic";
 import type { BotAvatar } from "./types";
 import { useBotEngineAvailability } from "./useBotEngineAvailability";
+import type { NewBotInput } from "./useNewBotCreate";
+
+const viewerTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 /** A compact bot creation form with all required choices in one view. */
 export function NewBotDialog({
@@ -33,7 +45,7 @@ export function NewBotDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { name: string; avatar: BotAvatar }) => void;
+  onCreate: (input: NewBotInput) => void;
   submitting?: boolean;
 }) {
   const { t } = useI18n();
@@ -44,7 +56,37 @@ export function NewBotDialog({
   const [name, setName] = useState("");
   const [blobAvatar, setBlobAvatar] = useState(() => randomBotAvatar());
   const [avatar, setAvatar] = useState<BotAvatar>(() => blobAvatar);
+  const [presetId, setPresetId] = useState<ReadyMadeBotId | null>(null);
+  const [target, setTarget] = useState("");
+  const [schedule, setSchedule] = useState<RoutineAdapterSchedule>(() => ({
+    frequency: "daily",
+    time: "09:00",
+    timezone: viewerTimezone(),
+    weekday: null,
+  }));
   const trimmedName = name.trim();
+  const preset = presetId === null ? undefined : readyMadeBot(presetId);
+  const presetCopy = preset ? readyMadeBotCopy(preset.id) : null;
+  const targetProblem = preset ? readyMadeTargetProblem(target) : null;
+
+  const selectPreset = (id: ReadyMadeBotId | null) => {
+    setPresetId(id);
+    const next = id === null ? undefined : readyMadeBot(id);
+
+    if (!next) return;
+    const copy = readyMadeBotCopy(next.id);
+    // Name and look follow the preset only while the user has not set their own.
+    setName((current) => (current.trim().length === 0 && copy ? t(copy.name) : current));
+
+    // The look follows the preset only while the user has not uploaded their own.
+    if (presetId === null) {
+      if (next.avatar.kind === "blob") setBlobAvatar(next.avatar);
+      setAvatar(next.avatar);
+    }
+
+    setTarget(next.defaultTarget);
+    setSchedule(readyMadeStartSchedule(next, viewerTimezone()));
+  };
 
   const updateBlobAvatar = (next: typeof blobAvatar) => {
     setBlobAvatar(next);
@@ -74,8 +116,14 @@ export function NewBotDialog({
           onSubmit={(event) => {
             event.preventDefault();
 
-            if (submitting || trimmedName.length === 0) return;
-            onCreate({ name: trimmedName, avatar });
+            if (submitting || trimmedName.length === 0 || targetProblem !== null) return;
+            onCreate({
+              name: trimmedName,
+              avatar,
+              ...(preset
+                ? { readyMade: { presetId: preset.id, target: target.trim(), schedule } }
+                : {}),
+            });
           }}
         >
           <DialogHeader className="shrink-0">
@@ -86,6 +134,13 @@ export function NewBotDialog({
           </DialogHeader>
 
           <DialogPanel className="grid gap-6 sm:grid-cols-(--grid-template-columns-12rem-1fr)">
+            <div className="sm:col-span-2">
+              <ReadyMadeBotPicker
+                selected={presetId}
+                timezone={schedule.timezone}
+                onSelect={selectPreset}
+              />
+            </div>
             {defaultEngine.blocked && defaultEngine.unavailability ? (
               <div className="sm:col-span-2">
                 <ProviderUnavailableNotice
@@ -100,7 +155,9 @@ export function NewBotDialog({
               <div className="mt-4 max-w-full truncate text-sm font-semibold">
                 {trimmedName || t("Your bot")}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{t("Preview")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {presetCopy ? t(presetCopy.role) : t("Preview")}
+              </p>
             </div>
 
             <div className="min-w-0 space-y-6">
@@ -128,6 +185,43 @@ export function NewBotDialog({
                     : t("This is how the bot appears in your roster.")}
                 </span>
               </label>
+
+              {preset && presetCopy ? (
+                <section
+                  aria-labelledby="new-bot-ready-made-heading"
+                  className="space-y-4 border-t border-border/70 pt-5"
+                >
+                  <h3
+                    id="new-bot-ready-made-heading"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {t(presetCopy.targetLabel)}
+                  </h3>
+                  <Input
+                    data-testid="new-bot-target-input"
+                    aria-invalid={targetProblem !== null}
+                    aria-describedby="new-bot-target-help"
+                    value={target}
+                    onChange={(event) => setTarget(event.target.value)}
+                  />
+                  <p
+                    id="new-bot-target-help"
+                    className={cn(
+                      "text-xs",
+                      targetProblem !== null ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {targetProblem === "unsupported-scheme"
+                      ? t(presetCopy.targetSchemeProblem)
+                      : targetProblem === "empty"
+                        ? t(
+                            "Enter a folder in the project, or a link that starts with http:// or https://.",
+                          )
+                        : t(presetCopy.targetHelp)}
+                  </p>
+                  <RoutineScheduleFields schedule={schedule} onChange={setSchedule} />
+                </section>
+              ) : null}
 
               <section
                 aria-labelledby="new-bot-avatar-heading"
@@ -194,7 +288,7 @@ export function NewBotDialog({
               type="submit"
               aria-describedby={trimmedName.length === 0 ? "new-bot-name-help" : undefined}
               variant="default-muted-disabled"
-              disabled={submitting || trimmedName.length === 0}
+              disabled={submitting || trimmedName.length === 0 || targetProblem !== null}
             >
               {submitting ? t("Creating") : t("Create bot")}
             </Button>

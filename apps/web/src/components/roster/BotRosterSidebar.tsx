@@ -31,7 +31,6 @@ import {
 import { Button } from "../ui/button";
 import { SidebarContent, SidebarGroup } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
-import { DEFAULT_BOT_RUNTIME_MODE } from "./botSandbox";
 import { NewBotDialog } from "./NewBotDialog";
 import { NewGroupDialog, type NewGroupInput } from "./NewGroupDialog";
 import {
@@ -53,8 +52,9 @@ import { useRosterStore } from "./rosterStore";
 import { resolveRosterListState } from "./rosterRouteSelection";
 import { RosterLoadStatus } from "./RosterLoadStatus";
 import { useRosterLoadState } from "./useServerRoster";
-import type { Bot, BotAvatar, Group } from "./types";
+import type { Bot, Group } from "./types";
 import { useBotThreadRef } from "./useBotThreadRef";
+import { useNewBotCreate, type NewBotInput } from "./useNewBotCreate";
 import {
   RosterDragBoundary,
   RosterSectionPlaceholder,
@@ -89,10 +89,6 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
   const navigate = useNavigate();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const environmentId = usePrimaryEnvironmentId();
-
-  const createBotCommand = useAtomCommand(botEnvironment.create, {
-    reportFailure: false,
-  });
 
   const createGroupCommand = useAtomCommand(botEnvironment.groups.create, {
     reportFailure: false,
@@ -373,54 +369,19 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
   }, [bots, focusRosterRow, navigate, pendingArchivedBotId]);
 
   const [pendingCreatedBotId, setPendingCreatedBotId] = useState<string | null>(null);
-  const [creatingBot, setCreatingBot] = useState(false);
+  const { creating: creatingBot, createBot } = useNewBotCreate();
   const creatingBotRef = useRef(false);
   const handleNewBot = () => setNewBotOpen(true);
   const handleNewGroup = () => setNewGroupOpen(true);
 
-  const handleCreateBot = ({ name, avatar }: { name: string; avatar: BotAvatar }) =>
+  const handleCreateBot = (input: NewBotInput) =>
     runCreateBotOnce(creatingBotRef, async () => {
-      if (environmentId === null) {
-        toastManager.add({
-          type: "error",
-          title: t("Connect an environment first"),
-        });
+      const botId = await createBot(input);
 
-        return;
-      }
+      if (botId === null) return;
 
-      setCreatingBot(true);
-
-      try {
-        const botId = BotId.make(`bot-${randomUUID()}`);
-
-        const result = await createBotCommand({
-          environmentId,
-          input: {
-            botId,
-            name: name.trim(),
-            title: "Assistant",
-            label: null,
-            description: null,
-            avatar,
-            engine: null,
-            sandbox: null,
-            runtimeMode: DEFAULT_BOT_RUNTIME_MODE,
-            groupId: null,
-          },
-        });
-
-        if (Predicate.isTagged(result, "Failure")) {
-          toastManager.add({ type: "error", title: t("Could not create bot") });
-
-          return;
-        }
-
-        setNewBotOpen(false);
-        setPendingCreatedBotId(botId);
-      } finally {
-        setCreatingBot(false);
-      }
+      setNewBotOpen(false);
+      setPendingCreatedBotId(botId);
     });
 
   const handleCreateGroup = async (input: NewGroupInput) => {

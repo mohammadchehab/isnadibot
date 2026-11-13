@@ -1,4 +1,17 @@
 export const rosterCatalog = {
+  "Start with": "起始方式",
+  "From scratch": "从零开始",
+  "Name a bot and pick its look yourself.": "自己给机器人命名并挑选外观。",
+  "Enter a folder in the project, or a link that starts with http:// or https://.":
+    "请输入项目中的文件夹，或以 http:// 或 https:// 开头的链接。",
+  "Link monitor": "链接监控",
+  "Checks your docs on a schedule and reports every broken link.":
+    "按计划检查你的文档，并报告每一个失效链接。",
+  "Docs folder or URL": "文档文件夹或网址",
+  "A folder in the bot's project, or a live site that starts with http:// or https://.":
+    "机器人项目中的文件夹，或以 http:// 或 https:// 开头的线上站点。",
+  "Use a folder in the project, or a link that starts with http:// or https://.":
+    "请使用项目中的文件夹，或以 http:// 或 https:// 开头的链接。",
   Decisions: "待决事项",
   "Nothing waiting on you": "没有等你处理的事项",
   "Show all ({count})": "显示全部（{count}）",

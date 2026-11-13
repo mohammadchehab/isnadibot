@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import {
   type RoutineAdapterBot,
   type RoutineAdapterDraft,
-  type RoutineAdapterFrequency,
   type RoutineAdapterItem,
   type RoutineAdapterProject,
 } from "@isnadi/client-runtime/routines";
@@ -21,16 +20,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-
-const WEEKDAYS: readonly MessageKey[] = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+import { RoutineScheduleFields } from "./RoutineScheduleFields";
 
 export function editDraft(routine: RoutineAdapterItem): RoutineAdapterDraft {
   return {
@@ -159,73 +149,10 @@ export function RoutineFormDialog({
               onChange={(event) => setDraft({ ...draft, prompt: event.target.value })}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="space-y-1.5 text-sm">
-              <span>{t("Schedule")}</span>
-              <select
-                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={draft.schedule.frequency}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    schedule: {
-                      ...draft.schedule,
-                      frequency: event.target.value as RoutineAdapterFrequency,
-                      weekday:
-                        event.target.value === "weekly" ? (draft.schedule.weekday ?? 1) : null,
-                    },
-                  })
-                }
-              >
-                <option value="daily">{t("Daily")}</option>
-                <option value="weekdays">{t("Weekdays")}</option>
-                <option value="weekly">{t("Weekly")}</option>
-              </select>
-            </label>
-            <label className="space-y-1.5 text-sm">
-              <span>{t("Time")}</span>
-              <Input
-                type="time"
-                value={draft.schedule.time}
-                onChange={(event) =>
-                  setDraft({ ...draft, schedule: { ...draft.schedule, time: event.target.value } })
-                }
-              />
-            </label>
-          </div>
-          {draft.schedule.frequency === "weekly" ? (
-            <label className="block space-y-1.5 text-sm">
-              <span>{t("Day")}</span>
-              <select
-                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={draft.schedule.weekday ?? 1}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    schedule: { ...draft.schedule, weekday: Number(event.target.value) },
-                  })
-                }
-              >
-                {WEEKDAYS.map((day, index) => (
-                  <option key={day} value={index}>
-                    {t(day)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <label className="block space-y-1.5 text-sm">
-            <span>{t("Timezone")}</span>
-            <Input
-              value={draft.schedule.timezone}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  schedule: { ...draft.schedule, timezone: event.target.value },
-                })
-              }
-            />
-          </label>
+          <RoutineScheduleFields
+            schedule={draft.schedule}
+            onChange={(schedule) => setDraft({ ...draft, schedule })}
+          />
           {showsWorkspacePicker(projectOptions) ? (
             <label className="block space-y-1.5 text-sm">
               <span>{t("Workspace")}</span>

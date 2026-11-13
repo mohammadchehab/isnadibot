@@ -1,19 +1,12 @@
-import { Predicate } from "effect";
-import { BotId } from "@isnadi/contracts";
 import { BotIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 
-import { randomUUID } from "../../lib/utils";
-import { botEnvironment } from "../../state/bots";
 import { usePrimaryEnvironmentId } from "../../state/environments";
-import { useAtomCommand } from "../../state/use-atom-command";
 import { useI18n } from "../../i18n";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
-import { toastManager } from "../ui/toast";
-import { DEFAULT_BOT_RUNTIME_MODE } from "./botSandbox";
 import { NewBotDialog } from "./NewBotDialog";
-import type { BotAvatar } from "./types";
+import { useNewBotCreate, type NewBotInput } from "./useNewBotCreate";
 
 /**
  * What a brand-new workspace sees. The old copy named the missing thing and
@@ -24,45 +17,13 @@ import type { BotAvatar } from "./types";
 export function BotZeroState() {
   const { t } = useI18n();
   const environmentId = usePrimaryEnvironmentId();
-  const createBot = useAtomCommand(botEnvironment.create, { reportFailure: false });
+  const { creating, createBot } = useNewBotCreate();
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
 
-  const handleCreate = async ({ name, avatar }: { name: string; avatar: BotAvatar }) => {
-    // A second submit before the first resolves would create a second bot.
-    if (creating) return;
+  const handleCreate = async (input: NewBotInput) => {
+    const botId = await createBot(input);
 
-    if (environmentId === null) {
-      toastManager.add({ type: "error", title: t("Connect an environment first") });
-
-      return;
-    }
-
-    setCreating(true);
-
-    const result = await createBot({
-      environmentId,
-      input: {
-        botId: BotId.make(`bot-${randomUUID()}`),
-        name: name.trim(),
-        title: "Assistant",
-        label: null,
-        description: null,
-        avatar,
-        engine: null,
-        sandbox: null,
-        runtimeMode: DEFAULT_BOT_RUNTIME_MODE,
-        groupId: null,
-      },
-    });
-
-    setCreating(false);
-
-    if (Predicate.isTagged(result, "Failure")) {
-      toastManager.add({ type: "error", title: t("Could not create bot") });
-
-      return;
-    }
+    if (botId === null) return;
 
     // The roster route watches for the new bot and opens its chat.
     setOpen(false);

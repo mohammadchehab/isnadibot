@@ -1,4 +1,17 @@
 export const rosterCatalog = {
+  "Start with": "Start with",
+  "From scratch": "From scratch",
+  "Name a bot and pick its look yourself.": "Name a bot and pick its look yourself.",
+  "Enter a folder in the project, or a link that starts with http:// or https://.":
+    "Enter a folder in the project, or a link that starts with http:// or https://.",
+  "Link monitor": "Link monitor",
+  "Checks your docs on a schedule and reports every broken link.":
+    "Checks your docs on a schedule and reports every broken link.",
+  "Docs folder or URL": "Docs folder or URL",
+  "A folder in the bot's project, or a live site that starts with http:// or https://.":
+    "A folder in the bot's project, or a live site that starts with http:// or https://.",
+  "Use a folder in the project, or a link that starts with http:// or https://.":
+    "Use a folder in the project, or a link that starts with http:// or https://.",
   Decisions: "Decisions",
   "Nothing waiting on you": "Nothing waiting on you",
   "Show all ({count})": "Show all ({count})",

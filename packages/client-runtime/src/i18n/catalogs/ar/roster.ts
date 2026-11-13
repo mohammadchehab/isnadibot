@@ -1,4 +1,17 @@
 export const rosterCatalog = {
+  "Start with": "ابدأ بـ",
+  "From scratch": "من الصفر",
+  "Name a bot and pick its look yourself.": "سمِّ البوت واختر مظهره بنفسك.",
+  "Enter a folder in the project, or a link that starts with http:// or https://.":
+    "أدخل مجلدا في المشروع، أو رابطا يبدأ بـ http:// أو https://.",
+  "Link monitor": "مراقب الروابط",
+  "Checks your docs on a schedule and reports every broken link.":
+    "يفحص مستنداتك وفق جدول ويبلّغ عن كل رابط معطّل.",
+  "Docs folder or URL": "مجلد المستندات أو الرابط",
+  "A folder in the bot's project, or a live site that starts with http:// or https://.":
+    "مجلد داخل مشروع البوت، أو موقع منشور يبدأ بـ http:// أو https://.",
+  "Use a folder in the project, or a link that starts with http:// or https://.":
+    "استخدم مجلدا في المشروع، أو رابطا يبدأ بـ http:// أو https://.",
   Decisions: "القرارات",
   "Nothing waiting on you": "لا شيء ينتظرك",
   "Show all ({count})": "عرض الكل ({count})",
