@@ -6,7 +6,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { runMigrations } from "../Migrations.ts";
 import * as NodeSqliteClient from "../NodeSqliteClient.ts";
 
-it.layer(Layer.mergeAll(NodeSqliteClient.layerMemory()))("081_ProjectionGroupKeepBusy", (it) => {
+it.layer(Layer.mergeAll(NodeSqliteClient.layerMemory()))("082_ProjectionGroupKeepBusy", (it) => {
   it.effect("adds the column once and reads off for an existing group", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -17,8 +17,8 @@ it.layer(Layer.mergeAll(NodeSqliteClient.layerMemory()))("081_ProjectionGroupKee
         ) VALUES ('group-1', 'Product', 'bot-1', '[]', '2026-01-01', '2026-01-01')
       `;
 
-      yield* runMigrations({ toMigrationInclusive: 81 });
-      yield* runMigrations({ toMigrationInclusive: 81 });
+      yield* runMigrations({ toMigrationInclusive: 82 });
+      yield* runMigrations({ toMigrationInclusive: 82 });
 
       const columns = yield* sql<{ readonly name: string }>`
         PRAGMA table_info(projection_groups)

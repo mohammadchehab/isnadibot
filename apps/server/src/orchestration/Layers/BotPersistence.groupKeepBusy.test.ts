@@ -77,6 +77,22 @@ it.layer(TestLayer)("group keep busy persistence", (it) => {
       yield* sql`DELETE FROM projection_state WHERE projector = 'projection.groups'`;
       yield* pipeline.bootstrap;
       check((yield* snapshots.getSnapshot()).groups);
+
+      // keep-busy.set re-upserts what SQLite handed back, so a NULL hop budget must
+      // stay bindable instead of reaching the driver as undefined.
+      yield* engine.dispatch({
+        type: "group.keep-busy.set",
+        commandId: CommandId.make("cmd-toggle-keep-busy"),
+        groupId: GroupId.make("stays-idle"),
+        keepBusy: true,
+      });
+
+      const toggled = yield* sql<{ readonly keepBusy: number; readonly hopBudget: number | null }>`
+        SELECT keep_busy AS "keepBusy", hop_budget AS "hopBudget"
+        FROM projection_groups WHERE group_id = 'stays-idle'
+      `;
+
+      assert.deepEqual(toggled, [{ keepBusy: 1, hopBudget: null }]);
     }),
   );
 });

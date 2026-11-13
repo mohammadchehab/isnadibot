@@ -36,7 +36,7 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
         group_id, name, boss_bot_id, members_json, hop_budget, keep_busy, created_at, updated_at
       )
       VALUES (
-        ${row.groupId}, ${row.name}, ${row.bossBotId}, ${JSON.stringify(row.members)}, ${row.hopBudget}, ${row.keepBusy ? 1 : 0}, ${row.createdAt}, ${row.updatedAt}
+        ${row.groupId}, ${row.name}, ${row.bossBotId ?? null}, ${JSON.stringify(row.members)}, ${row.hopBudget ?? null}, ${row.keepBusy ? 1 : 0}, ${row.createdAt}, ${row.updatedAt}
       )
       ON CONFLICT (group_id) DO UPDATE SET
         name = excluded.name,
