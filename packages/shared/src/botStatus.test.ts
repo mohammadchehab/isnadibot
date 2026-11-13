@@ -14,6 +14,7 @@ import {
   BOT_STATUSES,
   countBotStatuses,
   deriveBotStatus,
+  idleSince,
   type BotStatus,
   type BotStatusChat,
   type BotStatusWorkItem,
@@ -436,5 +437,87 @@ describe("deriveBotStatus sign-in-required", () => {
         JSON.stringify(signals),
       ).toBe(expected);
     }
+  });
+});
+
+describe("idleSince", () => {
+  function idleOf(chats: ReadonlyArray<BotStatusChat>, botId: BotId = BOSS): string | null {
+    return idleSince({ botId, chats, workItems: [], delegations: [] });
+  }
+
+  it("is null for a bot that never had a turn, which reads as idle longest", () => {
+    expect(idleOf([])).toBeNull();
+    expect(idleOf([chat()])).toBeNull();
+  });
+
+  it("is when the last turn finished, whatever its outcome", () => {
+    for (const turn of [COMPLETED, INTERRUPTED, ERRORED]) {
+      expect(idleOf([chat({ latestTurn: turn })])).toBe(turn.completedAt);
+    }
+  });
+
+  it("is when the last turn started while it has not finished, or when it was asked", () => {
+    expect(idleOf([chat({ latestTurn: RUNNING })])).toBe(NOW);
+    expect(
+      idleOf([
+        chat({ latestTurn: { ...RUNNING, startedAt: null, requestedAt: "2026-11-13T09:00:00Z" } }),
+      ]),
+    ).toBe("2026-11-13T09:00:00Z");
+  });
+
+  it("is the most recent turn across every chat the bot speaks for", () => {
+    const earlier = chat({
+      id: ThreadId.make("chat-old"),
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T08:00:00Z" },
+    });
+
+    const later = chat({
+      id: ThreadId.make("chat-new"),
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T09:30:00Z" },
+    });
+
+    expect(idleOf([earlier, later])).toBe("2026-11-13T09:30:00Z");
+    expect(idleOf([later, earlier])).toBe("2026-11-13T09:30:00Z");
+  });
+
+  it("ignores another bot's chat and an archived one", () => {
+    const busyOther = chat({
+      id: ThreadId.make("other-chat"),
+      botId: OTHER,
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T09:30:00Z" },
+    });
+
+    const archived = chat({
+      id: ThreadId.make("archived-chat"),
+      archivedAt: NOW,
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T09:30:00Z" },
+    });
+
+    expect(idleOf([busyOther, archived])).toBeNull();
+  });
+
+  it("counts a group chat for the bot responding in it", () => {
+    const groupChat = chat({
+      id: ThreadId.make("group-chat"),
+      botId: null,
+      respondingBotId: BOSS,
+      latestTurn: COMPLETED,
+    });
+
+    expect(idleOf([groupChat])).toBe(NOW);
+    expect(idleOf([groupChat], OTHER)).toBeNull();
+  });
+
+  it("counts a delegated sub-chat toward the bot its root chat belongs to", () => {
+    const root = chat({ id: ThreadId.make("root"), latestTurn: COMPLETED });
+
+    const child = chat({
+      id: ThreadId.make("child"),
+      botId: null,
+      parentThreadId: ThreadId.make("root"),
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T11:00:00Z" },
+    });
+
+    expect(idleOf([root, child])).toBe("2026-11-13T11:00:00Z");
   });
 });

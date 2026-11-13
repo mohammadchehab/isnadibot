@@ -2,6 +2,7 @@ import {
   isIsnadiDelegationTerminal,
   type BotId,
   type IsnadiDelegationRecord,
+  type IsoDateTime,
   type OrchestrationSessionStatus,
   type OrchestrationThreadShell,
   type WorkItemSummary,
@@ -109,6 +110,19 @@ function needsSignIn(chat: BotStatusChat): boolean {
 }
 
 /**
+ * The chats that speak for a bot: its own and its sub-chats, minus the archived
+ * ones. Both status and idle time read the same set, so the two never disagree
+ * about which chats a bot has.
+ */
+function ownedChats(input: BotStatusInput): ReadonlyArray<BotStatusChat> {
+  const byId = new Map(input.chats.map((chat) => [chat.id, chat]));
+
+  return input.chats.filter(
+    (chat) => chat.archivedAt === null && chatBotId(rootOf(chat, byId)) === input.botId,
+  );
+}
+
+/**
  * The five states, in precedence order asking, sign-in-required, held, busy,
  * idle:
  *
@@ -129,15 +143,7 @@ function needsSignIn(chat: BotStatusChat): boolean {
  * the shell at all. A bot with no chat is idle.
  */
 export function deriveBotStatus(input: BotStatusInput): BotStatus {
-  const byId = new Map(input.chats.map((chat) => [chat.id, chat]));
-
-  const owns = (chat: BotStatusChat): boolean => {
-    if (chat.archivedAt !== null) return false;
-
-    return chatBotId(rootOf(chat, byId)) === input.botId;
-  };
-
-  const chats = input.chats.filter(owns);
+  const chats = ownedChats(input);
 
   if (chats.some((chat) => chat.hasPendingApprovals === true || chat.hasPendingUserInput === true))
     return "asking";
@@ -171,6 +177,30 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
   );
 
   return running.length > 0 || workingItem || liveSession ? "busy" : "idle";
+}
+
+/**
+ * When the bot last stopped working: the moment its most recent turn finished, or
+ * the moment that turn started when it has not finished yet.
+ *
+ * A bot that never had a turn returns null. A caller that orders bots by who is
+ * free reads null as the most idle of all, so a freshly hired bot takes the next
+ * item before a bot that has been sitting since this morning.
+ *
+ * Only the chats {@link deriveBotStatus} attributes to the bot count, so a group
+ * chat speaks for the bot responding in it. Nothing here reads a turn's outcome:
+ * a turn that ended in an error still ends, and the bot is free again.
+ */
+export function idleSince(input: BotStatusInput): IsoDateTime | null {
+  return ownedChats(input).reduce<IsoDateTime | null>((latest, chat) => {
+    const turn = chat.latestTurn;
+
+    if (turn === null || turn === undefined) return latest;
+
+    const at = turn.completedAt ?? turn.startedAt ?? turn.requestedAt;
+
+    return latest === null || at > latest ? at : latest;
+  }, null);
 }
 
 /** How many bots are in each state, for a header that wants a total. */
