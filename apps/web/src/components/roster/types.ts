@@ -71,6 +71,13 @@ export interface Group {
   name: string;
   bossBotId: string | null;
   members: ReadonlyArray<GroupMembership>;
+  /**
+   * The fleet template this group was hired from; null for a group the user put
+   * together by hand. Only a hired group shows the capacity view. Optional here
+   * so hand-written group literals stay valid; the server always sends it and
+   * the roster mirrors it verbatim.
+   */
+  fleetTemplateId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

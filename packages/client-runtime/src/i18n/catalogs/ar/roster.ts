@@ -405,4 +405,10 @@ export const rosterCatalog = {
   Steer: "توجيه",
   "Send a correction to {name}": "أرسل تصحيحًا إلى {name}",
   "Opens the chat and puts the caret in the composer": "يفتح المحادثة ويضع المؤشر في حقل الكتابة",
+  Asking: "يسأل",
+  Held: "معلّق",
+  Busy: "مشغول",
+  Idle: "متاح",
+  "Context used: {percent}%": "السياق المستخدم: {percent}%",
+  "Queued ({count})": "في الانتظار ({count})",
 } as const;
