@@ -1,14 +1,14 @@
 import type { WorkItemState, WorkItemSummary } from "@isnadi/contracts";
 
-export type WorkItemColumn = "new" | "in-progress" | "draft" | "done" | "closed";
+export type WorkItemColumn = "new" | "in-progress" | "draft" | "closed" | "done";
 
-/** The board's columns, left to right. */
+/** The board's columns, left to right: New, In progress, Draft, Closed, Done. */
 export const WORK_ITEM_BOARD_COLUMNS: ReadonlyArray<WorkItemColumn> = [
   "new",
   "in-progress",
   "draft",
-  "done",
   "closed",
+  "done",
 ];
 
 /** The board column a work item shows in. Blocked items stay in In progress with a badge. */
@@ -29,7 +29,15 @@ export function workItemColumn(state: WorkItemState): WorkItemColumn {
   }
 }
 
-export type WorkItemBoard = Readonly<Record<WorkItemColumn, ReadonlyArray<WorkItemSummary>>>;
+/**
+ * The fields the board needs from an item. Both the open summaries the shell
+ * carries and the full items the finished read returns satisfy it.
+ */
+export type BoardItem = Pick<WorkItemSummary, "id" | "state" | "updatedAt">;
+
+export type WorkItemBoard<T extends BoardItem = WorkItemSummary> = Readonly<
+  Record<WorkItemColumn, ReadonlyArray<T>>
+>;
 
 /** True when the item is still queued, assigned, in progress, blocked or in review. */
 export function isOpenWorkItem(state: WorkItemState): boolean {
@@ -37,7 +45,7 @@ export function isOpenWorkItem(state: WorkItemState): boolean {
 }
 
 /** Sorts newest first, then by id so two items saved in the same instant keep a stable order. */
-const newestFirst = (left: WorkItemSummary, right: WorkItemSummary) =>
+const newestFirst = (left: BoardItem, right: BoardItem) =>
   right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id);
 
 /**
@@ -47,15 +55,15 @@ const newestFirst = (left: WorkItemSummary, right: WorkItemSummary) =>
  * `workItems.list` read. An item that arrives in both lists is kept once, in the
  * open copy, until the finished list catches up.
  */
-export function workItemBoard(items: Iterable<WorkItemSummary>): WorkItemBoard {
+export function workItemBoard<T extends BoardItem>(items: Iterable<T>): WorkItemBoard<T> {
   const seen = new Set<string>();
 
-  const columns: Record<WorkItemColumn, WorkItemSummary[]> = {
+  const columns: Record<WorkItemColumn, T[]> = {
     new: [],
     "in-progress": [],
     draft: [],
-    done: [],
     closed: [],
+    done: [],
   };
 
   for (const item of items) {
