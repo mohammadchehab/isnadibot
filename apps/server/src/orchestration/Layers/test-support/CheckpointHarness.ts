@@ -231,7 +231,7 @@ export async function waitForGitRefExists(
 ) {
   if (!gitRefExists(cwd, ref))
     await harness.waitForReceipt(
-      (receipt) => receipt.type !== "turn.processing.quiesced" && receipt.checkpointRef === ref,
+      (receipt) => "checkpointRef" in receipt && receipt.checkpointRef === ref,
     );
 
   if (!gitRefExists(cwd, ref)) throw new Error("Checkpoint receipt did not create " + ref);
