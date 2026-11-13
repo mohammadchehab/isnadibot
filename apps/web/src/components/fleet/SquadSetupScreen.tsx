@@ -62,6 +62,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
 
   const boss =
     draft.members.find((member) => member.roleId === draft.bossRoleId) ?? draft.members[0];
+
   const less = stepHopBudget(draft.hopBudget, -1);
   const more = stepHopBudget(draft.hopBudget, 1);
 
