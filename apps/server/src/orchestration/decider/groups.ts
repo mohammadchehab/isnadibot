@@ -233,6 +233,14 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       yield* requireMutationActorAuthorized({ group, command, actor });
       const bot = yield* requireBotNotArchived({ readModel, command, botId: command.botId });
 
+      // A bot that already belongs to another group is pulled across a boundary, so target-group
+      // rights are not enough: this needs the same two-sided rights `bot.update` needs to move it.
+      if (bot.groupId !== null && bot.groupId !== group.id) {
+        const sourceGroup = yield* requireGroup({ readModel, command, groupId: bot.groupId });
+
+        yield* requireMutationActorAuthorized({ group: sourceGroup, command, actor });
+      }
+
       if (command.role === "boss" && group.bossBotId !== null && group.bossBotId !== bot.id) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,

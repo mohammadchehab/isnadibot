@@ -736,6 +736,63 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
     }),
   );
 
+  it.effect("refuses pulling another group's bot into a group you only have rights over", () =>
+    Effect.gen(function* () {
+      const otherGroupId = GroupId.make("group-other");
+      const otherGroupOwnerId = AuthSessionId.make("person-other-group");
+
+      const model = makeReadModel({
+        bots: [
+          makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
+          makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
+          makeBot({ id: OTHER_SPECIALIST_ID, groupId: otherGroupId }),
+        ],
+        groups: [
+          makeGroup(),
+          {
+            ...makeGroup(),
+            id: otherGroupId,
+            name: "Other",
+            bossBotId: OTHER_SPECIALIST_ID,
+            members: [
+              { kind: "bot" as const, botId: OTHER_SPECIALIST_ID, role: "boss" as const },
+              { kind: "person" as const, personId: otherGroupOwnerId, displayName: "Other owner" },
+            ],
+          },
+        ],
+      });
+
+      const assignCommand: OrchestrationCommand = {
+        type: "group.member.assign",
+        commandId: CommandId.make("cmd-steal-member"),
+        groupId: GROUP_ID,
+        botId: OTHER_SPECIALIST_ID,
+        role: "specialist",
+      };
+
+      const memberError = yield* decideOrchestrationCommand({
+        command: assignCommand,
+        readModel: model,
+        actor: member,
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(memberError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected a source-group authorization invariant error");
+      }
+
+      expect(memberError.detail).toContain(`Person '${PERSON_ID}' is not a member of group`);
+      expect(memberError.detail).toContain(otherGroupId);
+
+      const adminResult = yield* decideOrchestrationCommand({
+        command: assignCommand,
+        readModel: model,
+        actor: admin,
+      });
+
+      expect("type" in adminResult && adminResult.type).toBe("group.member-assigned");
+    }),
+  );
+
   it.effect("keeps group creation and person membership on environment manage rights", () =>
     Effect.gen(function* () {
       const commands: ReadonlyArray<OrchestrationCommand> = [
