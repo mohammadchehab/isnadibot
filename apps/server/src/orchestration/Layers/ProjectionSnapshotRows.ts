@@ -99,7 +99,10 @@ export const ProjectionBotDbRowSchema = ProjectionBot.mapFields(
 );
 
 export const ProjectionGroupDbRowSchema = ProjectionGroup.mapFields(
-  Struct.assign({ members: Schema.fromJsonString(Schema.Array(GroupMembership)) }),
+  Struct.assign({
+    members: Schema.fromJsonString(Schema.Array(GroupMembership)),
+    keepBusy: Schema.Number,
+  }),
 );
 
 export const ProjectionWorkItemDbRowSchema = Schema.Struct({
@@ -528,7 +531,7 @@ export function mapGroupRow(
     bossBotId: row.bossBotId,
     members: row.members,
     ...(row.hopBudget === null ? {} : { hopBudget: row.hopBudget }),
-    keepBusy: row.keepBusy,
+    keepBusy: row.keepBusy === 1,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

@@ -192,6 +192,7 @@ it.layer(TestLayer)("bot persistence", (it) => {
             { kind: "bot", botId, role: "boss" },
             { kind: "bot", botId: specialistBotId, role: "specialist" },
           ],
+          keepBusy: false,
           createdAt,
           updatedAt: restored.groups[0]!.updatedAt,
         },

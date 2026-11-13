@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { GroupMembership } from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
 import * as Struct from "effect/Struct";
@@ -15,20 +16,27 @@ import {
 } from "../Services/ProjectionGroups.ts";
 
 const ProjectionGroupDbRow = ProjectionGroup.mapFields(
-  Struct.assign({ members: Schema.fromJsonString(Schema.Array(GroupMembership)) }),
+  Struct.assign({
+    members: Schema.fromJsonString(Schema.Array(GroupMembership)),
+    keepBusy: Schema.Number,
+  }),
 );
+
+function toProjectionGroup(row: Schema.Schema.Type<typeof ProjectionGroupDbRow>): ProjectionGroup {
+  return { ...row, keepBusy: row.keepBusy === 1 };
+}
 
 const makeProjectionGroupRepository = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
   const upsertGroupRow = SqlSchema.void({
-    Request: ProjectionGroupDbRow,
+    Request: ProjectionGroup,
     execute: (row) => sql`
       INSERT INTO projection_groups (
         group_id, name, boss_bot_id, members_json, hop_budget, keep_busy, created_at, updated_at
       )
       VALUES (
-        ${row.groupId}, ${row.name}, ${row.bossBotId}, ${row.members}, ${row.hopBudget}, ${row.keepBusy}, ${row.createdAt}, ${row.updatedAt}
+        ${row.groupId}, ${row.name}, ${row.bossBotId}, ${JSON.stringify(row.members)}, ${row.hopBudget}, ${row.keepBusy ? 1 : 0}, ${row.createdAt}, ${row.updatedAt}
       )
       ON CONFLICT (group_id) DO UPDATE SET
         name = excluded.name,
@@ -77,11 +85,13 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
 
   const getById: ProjectionGroupRepositoryShape["getById"] = (input) =>
     getGroupRow(input).pipe(
+      Effect.map(Option.map(toProjectionGroup)),
       Effect.mapError(toPersistenceSqlError("ProjectionGroupRepository.getById:query")),
     );
 
   const listAll: ProjectionGroupRepositoryShape["listAll"] = () =>
     listGroupRows(undefined).pipe(
+      Effect.map((rows) => rows.map(toProjectionGroup)),
       Effect.mapError(toPersistenceSqlError("ProjectionGroupRepository.listAll:query")),
     );
 
