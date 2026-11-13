@@ -216,6 +216,11 @@ export interface HireFleetResult {
   readonly botIds: ReadonlyArray<BotId>;
 }
 
+/** How the hire reaches the server as a command: the draft the screen finished. */
+export interface HireFleetInput {
+  readonly draft: HireDraft;
+}
+
 /**
  * Creates the squad: one bot per member in screen order, then the group that
  * holds them under the template. Every command carries the draft's own command
