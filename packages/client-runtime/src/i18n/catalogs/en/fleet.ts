@@ -22,6 +22,8 @@ export const fleetCatalog = {
     "Runs on another provider because the role's own is not set up.",
   "The model has no such reasoning level, so it starts on the model's default.":
     "The model has no such reasoning level, so it starts on the model's default.",
+  "The provider or model this bot picked is no longer connected.":
+    "The provider or model this bot picked is no longer connected.",
 
   // Templates
   Recruiting: "Recruiting",

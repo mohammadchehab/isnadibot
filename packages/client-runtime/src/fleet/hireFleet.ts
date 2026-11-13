@@ -38,6 +38,8 @@ export interface HireDraft {
   readonly name: string;
   readonly bossRoleId: FleetRoleId;
   readonly hopBudget: GroupHopBudget;
+  /** Whether the space keeps its idle members busy; the plan decides it. */
+  readonly keepBusy: boolean;
   readonly members: ReadonlyArray<HireMember>;
   readonly groupId: GroupId;
   readonly groupCommandId: CommandId;
@@ -75,7 +77,9 @@ export function createHireDraft({
   readonly makeId: MakeId;
   readonly createdAt: string;
 }): HireDraft {
-  const members = planFleetHire({ template, providers }).members.map(
+  const plan = planFleetHire({ template, providers });
+
+  const members = plan.members.map(
     (member): HireMember => ({
       ...member,
       botId: BotId.make(`bot-${makeId()}`),
@@ -88,6 +92,7 @@ export function createHireDraft({
     name: template.name,
     bossRoleId: template.bossRoleId,
     hopBudget: GroupHopBudget.make(GROUP_HOP_BUDGET_DEFAULT),
+    keepBusy: plan.keepBusy,
     members,
     groupId: GroupId.make(`group-${makeId()}`),
     groupCommandId: CommandId.make(makeId()),
@@ -112,6 +117,11 @@ function replaceMember(
  * against the new model: when the model has no such level, the model's own
  * default stands and the member carries the "reasoning-adjusted" notice, so the
  * screen says so before Create rather than after the bot exists.
+ *
+ * A pick whose provider or model is no longer on the server keeps the member's
+ * choice on screen and marks it "model-unavailable": the picker stays usable, so
+ * the user can pick again, and the blocker stops Create from making a bot that
+ * has nowhere to run.
  */
 export function setMemberModel(
   draft: HireDraft,
@@ -122,10 +132,21 @@ export function setMemberModel(
   return replaceMember(draft, roleId, (member) => {
     const provider = providers.find((candidate) => candidate.instanceId === pick.instanceId);
 
-    const { options, adjusted } = reasoningOptionsFor(
-      provider?.models.find((candidate) => candidate.slug === pick.model),
-      reasoningLevelOf(member, roleId),
-    );
+    const model = provider?.models.find((candidate) => candidate.slug === pick.model);
+
+    if (model === undefined) {
+      return {
+        ...member,
+        engine: {
+          provider: pick.instanceId,
+          model: pick.model,
+          fallbacks: [],
+        },
+        notice: "model-unavailable",
+      };
+    }
+
+    const { options, adjusted } = reasoningOptionsFor(model, reasoningLevelOf(member, roleId));
 
     return {
       ...member,
@@ -159,12 +180,26 @@ export function setMemberReasoning(
   });
 }
 
-/** Makes `roleId` the boss. The template's boss is the default; the frames allow another. */
+/**
+ * Makes `roleId` the boss. The template's boss is the default; the frames allow
+ * another. The plan's order is boss first, so the members are re-sorted here:
+ * a boss picked on screen 2b heads the squad the hire creates, the same order
+ * screen 2 shows.
+ */
 export function setBoss(draft: HireDraft, roleId: FleetRoleId): HireDraft {
+  const members = draft.members.map((member) => ({
+    ...member,
+    isBoss: member.roleId === roleId,
+  }));
+
+  const boss = members.find((member) => member.isBoss);
+
+  if (boss === undefined) return draft;
+
   return {
     ...draft,
     bossRoleId: roleId,
-    members: draft.members.map((member) => ({ ...member, isBoss: member.roleId === roleId })),
+    members: [boss, ...members.filter((member) => member !== boss)],
   };
 }
 
@@ -252,9 +287,7 @@ export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (draft: HireDraf
       .filter((member) => member.roleId !== draft.bossRoleId)
       .map((member) => member.botId),
     hopBudget: draft.hopBudget,
-    // A hired fleet starts keeping its idle members busy: the group exists to
-    // hand work around, not to sit still until someone types.
-    keepBusy: true,
+    keepBusy: draft.keepBusy,
     fleetTemplateId: draft.templateId,
     createdAt: draft.createdAt,
   }).pipe(Effect.mapError((cause) => new HireFleetError({ step: "group", cause })));

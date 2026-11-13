@@ -19,6 +19,8 @@ function noticeCopy(notice: SquadSeedNotice): string {
       return "Runs on another provider because the role's own is not set up.";
     case "reasoning-adjusted":
       return "The model has no such reasoning level, so it starts on the model's default.";
+    case "model-unavailable":
+      return "The provider or model this bot picked is no longer connected.";
   }
 }
 

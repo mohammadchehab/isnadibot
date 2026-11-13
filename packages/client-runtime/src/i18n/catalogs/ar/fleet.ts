@@ -17,6 +17,8 @@ export const fleetCatalog = {
     "يعمل على مزود آخر لأن مزود الدور نفسه غير مهيأ.",
   "The model has no such reasoning level, so it starts on the model's default.":
     "لا يوفر هذا النموذج مستوى التفكير المطلوب، لذا يبدأ على الوضع الافتراضي للنموذج.",
+  "The provider or model this bot picked is no longer connected.":
+    "لم يعد مزود الخدمة أو النموذج الذي اختاره هذا البوت متصلًا.",
 
   // Templates
   Recruiting: "التوظيف",
