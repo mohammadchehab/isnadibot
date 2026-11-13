@@ -291,6 +291,10 @@
     "./fleet/hire-plan": {
       "types": "./src/fleet/hirePlan.ts",
       "default": "./src/fleet/hirePlan.ts"
+    },
+    "./fleet/hire": {
+      "types": "./src/fleet/hireFleet.ts",
+      "default": "./src/fleet/hireFleet.ts"
     }
   },
   "scripts": {
