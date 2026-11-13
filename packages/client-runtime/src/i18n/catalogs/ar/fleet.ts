@@ -8,6 +8,15 @@ export const fleetCatalog = {
   "Start empty": "ابدأ فارغا",
   "{count} more": "{count} أخرى",
   "This fleet is no longer available.": "هذا الفريق لم يعد متاحا.",
+  "The bot that hands work out and answers for this space.":
+    "البوت الذي يوزع العمل ويجيب عن هذه المساحة.",
+  "Bot replies one message can chain before the space stops.":
+    "عدد ردود البوتات التي يمكن أن تتسلسل من رسالة واحدة قبل أن تتوقف المساحة.",
+  "No provider can run this bot yet.": "لا يوجد مزود يمكنه تشغيل هذا البوت بعد.",
+  "Runs on another provider because the role's own is not set up.":
+    "يعمل على مزود آخر لأن مزود الدور نفسه غير مهيأ.",
+  "The model has no such reasoning level, so it starts on the model's default.":
+    "لا يوفر هذا النموذج مستوى التفكير المطلوب، لذا يبدأ على الوضع الافتراضي للنموذج.",
 
   // Templates
   Recruiting: "التوظيف",
