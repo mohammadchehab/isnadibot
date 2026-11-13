@@ -43,6 +43,7 @@ const routine: RoutineAdapterItem = {
     time: "09:00",
     timezone: "America/New_York",
     weekday: null,
+    everyHours: null,
   },
   approval: "approval-required",
   skills: ["research"],
@@ -85,6 +86,7 @@ describe("RoutinePanel", () => {
         time: "08:30",
         timezone: "UTC",
         weekday: null,
+        everyHours: null,
       }),
     ).toBe("Daily at 08:30 (UTC)");
     expect(
@@ -93,6 +95,7 @@ describe("RoutinePanel", () => {
         time: "14:00",
         timezone: "Europe/London",
         weekday: 5,
+        everyHours: null,
       }),
     ).toBe("Friday at 14:00 (Europe/London)");
   });
@@ -110,7 +113,13 @@ describe("RoutinePanel", () => {
 
     expect(
       routineScheduleLabel(
-        { frequency: "weekly", time: "14:00", timezone: "Europe/London", weekday: 5 },
+        {
+          frequency: "weekly",
+          time: "14:00",
+          timezone: "Europe/London",
+          weekday: 5,
+          everyHours: null,
+        },
         i18n,
       ),
     ).toBe("星期五 14:00（Europe/London）");
@@ -133,6 +142,7 @@ describe("RoutinePanel", () => {
           time: "14:00",
           timezone: "Europe/London",
           weekday: 5,
+          everyHours: null,
         },
         approval: "approval-required",
         skills: [],

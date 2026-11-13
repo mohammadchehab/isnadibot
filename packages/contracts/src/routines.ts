@@ -47,6 +47,17 @@ export const RoutineLocalTime = Schema.String.check(
 
 export type RoutineLocalTime = typeof RoutineLocalTime.Type;
 
+/**
+ * How often an interval routine runs. Every value divides 24, so "every N hours"
+ * is exactly what it says: a routine lands the same times each day and the last
+ * slot of the day is a whole interval before the first of the next.
+ */
+export const ROUTINE_INTERVAL_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
+
+export type RoutineIntervalHours = (typeof ROUTINE_INTERVAL_HOURS)[number];
+
+export const RoutineIntervalHours = Schema.Literals(ROUTINE_INTERVAL_HOURS);
+
 export const RoutineSchedule = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("daily"), time: RoutineLocalTime }),
   Schema.Struct({ kind: Schema.Literal("weekdays"), time: RoutineLocalTime }),
@@ -55,6 +66,8 @@ export const RoutineSchedule = Schema.Union([
     weekdays: Schema.Array(RoutineWeekday).check(Schema.isMinLength(1)),
     time: RoutineLocalTime,
   }),
+  /** Every N hours from local midnight, repeated every day. */
+  Schema.Struct({ kind: Schema.Literal("interval"), everyHours: RoutineIntervalHours }),
 ]);
 
 export type RoutineSchedule = typeof RoutineSchedule.Type;

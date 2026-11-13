@@ -25,6 +25,8 @@ const matchesDay = (schedule: RoutineSchedule, weekDay: number) => {
       return weekDay >= 1 && weekDay <= 5;
     case "weekly":
       return schedule.weekdays.includes(weekdays[weekDay]!);
+    case "interval":
+      return true;
   }
 };
 
@@ -38,12 +40,12 @@ const weekdays: ReadonlyArray<RoutineWeekday> = [
   "saturday",
 ];
 
-const candidateForDay = (
+const atLocalTime = (
   day: DateTime.Zoned,
-  schedule: RoutineSchedule,
+  hour: number,
+  minute: number,
   timezone: string,
 ): DateTime.Zoned => {
-  const [hour, minute] = parseTime(schedule.time);
   const parts = DateTime.toParts(day);
 
   const candidate = DateTime.makeZoned(
@@ -64,6 +66,36 @@ const candidateForDay = (
   return candidate.value;
 };
 
+/**
+ * Every instant a schedule lands on inside one day, earliest first. An interval
+ * routine lands once per interval from local midnight; the others land once.
+ */
+const candidatesForDay = (
+  day: DateTime.Zoned,
+  schedule: RoutineSchedule,
+  timezone: string,
+): ReadonlyArray<DateTime.Zoned> => {
+  if (schedule.kind === "interval") {
+    return Array.from({ length: 24 / schedule.everyHours }, (_unused, index) =>
+      atLocalTime(day, index * schedule.everyHours, 0, timezone),
+    );
+  }
+
+  const [hour, minute] = parseTime(schedule.time);
+
+  return [atLocalTime(day, hour, minute, timezone)];
+};
+
+/** The last slot a day offers at or before `epochMillis`, or none when the whole day is ahead. */
+const lastAtOrBefore = (
+  candidates: ReadonlyArray<DateTime.Zoned>,
+  epochMillis: number,
+): DateTime.Zoned | undefined =>
+  candidates.reduce<DateTime.Zoned | undefined>(
+    (found, candidate) => (DateTime.toEpochMillis(candidate) <= epochMillis ? candidate : found),
+    undefined,
+  );
+
 export const latestScheduledFor = (
   schedule: RoutineSchedule,
   timezone: string,
@@ -79,9 +111,10 @@ export const latestScheduledFor = (
     const day = DateTime.subtract(now.value, { days: daysBack });
 
     if (!matchesDay(schedule, DateTime.toParts(day).weekDay)) continue;
-    const candidate = candidateForDay(day, schedule, timezone);
 
-    if (DateTime.toEpochMillis(candidate) <= nowEpochMillis) return DateTime.formatIso(candidate);
+    const found = lastAtOrBefore(candidatesForDay(day, schedule, timezone), nowEpochMillis);
+
+    if (found !== undefined) return DateTime.formatIso(found);
   }
 
   throw new RoutineScheduleError({ detail: "Routine schedule has no matching day." });
@@ -102,9 +135,12 @@ export const nextScheduledFor = (
     const day = DateTime.add(after.value, { days: daysAhead });
 
     if (!matchesDay(schedule, DateTime.toParts(day).weekDay)) continue;
-    const candidate = candidateForDay(day, schedule, timezone);
 
-    if (DateTime.toEpochMillis(candidate) > afterEpochMillis) return DateTime.formatIso(candidate);
+    const found = candidatesForDay(day, schedule, timezone).find(
+      (candidate) => DateTime.toEpochMillis(candidate) > afterEpochMillis,
+    );
+
+    if (found !== undefined) return DateTime.formatIso(found);
   }
 
   throw new RoutineScheduleError({ detail: "Routine schedule has no matching day." });

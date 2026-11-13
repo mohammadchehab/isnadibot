@@ -120,6 +120,7 @@ describe("toRoutinePanelItem", () => {
       time: "09:00",
       timezone: "America/New_York",
       weekday: 5,
+      everyHours: null,
     });
     expect(item.runHistory.map((entry) => entry.id)).toEqual(["run-new", "run-old"]);
     expect(item.latestRun).toMatchObject({ id: "run-new", error: "Provider timed out" });

@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
+import { ROUTINE_INTERVAL_HOURS } from "@isnadi/contracts";
 import {
+  routineIntervalHours,
   type RoutineAdapterBot,
   type RoutineAdapterDraft,
   type RoutineAdapterFrequency,
@@ -70,6 +72,7 @@ export function blankDraft(projectOptions: readonly RoutineAdapterProject[]): Ro
       time: "09:00",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
       weekday: null,
+      everyHours: null,
     },
     approval: "approval-required",
     skills: [],
@@ -165,32 +168,61 @@ export function RoutineFormDialog({
               <select
                 className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
                 value={draft.schedule.frequency}
-                onChange={(event) =>
+                onChange={(event) => {
+                  // SAFETY: the select's four options are the only values it can report.
+                  const frequency = event.target.value as RoutineAdapterFrequency;
+
                   setDraft({
                     ...draft,
                     schedule: {
                       ...draft.schedule,
-                      frequency: event.target.value as RoutineAdapterFrequency,
-                      weekday:
-                        event.target.value === "weekly" ? (draft.schedule.weekday ?? 1) : null,
+                      frequency,
+                      weekday: frequency === "weekly" ? (draft.schedule.weekday ?? 1) : null,
+                      everyHours:
+                        frequency === "interval"
+                          ? routineIntervalHours(draft.schedule.everyHours)
+                          : null,
                     },
-                  })
-                }
+                  });
+                }}
               >
                 <option value="daily">{t("Daily")}</option>
                 <option value="weekdays">{t("Weekdays")}</option>
                 <option value="weekly">{t("Weekly")}</option>
+                <option value="interval">{t("Every few hours")}</option>
               </select>
             </label>
             <label className="space-y-1.5 text-sm">
-              <span>{t("Time")}</span>
-              <Input
-                type="time"
-                value={draft.schedule.time}
-                onChange={(event) =>
-                  setDraft({ ...draft, schedule: { ...draft.schedule, time: event.target.value } })
-                }
-              />
+              <span>{draft.schedule.frequency === "interval" ? t("Hours") : t("Time")}</span>
+              {draft.schedule.frequency === "interval" ? (
+                <select
+                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  value={routineIntervalHours(draft.schedule.everyHours)}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      schedule: { ...draft.schedule, everyHours: Number(event.target.value) },
+                    })
+                  }
+                >
+                  {ROUTINE_INTERVAL_HOURS.map((hours) => (
+                    <option key={hours} value={hours}>
+                      {hours === 1 ? t("Every hour") : t("Every {hours} hours", { hours })}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  type="time"
+                  value={draft.schedule.time}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      schedule: { ...draft.schedule, time: event.target.value },
+                    })
+                  }
+                />
+              )}
             </label>
           </div>
           {draft.schedule.frequency === "weekly" ? (

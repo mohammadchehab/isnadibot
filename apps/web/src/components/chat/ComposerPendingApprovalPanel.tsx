@@ -55,6 +55,12 @@ function stringField(record: Schema.JsonObject, key: string): string | null {
   return Predicate.isString(value) && value.trim() ? value.trim() : null;
 }
 
+function numberField(record: Schema.JsonObject, key: string): number | null {
+  const value = record[key];
+
+  return Predicate.isNumber(value) ? value : null;
+}
+
 function stringList(value: Schema.Json | undefined): ReadonlyArray<string> {
   return Array.isArray(value)
     ? value.filter((item): item is string => Predicate.isString(item) && item.trim() !== "")
@@ -85,7 +91,8 @@ function routineInstructions(
     (kind === "daily" && /^(?:every day|every morning|daily)\b/i.test(lead)) ||
     (kind === "weekdays" && /^(?:every weekday|on weekdays|weekdays)\b/i.test(lead)) ||
     (kind === "weekly" &&
-      /^every (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(lead));
+      /^every (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(lead)) ||
+    (kind === "interval" && /^every (?:few |\d+ )?hours?\b/i.test(lead));
 
   return duplicatesSchedule ? capitalize(task) : instructions;
 }
@@ -140,6 +147,15 @@ function routineScheduleText(
 ): string | null {
   if (!schedule || !isJsonObject(schedule)) return null;
   const record = schedule;
+
+  if (record.kind === "interval") {
+    const hours = numberField(record, "everyHours");
+
+    if (hours === null) return null;
+
+    return hours === 1 ? t("Every hour") : t("Every {hours} hours", { hours });
+  }
+
   const time = stringField(record, "time");
 
   if (!time) return null;

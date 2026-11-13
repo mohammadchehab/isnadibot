@@ -12,6 +12,7 @@ import {
   RoutineApprovalPolicy,
   RoutineFailureKind,
   RoutineRun,
+  ROUTINE_INTERVAL_HOURS,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -47,6 +48,10 @@ const RoutineRow = Schema.Struct({
           ]),
         ),
         time: Schema.String,
+      }),
+      Schema.Struct({
+        kind: Schema.Literal("interval"),
+        everyHours: Schema.Literals(ROUTINE_INTERVAL_HOURS),
       }),
     ]),
   ),

@@ -182,6 +182,12 @@ export const commonMessagesCatalog = {
   "Choose a version for {count} conflicts before applying. Nothing changes until you apply.":
     "Choose a version for {count} conflicts before applying. Nothing changes until you apply.",
   "{frequency} at {time} ({timezone})": "{frequency} at {time} ({timezone})",
+  "Every few hours": "Every few hours",
+  "Every hour": "Every hour",
+  "Every {hours} hours": "Every {hours} hours",
+  "Every hour ({timezone})": "Every hour ({timezone})",
+  "Every {hours} hours ({timezone})": "Every {hours} hours ({timezone})",
+  Hours: "Hours",
   "{count}m": "{count}m",
   "{count}h": "{count}h",
   "{count}d": "{count}d",

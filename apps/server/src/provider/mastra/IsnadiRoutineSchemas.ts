@@ -1,3 +1,4 @@
+import { ROUTINE_INTERVAL_HOURS } from "@isnadi/contracts";
 import { z } from "zod";
 
 export const routineTime = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
@@ -21,6 +22,7 @@ export const routineToolInputSchema = z.object({
         .min(1),
       time: routineTime,
     }),
+    z.object({ kind: z.literal("interval"), everyHours: z.literal(ROUTINE_INTERVAL_HOURS) }),
   ]),
   skillNames: z.array(z.string().trim().min(1)).nullish(),
   connectorNames: z.array(z.string().trim().min(1)).nullish(),

@@ -9,12 +9,14 @@ import type {
   McpServer,
   Routine,
   RoutineApprovalPolicy,
+  RoutineIntervalHours,
   RoutineRun,
   RoutineRunStatus,
   RoutineSandbox,
   RoutineSchedule,
   RoutineSkillAssignment,
 } from "@isnadi/contracts";
+import { ROUTINE_INTERVAL_HOURS } from "@isnadi/contracts";
 import { withoutErrorStack } from "@isnadi/shared/errorText";
 
 import { createTranslator, type MessageKey } from "./i18n/index.ts";
@@ -45,6 +47,8 @@ export interface RoutineAdapterSchedule {
   readonly time: string;
   readonly timezone: string;
   readonly weekday: number | null;
+  /** How many hours apart an interval routine runs, or null for the other frequencies. */
+  readonly everyHours: number | null;
 }
 
 export interface RoutineAdapterRun {
@@ -113,27 +117,39 @@ const WEEKDAY_LABELS: readonly MessageKey[] = [
   "Saturday",
 ];
 
-export function toRoutineSchedule(draft: RoutineAdapterDraft): RoutineSchedule {
-  if (draft.schedule.frequency !== "weekly") {
-    return { kind: draft.schedule.frequency, time: draft.schedule.time };
-  }
+/** The interval a draft runs on, falling back to the default when it holds none. */
+export function routineIntervalHours(value: number | null): RoutineIntervalHours {
+  return ROUTINE_INTERVAL_HOURS.find((hours) => hours === value) ?? DEFAULT_INTERVAL_HOURS;
+}
 
-  return {
-    kind: "weekly",
-    weekdays: [WEEKDAY_IDS[draft.schedule.weekday ?? 1]!],
-    time: draft.schedule.time,
-  };
+/** What a new interval routine starts on when the form holds no interval yet. */
+export const DEFAULT_INTERVAL_HOURS: RoutineIntervalHours = 6;
+
+export function toRoutineSchedule(draft: RoutineAdapterDraft): RoutineSchedule {
+  switch (draft.schedule.frequency) {
+    case "interval":
+      return { kind: "interval", everyHours: routineIntervalHours(draft.schedule.everyHours) };
+    case "weekly":
+      return {
+        kind: "weekly",
+        weekdays: [WEEKDAY_IDS[draft.schedule.weekday ?? 1]!],
+        time: draft.schedule.time,
+      };
+    default:
+      return { kind: draft.schedule.frequency, time: draft.schedule.time };
+  }
 }
 
 function toAdapterSchedule(routine: Routine): RoutineAdapterSchedule {
   return {
     frequency: routine.schedule.kind,
-    time: routine.schedule.time,
+    time: routine.schedule.kind === "interval" ? "00:00" : routine.schedule.time,
     timezone: routine.timezone,
     weekday:
       routine.schedule.kind === "weekly"
         ? WEEKDAY_IDS.indexOf(routine.schedule.weekdays[0] ?? "monday")
         : null,
+    everyHours: routine.schedule.kind === "interval" ? routine.schedule.everyHours : null,
   };
 }
 
@@ -256,6 +272,15 @@ export function routineScheduleLabel(
   schedule: RoutineAdapterSchedule,
   i18n: RoutineTranslator = englishTranslator,
 ) {
+  if (schedule.frequency === "interval") {
+    const hours = routineIntervalHours(schedule.everyHours);
+
+    return i18n.t(hours === 1 ? "Every hour ({timezone})" : "Every {hours} hours ({timezone})", {
+      hours,
+      timezone: schedule.timezone,
+    });
+  }
+
   const frequency = Match.value(schedule.frequency).pipe(
     Match.when("daily", () => i18n.t("Daily")),
     Match.when("weekdays", () => i18n.t("Weekdays")),
@@ -412,7 +437,7 @@ export function runSummaryLine(
 export interface RoutineApprovalSummary {
   readonly name: string;
   readonly instructions: string | null;
-  /** "Weekdays at 09:00", or null when the proposal has no time. */
+  /** "Weekdays at 09:00", "Every 6 hours", or null when the proposal has no timing. */
   readonly schedule: string | null;
 }
 
@@ -449,7 +474,20 @@ export function routineApprovalSummary(
     Match.orElse(() => t("Daily")),
   );
 
-  const base = time ? t("{schedule} at {time}", { schedule: kind, time }) : null;
+  const interval =
+    schedule?.kind === "interval" && Predicate.isNumber(schedule.everyHours)
+      ? routineIntervalHours(schedule.everyHours)
+      : null;
+
+  // An interval has no time of day, so it wins over `time` when both are readable.
+  const base =
+    interval !== null
+      ? interval === 1
+        ? t("Every hour")
+        : t("Every {hours} hours", { hours: interval })
+      : time !== null
+        ? t("{schedule} at {time}", { schedule: kind, time })
+        : null;
 
   const timezone =
     Predicate.isString(record?.timezone) && record.timezone.trim() ? record.timezone.trim() : null;
