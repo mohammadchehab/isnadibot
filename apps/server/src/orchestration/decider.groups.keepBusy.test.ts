@@ -55,6 +55,7 @@ it.layer(NodeServices.layer)("group keep busy decider", (it) => {
         command: setKeepBusy(true),
         readModel: model,
       });
+
       const event = Array.isArray(result) ? result[0] : result;
 
       if (event?.type !== "group.keep-busy-set") throw new Error("Expected keep busy event");
