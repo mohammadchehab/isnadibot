@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@isnadi/contracts";
 
-import { fallbackAllowedAtTurn, validateEngineFallbacks } from "./engineFallbackPolicy.ts";
+import {
+  fallbackAllowedAtTurn,
+  fallbackAllowedOnFailure,
+  validateEngineFallbacks,
+} from "./engineFallbackPolicy.ts";
+import type { ModelFailureClass } from "./modelFailure.ts";
 
 const providerOf = (instanceId: string, driver: string): ServerProvider => ({
   instanceId: ProviderInstanceId.make(instanceId),
@@ -116,5 +121,55 @@ describe("fallbackAllowedAtTurn", () => {
 
   it("denies a local or subscription instance moving to Custom API without consent", () => {
     expect(allowed("claude", { provider: "custom-2", model: "a" })).toBe(false);
+  });
+});
+
+describe("fallbackAllowedOnFailure", () => {
+  const moves = (
+    failureClass: ModelFailureClass,
+    from: string,
+    entry: { provider: string; model: string; historyConsent?: boolean },
+  ) => fallbackAllowedOnFailure({ providers, failureClass, from, entry });
+
+  it("does not move a 401 off the instance that failed", () => {
+    expect(moves("unavailable", "codex", { provider: "claude", model: "a" })).toBe(false);
+    expect(moves("unavailable", "codex", { provider: "opencodeGo", model: "a" })).toBe(false);
+  });
+
+  it("moves a 401 to another model on the same instance", () => {
+    expect(moves("unavailable", "claude", { provider: "claude", model: "b" })).toBe(true);
+  });
+
+  it("judges a chain that already moved from the instance that failed", () => {
+    // A (primary, codex), B (claude, instance 2), C (claude, instance 2, another model).
+    const from = "claude";
+
+    expect(moves("unavailable", from, { provider: "claude", model: "c" })).toBe(true);
+    expect(moves("unavailable", from, { provider: "codex", model: "a" })).toBe(false);
+    expect(
+      moves("unavailable", from, { provider: "custom-2", model: "a", historyConsent: true }),
+    ).toBe(false);
+  });
+
+  it.each(["rate-limit", "usage-limit", "overloaded"] as const)(
+    "keeps moving a %s failure across instances",
+    (failureClass) => {
+      expect(moves(failureClass, "codex", { provider: "claude", model: "a" })).toBe(true);
+    },
+  );
+
+  it("keeps history consent in front of every cross-instance move", () => {
+    expect(moves("rate-limit", "codex", { provider: "custom", model: "a" })).toBe(false);
+    expect(
+      moves("rate-limit", "codex", { provider: "custom", model: "a", historyConsent: true }),
+    ).toBe(true);
+  });
+
+  it("never moves a request failure, even on the same instance", () => {
+    expect(moves("request", "codex", { provider: "codex", model: "b" })).toBe(false);
+  });
+
+  it("keeps refusing a standard OpenCode entry", () => {
+    expect(moves("rate-limit", "codex", { provider: "opencode", model: "a" })).toBe(false);
   });
 });

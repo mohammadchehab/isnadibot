@@ -183,6 +183,41 @@ export const OrchestrationThreadActivity = Schema.Struct({
 export type OrchestrationThreadActivity = typeof OrchestrationThreadActivity.Type;
 
 /**
+ * The member projection of an activity payload is a **field allowlist**, the
+ * rule the `environment` methods follow: an activity field added later is
+ * hidden from a member by default, and exposing one means naming it here.
+ *
+ * A member reads the owner's conversation but not the owner's work. Nothing in
+ * their frame may carry a command line, an absolute path, tool output, or the
+ * owner's approval `args` — the approval card a member cannot answer still
+ * shows up, keyed by `requestId`, and the server strips the rest at the wire
+ * (`apps/server/src/orchestration/ActivityPayloadProjection.ts`) so every
+ * client inherits it. A screen cannot hide what its socket already received.
+ */
+export const MEMBER_ACTIVITY_PAYLOAD_FIELDS = [
+  "itemType",
+  "status",
+  "toolCallId",
+  "requestId",
+  "data",
+] as const;
+
+/** The `payload.data` fields a member's frame keeps; `item` narrows further. */
+export const MEMBER_ACTIVITY_DATA_FIELDS = ["toolCallId", "kind", "item"] as const;
+
+/** A tool item's status is the only thing a member's row renders from `item`. */
+export const MEMBER_ACTIVITY_ITEM_FIELDS = ["status"] as const;
+
+/**
+ * What a member's approval row reads. The owner's summary names the work
+ * ("Command approval requested", "File-read approval requested"), which is the
+ * same side channel as `requestKind`; going finer later is one field.
+ */
+export const MEMBER_APPROVAL_REQUESTED_SUMMARY = "The owner is needed here";
+
+export const MEMBER_APPROVAL_RESOLVED_SUMMARY = "The owner answered a request";
+
+/**
  * The silence watchdog appends `turn.silent` when a running turn has produced no
  * provider activity for a while, and `turn.silent.cleared` when activity resumes.
  * The latest of the two for a still-running turn is its current silent-run state.

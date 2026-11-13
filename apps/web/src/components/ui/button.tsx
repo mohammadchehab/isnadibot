@@ -45,6 +45,8 @@ const buttonPresentations = {
   "compact-gap": "gap-1",
   "wizard-preview-action": "h-7 px-2 text-xs text-muted-foreground",
   "environment-add": "h-7 gap-1.5 px-2 text-xs",
+  "decision-line":
+    "h-auto max-w-full min-w-0 justify-start border-0 bg-transparent px-0 text-xs font-normal text-warning hover:text-warning hover:underline",
   "environment-remove": "size-8 text-muted-foreground hover:text-destructive",
   "model-visibility": "text-muted-foreground/60 hover:text-muted-foreground",
   "channel-disclosure": "size-7 shrink-0 text-muted-foreground hover:text-foreground sm:size-7",

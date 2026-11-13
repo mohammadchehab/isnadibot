@@ -24,4 +24,11 @@ describe("hasRegistrableDomain", () => {
     assert.isFalse(hasRegistrableDomain("co.uk"));
     assert.isFalse(hasRegistrableDomain("localhost"));
   });
+
+  it("counts a site on a private suffix as its own domain, and the suffix itself as none", () => {
+    assert.isTrue(hasRegistrableDomain("foo.github.io"));
+    assert.isTrue(hasRegistrableDomain("a.foo.blogspot.com"));
+    assert.isFalse(hasRegistrableDomain("github.io"));
+    assert.isFalse(hasRegistrableDomain("blogspot.com"));
+  });
 });

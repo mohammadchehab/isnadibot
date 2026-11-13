@@ -17,7 +17,7 @@ import { useThreadActivities } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { environmentSnapshotAtom } from "../../state/shell";
 import { SidebarInset } from "../ui/sidebar";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { SpaceHeaderActions } from "../space/spaceHeaderActions";
 import {
   buildReplyPrompt,
   findReplySourceMessageId,
@@ -45,7 +45,6 @@ import { BotAvatarView } from "./BotAvatarView";
 import { BotConversationScrollArea } from "./BotConversationScrollArea";
 import { DelegationCard } from "./DelegationCard";
 import { RosterLoadStatus } from "./RosterLoadStatus";
-import { GroupMemberStack } from "./GroupMemberStack";
 import {
   buildBotConversationEntries,
   isBotConversationWorking,
@@ -79,7 +78,6 @@ import { useBotEngineAvailability } from "./useBotEngineAvailability";
 import { useLocalDay } from "./useLocalDay";
 import { useRosterPendingApproval } from "./useRosterPendingApproval";
 import { useEnableBotAutoReview, useRosterLoadState } from "./useServerRoster";
-import { useGroupDetailsOpen } from "./detailsPanelOpen";
 import { activeThreadRuntimeWarning } from "./threadRuntimeWarning.logic";
 import { ThreadRuntimeWarningBanner } from "./ThreadRuntimeWarningBanner";
 
@@ -119,7 +117,6 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
   const bots = useRosterStore((state) => state.bots);
   const runtime = useGroupThreadRuntime(groupId);
   useMarkChatVisited(runtime.linkedThreadRef);
-  const [detailsPanelOpen] = useGroupDetailsOpen();
 
   const mentionScope = useBotPromptMentionScope({
     environmentId,
@@ -341,26 +338,15 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
         data-testid="group-thread-landing"
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <WorkspacePageHeader
-            className="border-b border-border"
-            detailsPanelOpen={detailsPanelOpen}
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <GroupMemberStack group={group} bots={bots} />
-              <span className="truncate text-sm font-medium">
-                <bdi>{group.name}</bdi>
-              </span>
-            </div>
-            <div data-chat-header-actions className="ms-auto flex items-center">
-              {runtime.linkedThreadRef ? (
-                <GroupHopBudgetControl
-                  hopBudget={runtime.hopBudget}
-                  onChange={runtime.setHopBudget}
-                />
-              ) : null}
-              <ChatActionsMenu threadRef={runtime.linkedThreadRef} />
-            </div>
-          </WorkspacePageHeader>
+          <SpaceHeaderActions>
+            {runtime.linkedThreadRef ? (
+              <GroupHopBudgetControl
+                hopBudget={runtime.hopBudget}
+                onChange={runtime.setHopBudget}
+              />
+            ) : null}
+            <ChatActionsMenu threadRef={runtime.linkedThreadRef} />
+          </SpaceHeaderActions>
           <BotConversationScrollArea
             followKey={messages.findLast((message) => message.role === "user")?.id}
           >
