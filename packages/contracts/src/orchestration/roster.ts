@@ -16,6 +16,7 @@ import {
 } from "../baseSchemas.ts";
 import { McpServerId } from "../mcpServer.ts";
 import { BotSkillRegistryAccess, BotSkills } from "../botSkills.ts";
+import { FleetRoleId } from "../fleet/ids.ts";
 import { ImageProviderId } from "../imageGeneration.ts";
 import { ModelSelection, RuntimeMode, DEFAULT_RUNTIME_MODE } from "./modelSelection.ts";
 
@@ -348,6 +349,11 @@ export const OrchestrationBot = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   groupId: Schema.NullOr(GroupId),
+  /**
+   * The fleet role this bot was hired into. Set by the hire flow from the
+   * template; a bot created outside a fleet carries none.
+   */
+  roleId: Schema.optional(FleetRoleId),
   archivedAt: Schema.NullOr(IsoDateTime),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,

@@ -5,10 +5,10 @@ import { DEFAULT_MODEL_BY_PROVIDER } from "../model.ts";
 import { BotAvatar } from "../orchestration/roster.ts";
 import { ProviderDriverKind } from "../providerInstance.ts";
 import { SkillId } from "../routines.ts";
+import { FleetRoleId } from "./ids.ts";
 
-export const FleetRoleId = TrimmedNonEmptyString.pipe(Schema.brand("FleetRoleId"));
-
-export type FleetRoleId = typeof FleetRoleId.Type;
+/** Re-exported so a role and its id are still imported from the same module. */
+export * from "./ids.ts";
 
 export const FleetReasoningLevel = Schema.Literals(["low", "medium", "high"]);
 
