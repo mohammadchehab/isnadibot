@@ -29,6 +29,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       type:
         | "group.create"
         | "group.rename"
+        | "group.keep-busy.set"
         | "group.delete"
         | "group.member.assign"
         | "group.member.unassign"
@@ -93,6 +94,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
             ...(command.creator === undefined ? [] : [command.creator]),
           ],
           ...(command.hopBudget === undefined ? {} : { hopBudget: command.hopBudget }),
+          ...(command.keepBusy === undefined ? {} : { keepBusy: command.keepBusy }),
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },
@@ -116,6 +118,26 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         payload: {
           groupId: command.groupId,
           name: command.name,
+          updatedAt: occurredAt,
+        },
+      };
+    }
+
+    case "group.keep-busy.set": {
+      yield* requireGroup({ readModel, command, groupId: command.groupId });
+      const occurredAt = yield* nowIso;
+
+      return {
+        ...(yield* withEventBase({
+          aggregateKind: "group",
+          aggregateId: command.groupId,
+          occurredAt,
+          commandId: command.commandId,
+        })),
+        type: "group.keep-busy-set",
+        payload: {
+          groupId: command.groupId,
+          keepBusy: command.keepBusy,
           updatedAt: occurredAt,
         },
       };

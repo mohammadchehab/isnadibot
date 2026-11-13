@@ -168,6 +168,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                       { kind: "bot" as const, botId: memberId, role: "specialist" as const },
                     ],
                     hopBudget: null,
+                    keepBusy: false,
                     createdAt: "2026-01-01T00:00:00.000Z",
                     updatedAt: "2026-01-01T00:00:00.000Z",
                   }),

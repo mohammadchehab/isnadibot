@@ -15,6 +15,7 @@ import {
   GroupPersonAssignedPayload as ContractsGroupPersonAssignedPayloadSchema,
   GroupPersonUnassignedPayload as ContractsGroupPersonUnassignedPayloadSchema,
   GroupBossSetPayload as ContractsGroupBossSetPayloadSchema,
+  GroupKeepBusySetPayload as ContractsGroupKeepBusySetPayloadSchema,
   McpServerCreatedPayload as ContractsMcpServerCreatedPayloadSchema,
   McpServerUpdatedPayload as ContractsMcpServerUpdatedPayloadSchema,
   McpServerDeletedPayload as ContractsMcpServerDeletedPayloadSchema,
@@ -82,6 +83,8 @@ export const GroupPersonAssignedPayload = ContractsGroupPersonAssignedPayloadSch
 export const GroupPersonUnassignedPayload = ContractsGroupPersonUnassignedPayloadSchema;
 
 export const GroupBossSetPayload = ContractsGroupBossSetPayloadSchema;
+
+export const GroupKeepBusySetPayload = ContractsGroupKeepBusySetPayloadSchema;
 
 export const McpServerCreatedPayload = ContractsMcpServerCreatedPayloadSchema;
 

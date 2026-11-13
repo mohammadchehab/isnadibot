@@ -335,6 +335,8 @@ export const GroupCreateCommand = Schema.Struct({
   creator: Schema.optional(GroupPersonMembership),
   /** Seeds the hop budget of each new chat in this group. */
   hopBudget: Schema.optional(GroupHopBudget),
+  /** A fleet hired from a template starts keeping its members busy. Absent decodes to false. */
+  keepBusy: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
 });
 
@@ -343,6 +345,13 @@ export const GroupRenameCommand = Schema.Struct({
   commandId: CommandId,
   groupId: GroupId,
   name: TrimmedNonEmptyString,
+});
+
+export const GroupKeepBusySetCommand = Schema.Struct({
+  type: Schema.Literal("group.keep-busy.set"),
+  commandId: CommandId,
+  groupId: GroupId,
+  keepBusy: Schema.Boolean,
 });
 
 export const GroupDeleteCommand = Schema.Struct({

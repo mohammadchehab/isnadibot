@@ -16,11 +16,27 @@ export function createGroups({
             bossBotId: event.payload.bossBotId,
             members: event.payload.members,
             hopBudget: event.payload.hopBudget ?? null,
+            keepBusy: event.payload.keepBusy,
             createdAt: event.payload.createdAt,
             updatedAt: event.payload.updatedAt,
           });
 
           return;
+        case "group.keep-busy-set": {
+          const existing = yield* projectionGroupRepository.getById({
+            groupId: event.payload.groupId,
+          });
+
+          if (Option.isNone(existing)) return;
+          yield* projectionGroupRepository.upsert({
+            ...existing.value,
+            keepBusy: event.payload.keepBusy,
+            updatedAt: event.payload.updatedAt,
+          });
+
+          return;
+        }
+
         case "group.renamed": {
           const existing = yield* projectionGroupRepository.getById({
             groupId: event.payload.groupId,

@@ -78,6 +78,7 @@ export const OrchestrationEventType = Schema.Literals([
   "group.person-assigned",
   "group.person-unassigned",
   "group.boss-set",
+  "group.keep-busy-set",
   "mcp-server.created",
   "mcp-server.updated",
   "mcp-server.deleted",
@@ -265,6 +266,8 @@ export const GroupCreatedPayload = Schema.Struct({
   bossBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   members: Schema.Array(GroupMembership).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   hopBudget: Schema.optional(GroupHopBudget),
+  /** Absent decodes to false so pre-existing group.created events replay unchanged. */
+  keepBusy: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -272,6 +275,12 @@ export const GroupCreatedPayload = Schema.Struct({
 export const GroupRenamedPayload = Schema.Struct({
   groupId: GroupId,
   name: TrimmedNonEmptyString,
+  updatedAt: IsoDateTime,
+});
+
+export const GroupKeepBusySetPayload = Schema.Struct({
+  groupId: GroupId,
+  keepBusy: Schema.Boolean,
   updatedAt: IsoDateTime,
 });
 

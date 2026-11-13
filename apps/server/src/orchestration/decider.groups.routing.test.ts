@@ -193,6 +193,7 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
           name: "Legacy group",
           bossBotId: null,
           members: [],
+          keepBusy: false,
           createdAt: NOW,
           updatedAt: NOW,
         },

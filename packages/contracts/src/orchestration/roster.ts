@@ -410,6 +410,11 @@ export const OrchestrationGroup = Schema.Struct({
   members: Schema.Array(GroupMembership).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   /** Seeds the hop budget of each new chat in this group. Absent means GROUP_HOP_BUDGET_DEFAULT. */
   hopBudget: Schema.optional(GroupHopBudget),
+  /**
+   * Keeps idle group members working: the fleet dispatcher hands them queued work items.
+   * Absent means off, so a group that never set it behaves exactly as before.
+   */
+  keepBusy: Schema.optional(Schema.Boolean),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

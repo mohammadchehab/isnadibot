@@ -123,6 +123,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       return yield* decideBots({ command, readModel, ...(actor !== undefined ? { actor } : {}) });
     case "group.create":
     case "group.rename":
+    case "group.keep-busy.set":
     case "group.delete":
     case "group.member.assign":
     case "group.member.unassign":

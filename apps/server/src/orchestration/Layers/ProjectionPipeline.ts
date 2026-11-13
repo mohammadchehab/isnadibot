@@ -148,6 +148,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           "group.person-assigned",
           "group.person-unassigned",
           "group.boss-set",
+          "group.keep-busy-set",
           "group.deleted",
         ]),
         apply: applyGroupsProjection,

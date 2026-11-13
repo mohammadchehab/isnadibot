@@ -89,6 +89,7 @@ function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateR
       };
     case "group.create":
     case "group.rename":
+    case "group.keep-busy.set":
     case "group.delete":
     case "group.member.assign":
     case "group.member.unassign":
