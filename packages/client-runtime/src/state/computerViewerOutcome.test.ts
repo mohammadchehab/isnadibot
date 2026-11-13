@@ -1,23 +1,10 @@
-import { ComputerError } from "@isnadi/contracts";
+import { ComputerError, type ComputerState } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-vi.mock("~/state/computer", () => ({ computerEnvironment: {} }));
-
-vi.mock("~/state/environments", () => ({ useEnvironmentConnectionState: () => ({ data: null }) }));
-
-vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => vi.fn() }));
-
-vi.mock("~/state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.fn() }));
-
-import {
-  initialComputerViewerState,
-  type ComputerViewerState,
-} from "@isnadi/client-runtime/state/computer-viewer";
-import type { ComputerState } from "@isnadi/contracts";
-
-import { applyUnavailableRecheck, computerViewerOutcome } from "./useComputerViewer";
+import { initialComputerViewerState, type ComputerViewerState } from "./computerViewer.ts";
+import { applyUnavailableRecheck, computerViewerOutcome } from "./computerViewerController.ts";
 
 describe("computerViewerOutcome", () => {
   it("passes values through and keeps the server's error code", () => {

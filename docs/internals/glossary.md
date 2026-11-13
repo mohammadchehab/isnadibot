@@ -241,14 +241,17 @@ An element pinned to left-to-right whatever the interface direction: code, diffs
 
 The durable record of one bot asking for a site, in one thread. Its state is `asking`, `in_progress`,
 `signed_in`, `failed`, `dismissed` or `expired`; there is no `cancelled`, because Cancel returns a bot's
-request to `asking` and Not now is the only decline. The decider owns the state, the first terminal event
-wins, and the card the owner sees is a view of it. See [site sign-in](./site-signin.md#states).
+request to `asking` and Not now is the only decline. On an owner-started request, where no bot is waiting,
+Cancel ends the request as `dismissed` instead. The decider owns the state, the first terminal event wins,
+and the card the owner sees is a view of it. See [site sign-in](./site-signin.md#states).
 
 #### Sign-in flow
 
 One attempt to sign the owner in, started by Sign in on a request and bounded by a profile lease. Its
-phases are discovering, awaiting input, external action, human, submitting and completed. A second client's
-Sign in joins the running flow instead of starting another, and a flow is never cut by request expiry.
+phases are discovering, awaiting input, external action, human, submitting and completed. Starting one is a
+compare-and-set on `asking`, so a second client's Sign in joins the running flow instead of starting
+another, and a flow is never cut by request expiry. A completion names the flow it belongs to and is
+dropped if that is no longer the request's current flow.
 
 #### Profile
 

@@ -47,16 +47,17 @@ creates an egress grant (TASK-34 AC5).
 ### The request (server state)
 
 The decider owns these. There is no `cancelled` state: Cancel on a bot's request returns it to `asking`,
-and Not now is the only decline.
+Cancel on an owner-started request ends it as `dismissed` (no bot is waiting on those), and Not now is the
+only decline.
 
-| State         | Meaning                                                        | Terminal |
-| ------------- | -------------------------------------------------------------- | -------- |
-| `asking`      | the owner has been asked; no flow has started                  | no       |
-| `in_progress` | one flow exists, with `startedBy`; carries a `submitting` flag | no       |
-| `signed_in`   | a profile was saved at `generation + 1`                        | yes      |
-| `failed`      | the flow ended with a failure class                            | yes      |
-| `dismissed`   | the owner pressed Not now                                      | yes      |
-| `expired`     | nobody answered, or the turn that was waiting ended            | yes      |
+| State         | Meaning                                                                     | Terminal |
+| ------------- | --------------------------------------------------------------------------- | -------- |
+| `asking`      | the owner has been asked; no flow has started                               | no       |
+| `in_progress` | one flow exists, named by `flowId`, with `startedBy`; carries `submitting`  | no       |
+| `signed_in`   | a profile was saved at `generation + 1`, or an `access` request was allowed | yes      |
+| `failed`      | the flow ended with a failure class                                         | yes      |
+| `dismissed`   | the owner pressed Not now, or cancelled a request of their own              | yes      |
+| `expired`     | nobody answered, or the turn that was waiting ended                         | yes      |
 
 `kind` is `sign-in` (no usable profile) or `access` (a signed-in profile exists that this bot and thread do
 not cover; the card is a question with Allow and Not now, no form). The row also carries `requested_by`,
@@ -87,18 +88,19 @@ largest element and is shown as the normalized registrable domain, with an IDN a
 
 ### Transitions
 
-| From          | To            | Trigger                                                                   | Guard                                                            |
-| ------------- | ------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `asking`      | `in_progress` | Sign in                                                                   | compare-and-set on `asking`; one in-progress per request         |
-| `in_progress` | `in_progress` | a second client's Sign in                                                 | joins the existing flow as Continue sign-in, never a new one     |
-| `in_progress` | `in_progress` | flow reaches submitting                                                   | Cancel is refused from here on                                   |
-| `in_progress` | `asking`      | Cancel, or the flow is abandoned                                          | not submitting; the asking clock resumes, it does not restart    |
-| `in_progress` | `signed_in`   | the save at `generation + 1` is accepted                                  | the save is a compare-and-set on the generation                  |
-| `in_progress` | `failed`      | the flow ends with a class                                                | `in-use`, `signed-out-meanwhile`, `vault-disabled`, `signed-out` |
-| `asking`      | `dismissed`   | Not now                                                                   | any client                                                       |
-| `asking`      | `expired`     | the wait limit, turn end, interrupt, thread delete, bot archive or delete | never cuts a flow                                                |
-| `failed`      | `in_progress` | Sign in again                                                             | same compare-and-set as a first start                            |
-| `signed_in`   | —             | sign out                                                                  | writes the tombstone, see below                                  |
+| From          | To            | Trigger                                                                   | Guard                                                                       |
+| ------------- | ------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `asking`      | `in_progress` | Sign in                                                                   | compare-and-set on `asking`; one in-progress per request                    |
+| `in_progress` | `in_progress` | a second client's Sign in                                                 | joins the existing flow as Continue sign-in, never a new one                |
+| `in_progress` | `in_progress` | flow reaches submitting                                                   | Cancel is refused from here on                                              |
+| `in_progress` | `asking`      | Cancel on a bot's request, or the flow is abandoned                       | not submitting; the asking clock resumes, it does not restart               |
+| `in_progress` | `dismissed`   | Cancel on an owner-started request                                        | not submitting; no bot is waiting, so there is no asking state to return to |
+| `in_progress` | `signed_in`   | the save at `generation + 1` is accepted                                  | the save is a compare-and-set on the generation                             |
+| `in_progress` | `failed`      | the flow ends with a class                                                | `in-use`, `signed-out-meanwhile`, `vault-disabled`, `signed-out`            |
+| `asking`      | `dismissed`   | Not now                                                                   | any client                                                                  |
+| `asking`      | `expired`     | the wait limit, turn end, interrupt, thread delete, bot archive or delete | never cuts a flow                                                           |
+| `failed`      | `in_progress` | Sign in again                                                             | same compare-and-set as a first start                                       |
+| `signed_in`   | —             | sign out                                                                  | writes the tombstone, see below                                             |
 
 The precedence rule is the important half:
 
@@ -106,9 +108,84 @@ The precedence rule is the important half:
   profile is saved, and the bot is told the owner declined or did not answer.
 - **`submitting` beats Cancel.** Once the form is submitted the result stands, even if Not now was pressed on
   another client; the card shows Finishing sign-in rather than pretending to have stopped.
+- **One flow per request, and a completion belongs to its flow.** A start is compare-and-set on `asking`, so
+  two clients pressing Sign in produce one flow: the second joins it as Continue sign-in and is never a
+  second flow over one profile. Every completion names the `flowId` it was started for and is applied only
+  while that id is the request's current flow. After Cancel ended that flow the request is back at `asking`
+  with no current flow, so its late completion is dropped, and a later Start's flow is never satisfied by
+  an earlier flow's result.
+- **`submitting` is a window, not a lock.** It clears on the submit's result, or when the flow service's
+  step timeout dispatches `submit-settled`, whichever comes first; Cancel works again afterwards, and a
+  completion that arrives after a timed-out settle and a Cancel is dropped by the same `flowId` match.
 - **An in-progress flow is never cut by expiry.** Turn end, interrupt and thread delete expire `asking`
   requests only. A flow that finishes after its turn ended still saves the profile and posts a settled line
   in the chat, because the owner chose to sign in; the bot is not resumed.
+
+## The command and RPC surface
+
+Two surfaces, split by what they carry. A **request** is durable state, so it changes by orchestration command:
+the decider owns the state machine, every change is audited, and a replay is refused. A **flow** is the live form,
+so it is an RPC: it streams page state and carries typed answers that must never reach an event, a transcript or a
+log. Nothing else writes either one (TASK-27; the client seam is `packages/client-runtime/src/browserAuth/`).
+
+### Client commands
+
+All are dispatched through `orchestration.dispatchCommand` at `orchestration:operate`, and all are **owner-only for
+a member principal**: owner is the session principal, not `access:write`.
+
+| Command                                                 | Does                                                                                                        | Refused when                                                      |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `browser-auth.request.start { requestId }`              | `asking` → `in_progress`, compare-and-set, mints the flow id                                                | not `asking`; an expired request; a flow is open                  |
+| `browser-auth.request.start-owner { site, profileId? }` | creates the owner's own request (no bot, no thread) and opens its flow                                      | the site already has an open request                              |
+| `browser-auth.request.cancel { requestId }`             | back to `asking` with the clock resumed; an owner-started request is dismissed instead                      | `submitting`                                                      |
+| `browser-auth.request.dismiss { requestId }`            | Not now: the only decline                                                                                   | a flow is open                                                    |
+| `browser-auth.request.allow { requestId }`              | kind `access` only: the decider writes the session grant for (profile, bot, thread) and settles `signed_in` | kind `sign-in`; the grant already exists; the profile is not live |
+| `browser-auth.grant.revoke { grantId }`                 | revoke one bot's access                                                                                     | a bot principal, or a grant it does not hold                      |
+| `browser-profile.sign-out { profileId }`                | the tombstone at `generation + 1`                                                                           | —                                                                 |
+| `browser-profile.delete { profileId }`                  | remove the row and its ciphertext                                                                           | a flow is open on that profile                                    |
+
+**Allow is the only client path to a grant.** `browser-auth.grant.create` stays internal, next to
+`browser-auth.request.create`, `.complete`, `.fail`, `.expire`, `browser-profile.save` and `.health-recorded`: they
+are not in `ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a
+request it was shown and the decider resolves that into a grant. One request yields at most one grant; a replayed
+Allow is refused.
+
+### RPCs
+
+Only the live form is an RPC, plus the one server-side routing decision. All are registered in TASK-27 with their
+input schemas and `RPC_REQUIRED_SCOPES` entries, owner-only in `RPC_MEMBER_ACCESS`, and the `WS_METHODS`
+enumeration test fails if one is missing.
+
+| RPC                               | Scope                   | Handler lands in |
+| --------------------------------- | ----------------------- | ---------------- |
+| `browserAuth.flow.watch` (stream) | `orchestration:operate` | TASK-35          |
+| `browserAuth.flow.submit`         | `orchestration:operate` | TASK-36          |
+| `browserAuth.setProfileRoute`     | `access:write`          | TASK-27          |
+
+There is no `flow.start` and no `flow.cancel` RPC: starting and cancelling are the commands above, so a start is one
+audited state change rather than a second write path with its own authorization. A flow RPC never creates a profile,
+a grant or a host grant; it only moves a flow the decider already opened. `submitting` is set by the internal command
+the submit handler dispatches, so the decider stays the only writer.
+
+### The request view
+
+The view the card reads is the record `deriveSiteSignInCard` takes, and the server schema is the same shape
+(camelCase over the columns named above):
+`requestId`, `threadId`, `botId`, `site`, `kind`, `state`, `reason`, `startUrl`, `submitting`, `failureClass`,
+`hasSavedPassword`, `pcRouted`, `egress`, `checkFailed`, `askingElapsedMs`, `askingSince`, `settledAt`, and
+`profileId` on an owner-started request (so the inbox item in TASK-133 can match an open request to its profile). No
+`expiresAt`: expiry is computed from `askingSince` and `askingElapsedMs` by the rules below, and a second stored
+deadline would be a second clock. No cookie, typed value, profile path or generation is in it.
+
+### Site identity
+
+`site` is the registrable domain of the host, already punycode when it is an IDN, computed by one shared function in
+`@isnadi/shared/siteDomain` that every surface calls: TASK-26's `UNIQUE(site)` column, TASK-27's decider, the
+`startUrl` check, TASK-34's cookie filter, TASK-50's health check and the desktop's egress store. It must resolve
+public suffixes with private domains included (`getDomain(host, { allowPrivateDomains: true })`), so `foo.github.io`
+and `bar.github.io` are two sites and neither collapses into `github.io`. Today's exports there are `normalizeHost`
+and `hasRegistrableDomain` only; TASK-140 AC7 owns adding the identity function, and it lands before TASK-27, which
+reuses it rather than growing a second copy.
 
 ## The profile and the session
 
@@ -178,6 +255,67 @@ profile at its current generation (D6, TASK-30). It runs at most once per expiry
 has been `ok` again, no further automatic attempt happens, so a wrong password cannot be retried into a lockout.
 Without a saved password the owner is asked, with the normal card. Sign out deletes the password, which is
 the way out.
+
+## The tables and the events
+
+TASK-26 adds five tables; three that the original story asked for are deliberately absent. The columns live on that
+card (its consolidated table list supersedes the older one in the same brief); what is decided here is what exists,
+what a row is for, and which constraints are load-bearing.
+
+| Table                               | One row per            | Load-bearing                                                                                                                                                                                                                                                  |
+| ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projection_browser_profiles`       | site                   | `UNIQUE(site)`; a tombstone is the same row at `g+1`, reused on re-sign-in, never a second row; holds generation, status, health, route, `auth_hosts`, `last_write_id`; no ciphertext and no path                                                             |
+| `projection_browser_auth_requests`  | request                | no `expires_at` and no `cancelled`; `requested_by` is `bot` or `owner`, and a bot request must carry bot, thread and `tool_call_id`; carries `kind`, `start_url`, `failure_class`, `submitting`, `flow_id`, `asking_elapsed_ms`, `asking_since`, `settled_at` |
+| `projection_browser_session_grants` | (profile, bot, thread) | `UNIQUE(profile_id, bot_id, thread_id)`, so an approval cannot stack; expiry is derived from `last_used_at`; no FK to bots or threads, the projector deletes them on archive, delete, group removal and thread delete                                         |
+| `browser_profile_leases`            | profile                | `fencing_token` only ever grows, and release keeps the row                                                                                                                                                                                                    |
+| `browser_profile_checks`            | profile                | the last `result` plus the `expiry_episode` and `auto_resign_episode` counters                                                                                                                                                                                |
+
+**What is deliberately not a table**, and why:
+
+- **`connections`**: the story's "auth connections" are Kernel Managed Auth, which no card in this stack uses. It
+  gets a table with its first user.
+- **`flows`**: a flow's live state — the page's fields and the answers typed into them — is in memory only
+  (TASK-35, TASK-36). What persists is the request and its state. A flow table would be the one place a typed value
+  could reach a row.
+- **`egress_providers`**: the provider is the desktop's existing egress-provider pairing grant, whose token is
+  already hashed there. The server holds no egress token, so a profile only records its `route`.
+- **`events`**: browser-auth changes are orchestration events like every other kind, not their own log. The chat
+  line for a settled request is a thread activity, not a shell field.
+
+Ciphertext is on disk, never in a row: `<stateDir>/browser-profiles/<profileId>.<generation>.enc`, with the path
+derived from the brand-checked id and the generation — which is why no url, cookie, token, key or path column exists
+anywhere (TASK-26 AC1). The migration takes the next free number at build time; `080_ProjectionWorkItems` is the
+latest on main today, so it is `081`.
+
+### The events
+
+Every accepted browser-auth command appends exactly one orchestration event, named with the existing dotted
+`noun.verb` kinds, and the projector writes the rows above from them.
+
+| Event                             | Carries                                                                |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| `browser-auth.request.created`    | requestId, site, kind, state; threadId and botId on a bot request only |
+| `browser-auth.request.started`    | requestId, flowId, startedByClient                                     |
+| `browser-auth.request.submitting` | requestId                                                              |
+| `browser-auth.request.reopened`   | requestId (back to `asking`; `asking_since` resumes)                   |
+| `browser-auth.request.settled`    | requestId, state, site, failureClass when failed                       |
+| `browser-profile.saved`           | profileId, site, generation, status                                    |
+| `browser-profile.signed-out`      | profileId, generation                                                  |
+| `browser-profile.deleted`         | profileId                                                              |
+| `browser-profile.health-recorded` | profileId, result — only when the value changed                        |
+| `browser-profile.route-changed`   | profileId, from, to                                                    |
+| `browser-session-grant.created`   | grantId, profileId, botId, threadId, site                              |
+| `browser-session-grant.revoked`   | grantId                                                                |
+
+The payload rule is the one the card states and a schema test enforces: ids, site, state, route names and
+timestamps only. No URL with a query, no cookie, no typed value, no path, and the auth-check URL appears in no event
+except the profile save that stores it. A settled request also appends one thread activity,
+`browser-auth.request.settled { requestId, state, site }`, so the chat card keeps its final state after the request
+leaves the shell.
+
+There is no `AuditKind` on main yet (TASK-95 is unstarted), so nothing here invents one: the names are chosen to map
+1:1 onto the audit kinds TASK-95 will define — `browser-profile.route-changed` becomes `profile.route-changed`, and
+so on — so no rename is needed later.
 
 ## What must not change
 

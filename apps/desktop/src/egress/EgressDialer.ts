@@ -1,11 +1,14 @@
 import * as NodeNet from "node:net";
 
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { normalizeHost } from "@isnadi/shared/siteDomain";
 
 import { classifyAddress } from "./EgressAddressPolicy.ts";
+import { DIAL_TIMEOUT_MS } from "./EgressLimits.ts";
 
 const ALLOWED_PORTS: ReadonlySet<number> = new Set([80, 443]);
 
@@ -42,6 +45,16 @@ export interface EgressDialerDeps<Socket> {
 }
 
 /**
+ * Runs one dial step. A lookup or connect that hangs — a black-holed SYN, a resolver that never
+ * answers — becomes a refusal, because the stream that asked for it has already given up.
+ */
+const withinDialTimeout = <A, E>(step: Effect.Effect<A, E>): Effect.Effect<Option.Option<A>> =>
+  step.pipe(
+    Effect.timeoutOption(Duration.millis(DIAL_TIMEOUT_MS)),
+    Effect.orElseSucceed(() => Option.none()),
+  );
+
+/**
  * Opens TCP for one CONNECT. The desktop's own checks decide: port 80/443, the owner's host
  * grants, and a single resolution whose every address must be public. The socket connects to the
  * checked IP so a second lookup can never swap in another address.
@@ -67,9 +80,11 @@ export const openEgressTarget = <Socket>(
     const interfaces = deps.interfaces();
 
     const connectTo = (ip: string) =>
-      deps
-        .connect({ host: ip, port: request.port })
-        .pipe(Effect.catch(() => refuse("connect-failed")));
+      withinDialTimeout(deps.connect({ host: ip, port: request.port })).pipe(
+        Effect.flatMap(
+          Option.match({ onNone: () => refuse("connect-failed"), onSome: Effect.succeed }),
+        ),
+      );
 
     if (!deps.hostPolicy.allows(request.profileId, host)) return yield* refuse("host-not-granted");
 
@@ -79,7 +94,12 @@ export const openEgressTarget = <Socket>(
       return yield* connectTo(host);
     }
 
-    const addresses = yield* deps.resolve(host).pipe(Effect.catch(() => refuse("resolve-failed")));
+    const addresses = yield* withinDialTimeout(deps.resolve(host)).pipe(
+      Effect.flatMap(
+        Option.match({ onNone: () => refuse("resolve-failed"), onSome: Effect.succeed }),
+      ),
+    );
+
     const [first] = addresses;
 
     if (first === undefined) return yield* refuse("resolve-failed");

@@ -1,9 +1,12 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
+import * as TestClock from "effect/testing/TestClock";
 
 import { classifyAddress } from "./EgressAddressPolicy.ts";
 import { EgressRefused, denyAllHostPolicy, openEgressTarget } from "./EgressDialer.ts";
+import { DIAL_TIMEOUT_MS } from "./EgressLimits.ts";
 
 const PUBLIC_IP = "93.184.216.34";
 
@@ -266,6 +269,63 @@ describe("connect failures", () => {
       );
 
       assert.strictEqual(reason, "connect-failed");
+    }),
+  );
+});
+
+describe("dial timeouts (TASK-120)", () => {
+  it.effect("refuses a lookup that hangs instead of holding the stream", () =>
+    Effect.gen(function* () {
+      const { calls, deps } = makeDeps({ lookups: [[PUBLIC_IP]] });
+
+      const dial = yield* Effect.forkChild(
+        refusal(
+          openEgressTarget(
+            { host: "hang.example", port: 443, profileId: "p" },
+            { ...deps, resolve: () => Effect.never },
+          ),
+        ),
+      );
+
+      yield* TestClock.adjust(DIAL_TIMEOUT_MS);
+
+      assert.strictEqual(yield* Fiber.join(dial), "resolve-failed");
+      assert.deepStrictEqual(calls.connect, []);
+    }),
+  );
+
+  it.effect("refuses a connect that hangs, after it has resolved once", () =>
+    Effect.gen(function* () {
+      const { calls, deps } = makeDeps({ lookups: [[PUBLIC_IP]] });
+
+      const dial = yield* Effect.forkChild(
+        refusal(
+          openEgressTarget(
+            { host: "slow.example", port: 443, profileId: "p" },
+            { ...deps, connect: (target) => Effect.andThen(deps.connect(target), Effect.never) },
+          ),
+        ),
+      );
+
+      yield* TestClock.adjust(DIAL_TIMEOUT_MS);
+
+      assert.strictEqual(yield* Fiber.join(dial), "connect-failed");
+      assert.strictEqual(calls.resolve, 1);
+      assert.deepStrictEqual(calls.connect, [{ host: PUBLIC_IP, port: 443 }]);
+    }),
+  );
+
+  it.effect("still dials one that answers inside the window", () =>
+    Effect.gen(function* () {
+      const { deps } = makeDeps({ lookups: [[PUBLIC_IP]] });
+
+      const dial = yield* Effect.forkChild(
+        openEgressTarget({ host: "quick.example", port: 443, profileId: "p" }, deps),
+      );
+
+      yield* TestClock.adjust(DIAL_TIMEOUT_MS - 1);
+
+      assert.deepStrictEqual(yield* Fiber.join(dial), { host: PUBLIC_IP, port: 443 });
     }),
   );
 });
