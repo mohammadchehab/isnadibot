@@ -298,6 +298,7 @@ const make = Effect.gen(function* () {
     const thread = readModel.threads.find(
       (candidate) => candidate.id === threadId && candidate.deletedAt === null,
     );
+
     const groupId = thread?.groupId;
 
     if (groupId !== undefined && groupId !== null) return groupId;
