@@ -2,6 +2,7 @@ import { bootstrapRemoteBearerSession } from "@isnadi/client-runtime/authorizati
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
@@ -47,10 +48,14 @@ export const forkDesktopEgress = Effect.gen(function* () {
     return { httpBaseUrl: config.value.httpBaseUrl.href, bearerToken: session.access_token };
   });
 
+  // Seal the revocation subscription before any stream can open. Anything published after this
+  // point wakes the provider even if it has not started watching yet.
+  const revocationSubscription = yield* grants.subscribe;
+
   yield* Effect.forkScoped(
     runDesktopEgress(getSession, {
       hostPolicy: grants.policyFor(DesktopBackendPool.PRIMARY_INSTANCE_ID),
-      revocations: grants.revocations,
+      revocations: Stream.fromSubscription(revocationSubscription),
     }),
   );
 });

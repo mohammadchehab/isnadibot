@@ -7,10 +7,11 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
-import * as Stream from "effect/Stream";
 
 import { hasRegistrableDomain, normalizeHost } from "@isnadi/shared/siteDomain";
 
@@ -18,6 +19,10 @@ import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { denyAllHostPolicy, type EgressHostPolicy } from "./EgressDialer.ts";
 
 const FILE_MODE = 0o600;
+
+// The grants file names the hosts and profiles a bot may reach, so the directory holding it stays
+// owner-only even when it has to be created on the way to a write.
+const DIRECTORY_MODE = 0o700;
 
 /**
  * One host the owner let a profile reach. `suffix` covers the domain and every subdomain of it.
@@ -75,7 +80,7 @@ export class EgressGrantWriteError extends Schema.TaggedErrorClass<EgressGrantWr
       "encode-document",
       "create-directory",
       "write-temporary-file",
-      "protect-temporary-file",
+      "sync-temporary-file",
       "replace-grants-file",
     ]),
     path: Schema.String,
@@ -107,10 +112,11 @@ const normalizeDomain = (domain: string): string | null => {
 };
 
 /**
- * Validates and normalizes a grant the owner typed. A suffix must sit at least one label below a
- * public suffix (`example.com` yes; `com`, `co.uk`, `localhost` no) and may not be IP-shaped.
+ * Normalizes a grant the owner stored or typed, without judging whether it is still allowed.
+ * Tightening an acceptance rule must not strand a grant that is already on disk, or the owner
+ * could no longer revoke it.
  */
-const validateGrant = (grant: EgressGrant): Effect.Effect<EgressGrant, EgressGrantInvalid> => {
+const normalizeGrant = (grant: EgressGrant): Effect.Effect<EgressGrant, EgressGrantInvalid> => {
   if (grant.kind === "exact") {
     const host = normalizeDomain(grant.host);
 
@@ -121,21 +127,64 @@ const validateGrant = (grant: EgressGrant): Effect.Effect<EgressGrant, EgressGra
 
   const domain = normalizeDomain(grant.domain);
 
-  if (domain === null) {
-    return Effect.fail(new EgressGrantInvalid({ reason: "host", value: grant.domain }));
-  }
-
-  // A numeric last label (`1.2.3`, `0x7f`) is how IPv4 forms hide; refuse them with real IPs.
-  if (NodeNet.isIP(domain) !== 0 || /^(0x[0-9a-f]+|\d+)$/i.test(domain.split(".").at(-1) ?? "")) {
-    return Effect.fail(new EgressGrantInvalid({ reason: "ip-suffix", value: grant.domain }));
-  }
-
-  if (!hasRegistrableDomain(domain)) {
-    return Effect.fail(new EgressGrantInvalid({ reason: "public-suffix", value: grant.domain }));
-  }
-
-  return Effect.succeed({ kind: "suffix", domain });
+  return domain === null
+    ? Effect.fail(new EgressGrantInvalid({ reason: "host", value: grant.domain }))
+    : Effect.succeed({ kind: "suffix", domain });
 };
+
+/**
+ * Validates and normalizes a grant the owner typed. A suffix must sit at least one label below a
+ * public suffix (`example.com` yes; `com`, `co.uk`, `localhost`, `github.io` no) and may not be
+ * IP-shaped.
+ */
+const validateGrant = (grant: EgressGrant): Effect.Effect<EgressGrant, EgressGrantInvalid> =>
+  normalizeGrant(grant).pipe(
+    Effect.flatMap((normalized): Effect.Effect<EgressGrant, EgressGrantInvalid> => {
+      if (normalized.kind === "exact") return Effect.succeed(normalized);
+
+      const { domain } = normalized;
+
+      // A numeric last label (`1.2.3`, `0x7f`) is how IPv4 forms hide; refuse them with real IPs.
+      if (
+        NodeNet.isIP(domain) !== 0 ||
+        /^(0x[0-9a-f]+|\d+)$/i.test(domain.split(".").at(-1) ?? "")
+      ) {
+        return Effect.fail(new EgressGrantInvalid({ reason: "ip-suffix", value: domain }));
+      }
+
+      if (!hasRegistrableDomain(domain)) {
+        return Effect.fail(new EgressGrantInvalid({ reason: "public-suffix", value: domain }));
+      }
+
+      return Effect.succeed(normalized);
+    }),
+  );
+
+/** Applies the current acceptance rules to what was on disk, so a tightened rule takes effect. */
+const sanitizeDocument = (
+  document: EgressGrantsDocument,
+): Effect.Effect<{ readonly document: EgressGrantsDocument; readonly dropped: number }> =>
+  Effect.map(
+    Effect.forEach(Object.entries(document.grants), ([profileId, held]) =>
+      Effect.map(
+        Effect.forEach(held, (grant) => validateGrant(grant).pipe(Effect.option)),
+        (validated) => {
+          const kept = validated.flatMap((entry) => (Option.isSome(entry) ? [entry.value] : []));
+
+          return [profileId, kept] as const;
+        },
+      ),
+    ),
+    (entries) => {
+      const dropped = entries.reduce(
+        (total, [profileId, kept]) =>
+          total + (document.grants[profileId]?.length ?? 0) - kept.length,
+        0,
+      );
+
+      return { document: { ...document, grants: Object.fromEntries(entries) }, dropped };
+    },
+  );
 
 const sameGrant = (left: EgressGrant, right: EgressGrant): boolean =>
   left.kind === "exact"
@@ -178,7 +227,12 @@ export class DesktopEgressGrants extends Context.Service<
     ) => Effect.Effect<void, EgressGrantChangeError>;
     /** Replaces the file with an empty store. The only way out of `unreadable`. */
     readonly reset: Effect.Effect<void, EgressGrantWriteError>;
-    readonly revocations: Stream.Stream<EgressRevocation>;
+    /**
+     * A sealed subscription to revocations. Acquire it before serving egress: a revocation published
+     * between the store opening and the first pull of a lazy stream is a revocation nobody hears,
+     * and the stream it should have closed keeps running.
+     */
+    readonly subscribe: Effect.Effect<PubSub.Subscription<EgressRevocation>, never, Scope.Scope>;
   }
 >()("@isnadi/desktop/egress/EgressGrantStore/DesktopEgressGrants") {}
 
@@ -190,18 +244,46 @@ export const make = (grantsPath: string) =>
     const writes = yield* Semaphore.make(1);
     const revocationBus = yield* PubSub.unbounded<EgressRevocation>();
 
-    const raw = yield* fileSystem.readFileString(grantsPath).pipe(Effect.option);
+    // Only a missing file is an empty store. Any other read failure is `unreadable`, because a file
+    // we cannot see might hold grants we must not silently drop on the next write.
+    const raw = yield* fileSystem.readFileString(grantsPath).pipe(
+      Effect.matchEffect({
+        onSuccess: (text) => Effect.succeed(Option.some(text)),
+        onFailure: (error) =>
+          Predicate.isTagged(error.reason, "NotFound")
+            ? Effect.succeed(Option.none<string>())
+            : Effect.logWarning("egress grants file could not be read; denying every host", {
+                path: grantsPath,
+                cause: error,
+              }).pipe(Effect.as(null)),
+      }),
+    );
 
-    const loaded = yield* Option.match(raw, {
-      onNone: () => Effect.succeed<EgressGrantsDocument | null>(EMPTY_DOCUMENT),
-      onSome: (text) =>
-        decodeDocument(text).pipe(
-          Effect.catch(() =>
-            Effect.logWarning("egress grants file is unreadable; denying every host", {
-              path: grantsPath,
-            }).pipe(Effect.as(null)),
-          ),
+    const loaded = yield* Effect.gen(function* () {
+      if (raw === null) return null;
+
+      if (Option.isNone(raw)) return EMPTY_DOCUMENT;
+
+      const decoded = yield* decodeDocument(raw.value).pipe(
+        Effect.catch(() =>
+          Effect.logWarning("egress grants file is unreadable; denying every host", {
+            path: grantsPath,
+          }).pipe(Effect.as(null)),
         ),
+      );
+
+      if (decoded === null) return null;
+
+      const sanitized = yield* sanitizeDocument(decoded);
+
+      if (sanitized.dropped > 0) {
+        yield* Effect.logWarning("dropped stored egress grants the current rules refuse", {
+          path: grantsPath,
+          dropped: sanitized.dropped,
+        });
+      }
+
+      return sanitized.document;
     });
 
     // The synchronous snapshot the dialer reads. `null` means unreadable.
@@ -225,16 +307,27 @@ export const make = (grantsPath: string) =>
         Effect.mapError(writeFailure("encode-document", grantsPath)),
       );
 
+      const bytes = new TextEncoder().encode(`${encoded}\n`);
+
       yield* fileSystem
-        .makeDirectory(path.dirname(grantsPath), { recursive: true })
+        .makeDirectory(path.dirname(grantsPath), { recursive: true, mode: DIRECTORY_MODE })
         .pipe(Effect.mapError(writeFailure("create-directory", path.dirname(grantsPath))));
       yield* Effect.gen(function* () {
-        yield* fileSystem
-          .writeFileString(tempPath, `${encoded}\n`)
-          .pipe(Effect.mapError(writeFailure("write-temporary-file", tempPath)));
-        yield* fileSystem
-          .chmod(tempPath, FILE_MODE)
-          .pipe(Effect.mapError(writeFailure("protect-temporary-file", tempPath)));
+        // `open` scopes the handle, so the sync below completes and the handle closes before the
+        // rename. A crash after the rename can then never expose a file the kernel still holds in
+        // its page cache only.
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const file = yield* fileSystem
+              .open(tempPath, { flag: "w", mode: FILE_MODE })
+              .pipe(Effect.mapError(writeFailure("write-temporary-file", tempPath)));
+
+            yield* file
+              .writeAll(bytes)
+              .pipe(Effect.mapError(writeFailure("write-temporary-file", tempPath)));
+            yield* file.sync.pipe(Effect.mapError(writeFailure("sync-temporary-file", tempPath)));
+          }),
+        );
         yield* fileSystem
           .rename(tempPath, grantsPath)
           .pipe(Effect.mapError(writeFailure("replace-grants-file", grantsPath)));
@@ -315,7 +408,7 @@ export const make = (grantsPath: string) =>
           ),
         ),
       revoke: (profileId, grant) =>
-        validateGrant(grant).pipe(
+        normalizeGrant(grant).pipe(
           Effect.flatMap((valid) =>
             change((document) => {
               const held = document.grants[profileId] ?? [];
@@ -363,7 +456,7 @@ export const make = (grantsPath: string) =>
           );
         }),
       ),
-      revocations: Stream.fromPubSub(revocationBus),
+      subscribe: PubSub.subscribe(revocationBus),
     });
   });
 

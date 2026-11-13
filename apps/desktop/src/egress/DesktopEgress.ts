@@ -111,7 +111,13 @@ export const serveEgressControl = (input: {
   readonly openStream: EgressProvider.EgressProviderDeps["openStreamLink"];
   /** The owner's grants for this connection's backend. Built by the grant store. */
   readonly hostPolicy: EgressHostPolicy;
+  /**
+   * The store's sealed subscription, as a stream. Taken before the control socket runs, so a
+   * revocation published before this point is still delivered to the provider.
+   */
   readonly revocations: EgressProvider.EgressProviderDeps["revocations"];
+  /** The dialer the provider pumps. Injectable so a test can watch a stream end without a socket. */
+  readonly dial?: EgressProvider.EgressProviderDeps["dial"];
 }) =>
   Effect.gen(function* () {
     const bucket = EgressLimits.makeTokenBucket(
@@ -120,13 +126,15 @@ export const serveEgressControl = (input: {
     );
 
     const provider = EgressProvider.makeEgressProvider({
-      dial: (request) =>
-        openEgressTarget(request, {
-          resolve: lookupAll,
-          connect: connectTcp,
-          hostPolicy: input.hostPolicy,
-          interfaces: interfaceCidrs,
-        }).pipe(Effect.flatMap((socket) => toEgressTarget(socket))),
+      dial:
+        input.dial ??
+        ((request) =>
+          openEgressTarget(request, {
+            resolve: lookupAll,
+            connect: connectTcp,
+            hostPolicy: input.hostPolicy,
+            interfaces: interfaceCidrs,
+          }).pipe(Effect.flatMap((socket) => toEgressTarget(socket)))),
       openStreamLink: (streamId, ticket) => input.openStream(streamId, ticket),
       stillAllowed: input.hostPolicy.allows,
       revocations: input.revocations,

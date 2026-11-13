@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -17,23 +18,41 @@ const exact = (host: string) => ({ kind: "exact" as const, host });
 
 const suffix = (domain: string) => ({ kind: "suffix" as const, domain });
 
+const permissionDenied = (method: string) =>
+  PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method });
+
 const withStore = <A, E, R extends FileSystem.FileSystem | Path.Path | Crypto.Crypto | Scope.Scope>(
   body: (input: {
     readonly store: EgressGrantStore.DesktopEgressGrants["Service"];
     readonly grantsPath: string;
     readonly fileSystem: FileSystem.FileSystem;
   }) => Effect.Effect<A, E, R>,
-  seed?: string,
+  options: {
+    readonly seed?: string;
+    /** The grants file goes one directory deeper, so a write creates its directory. */
+    readonly subdirectory?: string;
+    /** Wraps the real file system, so a test can make one call fail. */
+    readonly wrapFileSystem?: (fileSystem: FileSystem.FileSystem) => FileSystem.FileSystem;
+  } = {},
 ) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const directory = yield* fileSystem.makeTempDirectoryScoped();
-    const grantsPath = path.join(directory, "egress-grants.json");
+    const parent = options.subdirectory ? path.join(directory, options.subdirectory) : directory;
+    const grantsPath = path.join(parent, "egress-grants.json");
 
-    if (seed !== undefined) yield* fileSystem.writeFileString(grantsPath, seed);
+    if (options.seed !== undefined) {
+      yield* fileSystem.makeDirectory(parent, { recursive: true });
+      yield* fileSystem.writeFileString(grantsPath, options.seed);
+    }
 
-    const store = yield* EgressGrantStore.make(grantsPath);
+    const store = yield* EgressGrantStore.make(grantsPath).pipe(
+      Effect.provideService(
+        FileSystem.FileSystem,
+        options.wrapFileSystem ? options.wrapFileSystem(fileSystem) : fileSystem,
+      ),
+    );
 
     return yield* body({ store, grantsPath, fileSystem });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
@@ -169,6 +188,34 @@ describe("DesktopEgressGrants", () => {
     ),
   );
 
+  it.effect("creates the grants directory 0700 and opens the temp file 0600", () => {
+    const modes: Array<number | undefined> = [];
+
+    return withStore(
+      ({ store, grantsPath, fileSystem }) =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+
+          yield* store.setBinding(INSTANCE, ["p"]);
+
+          const directory = yield* fileSystem.stat(path.dirname(grantsPath));
+
+          assert.strictEqual(directory.mode & 0o777, 0o700);
+          assert.deepStrictEqual(modes, [0o600]);
+        }),
+      {
+        subdirectory: "grants",
+        wrapFileSystem: (fileSystem) => ({
+          ...fileSystem,
+          open: (filePath, openOptions) =>
+            fileSystem
+              .open(filePath, openOptions)
+              .pipe(Effect.tap(() => Effect.sync(() => modes.push(openOptions?.mode)))),
+        }),
+      },
+    );
+  });
+
   it.effect("a corrupt file denies everything, is left untouched and refuses writes", () =>
     withStore(
       ({ store, grantsPath, fileSystem }) =>
@@ -190,11 +237,67 @@ describe("DesktopEgressGrants", () => {
 
           assert.isTrue(store.policyFor(INSTANCE).allows("p", "example.com"));
         }),
-      "{not json",
+      { seed: "{not json" },
     ),
   );
 
-  it.effect("a failed write keeps the old file and the old in-memory grants", () =>
+  it.effect("a read error that is not NotFound is unreadable, never an empty store", () =>
+    withStore(
+      ({ store, grantsPath, fileSystem }) =>
+        Effect.gen(function* () {
+          // A file we cannot see might hold grants. Treating it as empty would deny every host
+          // silently and overwrite it on the next grant.
+          assert.strictEqual(yield* store.status, "unreadable");
+          assert.isFalse(store.policyFor(INSTANCE).allows("p", "example.com"));
+
+          const error = yield* Effect.flip(store.grant("p", exact("example.com")));
+
+          assert.strictEqual(error._tag, "EgressGrantStoreUnreadable");
+          assert.isFalse(yield* fileSystem.exists(grantsPath));
+        }),
+      {
+        wrapFileSystem: (fileSystem) => ({
+          ...fileSystem,
+          readFileString: () => Effect.fail(permissionDenied("readFileString")),
+        }),
+      },
+    ),
+  );
+
+  it.effect("drops a stored grant the rules now refuse, and still lets revoke name it", () =>
+    withStore(
+      ({ store, grantsPath, fileSystem }) =>
+        Effect.gen(function* () {
+          // `co.uk` passed an older entry check. It must not survive a load, or a tightened rule
+          // would still be honoured from disk.
+          assert.strictEqual(yield* store.status, "ready");
+          assert.isFalse(store.policyFor(INSTANCE).allows("p", "example.co.uk"));
+          assert.isTrue(store.policyFor(INSTANCE).allows("p", "kept.com"));
+
+          // Revoke normalizes and never validates, so naming a grant the entry check refuses is a
+          // no-op instead of stranding the owner with a grant no control can remove.
+          yield* store.revoke("p", suffix("co.uk"));
+
+          yield* store.grant("p", exact("added.com"));
+
+          assert.notInclude(yield* fileSystem.readFileString(grantsPath), "co.uk");
+        }),
+      {
+        seed: JSON.stringify({
+          version: 1,
+          bindings: { primary: ["p"] },
+          grants: {
+            p: [
+              { kind: "suffix", domain: "co.uk" },
+              { kind: "exact", host: "kept.com" },
+            ],
+          },
+        }),
+      },
+    ),
+  );
+
+  it.effect("a failed rename keeps the old file and the old in-memory grants", () =>
     withStore(({ store, grantsPath, fileSystem }) =>
       Effect.gen(function* () {
         yield* store.setBinding(INSTANCE, ["p"]);
@@ -205,14 +308,7 @@ describe("DesktopEgressGrants", () => {
         const failing = yield* EgressGrantStore.make(grantsPath).pipe(
           Effect.provideService(FileSystem.FileSystem, {
             ...fileSystem,
-            rename: () =>
-              Effect.fail(
-                PlatformError.systemError({
-                  _tag: "PermissionDenied",
-                  module: "FileSystem",
-                  method: "rename",
-                }),
-              ),
+            rename: () => Effect.fail(permissionDenied("rename")),
           }),
         );
 
@@ -226,25 +322,103 @@ describe("DesktopEgressGrants", () => {
     ),
   );
 
+  it.effect("a failed fsync keeps the old file and the old in-memory grants", () =>
+    withStore(({ store, grantsPath, fileSystem }) =>
+      Effect.gen(function* () {
+        yield* store.setBinding(INSTANCE, ["p"]);
+        yield* store.grant("p", exact("example.com"));
+
+        const before = yield* fileSystem.readFileString(grantsPath);
+
+        // The bytes reached the kernel but never the disk. Renaming anyway would put a file on
+        // disk whose only copy is in the page cache, so the write has to fail instead.
+        const failing = yield* EgressGrantStore.make(grantsPath).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fileSystem,
+            // Every handle the store opens writes and then never syncs.
+            open: (filePath, openOptions) =>
+              fileSystem.open(filePath, openOptions).pipe(
+                Effect.map(
+                  (file): FileSystem.File => ({
+                    [FileSystem.FileTypeId]: FileSystem.FileTypeId,
+                    stat: file.stat,
+                    seek: (offset, from) => file.seek(offset, from),
+                    sync: Effect.fail(permissionDenied("sync")),
+                    read: (buffer) => file.read(buffer),
+                    readAlloc: (size) => file.readAlloc(size),
+                    truncate: (length) => file.truncate(length),
+                    write: (buffer) => file.write(buffer),
+                    writeAll: (buffer) => file.writeAll(buffer),
+                  }),
+                ),
+              ),
+          }),
+        );
+
+        const error = yield* Effect.flip(failing.grant("p", exact("added.com")));
+
+        assert.strictEqual(
+          Predicate.isTagged(error, "EgressGrantWriteError") ? error.operation : error._tag,
+          "sync-temporary-file",
+        );
+        assert.strictEqual(yield* fileSystem.readFileString(grantsPath), before);
+        assert.isFalse(failing.policyFor(INSTANCE).allows("p", "added.com"));
+        assert.isTrue(failing.policyFor(INSTANCE).allows("p", "example.com"));
+      }),
+    ),
+  );
+
   it.effect("a revoke removes the grant and publishes the revocation", () =>
     withStore(({ store }) =>
       Effect.gen(function* () {
         yield* store.setBinding(INSTANCE, ["p"]);
         yield* store.grant("p", exact("example.com"));
 
-        const received = yield* store.revocations.pipe(
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.forkScoped,
-        );
+        const watching = yield* Deferred.make<void>();
 
-        yield* Effect.forEach(Array.from({ length: 10 }), () => Effect.yieldNow, { discard: true });
+        const received = yield* Effect.gen(function* () {
+          const subscription = yield* store.subscribe;
+
+          yield* Deferred.succeed(watching, undefined);
+
+          return yield* Stream.fromSubscription(subscription).pipe(
+            Stream.take(1),
+            Stream.runCollect,
+          );
+        }).pipe(Effect.scoped, Effect.forkChild);
+
+        yield* Deferred.await(watching);
         yield* store.revoke("p", exact("example.com"));
 
         const revocations = yield* Fiber.join(received);
 
         assert.isFalse(store.policyFor(INSTANCE).allows("p", "example.com"));
         assert.deepStrictEqual(revocations, [{ profileId: "p", host: "example.com" }]);
+      }),
+    ),
+  );
+
+  it.effect("a revocation published before anything watches is still delivered", () =>
+    withStore(({ store }) =>
+      Effect.gen(function* () {
+        yield* store.setBinding(INSTANCE, ["p"]);
+
+        // The subscription is sealed first, the way the runner takes it before any stream can
+        // open. A lazily subscribing stream would drop this revocation on the floor.
+        const revocations = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const subscription = yield* store.subscribe;
+
+            yield* store.setBinding(INSTANCE, []);
+
+            return yield* Stream.fromSubscription(subscription).pipe(
+              Stream.take(1),
+              Stream.runCollect,
+            );
+          }),
+        );
+
+        assert.deepStrictEqual(revocations, [{ profileId: "p" }]);
       }),
     ),
   );
