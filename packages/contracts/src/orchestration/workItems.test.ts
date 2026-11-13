@@ -1,12 +1,14 @@
 import { assert, it } from "@effect/vitest";
+import * as Schema from "effect/Schema";
 
 import {
   briefPreview,
   toWorkItemSummary,
   WORK_ITEM_PREVIEW_LIMIT,
+  WorkItem,
   WorkItemId,
   parseTrackerLink,
-  type WorkItem,
+  type WorkItem as WorkItemType,
 } from "./workItems.ts";
 
 it("parses a GitHub issue URL", () => {
@@ -71,9 +73,9 @@ it("cuts a brief with no spaces at the limit", () => {
 });
 
 it("summarises an item without its brief", () => {
-  const item: WorkItem = {
+  const item: WorkItemType = {
     id: WorkItemId.make("work-item-1"),
-    groupId: "group-1" as WorkItem["groupId"],
+    groupId: "group-1" as WorkItemType["groupId"],
     title: "Ship it",
     brief: "y ".repeat(4000),
     kind: "task",
@@ -86,4 +88,34 @@ it("summarises an item without its brief", () => {
 
   assert.notProperty(summary, "brief");
   assert.isAtMost(summary.briefPreview.length, WORK_ITEM_PREVIEW_LIMIT);
+});
+
+const decodeItem = Schema.decodeUnknownSync(WorkItem);
+
+const encodeItem = Schema.encodeSync(WorkItem);
+
+const writableItem = {
+  id: "work-item-1",
+  groupId: "group-1",
+  title: "Ship it",
+  brief: "Do the thing.",
+  kind: "task",
+  state: "queued",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+it("an item keeps the fleet role it needs through a stored event", () => {
+  const item = decodeItem({ ...writableItem, role: "architect" });
+
+  assert.strictEqual(item.role, "architect");
+  assert.strictEqual(decodeItem(encodeItem(item)).role, "architect");
+});
+
+it("an item without a role stays role-less", () => {
+  assert.isUndefined(decodeItem(writableItem).role);
+});
+
+it("refuses an empty role on an item", () => {
+  assert.throws(() => decodeItem({ ...writableItem, role: "" }));
 });
