@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as PlatformError from "effect/PlatformError";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
@@ -117,6 +118,36 @@ describe("DesktopEgressGrants", () => {
         }
 
         assert.isFalse(store.policyFor(INSTANCE).allows("p", "example.com"));
+      }),
+    ),
+  );
+
+  it.effect("refuses a wildcard on a private suffix but still accepts the exact host", () =>
+    withStore(({ store }) =>
+      Effect.gen(function* () {
+        // One wildcard on `github.io` would cover every unrelated site hosted there.
+        for (const domain of ["github.io", "blogspot.com"]) {
+          const error = yield* Effect.flip(store.grant("p", suffix(domain)));
+
+          const reason = Predicate.isTagged(error, "EgressGrantInvalid")
+            ? error.reason
+            : error._tag;
+
+          assert.strictEqual(reason, "public-suffix", domain);
+        }
+
+        yield* store.grant("p", exact("foo.github.io"));
+        yield* store.setBinding(INSTANCE, ["p"]);
+
+        const policy = store.policyFor(INSTANCE);
+
+        assert.isTrue(policy.allows("p", "foo.github.io"));
+        assert.isFalse(policy.allows("p", "bar.github.io"));
+
+        // Only the wildcard is refused. The bare suffix host is still a host the owner can name.
+        yield* store.grant("p", exact("github.io"));
+
+        assert.isTrue(policy.allows("p", "github.io"));
       }),
     ),
   );
