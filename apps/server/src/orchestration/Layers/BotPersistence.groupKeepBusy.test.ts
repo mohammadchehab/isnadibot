@@ -65,7 +65,7 @@ it.layer(TestLayer)("group keep busy persistence", (it) => {
       ]);
 
       const check = (
-        groups: ReadonlyArray<{ readonly id: string; readonly keepBusy: boolean }>,
+        groups: ReadonlyArray<{ readonly id: string; readonly keepBusy?: boolean | undefined }>,
       ) => {
         assert.isTrue(groups.find((group) => group.id === "keep-busy")?.keepBusy);
         assert.isFalse(groups.find((group) => group.id === "stays-idle")?.keepBusy);
