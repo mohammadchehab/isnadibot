@@ -456,3 +456,42 @@ it.effect("decodes exclusive thread ownership", () =>
     assert.equal(invalid._tag, "Failure");
   }),
 );
+
+it.effect("a bot hired into a fleet keeps the role id it was hired for", () =>
+  Effect.gen(function* () {
+    const bot = yield* decodeOrchestrationBot({
+      id: "bot-1",
+      name: "Architect",
+      title: "Agent",
+      avatar: { kind: "dither", seed: "architect" },
+      engine: null,
+      sandbox: "local",
+      groupId: null,
+      roleId: "architect",
+      archivedAt: null,
+      createdAt: "2026-08-27T20:00:00.000Z",
+      updatedAt: "2026-08-27T20:00:00.000Z",
+    });
+
+    assert.strictEqual(bot.roleId, "architect");
+  }),
+);
+
+it.effect("a bot created outside a fleet carries no role id", () =>
+  Effect.gen(function* () {
+    const bot = yield* decodeOrchestrationBot({
+      id: "bot-1",
+      name: "Isnadi",
+      title: "Agent",
+      avatar: { kind: "dither", seed: "isnadi" },
+      engine: null,
+      sandbox: "local",
+      groupId: null,
+      archivedAt: null,
+      createdAt: "2026-08-27T20:00:00.000Z",
+      updatedAt: "2026-08-27T20:00:00.000Z",
+    });
+
+    assert.isUndefined(bot.roleId);
+  }),
+);
