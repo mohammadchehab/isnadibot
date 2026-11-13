@@ -9,6 +9,7 @@ import {
   weekStart,
   type SpaceRoutine,
 } from "@isnadi/client-runtime/space";
+import { spaceStandup } from "@isnadi/client-runtime/space/standup";
 
 import { useMemo } from "react";
 
@@ -23,18 +24,10 @@ import type { Bot, Group } from "../roster/types";
 import { useLocalDay } from "../roster/useLocalDay";
 import { useRosterStore } from "../roster/rosterStore";
 import { Button } from "../ui/button";
-import { Card } from "../ui/card";
+import { SpaceStandup } from "./SpaceStandup";
+import { SpaceTile } from "./SpaceTile";
 
 const NO_ROUTINES: ReadonlyArray<SpaceRoutine> = [];
-
-function Tile({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Card className="min-w-0 gap-2 p-4">
-      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
-      {children}
-    </Card>
-  );
-}
 
 /**
  * The space's dashboard. Everything is derived from data the client already holds (chat
@@ -73,6 +66,20 @@ export function SpaceOverview({ group }: { group: Group }) {
 
   const usage = useSpaceUsage(environmentId, since, memberIds);
 
+  const standup = useMemo(
+    () =>
+      snapshot === null
+        ? null
+        : spaceStandup({
+            group,
+            bots: snapshot.bots,
+            chats: snapshot.threads,
+            workItems: snapshot.workItems ?? [],
+            delegations: snapshot.delegations,
+          }),
+    [group, snapshot],
+  );
+
   const updated = relativeRunTime(spaceUpdatedAt(group, decisions, activity), Date.now(), i18n);
   const boss = bots.find((bot) => bot.id === group.bossBotId);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.id, bot])), [bots]);
@@ -98,8 +105,9 @@ export function SpaceOverview({ group }: { group: Group }) {
         {" · "}
         {t("updated {time}", { time: updated })}
       </p>
+      {standup === null ? null : <SpaceStandup report={standup} />}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Tile title={t("Decisions")}>
+        <SpaceTile title={t("Decisions")}>
           {decisions.length === 0 ? (
             <p className="text-sm">{t("Nothing waiting on you")}</p>
           ) : (
@@ -110,16 +118,16 @@ export function SpaceOverview({ group }: { group: Group }) {
               </Button>
             </>
           )}
-        </Tile>
-        <Tile title={t("Routines")}>
+        </SpaceTile>
+        <SpaceTile title={t("Routines")}>
           <p className="text-2xl font-semibold">
             {t("{count} active", { count: i18n.formatNumber(routines.active) })}
           </p>
           <p className="text-xs text-muted-foreground">
             {t("Next run")}: {routineDateLabel(routines.nextRunAt, i18n)}
           </p>
-        </Tile>
-        <Tile title={t("Usage")}>
+        </SpaceTile>
+        <SpaceTile title={t("Usage")}>
           <p className="text-2xl font-semibold">
             {usage.isPending
               ? "…"
@@ -128,9 +136,9 @@ export function SpaceOverview({ group }: { group: Group }) {
           <p className="text-xs text-muted-foreground">
             {usage.hasError ? t("Some bots could not report usage") : t("this week")}
           </p>
-        </Tile>
+        </SpaceTile>
       </div>
-      <Tile title={t("Activity")}>
+      <SpaceTile title={t("Activity")}>
         {activity.length === 0 ? (
           <p className="text-sm">{t("Nothing here yet")}</p>
         ) : (
@@ -165,7 +173,7 @@ export function SpaceOverview({ group }: { group: Group }) {
             })}
           </ul>
         )}
-      </Tile>
+      </SpaceTile>
     </div>
   );
 }
