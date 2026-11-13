@@ -1,4 +1,14 @@
 export const fleetCatalog = {
+  // Screens
+  "New space": "مساحة جديدة",
+  "Start from a fleet": "ابدأ من فريق",
+  "Pick the team you need. You can adjust it before it starts.":
+    "اختر الفريق الذي تحتاجه. يمكنك تعديله قبل أن يبدأ.",
+  "Hire fleet": "تعيين الفريق",
+  "Start empty": "ابدأ فارغا",
+  "{count} more": "{count} أخرى",
+  "This fleet is no longer available.": "هذا الفريق لم يعد متاحا.",
+
   // Templates
   Recruiting: "التوظيف",
   "Sources candidates, writes outreach, and tracks every opening.":

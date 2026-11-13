@@ -20,10 +20,12 @@ import { Route as SettingsSplatRouteImport } from './routes/settings.$'
 import { Route as SettingsProvidersProviderIdRouteImport } from './routes/settings.providers.$providerId'
 import { Route as SettingsChannelsChannelRouteImport } from './routes/settings.channels.$channel'
 import { Route as BotsBotIdSettingsRouteImport } from './routes/bots.$botId.settings'
+import { Route as ChatSpacesNewRouteImport } from './routes/_chat.spaces.new'
 import { Route as ChatGroupsGroupIdRouteImport } from './routes/_chat.groups.$groupId'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatBotsBotIdRouteImport } from './routes/_chat.bots.$botId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
+import { Route as ChatSpacesNewTemplateIdRouteImport } from './routes/_chat.spaces.new.$templateId'
 
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
@@ -80,6 +82,11 @@ const BotsBotIdSettingsRoute = BotsBotIdSettingsRouteImport.update({
   path: '/bots/$botId/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatSpacesNewRoute = ChatSpacesNewRouteImport.update({
+  id: '/spaces/new',
+  path: '/spaces/new',
+  getParentRoute: () => ChatRoute,
+} as any)
 const ChatGroupsGroupIdRoute = ChatGroupsGroupIdRouteImport.update({
   id: '/groups/$groupId',
   path: '/groups/$groupId',
@@ -101,6 +108,11 @@ const ChatEnvironmentIdThreadIdRoute =
     path: '/$environmentId/$threadId',
     getParentRoute: () => ChatRoute,
   } as any)
+const ChatSpacesNewTemplateIdRoute = ChatSpacesNewTemplateIdRouteImport.update({
+  id: '/$templateId',
+  path: '/$templateId',
+  getParentRoute: () => ChatSpacesNewRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
@@ -114,9 +126,11 @@ export interface FileRoutesByFullPath {
   '/bots/$botId': typeof ChatBotsBotIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/groups/$groupId': typeof ChatGroupsGroupIdRoute
+  '/spaces/new': typeof ChatSpacesNewRouteWithChildren
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
+  '/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/pair': typeof PairRoute
@@ -130,9 +144,11 @@ export interface FileRoutesByTo {
   '/bots/$botId': typeof ChatBotsBotIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/groups/$groupId': typeof ChatGroupsGroupIdRoute
+  '/spaces/new': typeof ChatSpacesNewRouteWithChildren
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
+  '/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -148,9 +164,11 @@ export interface FileRoutesById {
   '/_chat/bots/$botId': typeof ChatBotsBotIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/_chat/groups/$groupId': typeof ChatGroupsGroupIdRoute
+  '/_chat/spaces/new': typeof ChatSpacesNewRouteWithChildren
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
+  '/_chat/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -166,9 +184,11 @@ export interface FileRouteTypes {
     | '/bots/$botId'
     | '/draft/$draftId'
     | '/groups/$groupId'
+    | '/spaces/new'
     | '/bots/$botId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
+    | '/spaces/new/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/pair'
@@ -182,9 +202,11 @@ export interface FileRouteTypes {
     | '/bots/$botId'
     | '/draft/$draftId'
     | '/groups/$groupId'
+    | '/spaces/new'
     | '/bots/$botId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
+    | '/spaces/new/$templateId'
   id:
     | '__root__'
     | '/_chat'
@@ -199,9 +221,11 @@ export interface FileRouteTypes {
     | '/_chat/bots/$botId'
     | '/_chat/draft/$draftId'
     | '/_chat/groups/$groupId'
+    | '/_chat/spaces/new'
     | '/bots/$botId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
+    | '/_chat/spaces/new/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -292,6 +316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BotsBotIdSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_chat/spaces/new': {
+      id: '/_chat/spaces/new'
+      path: '/spaces/new'
+      fullPath: '/spaces/new'
+      preLoaderRoute: typeof ChatSpacesNewRouteImport
+      parentRoute: typeof ChatRoute
+    }
     '/_chat/groups/$groupId': {
       id: '/_chat/groups/$groupId'
       path: '/groups/$groupId'
@@ -320,8 +351,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatEnvironmentIdThreadIdRouteImport
       parentRoute: typeof ChatRoute
     }
+    '/_chat/spaces/new/$templateId': {
+      id: '/_chat/spaces/new/$templateId'
+      path: '/$templateId'
+      fullPath: '/spaces/new/$templateId'
+      preLoaderRoute: typeof ChatSpacesNewTemplateIdRouteImport
+      parentRoute: typeof ChatSpacesNewRoute
+    }
   }
 }
+
+interface ChatSpacesNewRouteChildren {
+  ChatSpacesNewTemplateIdRoute: typeof ChatSpacesNewTemplateIdRoute
+}
+
+const ChatSpacesNewRouteChildren: ChatSpacesNewRouteChildren = {
+  ChatSpacesNewTemplateIdRoute: ChatSpacesNewTemplateIdRoute,
+}
+
+const ChatSpacesNewRouteWithChildren = ChatSpacesNewRoute._addFileChildren(
+  ChatSpacesNewRouteChildren,
+)
 
 interface ChatRouteChildren {
   ChatIndexRoute: typeof ChatIndexRoute
@@ -329,6 +379,7 @@ interface ChatRouteChildren {
   ChatBotsBotIdRoute: typeof ChatBotsBotIdRoute
   ChatDraftDraftIdRoute: typeof ChatDraftDraftIdRoute
   ChatGroupsGroupIdRoute: typeof ChatGroupsGroupIdRoute
+  ChatSpacesNewRoute: typeof ChatSpacesNewRouteWithChildren
 }
 
 const ChatRouteChildren: ChatRouteChildren = {
@@ -337,6 +388,7 @@ const ChatRouteChildren: ChatRouteChildren = {
   ChatBotsBotIdRoute: ChatBotsBotIdRoute,
   ChatDraftDraftIdRoute: ChatDraftDraftIdRoute,
   ChatGroupsGroupIdRoute: ChatGroupsGroupIdRoute,
+  ChatSpacesNewRoute: ChatSpacesNewRouteWithChildren,
 }
 
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
