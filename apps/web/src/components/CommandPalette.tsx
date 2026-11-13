@@ -6,6 +6,7 @@ import {
   ArchiveIcon,
   BotIcon,
   ChartNoAxesColumnIcon,
+  EraserIcon,
   ImageIcon,
   LanguagesIcon,
   MessageCircleIcon,
@@ -14,6 +15,7 @@ import {
   PaletteIcon,
   PuzzleIcon,
   SettingsIcon,
+  SquareIcon,
   SunIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -51,6 +53,7 @@ import { useThreadSearch } from "../state/queries";
 import { findLatestGroupThreadIds, latestGroupThreadKey } from "./roster/botThreadRuntime.logic";
 import { useOpenChat } from "./chat/useOpenChat";
 import { useRosterStore } from "./roster/rosterStore";
+import { useBotFleetControls } from "./roster/useBotControls";
 import { resolveShortcutCommand } from "../keybindings";
 import { CommandDialog, CommandDialogPopup } from "./ui/command";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -267,8 +270,44 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
     }),
   );
 
+  // Fleet-wide bot controls. The group is only there when one of them can act,
+  // so the palette never lists a row that does nothing.
+  const fleet = useBotFleetControls();
+
+  const botItems: CommandPaletteActionItem[] = [
+    ...(fleet.canInterruptAll
+      ? [
+          {
+            value: "bots:interrupt-all",
+            searchTerms: [t("Interrupt all bots"), "interrupt", "stop", "cancel", "all", "bots"],
+            title: t("Interrupt all bots"),
+            description: t("{count} working now", { count: fleet.running.length }),
+            icon: <SquareIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await fleet.interruptAll();
+            },
+          },
+        ]
+      : []),
+    ...(fleet.canClearAll
+      ? [
+          {
+            value: "bots:clear-all",
+            searchTerms: [t("Clear all bot contexts"), "clear", "context", "reset", "all", "bots"],
+            title: t("Clear all bot contexts"),
+            description: t("{count} idle to clear", { count: fleet.clearable.length }),
+            icon: <EraserIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await fleet.clearAll();
+            },
+          },
+        ]
+      : []),
+  ];
+
   const groups: CommandPaletteGroup[] = [
     ...(chatItems.length > 0 ? [{ value: "chat", label: t("This chat"), items: chatItems }] : []),
+    ...(botItems.length > 0 ? [{ value: "bots", label: t("Bots"), items: botItems }] : []),
     { value: "actions", label: t("Actions"), items: actionItems },
   ];
 
