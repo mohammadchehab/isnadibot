@@ -153,22 +153,26 @@ export function SpaceTasks({ group }: { group: Group }) {
     refreshFinished();
   };
 
-  const moveCard = (card: BoardCard, state: "in-progress" | "review") => () =>
+  const moveCard = (card: BoardCard, state: "in-progress" | "review") => () => {
+    if (environmentId === null) return;
+
     void run(card, () => update({ environmentId, input: { workItemId: card.id, state } }));
+  };
 
-  const closeCard = (card: BoardCard, resolution: "done" | "dropped") => () =>
+  const closeCard = (card: BoardCard, resolution: "done" | "dropped") => () => {
+    if (environmentId === null) return;
+
     void run(card, () => close({ environmentId, input: { workItemId: card.id, resolution } }));
+  };
 
-  const reopenCard = (card: BoardCard) => () =>
+  const reopenCard = (card: BoardCard) => () => {
+    if (environmentId === null) return;
+
     void run(card, () => reopen({ environmentId, input: { workItemId: card.id } }));
-
-  const finishedState = {
-    closed: { query: closedQuery },
-    done: { query: doneQuery },
-  } as const;
+  };
 
   const renderFinishedNote = (column: "closed" | "done") => {
-    const { query } = finishedState[column];
+    const query = column === "closed" ? closedQuery : doneQuery;
 
     if (query.isPending) {
       return <p className="px-1 text-xs text-muted-foreground">{t("Loading…")}</p>;

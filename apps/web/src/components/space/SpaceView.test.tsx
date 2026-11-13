@@ -7,6 +7,8 @@ vi.mock("../../i18n", () => ({ useI18n: () => ({ t: (message: string) => message
 
 vi.mock("./SpaceOverview", () => ({ SpaceOverview: () => <p>overview-body</p> }));
 
+vi.mock("./SpaceTasks", () => ({ SpaceTasks: () => <p>tasks-body</p> }));
+
 import { SpaceView, type SpaceTab } from "./SpaceView";
 
 const group: Group = {
@@ -32,18 +34,21 @@ describe("SpaceView", () => {
     expect(html.indexOf("Launch")).toBeLessThan(html.indexOf("overview-body"));
   });
 
-  it("lists the four tabs", () => {
+  it("lists the five tabs", () => {
     const html = render("chat");
 
-    for (const label of ["Overview", "Group chat", "Skills", "Files"])
+    for (const label of ["Overview", "Tasks", "Group chat", "Skills", "Files"])
       expect(html).toContain(label);
   });
 
   it("shows only the selected tab's panel", () => {
     expect(render("chat")).toContain("chat-body");
     expect(render("chat")).not.toContain("overview-body");
+    expect(render("chat")).not.toContain("tasks-body");
     expect(render("overview")).toContain("overview-body");
     expect(render("overview")).not.toContain("chat-body");
+    expect(render("tasks")).toContain("tasks-body");
+    expect(render("tasks")).not.toContain("overview-body");
   });
 
   it("shows an empty state on Files", () => {

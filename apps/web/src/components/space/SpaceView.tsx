@@ -11,13 +11,14 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "../ui/tabs";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { SpaceHeaderActionsHost } from "./spaceHeaderActions";
 import { SpaceOverview } from "./SpaceOverview";
+import { SpaceTasks } from "./SpaceTasks";
 
-export const SPACE_TABS = ["overview", "chat", "skills", "files"] as const;
+export const SPACE_TABS = ["overview", "tasks", "chat", "skills", "files"] as const;
 
 export type SpaceTab = (typeof SPACE_TABS)[number];
 
 /**
- * The space's four tabs under one top bar carrying the space name. The chat tab keeps the
+ * The space's five tabs under one top bar carrying the space name. The chat tab keeps the
  * existing group chat; the tab lives in the URL.
  */
 export function SpaceView({
@@ -56,6 +57,9 @@ export function SpaceView({
           <TabsTab value="overview" variant="top-bar">
             {t("Overview")}
           </TabsTab>
+          <TabsTab value="tasks" variant="top-bar">
+            {t("Tasks")}
+          </TabsTab>
           <TabsTab value="chat" variant="top-bar">
             {t("Group chat")}
           </TabsTab>
@@ -75,6 +79,9 @@ export function SpaceView({
       <SpaceHeaderActionsHost.Provider value={actionsHost}>
         <TabsPanel value="overview">
           <SpaceOverview group={group} />
+        </TabsPanel>
+        <TabsPanel value="tasks">
+          <SpaceTasks group={group} />
         </TabsPanel>
         <TabsPanel value="chat">{chat}</TabsPanel>
         <TabsPanel value="skills">
