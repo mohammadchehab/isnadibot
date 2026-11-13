@@ -364,4 +364,10 @@ export const rosterCatalog = {
   Steer: "纠正",
   "Send a correction to {name}": "向 {name} 发送纠正",
   "Opens the chat and puts the caret in the composer": "打开聊天并将光标放入输入框",
+  Asking: "询问中",
+  Held: "受阻",
+  Busy: "忙碌",
+  Idle: "空闲",
+  "Context used: {percent}%": "上下文已用：{percent}%",
+  "Queued ({count})": "排队中（{count}）",
 } as const;

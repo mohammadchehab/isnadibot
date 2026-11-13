@@ -170,6 +170,7 @@ it.layer(NodeServices.layer)("user input response decider", (it) => {
                       name: "Product",
                       bossBotId: BOT_ID,
                       members: [{ kind: "bot" as const, botId: BOT_ID, role: "boss" as const }],
+                      fleetTemplateId: null,
                       createdAt: NOW,
                       updatedAt: NOW,
                     },

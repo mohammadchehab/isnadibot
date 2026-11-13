@@ -194,6 +194,7 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
           bossBotId: null,
           members: [],
           keepBusy: false,
+          fleetTemplateId: null,
           createdAt: NOW,
           updatedAt: NOW,
         },

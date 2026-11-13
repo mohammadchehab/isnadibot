@@ -34,6 +34,7 @@ import { ThreadErrorBanner } from "../chat/ThreadErrorBanner";
 import { useOptionalVoiceCall } from "../voice/VoiceCall";
 import { threadSilentRun } from "@isnadi/client-runtime/silent-run";
 import { botActivityUpdate, BotActivityStatus } from "./BotActivityStatus";
+import { FleetCapacityView } from "./FleetCapacityView";
 import { ChatReplyContext } from "../markdown/generative/chatReplyContext";
 import { deriveBotActivity } from "./botActivityStatus.logic";
 import { BotApprovalPrompt } from "./BotApprovalPrompt";
@@ -277,6 +278,17 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
     [],
   );
 
+  // The capacity view counts how many chats wait behind each bot, not just who is next.
+  const queuedByBotId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const entry of runtime.responderQueue?.entries ?? []) {
+      counts.set(entry.botId, (counts.get(entry.botId) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [runtime.responderQueue]);
+
   if (!group) {
     // A failed first roster load leaves every group missing; say so and offer
     // a retry rather than a blank pane.
@@ -293,6 +305,7 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
 
   const currentPersonId = peopleIdentity.current?.id;
   const queuedNames = responderQueueNames(runtime.responderQueue, members);
+
   const activeBot = members.find((bot) => bot.id === runtime.respondingBotId) ?? boss;
 
   const inboxItems = selectOpenBotInboxItems(
@@ -503,7 +516,13 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
               pendingApproval === null &&
               (working || queuedNames.length > 0) ? (
                 <>
-                  {working && activeBot ? (
+                  {group.fleetTemplateId ? (
+                    <FleetCapacityView
+                      environmentId={environmentId}
+                      groupId={group.id}
+                      queuedByBotId={queuedByBotId}
+                    />
+                  ) : working && activeBot ? (
                     <BotActivityStatus
                       name={activeBot.name}
                       activity={botActivity}

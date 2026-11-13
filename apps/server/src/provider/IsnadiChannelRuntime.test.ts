@@ -58,6 +58,7 @@ const snapshot: OrchestrationReadModel = {
         { kind: "bot", botId: bossBotId, role: "boss" },
         { kind: "bot", botId: specialistBotId, role: "specialist" },
       ],
+      fleetTemplateId: null,
       createdAt: now,
       updatedAt: now,
     },

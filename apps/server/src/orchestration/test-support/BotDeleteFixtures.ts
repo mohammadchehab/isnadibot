@@ -93,6 +93,7 @@ export function makeGroup(
       { kind: "bot", botId: BOT_ID, role: "boss" },
       { kind: "bot", botId: OTHER_BOT_ID, role: "specialist" },
     ],
+    fleetTemplateId: null,
     createdAt: NOW,
     updatedAt: NOW,
   };
