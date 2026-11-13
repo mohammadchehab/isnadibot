@@ -1,6 +1,15 @@
+import type { LinkCheckBrokenLink } from "@isnadi/contracts";
 import * as Predicate from "effect/Predicate";
 
-import { isInternalTarget, splitAnchor, type BrokenLink } from "./brokenLinkReport.ts";
+import {
+  isWithinPath,
+  linkKey,
+  pageCandidates,
+  repoPathForPage,
+  resolvePageAddress,
+  splitAddress,
+  type SiteDocs,
+} from "./sitePages.ts";
 
 /**
  * How a link was repaired, so the PR body can say what it changed rather than
@@ -29,7 +38,7 @@ export interface Fix {
 }
 
 export interface Unfixable {
-  readonly link: BrokenLink;
+  readonly link: LinkCheckBrokenLink;
   readonly reason: UnfixableReason;
 }
 
@@ -54,49 +63,163 @@ export interface FixPlannerFiles {
   readonly readText: (repoRelativePath: string) => string | null;
 }
 
-/** True when `candidate` is `root` or below it, with no `..` escape. */
-export function isWithin(root: string, candidate: string): boolean {
-  const normalizedRoot = normalize(root);
-  const normalizedCandidate = normalize(candidate);
-
-  return (
-    normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`)
-  );
+export interface PlanLinkFixesInput {
+  readonly docs: SiteDocs;
+  readonly links: ReadonlyArray<LinkCheckBrokenLink>;
+  /**
+   * Where each redirecting link landed, keyed by `linkKey`. A report carries the
+   * status a link answered with but not the address it pointed at, so the
+   * envelope follows those redirects and hands the answers in here.
+   */
+  readonly redirects: ReadonlyMap<string, string>;
+  readonly files: FixPlannerFiles;
 }
 
-function normalize(path: string): string {
-  const parts: string[] = [];
+/**
+ * Plans the edits that repair what can be repaired and names the rest. Pure: it
+ * writes nothing and runs no command, so a plan can be inspected, tested, and
+ * refused before any branch exists.
+ *
+ * A rewrite only ever happens for a link that points inside the docs root, and
+ * only to a file that exists there. Everything else is reported, which keeps
+ * the fixer from inventing a destination it cannot verify.
+ */
+export function planLinkFixes(input: PlanLinkFixesInput): LinkFixPlan {
+  const docsFiles = input.files.listDocsFiles();
+  const byBasename = new Map<string, string[]>();
 
-  for (const part of path.replaceAll("\\", "/").split("/")) {
-    if (part === "" || part === ".") continue;
+  for (const file of docsFiles) {
+    const name = basename(file);
+    const existing = byBasename.get(name);
 
-    if (part === "..") {
-      parts.pop();
+    if (existing === undefined) byBasename.set(name, [file]);
+    else existing.push(file);
+  }
+
+  const exists = (path: string) => input.files.readText(path) !== null;
+
+  const fixes: Fix[] = [];
+  const unfixable: Unfixable[] = [];
+  // One entry per source file, so a second fix in the same file extends the
+  // content rather than writing over the first.
+  const editsByPath = new Map<string, string>();
+
+  const decideRedirect = (
+    sourcePath: string,
+    location: string,
+    anchor: string | null,
+  ): { to: string; kind: FixKind } | UnfixableReason => {
+    const destination = repoPathForPage(input.docs, location, exists);
+
+    if (destination === null) {
+      // A redirect out of the docs tree is a deliberate refusal; one into a page
+      // the fixer cannot find is a report, not an edit.
+      return isOutsideDocs(input.docs, location) ? "outside-docs" : "no-candidate";
+    }
+
+    const suffix = anchor === null ? "" : `#${anchor}`;
+
+    return { to: `${relativeLink(sourcePath, destination)}${suffix}`, kind: "redirect" };
+  };
+
+  const decide = (link: LinkCheckBrokenLink): { to: string; kind: FixKind } | UnfixableReason => {
+    const { path: targetPath, anchor } = splitAddress(link.targetUrl);
+
+    if (!isInternalTarget(link.targetUrl)) return "external";
+
+    const sourcePath = repoPathForPage(input.docs, link.sourcePage, exists);
+
+    if (sourcePath === null) return "unresolvable-target";
+
+    // A bare `#anchor` asks for another section of the page it sits on; there is
+    // no file to repair and no heading the fixer can prove is the right one.
+    if (targetPath.length === 0) return "unresolvable-target";
+
+    const redirect = input.redirects.get(linkKey(link));
+
+    if (redirect !== undefined) return decideRedirect(sourcePath, redirect, anchor);
+
+    const resolved = resolvePageAddress(link.sourcePage, targetPath);
+    const file = repoPathForPage(input.docs, resolved, exists);
+
+    if (file !== null) {
+      // The file is there, so this was only ever about the fragment.
+      return anchor === null
+        ? "unresolvable-target"
+        : { to: relativeLink(sourcePath, file), kind: "drop-anchor" };
+    }
+
+    const candidates = byBasename.get(basename(targetPath));
+
+    if (candidates === undefined || candidates.length === 0) return "no-candidate";
+
+    if (candidates.length > 1) return "ambiguous-candidate";
+
+    return { to: relativeLink(sourcePath, candidates[0]!), kind: "repath" };
+  };
+
+  for (const link of input.links) {
+    const decision = decide(link);
+
+    if (Predicate.isString(decision)) {
+      unfixable.push({ link, reason: decision });
       continue;
     }
 
-    parts.push(part);
+    const sourcePath = repoPathForPage(input.docs, link.sourcePage, exists);
+
+    if (sourcePath === null) {
+      unfixable.push({ link, reason: "unresolvable-target" });
+      continue;
+    }
+
+    const current = editsByPath.get(sourcePath) ?? input.files.readText(sourcePath);
+
+    if (current === null) {
+      // A source page the planner cannot read cannot be edited, and guessing at
+      // its contents would corrupt a file nobody asked it to write.
+      unfixable.push({ link, reason: "unresolvable-target" });
+      continue;
+    }
+
+    const rewritten = rewriteLink(current, link.targetUrl, decision.to);
+
+    if (rewritten === current) {
+      // Nothing changed, so there is no fix to claim.
+      unfixable.push({ link, reason: "unresolvable-target" });
+      continue;
+    }
+
+    editsByPath.set(sourcePath, rewritten);
+    fixes.push({ sourcePath, from: link.targetUrl, to: decision.to, kind: decision.kind });
   }
 
-  return parts.join("/");
+  return {
+    edits: [...editsByPath].map(([path, content]) => ({ path, content })),
+    fixes,
+    unfixable,
+  };
 }
 
-/** Resolves `target` the way a browser would, against the page that links it. */
-export function resolveTarget(sourcePath: string, target: string): string {
-  if (target.startsWith("/")) return normalize(target);
+/** True when a link target points at another repository file rather than the web. */
+export function isInternalTarget(target: string): boolean {
+  return !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(target) && !target.startsWith("//");
+}
 
-  if (target.startsWith("./") || target.startsWith("../")) {
-    return normalize(`${dirname(sourcePath)}/${target}`);
+/** True when an address names a file outside the docs root the monitor was pointed at. */
+function isOutsideDocs(docs: SiteDocs, address: string): boolean {
+  for (const candidate of pageCandidates(docs, address)) {
+    if (!isWithinPath(docs.docsRoot, candidate)) return true;
   }
 
-  // A bare `page.md#x` is ambiguous to a browser and common to a mistake: read it
-  // as relative to the linking page, which is what the author meant.
-  return normalize(`${dirname(sourcePath)}/${target}`);
+  return pageCandidates(docs, address).length === 0;
 }
 
 /** The relative path a link from `sourcePath` to `destination` would use. */
 export function relativeLink(sourcePath: string, destination: string): string {
-  const directory = normalize(relativeDir(dirname(sourcePath), dirname(destination)));
+  // `relativeDir` already answers a clean relative path, so `..` segments it
+  // produces are part of the answer and must not be resolved away.
+  const directory = relativeDir(dirname(sourcePath), dirname(destination));
   const name = basename(destination);
 
   // `./page.md` and `/page.md` both read badly in a docs link; a bare name is what an author writes.
@@ -133,133 +256,6 @@ function relativeDir(from: string, to: string): string {
   const down = toParts.slice(shared);
 
   return [...up, ...down].join("/");
-}
-
-/**
- * Plans the edits that repair what can be repaired and names the rest. Pure: it
- * writes nothing and runs no command, so a plan can be inspected, tested, and
- * refused before any branch exists.
- *
- * A rewrite only ever happens for a link that points inside the docs root, and
- * only into a file that exists there. Everything else is reported, which keeps
- * the fixer from inventing a destination it cannot verify.
- */
-export function planLinkFixes(input: {
-  readonly docsRoot: string;
-  readonly links: ReadonlyArray<BrokenLink>;
-  readonly files: FixPlannerFiles;
-}): LinkFixPlan {
-  const docsFiles = input.files.listDocsFiles();
-  const byBasename = new Map<string, string[]>();
-
-  for (const file of docsFiles) {
-    const name = basename(file);
-    const existing = byBasename.get(name);
-
-    if (existing === undefined) byBasename.set(name, [file]);
-    else existing.push(file);
-  }
-
-  const fixes: Fix[] = [];
-  const unfixable: Unfixable[] = [];
-  // One entry per source file, so a second fix in the same file extends the
-  // content rather than writing over the first.
-  const editsByPath = new Map<string, string>();
-
-  const decide = (link: BrokenLink): { to: string; kind: FixKind } | UnfixableReason => {
-    const { path: pagePath, anchor } = splitAnchor(link.target);
-
-    if (!isInternalTarget(link.target)) return "external";
-
-    if (link.redirectTo !== undefined) {
-      const redirect = splitAnchor(link.redirectTo);
-      // The crawler reports where the redirect landed as a repo-relative path, because
-      // only it knows how the site's URLs map onto files.
-      const resolved = normalize(redirect.path);
-
-      if (!isInternalTarget(link.redirectTo) || !isWithin(input.docsRoot, resolved)) {
-        return "outside-docs";
-      }
-
-      // The redirect names where the page went; write it the way a link from this
-      // page has to be written, not the way the server wrote it.
-      if (input.files.readText(resolved) === null) return "no-candidate";
-
-      const suffix = redirect.anchor === null ? "" : `#${redirect.anchor}`;
-
-      return { to: `${relativeTo(link.sourcePath, resolved)}${suffix}`, kind: "redirect" };
-    }
-
-    if (pagePath.length === 0) {
-      // A bare `#anchor` links into the page it sits on, so there is no file to repair.
-      return anchor === null ? "unresolvable-target" : { to: `#${anchor}`, kind: "drop-anchor" };
-    }
-
-    const resolved = resolveTarget(link.sourcePath, pagePath);
-
-    if (!isWithin(input.docsRoot, resolved)) return "outside-docs";
-
-    const text = input.files.readText(resolved);
-
-    if (text !== null) {
-      // The file is there, so this was only ever about the fragment.
-      return anchor === null
-        ? "unresolvable-target"
-        : { to: relativeTo(link.sourcePath, resolved), kind: "drop-anchor" };
-    }
-
-    const candidates = byBasename.get(basename(pagePath)) ?? [];
-
-    if (candidates.length === 0) return "no-candidate";
-
-    if (candidates.length > 1) return "ambiguous-candidate";
-
-    return { to: relativeTo(link.sourcePath, candidates[0]!), kind: "repath" };
-  };
-
-  for (const link of input.links) {
-    const decision = decide(link);
-
-    if (Predicate.isString(decision)) {
-      unfixable.push({ link, reason: decision });
-      continue;
-    }
-
-    const current = editsByPath.get(link.sourcePath) ?? input.files.readText(link.sourcePath);
-
-    if (current === null) {
-      // A source page the planner cannot read cannot be edited, and guessing at
-      // its contents would corrupt a file nobody asked it to write.
-      unfixable.push({ link, reason: "unresolvable-target" });
-      continue;
-    }
-
-    const rewritten = rewriteLink(current, link.target, decision.to);
-
-    if (rewritten === current) {
-      // Nothing changed, so there is no fix to claim.
-      unfixable.push({ link, reason: "unresolvable-target" });
-      continue;
-    }
-
-    editsByPath.set(link.sourcePath, rewritten);
-    fixes.push({
-      sourcePath: link.sourcePath,
-      from: link.target,
-      to: decision.to,
-      kind: decision.kind,
-    });
-  }
-
-  return {
-    edits: [...editsByPath].map(([path, content]) => ({ path, content })),
-    fixes,
-    unfixable,
-  };
-}
-
-function relativeTo(sourcePath: string, destination: string): string {
-  return relativeLink(sourcePath, destination).replace(/^\.\//, "");
 }
 
 /**

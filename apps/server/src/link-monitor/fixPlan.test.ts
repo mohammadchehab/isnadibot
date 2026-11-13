@@ -1,8 +1,10 @@
+import type { LinkCheckBrokenLink } from "@isnadi/contracts";
 import { assert, it } from "@effect/vitest";
 
 import { planLinkFixes, type FixPlannerFiles } from "./fixPlan.ts";
+import { linkKey, type SiteDocs } from "./sitePages.ts";
 
-const DOCS_ROOT = "docs";
+const SITE: SiteDocs = { siteUrl: "https://docs.invalid", docsRoot: "docs" };
 
 /** A docs tree that answers exactly what the planner asks, so a case reads as one line. */
 function files(entries: Record<string, string>): FixPlannerFiles {
@@ -12,191 +14,238 @@ function files(entries: Record<string, string>): FixPlannerFiles {
   };
 }
 
+/** One broken link as the crawl reports it: the page URL, and the href as written. */
+function link(
+  sourcePage: string,
+  targetUrl: string,
+  status: number | null = 404,
+): LinkCheckBrokenLink {
+  return { sourcePage, targetUrl, status, reason: status === null ? "timeout" : null };
+}
+
+function plan(input: {
+  readonly links: ReadonlyArray<LinkCheckBrokenLink>;
+  readonly entries: Record<string, string>;
+  readonly redirects?: ReadonlyArray<[LinkCheckBrokenLink, string]>;
+}) {
+  return planLinkFixes({
+    docs: SITE,
+    links: input.links,
+    redirects: new Map(
+      (input.redirects ?? []).map(([entry, location]) => [linkKey(entry), location]),
+    ),
+    files: files(input.entries),
+  });
+}
+
 it("retargets a link whose old address redirects", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [
-      { sourcePath: "docs/a.md", target: "old.md", reason: "redirect", redirectTo: "docs/new.md" },
-    ],
-    files: files({
+  const broken = link("https://docs.invalid/a", "old.md", 301);
+
+  const result = plan({
+    links: [broken],
+    redirects: [[broken, "https://docs.invalid/new"]],
+    entries: {
       "docs/a.md": "See [the guide](old.md) for details.",
       "docs/new.md": "# New",
-    }),
+    },
   });
 
   assert.deepEqual(
-    plan.fixes.map((fix) => [fix.from, fix.to, fix.kind]),
+    result.fixes.map((fix) => [fix.from, fix.to, fix.kind]),
     [["old.md", "new.md", "redirect"]],
   );
-  assert.equal(plan.edits[0]?.content, "See [the guide](new.md) for details.");
-  assert.deepEqual(plan.unfixable, []);
+  assert.equal(result.edits[0]?.content, "See [the guide](new.md) for details.");
+  assert.deepEqual(result.unfixable, []);
+});
+
+it("relativizes a redirect that lands in another folder", () => {
+  const broken = link("https://docs.invalid/guide/a", "old.md", 302);
+
+  const result = plan({
+    links: [broken],
+    redirects: [[broken, "https://docs.invalid/internals/new"]],
+    entries: {
+      "docs/guide/a.md": "[x](old.md)",
+      "docs/internals/new.md": "# New",
+    },
+  });
+
+  assert.equal(result.edits[0]?.content, "[x](../internals/new.md)");
+});
+
+it("refuses a redirect that leaves the docs site", () => {
+  const broken = link("https://docs.invalid/a", "old.md", 301);
+
+  const result = plan({
+    links: [broken],
+    redirects: [[broken, "https://published.invalid/new"]],
+    entries: { "docs/a.md": "[x](old.md)" },
+  });
+
+  assert.deepEqual(result.edits, []);
+  assert.deepEqual(
+    result.unfixable.map((entry) => entry.reason),
+    ["outside-docs"],
+  );
+});
+
+it("reports a redirect into a page that is not in the docs", () => {
+  const broken = link("https://docs.invalid/a", "old.md", 301);
+
+  const result = plan({
+    links: [broken],
+    redirects: [[broken, "https://docs.invalid/gone"]],
+    entries: { "docs/a.md": "[x](old.md)" },
+  });
+
+  assert.deepEqual(result.edits, []);
+  assert.deepEqual(
+    result.unfixable.map((entry) => entry.reason),
+    ["no-candidate"],
+  );
 });
 
 it("repaths a moved page by its basename when exactly one candidate exists", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "old/page.md", reason: "missing-file" }],
-    files: files({
+  const result = plan({
+    links: [link("https://docs.invalid/a", "old/page.md")],
+    entries: {
       "docs/a.md": "[page](old/page.md)",
       "docs/guide/page.md": "# Page",
-    }),
+    },
   });
 
   assert.deepEqual(
-    plan.fixes.map((fix) => [fix.to, fix.kind]),
+    result.fixes.map((fix) => [fix.to, fix.kind]),
     [["guide/page.md", "repath"]],
   );
-  assert.equal(plan.edits[0]?.content, "[page](guide/page.md)");
+  assert.equal(result.edits[0]?.content, "[page](guide/page.md)");
 });
 
 it("refuses to repath when two docs files share the basename", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "old/page.md", reason: "missing-file" }],
-    files: files({
+  const result = plan({
+    links: [link("https://docs.invalid/a", "old/page.md")],
+    entries: {
       "docs/a.md": "[page](old/page.md)",
       "docs/guide/page.md": "# One",
       "docs/internals/page.md": "# Two",
-    }),
+    },
   });
 
-  assert.deepEqual(plan.fixes, []);
-  assert.deepEqual(plan.edits, []);
+  assert.deepEqual(result.fixes, []);
+  assert.deepEqual(result.edits, []);
   assert.deepEqual(
-    plan.unfixable.map((entry) => entry.reason),
+    result.unfixable.map((entry) => entry.reason),
     ["ambiguous-candidate"],
   );
 });
 
 it("drops a dead anchor and links the page that still exists", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "b.md#gone", reason: "missing-anchor" }],
-    files: files({
+  const result = plan({
+    links: [link("https://docs.invalid/a", "b.md#gone")],
+    entries: {
       "docs/a.md": "[b](b.md#gone)",
       "docs/b.md": "# B",
-    }),
+    },
   });
 
   assert.deepEqual(
-    plan.fixes.map((fix) => [fix.to, fix.kind]),
+    result.fixes.map((fix) => [fix.to, fix.kind]),
     [["b.md", "drop-anchor"]],
   );
-  assert.equal(plan.edits[0]?.content, "[b](b.md)");
+  assert.equal(result.edits[0]?.content, "[b](b.md)");
+});
+
+it("reads a directory URL as its index page", () => {
+  const result = plan({
+    links: [link("https://docs.invalid/guide/", "setup.md#gone")],
+    entries: {
+      "docs/guide/index.md": "[setup](setup.md#gone)",
+      "docs/guide/setup.md": "# Setup",
+    },
+  });
+
+  assert.equal(result.edits[0]?.path, "docs/guide/index.md");
+  assert.deepEqual(
+    result.fixes.map((fix) => fix.to),
+    ["setup.md"],
+  );
 });
 
 it("reports an external URL instead of rewriting it", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "https://example.invalid/page", reason: "timeout" }],
-    files: files({ "docs/a.md": "[x](https://example.invalid/page)" }),
+  const result = plan({
+    links: [link("https://docs.invalid/a", "https://example.invalid/page", null)],
+    entries: { "docs/a.md": "[x](https://example.invalid/page)" },
   });
 
-  assert.deepEqual(plan.fixes, []);
+  assert.deepEqual(result.fixes, []);
   assert.deepEqual(
-    plan.unfixable.map((entry) => entry.reason),
+    result.unfixable.map((entry) => entry.reason),
     ["external"],
   );
 });
 
-it("refuses a target that climbs out of the docs root", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "../../etc/passwd", reason: "missing-file" }],
-    files: files({ "docs/a.md": "[x](../../etc/passwd)" }),
+it("refuses a bare anchor, because no heading can be proven to be the right one", () => {
+  const result = plan({
+    links: [link("https://docs.invalid/a", "#gone")],
+    entries: { "docs/a.md": "[x](#gone)" },
   });
 
-  assert.deepEqual(plan.edits, []);
+  assert.deepEqual(result.edits, []);
   assert.deepEqual(
-    plan.unfixable.map((entry) => entry.reason),
-    ["outside-docs"],
+    result.unfixable.map((entry) => entry.reason),
+    ["unresolvable-target"],
   );
 });
 
-it("refuses a redirect that lands outside the docs root", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [
-      {
-        sourcePath: "docs/a.md",
-        target: "old.md",
-        reason: "redirect",
-        redirectTo: "../../elsewhere.md",
-      },
-    ],
-    files: files({ "docs/a.md": "[x](old.md)" }),
+it("reports a broken link whose page was not found in the docs", () => {
+  const result = plan({
+    links: [link("https://docs.invalid/elsewhere/a", "b.md")],
+    entries: { "docs/a.md": "[b](b.md)", "docs/b.md": "# B" },
   });
 
-  assert.deepEqual(plan.edits, []);
+  assert.deepEqual(result.edits, []);
   assert.deepEqual(
-    plan.unfixable.map((entry) => entry.reason),
-    ["outside-docs"],
-  );
-});
-
-it("reports a redirect whose destination page is not in the docs", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [
-      {
-        sourcePath: "docs/a.md",
-        target: "old.md",
-        reason: "redirect",
-        redirectTo: "https://published.invalid/new.md",
-      },
-    ],
-    files: files({ "docs/a.md": "[x](old.md)" }),
-  });
-
-  assert.deepEqual(plan.edits, []);
-  assert.deepEqual(
-    plan.unfixable.map((entry) => entry.reason),
-    ["outside-docs"],
+    result.unfixable.map((entry) => entry.reason),
+    ["unresolvable-target"],
   );
 });
 
 it("leaves prose that merely mentions the target alone", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [{ sourcePath: "docs/a.md", target: "b.md#gone", reason: "missing-anchor" }],
-    files: files({
+  const result = plan({
+    links: [link("https://docs.invalid/a", "b.md#gone")],
+    entries: {
       "docs/a.md": "The old b.md#gone path was retired.\n\n[b](b.md#gone)\n",
       "docs/b.md": "# B",
-    }),
+    },
   });
 
-  assert.equal(plan.edits[0]?.content, "The old b.md#gone path was retired.\n\n[b](b.md)\n");
+  assert.equal(result.edits[0]?.content, "The old b.md#gone path was retired.\n\n[b](b.md)\n");
   assert.deepEqual(
-    plan.fixes.map((fix) => fix.kind),
+    result.fixes.map((fix) => fix.kind),
     ["drop-anchor"],
   );
 });
 
 it("extends one edit when a page has several broken links", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
+  const result = plan({
     links: [
-      { sourcePath: "docs/a.md", target: "one.md#gone", reason: "missing-anchor" },
-      { sourcePath: "docs/a.md", target: "two.md#gone", reason: "missing-anchor" },
+      link("https://docs.invalid/a", "one.md#gone"),
+      link("https://docs.invalid/a", "two.md#gone"),
     ],
-    files: files({
+    entries: {
       "docs/a.md": "[one](one.md#gone) and [two](two.md#gone)",
       "docs/one.md": "# One",
       "docs/two.md": "# Two",
-    }),
+    },
   });
 
-  assert.equal(plan.edits.length, 1);
-  assert.equal(plan.edits[0]?.content, "[one](one.md) and [two](two.md)");
-  assert.equal(plan.fixes.length, 2);
+  assert.equal(result.edits.length, 1);
+  assert.equal(result.edits[0]?.content, "[one](one.md) and [two](two.md)");
+  assert.equal(result.fixes.length, 2);
 });
 
 it("plans nothing when there are no broken links", () => {
-  const plan = planLinkFixes({
-    docsRoot: DOCS_ROOT,
-    links: [],
-    files: files({ "docs/a.md": "# A" }),
-  });
+  const result = plan({ links: [], entries: { "docs/a.md": "# A" } });
 
-  assert.deepEqual(plan, { edits: [], fixes: [], unfixable: [] });
+  assert.deepEqual(result, { edits: [], fixes: [], unfixable: [] });
 });

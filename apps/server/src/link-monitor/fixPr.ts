@@ -1,9 +1,20 @@
+import * as NodeFS from "node:fs";
+
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 
-import type { BrokenLink } from "./brokenLinkReport.ts";
-import { isWithin, type Fix, type LinkFixPlan, type Unfixable } from "./fixPlan.ts";
+import type { LinkCheckBrokenLink, LinkCheckReport } from "@isnadi/contracts";
+
+import {
+  planLinkFixes,
+  type Fix,
+  type FixPlannerFiles,
+  type LinkFixPlan,
+  type Unfixable,
+} from "./fixPlan.ts";
+import { resolveReportRedirects } from "./redirects.ts";
+import { isWithinPath, type SiteDocs } from "./sitePages.ts";
 
 /**
  * The bot opens this PR with nobody watching, so every rule below is a refusal
@@ -76,14 +87,14 @@ export type OpenFixPrResult =
  * can see the verdict without side effects.
  */
 export function checkFixPr(input: OpenFixPrInput): FixPrRefusal | null {
-  if (!isWithin(input.grantedRepo, input.repo)) return "target-not-granted";
+  if (!isWithinPath(input.grantedRepo, input.repo)) return "target-not-granted";
 
-  if (!isWithin(input.repo, `${input.repo}/${input.docsRoot}`)) return "docs-outside-repo";
+  if (!isWithinPath(input.repo, `${input.repo}/${input.docsRoot}`)) return "docs-outside-repo";
 
   if (isProtectedBranch(input.branch)) return "protected-branch";
 
   for (const edit of input.plan.edits) {
-    if (!isWithin(input.docsRoot, edit.path)) return "edit-outside-docs";
+    if (!isWithinPath(input.docsRoot, edit.path)) return "edit-outside-docs";
   }
 
   return null;
@@ -107,7 +118,7 @@ export function fixPrBody(plan: LinkFixPlan): string {
       : plan.unfixable
           .map(
             (entry: Unfixable) =>
-              `- \`${entry.link.target}\` in \`${entry.link.sourcePath}\` — ${entry.reason}`,
+              `- \`${entry.link.targetUrl}\` in \`${entry.link.sourcePage}\` — ${entry.reason}`,
           )
           .join("\n");
 
@@ -190,7 +201,7 @@ export const openFixPr = Effect.fn("linkMonitor.openFixPr")(function* (input: Op
     }
 
     for (const edit of input.plan.edits) {
-      if (!isWithin(input.docsRoot, edit.path)) {
+      if (!isWithinPath(input.docsRoot, edit.path)) {
         return { kind: "refused", refusal: "edit-outside-docs" } satisfies OpenFixPrResult;
       }
 
@@ -261,8 +272,8 @@ export class FixPrCommandError extends Error {
 /** Groups links the fixer left alone by reason, for a caller that wants a count. */
 export function unfixableByReason(
   plan: LinkFixPlan,
-): ReadonlyMap<Unfixable["reason"], ReadonlyArray<BrokenLink>> {
-  const grouped = new Map<Unfixable["reason"], BrokenLink[]>();
+): ReadonlyMap<Unfixable["reason"], ReadonlyArray<LinkCheckBrokenLink>> {
+  const grouped = new Map<Unfixable["reason"], LinkCheckBrokenLink[]>();
 
   for (const entry of plan.unfixable) {
     const existing = grouped.get(entry.reason);
@@ -273,3 +284,72 @@ export function unfixableByReason(
 
   return grouped;
 }
+
+/**
+ * Turns one run's report into a plan: follows the redirects a report cannot
+ * describe, then plans every repair against the docs tree being crawled.
+ */
+export const planReportFixes = Effect.fn("linkMonitor.planReportFixes")(function* (input: {
+  readonly report: LinkCheckReport;
+  readonly docs: SiteDocs;
+  readonly files: FixPlannerFiles;
+}) {
+  const redirects = yield* resolveReportRedirects({
+    siteUrl: input.docs.siteUrl,
+    links: input.report.brokenLinks,
+  });
+
+  return planLinkFixes({
+    docs: input.docs,
+    links: input.report.brokenLinks,
+    redirects,
+    files: input.files,
+  });
+});
+
+/**
+ * The planner's view of a real checkout: every file below the docs root, and a
+ * read that answers null rather than failing, because an unreadable candidate
+ * is simply not a candidate.
+ */
+export const checkoutPlannerFiles = Effect.fn("linkMonitor.checkoutPlannerFiles")(
+  function* (input: { readonly repo: string; readonly docsRoot: string }) {
+    const fs = yield* FileSystem.FileSystem;
+    const root = `${input.repo}/${input.docsRoot}`;
+
+    const walk = (directory: string, prefix: string): Effect.Effect<ReadonlyArray<string>> =>
+      Effect.gen(function* () {
+        const entries = yield* fs.readDirectory(directory);
+        const found: string[] = [];
+
+        for (const entry of entries) {
+          const relative = prefix.length === 0 ? entry : `${prefix}/${entry}`;
+          const info = yield* fs.stat(`${directory}/${entry}`);
+
+          if (info.type === "Directory") {
+            found.push(...(yield* walk(`${directory}/${entry}`, relative)));
+            continue;
+          }
+
+          found.push(`${input.docsRoot}/${relative}`);
+        }
+
+        return found;
+      });
+
+    const listed = yield* walk(root, "");
+
+    return {
+      listDocsFiles: () => listed,
+      // A page the planner cannot read is a page it cannot argue with, so the
+      // failure is an absence here rather than an error that ends the run.
+      readText: (repoRelativePath: string) => {
+        try {
+          return NodeFS.readFileSync(`${input.repo}/${repoRelativePath}`, "utf8");
+        } catch {
+          return null;
+        }
+      },
+    } satisfies FixPlannerFiles;
+  },
+);

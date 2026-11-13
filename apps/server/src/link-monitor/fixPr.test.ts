@@ -223,7 +223,12 @@ it("writes the PR body with every link it could not fix", () => {
       fixes: [{ sourcePath: "docs/a.md", from: "docs/old.md", to: "b.md", kind: "repath" }],
       unfixable: [
         {
-          link: { sourcePath: "docs/a.md", target: "https://example.invalid/x", reason: "timeout" },
+          link: {
+            sourcePage: "https://docs.invalid/a",
+            targetUrl: "https://example.invalid/x",
+            status: null,
+            reason: "timeout",
+          },
           reason: "external",
         },
       ],
