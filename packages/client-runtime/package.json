@@ -283,6 +283,10 @@
     "./usage": {
       "types": "./src/usage.ts",
       "default": "./src/usage.ts"
+    },
+    "./fleet/hire-plan": {
+      "types": "./src/fleet/hirePlan.ts",
+      "default": "./src/fleet/hirePlan.ts"
     }
   },
   "scripts": {
