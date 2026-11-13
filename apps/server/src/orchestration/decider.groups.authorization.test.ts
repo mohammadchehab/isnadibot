@@ -691,6 +691,51 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
     }),
   );
 
+  it.effect("refuses group configuration from a person who is only in another group", () =>
+    Effect.gen(function* () {
+      const otherGroupId = GroupId.make("group-other");
+      const otherGroupOwnerId = AuthSessionId.make("person-other-group");
+      const otherGroupOwner = { personId: otherGroupOwnerId, canManageGroups: false } as const;
+
+      const model = makeReadModel({
+        bots: [
+          makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
+          makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
+          makeBot({ id: OTHER_SPECIALIST_ID, groupId: otherGroupId }),
+        ],
+        groups: [
+          makeGroup(),
+          {
+            ...makeGroup(),
+            id: otherGroupId,
+            name: "Other",
+            bossBotId: OTHER_SPECIALIST_ID,
+            members: [
+              { kind: "bot" as const, botId: OTHER_SPECIALIST_ID, role: "boss" as const },
+              { kind: "person" as const, personId: otherGroupOwnerId, displayName: "Other owner" },
+            ],
+          },
+        ],
+      });
+
+      const errors = yield* Effect.all(
+        groupConfigCommands.map((command) =>
+          decideOrchestrationCommand({ command, readModel: model, actor: otherGroupOwner }).pipe(
+            Effect.flip,
+          ),
+        ),
+      );
+
+      for (const error of errors) {
+        if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+          throw new Error("Expected a group authorization invariant error");
+        }
+
+        expect(error.detail).toContain(`Person '${otherGroupOwnerId}' is not a member`);
+      }
+    }),
+  );
+
   it.effect("keeps group creation and person membership on environment manage rights", () =>
     Effect.gen(function* () {
       const commands: ReadonlyArray<OrchestrationCommand> = [

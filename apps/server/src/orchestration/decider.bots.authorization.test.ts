@@ -199,6 +199,69 @@ it.layer(NodeServices.layer)("bot command authorization", (it) => {
     }),
   );
 
+  it.effect("refuses bot changes from a person who is only in another group", () =>
+    Effect.gen(function* () {
+      const otherGroupOwnerId = AuthSessionId.make("person-other-group");
+      const otherGroupOwner = { personId: otherGroupOwnerId, canManageGroups: false } as const;
+
+      const model = makeReadModel({
+        bots: [
+          makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
+          makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
+          makeBot({ id: OTHER_SPECIALIST_ID, groupId: OTHER_GROUP_ID }),
+        ],
+        groups: [
+          makeGroup(),
+          {
+            ...makeGroup(),
+            id: OTHER_GROUP_ID,
+            name: "Other",
+            bossBotId: OTHER_SPECIALIST_ID,
+            members: [
+              { kind: "bot" as const, botId: OTHER_SPECIALIST_ID, role: "boss" as const },
+              { kind: "person" as const, personId: otherGroupOwnerId, displayName: "Other owner" },
+            ],
+          },
+        ],
+      });
+
+      const commands: ReadonlyArray<OrchestrationCommand> = [
+        {
+          type: "bot.update",
+          commandId: CommandId.make("cmd-other-owner-update"),
+          botId: SPECIALIST_ID,
+          title: "Other group's owner edited",
+        },
+        {
+          type: "bot.archive",
+          commandId: CommandId.make("cmd-other-owner-archive"),
+          botId: SPECIALIST_ID,
+        },
+        {
+          type: "bot.delete",
+          commandId: CommandId.make("cmd-other-owner-delete"),
+          botId: SPECIALIST_ID,
+        },
+      ];
+
+      const errors = yield* Effect.all(
+        commands.map((command) =>
+          decideOrchestrationCommand({ command, readModel: model, actor: otherGroupOwner }).pipe(
+            Effect.flip,
+          ),
+        ),
+      );
+
+      for (const error of errors) {
+        if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+          throw new Error("Expected a group authorization invariant error");
+        }
+
+        expect(error.detail).toContain(`Person '${otherGroupOwnerId}' is not a member`);
+      }
+    }),
+  );
+
   it.effect("keeps group-less bots to environment manage rights", () =>
     Effect.gen(function* () {
       const commands: ReadonlyArray<OrchestrationCommand> = [
