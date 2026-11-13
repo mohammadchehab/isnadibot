@@ -1,5 +1,7 @@
 import type { BotEngine, BotEngineChoice, ServerProvider } from "@isnadi/contracts";
 
+import type { ModelFailureClass } from "./modelFailure.ts";
+
 const OPENCODE_DRIVER = "opencode";
 
 const CUSTOM_API_DRIVER = "customOpenai";
@@ -47,6 +49,31 @@ export const fallbackAllowedAtTurn = (input: {
   readonly from: string;
   readonly entry: Pick<BotEngineChoice, "provider" | "historyConsent">;
 }): boolean => fallbackDenial(input) === undefined;
+
+/**
+ * Whether a failed attempt may move its turn to `entry`. `from` is the instance
+ * the failed attempt ran on, not the chain's start: a chain that has already
+ * moved is judged from where it is now.
+ *
+ * An `unavailable` failure — a 401, a 403, an unknown model — is a
+ * configuration fault the user has to fix, so it never leaves the instance that
+ * failed; moving would hide a broken credential and send the chat to another
+ * vendor. A `request` failure never moves at all. The other classes keep
+ * crossing instances under the rule above, consent included.
+ */
+export const fallbackAllowedOnFailure = (input: {
+  readonly providers: ReadonlyArray<ServerProvider>;
+  readonly failureClass: ModelFailureClass;
+  /** The instance the failed attempt ran on. */
+  readonly from: string;
+  readonly entry: Pick<BotEngineChoice, "provider" | "historyConsent">;
+}): boolean => {
+  if (input.failureClass === "request") return false;
+
+  if (input.failureClass === "unavailable" && input.entry.provider !== input.from) return false;
+
+  return fallbackDenial(input) === undefined;
+};
 
 /** Checks a bot engine's fallback chain on save. Returns the reason it is refused, or undefined when it may be stored. */
 export const validateEngineFallbacks = (input: {
