@@ -235,7 +235,12 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
       // A bot that already belongs to another group is pulled across a boundary, so target-group
       // rights are not enough: this needs the same two-sided rights `bot.update` needs to move it.
-      if (bot.groupId !== null && bot.groupId !== group.id) {
+      if (bot.groupId === null) {
+        // A group-less bot belongs to the environment, not to any group, so no group's membership
+        // reaches it: only environment manage rights can put it into one. `bot.update` moves the
+        // same bot under the same rule.
+        yield* requireEnvironmentManageRights({ command, actor });
+      } else if (bot.groupId !== group.id) {
         const sourceGroup = yield* requireGroup({ readModel, command, groupId: bot.groupId });
 
         yield* requireMutationActorAuthorized({ group: sourceGroup, command, actor });
