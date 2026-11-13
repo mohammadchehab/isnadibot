@@ -14,7 +14,16 @@
  *
  * @module RuntimeReceiptBus
  */
-import { CheckpointRef, IsoDateTime, NonNegativeInt, ThreadId, TurnId } from "@isnadi/contracts";
+import {
+  BotId,
+  CheckpointRef,
+  GroupId,
+  IsoDateTime,
+  NonNegativeInt,
+  ThreadId,
+  TurnId,
+  WorkItemId,
+} from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
@@ -53,10 +62,30 @@ export const TurnProcessingQuiescedReceipt = Schema.Struct({
 
 export type TurnProcessingQuiescedReceipt = typeof TurnProcessingQuiescedReceipt.Type;
 
+/**
+ * One decision the keep-busy dispatcher made for a group. `assigned` means an item went to a bot
+ * and a turn started with its brief; every other kind records why nothing was handed out, so a
+ * test can wait for the exact decision instead of for a sleep.
+ */
+export const FleetDispatchDecidedReceipt = Schema.Struct({
+  type: Schema.Literal("fleet.dispatch.decided"),
+  groupId: GroupId,
+  kind: Schema.Literals(["assigned", "boss-woken", "owner-notified", "skipped"]),
+  itemId: Schema.optional(WorkItemId),
+  botId: Schema.optional(BotId),
+  reason: Schema.optional(
+    Schema.Literals(["queue-empty", "no-idle-member", "no-chat", "claim-lost"]),
+  ),
+  createdAt: IsoDateTime,
+});
+
+export type FleetDispatchDecidedReceipt = typeof FleetDispatchDecidedReceipt.Type;
+
 export const OrchestrationRuntimeReceipt = Schema.Union([
   CheckpointBaselineCapturedReceipt,
   CheckpointDiffFinalizedReceipt,
   TurnProcessingQuiescedReceipt,
+  FleetDispatchDecidedReceipt,
 ]);
 
 export type OrchestrationRuntimeReceipt = typeof OrchestrationRuntimeReceipt.Type;
