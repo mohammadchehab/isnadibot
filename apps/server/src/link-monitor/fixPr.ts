@@ -3,6 +3,7 @@ import * as NodeFS from "node:fs";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import type * as PlatformError from "effect/PlatformError";
 
 import type { LinkCheckBrokenLink, LinkCheckReport } from "@isnadi/contracts";
 
@@ -317,7 +318,10 @@ export const checkoutPlannerFiles = Effect.fn("linkMonitor.checkoutPlannerFiles"
     const fs = yield* FileSystem.FileSystem;
     const root = `${input.repo}/${input.docsRoot}`;
 
-    const walk = (directory: string, prefix: string): Effect.Effect<ReadonlyArray<string>> =>
+    const walk = (
+      directory: string,
+      prefix: string,
+    ): Effect.Effect<ReadonlyArray<string>, PlatformError.PlatformError> =>
       Effect.gen(function* () {
         const entries = yield* fs.readDirectory(directory);
         const found: string[] = [];

@@ -82,6 +82,7 @@ export const redirectResolverLive = (
 
         return null;
       },
+      // A chain nobody answers is one the planner reports, not an error that ends the run.
       catch: () => null,
-    }).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    }).pipe(Effect.orElseSucceed(() => null)),
 });
