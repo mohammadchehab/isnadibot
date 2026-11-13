@@ -24,6 +24,7 @@ type FixtureChat = {
   archivedAt: string | null;
   updatedAt: string;
   latestTurn: { state: string } | null;
+  session: { status: string } | null;
   hasPendingApprovals: boolean;
   hasPendingUserInput: boolean;
 };
@@ -105,6 +106,7 @@ function chat(overrides: Partial<FixtureChat> & { id: string }): FixtureChat {
     archivedAt: null,
     updatedAt: "2026-11-13T10:00:00.000Z",
     latestTurn: null,
+    session: null,
     hasPendingApprovals: false,
     hasPendingUserInput: false,
     ...overrides,
