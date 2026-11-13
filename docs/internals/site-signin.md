@@ -116,7 +116,7 @@ The precedence rule is the important half:
   an earlier flow's result.
 - **The save is the completion, not a command after it.** `browser-auth.request.complete` is the only path
   that writes a profile, and it decides both halves in one step: its `flowId` must still be the request's
-  current flow *and* the profile's `generation` must be the one the flow started from. Only an accepted
+  current flow _and_ the profile's `generation` must be the one the flow started from. Only an accepted
   complete appends the `browser-profile.saved` event and the request's `signed_in` together; a refused one
   appends nothing, keeps whatever state Cancel put the request in, and leaves no ciphertext file behind
   (the staged storage state is discarded). There is no standalone `browser-profile.save` command, because
