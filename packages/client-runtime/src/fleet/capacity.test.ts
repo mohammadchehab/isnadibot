@@ -43,6 +43,7 @@ function chat(overrides: Partial<BotStatusChat> = {}): BotStatusChat {
     parentThreadId: null,
     archivedAt: null,
     latestTurn: null,
+    session: null,
     hasPendingApprovals: false,
     hasPendingUserInput: false,
     ...overrides,

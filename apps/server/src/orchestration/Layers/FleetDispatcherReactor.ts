@@ -16,6 +16,7 @@ import {
   type WorkItem,
 } from "@isnadi/contracts";
 import { makeDrainableWorker } from "@isnadi/shared/DrainableWorker";
+import { deriveBotStatus, isLiveSessionStatus } from "@isnadi/shared/botStatus";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -39,16 +40,6 @@ import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 
 /** Why a group was left exactly as it was. */
 type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost";
-
-/** The state an item holds while its owner is expected to be working on it. */
-const HELD_ITEM_STATES: ReadonlySet<WorkItem["state"]> = new Set([
-  "assigned",
-  "in-progress",
-  "blocked",
-]);
-
-/** A session in one of these states still has a turn in flight for its bot. */
-const LIVE_SESSION_STATUSES: ReadonlySet<string> = new Set(["running", "starting"]);
 
 /**
  * Runs a keep-busy group: when one of its members stops running a turn, or a queued item
@@ -354,7 +345,7 @@ const make = Effect.gen(function* () {
           return Effect.void;
         }
 
-        return LIVE_SESSION_STATUSES.has(session.status)
+        return isLiveSessionStatus(session.status)
           ? Effect.void
           : turnEnded(threadId, lastTurnId.get(threadId) ?? `event:${event.sequence}`);
       }
@@ -463,33 +454,23 @@ export function botChat(
 }
 
 /**
- * A bot with nothing to do: nothing running for it and no item it is expected to be working on.
- *
- * AC3 replaces this with `@isnadi/shared/botStatus` (TASK-83), which also knows about a pending
- * approval or question and about work waiting on children — neither is in the command read model.
+ * Whether the dispatcher may hand this bot the next queued item: it exists, it is not archived, and
+ * the shared status rule (`@isnadi/shared/botStatus`) reads it as idle. Asking, held and busy all
+ * mean the bot is not free, so only `idle` is dispatchable.
  */
 export function isBotIdle(readModel: OrchestrationReadModel, botId: BotId): boolean {
   const bot = readModel.bots.find((candidate) => candidate.id === botId);
 
   if (bot === undefined || bot.archivedAt !== null) return false;
 
-  const holdingAnItem = (readModel.workItems ?? []).some(
-    (item) => item.ownerBotId === botId && HELD_ITEM_STATES.has(item.state),
+  return (
+    deriveBotStatus({
+      botId,
+      chats: readModel.threads.filter((thread) => thread.deletedAt === null),
+      workItems: readModel.workItems ?? [],
+      delegations: readModel.delegations ?? [],
+    }) === "idle"
   );
-
-  if (holdingAnItem) return false;
-
-  // Any chat the bot might still be answering in keeps it busy: a second turn while the first is
-  // in flight would race the provider.
-  return readModel.threads
-    .filter(
-      (thread) => thread.botId === botId && thread.deletedAt === null && thread.archivedAt === null,
-    )
-    .every(
-      (thread) =>
-        !LIVE_SESSION_STATUSES.has(thread.session?.status ?? "") &&
-        thread.latestTurn?.state !== "running",
-    );
 }
 
 /**
