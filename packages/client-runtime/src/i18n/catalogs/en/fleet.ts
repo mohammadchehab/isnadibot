@@ -4,6 +4,16 @@
  * here must match `packages/contracts/src/fleet/roles.ts` word for word.
  */
 export const fleetCatalog = {
+  // Screens
+  "New space": "New space",
+  "Start from a fleet": "Start from a fleet",
+  "Pick the team you need. You can adjust it before it starts.":
+    "Pick the team you need. You can adjust it before it starts.",
+  "Hire fleet": "Hire fleet",
+  "Start empty": "Start empty",
+  "{count} more": "{count} more",
+  "This fleet is no longer available.": "This fleet is no longer available.",
+
   // Templates
   Recruiting: "Recruiting",
   "Sources candidates, writes outreach, and tracks every opening.":
