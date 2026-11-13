@@ -3,7 +3,9 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   applySiteSignInAction,
   SITE_SIGN_IN_ASKING_LIMIT_MS,
+  SITE_SIGN_IN_REASON_MAX_LENGTH,
   askingRemainingMs,
+  cappedSiteSignInReason,
   deriveSiteSignInCard,
   type SiteSignInAction,
   type SiteSignInRequestRecord,
@@ -34,6 +36,24 @@ const record = (patch: Partial<SiteSignInRequestRecord> = {}): SiteSignInRequest
 
 const step = (from: SiteSignInRequestRecord, ...actions: SiteSignInAction[]) =>
   actions.reduce(applySiteSignInAction, from);
+
+describe("cappedSiteSignInReason", () => {
+  it("caps a reason no bot can be trusted to keep short, and leaves a short one alone", () => {
+    const long = `Read https://example.test/${"a".repeat(SITE_SIGN_IN_REASON_MAX_LENGTH)}`;
+
+    expect(cappedSiteSignInReason(null)).toBeNull();
+    expect(cappedSiteSignInReason("Read the launch thread.")).toBe("Read the launch thread.");
+    expect(cappedSiteSignInReason("x".repeat(SITE_SIGN_IN_REASON_MAX_LENGTH))).toBe(
+      "x".repeat(SITE_SIGN_IN_REASON_MAX_LENGTH),
+    );
+
+    const capped = cappedSiteSignInReason(long);
+
+    expect(capped).toHaveLength(SITE_SIGN_IN_REASON_MAX_LENGTH);
+    expect(capped?.endsWith("…")).toBe(true);
+    expect(capped?.startsWith("Read https://example.test/")).toBe(true);
+  });
+});
 
 describe("deriveSiteSignInCard", () => {
   it("derives every card from the request record alone", () => {

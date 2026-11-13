@@ -1,4 +1,5 @@
 import {
+  cappedSiteSignInReason,
   deriveSiteSignInCard,
   type SiteSignInCardAction,
   type SiteSignInRequestRecord,
@@ -71,6 +72,7 @@ export function SiteSignInCard({
   const { t } = useI18n();
   const card = deriveSiteSignInCard(record);
   const failure = failureText(record, t);
+  const reason = cappedSiteSignInReason(record.reason);
 
   const heading = (() => {
     switch (card.id) {
@@ -148,7 +150,7 @@ export function SiteSignInCard({
       <p className="mt-1 truncate text-xl font-semibold text-foreground" dir="ltr">
         {record.site}
       </p>
-      {record.reason ? <p className="mt-1 text-xs text-muted-foreground">{record.reason}</p> : null}
+      {reason ? <p className="mt-1 text-xs text-muted-foreground">{reason}</p> : null}
       <p className="mt-1 text-xs text-muted-foreground">{body}</p>
       {card.actions.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap items-center justify-end gap-1.5">

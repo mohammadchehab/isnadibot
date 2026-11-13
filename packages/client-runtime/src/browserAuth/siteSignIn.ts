@@ -108,6 +108,21 @@ const askingCard = (kind: SiteSignInRequestKind): SiteSignInCard =>
       };
 
 /**
+ * The bot's reason is text a prompt-injected bot controls, so every surface caps it before it
+ * renders. See docs/internals/site-signin-security.md ("What the card shows").
+ */
+export const SITE_SIGN_IN_REASON_MAX_LENGTH = 160;
+
+/** The reason, ready to render as plain text: capped with an ellipsis, never linkified. */
+export function cappedSiteSignInReason(reason: string | null): string | null {
+  if (reason === null || reason.length <= SITE_SIGN_IN_REASON_MAX_LENGTH) {
+    return reason;
+  }
+
+  return `${reason.slice(0, SITE_SIGN_IN_REASON_MAX_LENGTH - 1).trimEnd()}…`;
+}
+
+/**
  * The card is a pure function of the request record: every branch below is a row of the state table
  * in docs/internals/site-signin.md, and no screen is allowed to pick a card on its own.
  */
