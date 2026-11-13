@@ -6,6 +6,7 @@ import { memoryCatalog } from "./memory.ts";
 import { commonCatalog } from "./common.ts";
 import { browserAuthCatalog } from "./browserAuth.ts";
 import { refusalsCatalog } from "./refusals.ts";
+import { fleetCatalog } from "./fleet.ts";
 
 export const arCatalog = {
   ...rosterCatalog,
@@ -16,4 +17,5 @@ export const arCatalog = {
   ...commonCatalog,
   ...browserAuthCatalog,
   ...refusalsCatalog,
+  ...fleetCatalog,
 } as const;
