@@ -6,8 +6,6 @@ import {
   GroupHopBudget,
   GroupId,
   fleetRole,
-  fleetTemplateRoles,
-  type BotAvatar,
   type FleetTemplate,
   type FleetTemplateId,
   type ProviderInstanceId,
@@ -19,8 +17,8 @@ import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 import { createBot, createGroup } from "../operations/commands.ts";
-import { planBlockers, type FleetHireMember } from "./hirePlan.ts";
-import { reasoningOptionsFor, seedSquadMember, type SquadSeedNotice } from "./squadSeed.ts";
+import { planBlockers, planFleetHire, type FleetHireMember } from "./hirePlan.ts";
+import { reasoningOptionsFor } from "./squadSeed.ts";
 
 /**
  * The squad screen's working copy of a hire: every id and command id minted
@@ -31,10 +29,7 @@ import { reasoningOptionsFor, seedSquadMember, type SquadSeedNotice } from "./sq
 /** One member as squad setup holds it, before anything exists on the server. */
 export interface HireMember extends FleetHireMember {
   readonly botId: BotId;
-  readonly avatar: BotAvatar;
   readonly createCommandId: CommandId;
-  /** Why the seeded engine differs from what the role asked for, or null. */
-  readonly notice: SquadSeedNotice | null;
 }
 
 export interface HireDraft {
@@ -80,23 +75,13 @@ export function createHireDraft({
   readonly makeId: MakeId;
   readonly createdAt: string;
 }): HireDraft {
-  const members = fleetTemplateRoles(template).map((role): HireMember => {
-    const seed = seedSquadMember(role, providers);
-
-    return {
-      roleId: role.id,
+  const members = planFleetHire({ template, providers }).members.map(
+    (member): HireMember => ({
+      ...member,
       botId: BotId.make(`bot-${makeId()}`),
-      name: role.name,
-      title: role.name,
-      description: role.description,
-      avatar: role.avatar,
-      isBoss: role.id === template.bossRoleId,
-      skills: role.skills.map((skillId) => ({ skillId, enabled: true })),
-      engine: seed.engine,
-      notice: seed.notice,
       createCommandId: CommandId.make(makeId()),
-    };
-  });
+    }),
+  );
 
   return {
     templateId: template.id,

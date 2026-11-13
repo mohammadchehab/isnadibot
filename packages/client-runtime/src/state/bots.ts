@@ -133,7 +133,9 @@ export function createBotEnvironmentAtoms<R, E>(
       scheduler,
       concurrency: botConcurrency,
     }),
-    // The whole hire is one command: a squad is created or not, never half.
+    // Not atomic: the hire sends one bot.create per member, then group.create. A
+    // failure partway leaves the bots already created, and re-running the same
+    // draft finishes them off because every command carries the draft's own id.
     hire: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:group:hire",
       execute: (input: HireFleetInput) => hireFleet(input.draft),
