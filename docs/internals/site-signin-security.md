@@ -183,6 +183,10 @@ These are the properties a user is entitled to assume, with the numbers.
   turn end, interrupt, thread delete, and bot archive or delete. The clock pauses while a flow is open and resumes —
   it does not restart — so repeated Cancels cannot extend a bot's wait. A start on an expired request is refused
   server-side, and the bot is told "owner did not answer".
+- **A restart cannot keep a bot waiting.** Boot repairs the requests a dead process left behind: an interrupted flow
+  returns to `asking` so the owner can still act on it, a wait whose window was already spent settles `expired`, and
+  the time the server was down is charged to nobody. A request whose window is still open keeps only the asking time it
+  had actually used, and no client or bot tool can reach the repair to re-anchor its own clock.
 - **Only one flow per request.** `browser-auth.request.start` is a compare-and-set on `asking`. A second client's Sign in joins the
   existing flow. The card shows Continue sign-in, not a second Sign in.
 - **The first terminal event wins.** Cancel is refused while `submitting` (the card says "Finishing sign-in…"), so a

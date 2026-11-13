@@ -129,6 +129,56 @@ The precedence rule is the important half:
   requests only. A flow that finishes after its turn ended still saves the profile and posts a settled line
   in the chat, because the owner chose to sign in; the bot is not resumed.
 
+### What a restart repairs
+
+Two things a request leans on live only as long as the process does: the flow that serves it, and the moment
+its asking window was anchored. The row itself is a projection and survives; those two do not, and a request
+left holding either one is a card no client can clear. One `runStartupPhase` entry,
+`reconcileBrowserAuthRequests`, repairs them on boot, beside the provider-session and delegation reconcilers
+and before the reactors start, reading the requests from the same read model the cards do rather than the
+tables.
+
+| Left as                      | After the restart                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `in_progress`, bot request   | back to `asking`, `submitting` cleared, the clock re-anchored at the restart |
+| `in_progress`, owner request | `dismissed`, the reverse state Cancel already gives an owner-started request |
+| `asking`, window spent       | `expired`, with the settled event the wait timer would have written          |
+| `asking`, window still open  | kept, with `asking_since` re-anchored at the restart                         |
+| Waiting for your PC          | nothing to repair; no check survives, so the card shows the non-PC state     |
+
+Four rules make that table safe.
+
+- **A lost flow returns the request to `asking`; it does not expire it.** An in-progress flow is never cut by
+  expiry while it lives, and a restart should not do what the running system refuses to. The bot's tool call
+  died with the process, but the owner's intent did not, and `asking` is the only state in which they can
+  still act on it: Sign in starts a fresh flow, and one that completes saves the profile and posts its settled
+  line. Expiring instead throws away the profile the owner was one form away from.
+- **The wait limit still applies, and the turn-end triggers do not.** After the repair the request is weighed
+  against its own 10-minute window in the same pass, so a bot request whose wait was nearly spent settles as
+  `expired` rather than sitting in `asking`. Recovery is not a turn-end trigger: it does not cascade the way
+  an ended turn does, because what the owner can still get out of the request is a profile, not a resumed bot.
+- **The owner's wait counts; the downtime does not.** Recovery keeps `asking_elapsed_ms` and re-anchors
+  `asking_since` at the restart, so time spent down is charged to nobody. Only rows whose `asking_since`
+  predates this process are touched, so a second repair in one boot changes nothing and a wait on a running
+  server is never re-anchored underneath the owner.
+- **Recovery is one internal command.** `browser-auth.request.recover { requestId, recoveredAt }` sits next to
+  `.complete`, `.fail` and `.expire`, is not in `ClientOrchestrationCommand`, and appends only events that
+  already exist: `browser-auth.request.reopened` for a request that comes back to `asking` (the projector
+  accumulates elapsed and re-anchors `asking_since` at the event, exactly as a Cancel does) and
+  `browser-auth.request.settled` with `dismissed` or `expired` for the rows that end. No new event kind. No
+  client and no bot tool can reach it, so nothing can re-anchor its own clock to keep a bot waiting, or
+  expire a request early.
+
+Rejected: a stored `expires_at` or a heartbeat-written `last_seen_at`, which is a second clock and a write per
+beat for a value the asking fields already carry; reconciling inside the decider on read, which makes a read
+path write; and expiring every `in_progress` at boot, which loses the profile the owner was in the middle of
+creating.
+
+Waiting for your PC needs no entry because nothing about it is stored: `pcRouted`, `egress` and `checkFailed`
+are derived from the profile's route and its last health, a self-check never outlives the process, and
+resuming re-runs the check instead of trusting an earlier answer. Failing closed here is doing nothing — the
+card cannot show a PC state it cannot prove.
+
 ## The command and RPC surface
 
 Two surfaces, split by what they carry. A **request** is durable state, so it changes by orchestration command:
@@ -153,8 +203,8 @@ a member principal**: owner is the session principal, not `access:write`.
 | `browser-profile.delete { profileId }`                  | remove the row and its ciphertext                                                                           | a flow is open on that profile                                    |
 
 **Allow is the only client path to a grant.** `browser-auth.grant.create` stays internal, next to
-`browser-auth.request.create`, `.complete`, `.fail`, `.expire` and `.health-recorded`: they are not in
-`ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a request it
+`browser-auth.request.create`, `.complete`, `.fail`, `.expire`, `.recover` and `.health-recorded`: they are not
+in `ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a request it
 was shown and the decider resolves that into a grant. One request yields at most one grant; a replayed Allow is
 refused.
 
@@ -314,20 +364,20 @@ latest on main today, so it is `081`.
 Every accepted browser-auth command appends exactly one orchestration event, named with the existing dotted
 `noun.verb` kinds, and the projector writes the rows above from them.
 
-| Event                             | Carries                                                                |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `browser-auth.request.created`    | requestId, site, kind, state; threadId and botId on a bot request only |
-| `browser-auth.request.started`    | requestId, flowId, startedByClient                                     |
-| `browser-auth.request.submitting` | requestId                                                              |
-| `browser-auth.request.reopened`   | requestId (back to `asking`; `asking_since` resumes)                   |
-| `browser-auth.request.settled`    | requestId, state, site, failureClass when failed                       |
-| `browser-profile.saved`           | profileId, site, generation, status                                    |
-| `browser-profile.signed-out`      | profileId, generation                                                  |
-| `browser-profile.deleted`         | profileId                                                              |
-| `browser-profile.health-recorded` | profileId, result — only when the value changed                        |
-| `browser-profile.route-changed`   | profileId, from, to                                                    |
-| `browser-session-grant.created`   | grantId, profileId, botId, threadId, site                              |
-| `browser-session-grant.revoked`   | grantId                                                                |
+| Event                             | Carries                                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `browser-auth.request.created`    | requestId, site, kind, state; threadId and botId on a bot request only                             |
+| `browser-auth.request.started`    | requestId, flowId, startedByClient                                                                 |
+| `browser-auth.request.submitting` | requestId                                                                                          |
+| `browser-auth.request.reopened`   | requestId; back to `asking`, with elapsed accumulated and `asking_since` re-anchored at this event |
+| `browser-auth.request.settled`    | requestId, state, site, failureClass when failed                                                   |
+| `browser-profile.saved`           | profileId, site, generation, status                                                                |
+| `browser-profile.signed-out`      | profileId, generation                                                                              |
+| `browser-profile.deleted`         | profileId                                                                                          |
+| `browser-profile.health-recorded` | profileId, result — only when the value changed                                                    |
+| `browser-profile.route-changed`   | profileId, from, to                                                                                |
+| `browser-session-grant.created`   | grantId, profileId, botId, threadId, site                                                          |
+| `browser-session-grant.revoked`   | grantId                                                                                            |
 
 The payload rule is the one the card states and a schema test enforces: ids, site, state, route names and
 timestamps only. No URL with a query, no cookie, no typed value, no path, and the auth-check URL appears in no event
@@ -385,6 +435,11 @@ did not intend to give.
 - A refused egress host raises one confirm per host per flow, and a profile outside the desktop's binding is
   refused before any DNS or TCP.
 - Path guard on the ciphertext path, a corrupted envelope, and a generation-`g` file copied to `g+1`.
+- Three restarts, each a fresh process over the same rows: an `in_progress` bot request comes back `asking`,
+  so Cancel still works and a fresh Sign in succeeds and saves; an `asking` request past its window is
+  `expired` in the same pass, so a start is refused until the owner starts a fresh one; and an `asking`
+  request left by a crash keeps its elapsed time, so the downtime is charged to nobody. A second repair in
+  one boot changes nothing.
 
 ## Build order: screens first
 
