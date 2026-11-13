@@ -124,6 +124,10 @@
       "types": "./src/durableMemory.ts",
       "default": "./src/durableMemory.ts"
     },
+    "./browser-auth": {
+      "types": "./src/browserAuth/siteSignIn.ts",
+      "default": "./src/browserAuth/siteSignIn.ts"
+    },
     "./space/work-items": {
       "types": "./src/space/workItems.ts",
       "default": "./src/space/workItems.ts"

@@ -38,6 +38,7 @@ import { ChatReplyContext } from "../markdown/generative/chatReplyContext";
 import { deriveBotActivity } from "./botActivityStatus.logic";
 import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { MemoryApprovalPrompt } from "./MemoryApprovalPrompt";
+import { SiteSignInCardSlot } from "./SiteSignInCardSlot";
 import { BotUserInputPrompt } from "./BotUserInputPrompt";
 import { BotInboxAlertStack } from "./BotInboxAlertStack";
 import { BotAvatarView } from "./BotAvatarView";
@@ -555,7 +556,13 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
                   approvals={memoryApprovals}
                   currentBotId={activeBot?.id ?? null}
                 />
-              ) : null
+              ) : (
+                <SiteSignInCardSlot
+                  threadId={runtime.linkedThreadRef?.threadId ?? null}
+                  botId={activeBot?.id ?? group.id}
+                  botName={group.name}
+                />
+              )
             }
             quietSurface={pendingApproval !== null || pendingUserInput !== null}
             {...(waitingForUserInput ? { placeholder: t("Write a custom answer…") } : {})}

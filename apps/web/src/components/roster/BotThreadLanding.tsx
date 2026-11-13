@@ -24,6 +24,7 @@ import { botActivityUpdate, BotActivityStatus } from "./BotActivityStatus";
 import { deriveBotActivity } from "./botActivityStatus.logic";
 import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { MemoryApprovalPrompt } from "./MemoryApprovalPrompt";
+import { SiteSignInCardSlot } from "./SiteSignInCardSlot";
 import { BotInboxAlertStack } from "./BotInboxAlertStack";
 import { ChatReplyContext } from "../markdown/generative/chatReplyContext";
 import { BotAvatarView } from "./BotAvatarView";
@@ -632,7 +633,13 @@ export function BotThreadLanding({
                     approvals={memoryApprovals}
                     currentBotId={bot.id}
                   />
-                ) : null
+                ) : (
+                  <SiteSignInCardSlot
+                    threadId={runtime.linkedThreadRef?.threadId ?? null}
+                    botId={bot.id}
+                    botName={bot.name}
+                  />
+                )
               }
               quietSurface={pendingApproval !== null}
               disabled={
