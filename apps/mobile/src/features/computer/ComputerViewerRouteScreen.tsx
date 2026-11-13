@@ -6,6 +6,7 @@ import { DEV_FIXTURES_ENABLED } from "../../dev-fixtures";
 import { ComputerViewerScreen } from "./ComputerViewerScreen";
 import { useComputerViewerCover } from "./useComputerViewerCover";
 import { useFixtureComputerViewer } from "./useFixtureComputerViewer";
+import { useLiveViewCaptureBlock } from "./useLiveViewCaptureBlock";
 
 export type ComputerViewerRouteParams = {
   readonly threadId: ThreadId;
@@ -20,6 +21,10 @@ export type ComputerViewerRouteParams = {
  * entry point that opens this screen is hidden there too (`ComputerDesktopNotice.tsx`).
  */
 export function ComputerViewerRouteScreen(props: StaticScreenProps<ComputerViewerRouteParams>) {
+  // On the route, not the fixture viewer, so the block keeps covering the screen when the port is
+  // wired to the environment RPC.
+  useLiveViewCaptureBlock();
+
   if (!DEV_FIXTURES_ENABLED) return <ComputerViewerUnavailableScreen />;
 
   return <FixtureComputerViewerRouteScreen {...props} />;
