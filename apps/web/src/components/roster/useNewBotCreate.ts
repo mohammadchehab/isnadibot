@@ -90,7 +90,9 @@ export function useNewBotCreate() {
         target: input.target,
         schedule: input.schedule,
       });
+
       const threadId = newThreadId();
+
       const threadResult = await createThread({
         environmentId,
         input: {
@@ -162,6 +164,7 @@ export function useNewBotCreate() {
 
       try {
         const botId = BotId.make(`bot-${randomUUID()}`);
+
         const result = await createBotCommand({
           environmentId,
           input: {

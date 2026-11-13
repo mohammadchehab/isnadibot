@@ -1,3 +1,4 @@
+import { Match } from "effect";
 import { useState } from "react";
 import { readyMadeBot, type ReadyMadeBotId } from "@isnadi/contracts";
 import {
@@ -58,12 +59,14 @@ export function NewBotDialog({
   const [avatar, setAvatar] = useState<BotAvatar>(() => blobAvatar);
   const [presetId, setPresetId] = useState<ReadyMadeBotId | null>(null);
   const [target, setTarget] = useState("");
+
   const [schedule, setSchedule] = useState<RoutineAdapterSchedule>(() => ({
     frequency: "daily",
     time: "09:00",
     timezone: viewerTimezone(),
     weekday: null,
   }));
+
   const trimmedName = name.trim();
   const preset = presetId === null ? undefined : readyMadeBot(presetId);
   const presetCopy = preset ? readyMadeBotCopy(preset.id) : null;
@@ -211,13 +214,15 @@ export function NewBotDialog({
                       targetProblem !== null ? "text-destructive" : "text-muted-foreground",
                     )}
                   >
-                    {targetProblem === "unsupported-scheme"
-                      ? t(presetCopy.targetSchemeProblem)
-                      : targetProblem === "empty"
-                        ? t(
-                            "Enter a folder in the project, or a link that starts with http:// or https://.",
-                          )
-                        : t(presetCopy.targetHelp)}
+                    {Match.value(targetProblem).pipe(
+                      Match.when("unsupported-scheme", () => t(presetCopy.targetSchemeProblem)),
+                      Match.when("empty", () =>
+                        t(
+                          "Enter a folder in the project, or a link that starts with http:// or https://.",
+                        ),
+                      ),
+                      Match.orElse(() => t(presetCopy.targetHelp)),
+                    )}
                   </p>
                   <RoutineScheduleFields schedule={schedule} onChange={setSchedule} />
                 </section>

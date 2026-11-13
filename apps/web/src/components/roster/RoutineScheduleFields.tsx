@@ -38,6 +38,7 @@ export function RoutineScheduleFields({
             onChange={(event) =>
               onChange({
                 ...schedule,
+                // SAFETY: the only options are the three RoutineAdapterFrequency kinds below.
                 frequency: event.target.value as RoutineAdapterFrequency,
                 weekday: event.target.value === "weekly" ? (schedule.weekday ?? 1) : null,
               })

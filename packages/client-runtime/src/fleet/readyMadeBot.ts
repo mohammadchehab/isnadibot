@@ -19,21 +19,24 @@ export interface ReadyMadeBotCopy {
   readonly targetSchemeProblem: MessageKey;
 }
 
-const READY_MADE_BOT_COPY: Readonly<Record<string, ReadyMadeBotCopy>> = {
-  [LINK_MONITOR_BOT_ID]: {
-    name: "Link monitor",
-    role: "Checks your docs on a schedule and reports every broken link.",
-    targetLabel: "Docs folder or URL",
-    targetHelp:
-      "A folder in the bot's project, or a live site that starts with http:// or https://.",
-    targetSchemeProblem:
-      "Use a folder in the project, or a link that starts with http:// or https://.",
-  },
-};
+const READY_MADE_BOT_COPY = new Map<ReadyMadeBotId, ReadyMadeBotCopy>([
+  [
+    LINK_MONITOR_BOT_ID,
+    {
+      name: "Link monitor",
+      role: "Checks your docs on a schedule and reports every broken link.",
+      targetLabel: "Docs folder or URL",
+      targetHelp:
+        "A folder in the bot's project, or a live site that starts with http:// or https://.",
+      targetSchemeProblem:
+        "Use a folder in the project, or a link that starts with http:// or https://.",
+    },
+  ],
+]);
 
 /** A preset added to the roster without copy has no row to show, so the picker skips it. */
 export const readyMadeBotCopy = (id: ReadyMadeBotId): ReadyMadeBotCopy | null =>
-  READY_MADE_BOT_COPY[id] ?? null;
+  READY_MADE_BOT_COPY.get(id) ?? null;
 
 /**
  * The preset's schedule in the routine form's shape, in the viewer's own timezone.

@@ -36,7 +36,7 @@ export function ReadyMadeBotPicker({
           size="row-relaxed"
           aria-pressed={selected === null}
           data-testid="new-bot-start-from-scratch"
-          className="h-auto items-start py-2 text-left"
+          className="h-auto items-start text-start"
           onClick={() => onSelect(null)}
         >
           <span className="flex min-w-0 flex-col gap-0.5">
@@ -61,7 +61,7 @@ export function ReadyMadeBotPicker({
               size="row-relaxed"
               aria-pressed={selected === bot.id}
               data-testid={`new-bot-preset-${bot.id}`}
-              className="h-auto items-start py-2 text-left"
+              className="h-auto items-start text-start"
               onClick={() => onSelect(bot.id)}
             >
               <span className="flex min-w-0 flex-col gap-0.5">
