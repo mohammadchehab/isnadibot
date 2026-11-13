@@ -15,6 +15,7 @@ import {
 import { SettingsDetailHeader, SettingsLinkRow, SettingsMessageRow } from "./settingsDetailLayout";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { SupportTierBadge } from "./SupportTierBadge";
 import { useI18n } from "../../i18n";
 import { subscriptionProviderTargetId } from "./subscriptionProviders";
 
@@ -130,6 +131,7 @@ function ProviderHeader({
       tone={state.tone}
       statusLabel={state.label}
       description={plan}
+      badge={<SupportTierBadge tier={entry.tier} />}
     />
   );
 }
@@ -207,6 +209,7 @@ function ConnectedProvidersList({ environmentId }: { readonly environmentId: Env
               description={plans.get(entry.slug) ?? translate(entry.planHint)}
               tone={state.tone}
               statusLabel={state.label}
+              badge={<SupportTierBadge tier={entry.tier} />}
             />
           );
         })}

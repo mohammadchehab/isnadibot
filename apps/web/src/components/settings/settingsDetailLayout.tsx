@@ -91,6 +91,7 @@ export function SettingsLinkRow<TRouter extends RegisteredRouter, TOptions>({
   description,
   tone,
   statusLabel,
+  badge,
 }: {
   /** Anchor so other pages can open Settings on this row. */
   readonly id?: string;
@@ -100,6 +101,8 @@ export function SettingsLinkRow<TRouter extends RegisteredRouter, TOptions>({
   readonly description?: ReactNode;
   readonly tone: ConnectionTone;
   readonly statusLabel: string;
+  /** A qualifier about the entry itself, e.g. its support tier, shown before the status. */
+  readonly badge?: ReactNode;
 }) {
   // SAFETY: ValidateLinkOptions has already checked these route options; Link erases the generic route parameter.
   return (
@@ -121,6 +124,7 @@ export function SettingsLinkRow<TRouter extends RegisteredRouter, TOptions>({
             <span className="block truncate text-13px text-muted-foreground/80">{description}</span>
           ) : null}
         </span>
+        {badge}
         <SettingsStatus tone={tone} label={statusLabel} />
         <ChevronRightIcon
           aria-hidden
@@ -140,6 +144,7 @@ export function SettingsDetailHeader({
   statusLabel,
   description,
   action,
+  badge,
 }: {
   readonly back: { readonly section: "providers" | "channels"; readonly label: string };
   readonly icon: Icon | string;
@@ -148,6 +153,8 @@ export function SettingsDetailHeader({
   readonly statusLabel: string;
   readonly description?: ReactNode;
   readonly action?: ReactNode;
+  /** A qualifier about the entry itself, e.g. its support tier, shown beside the title. */
+  readonly badge?: ReactNode;
 }) {
   return (
     <header className="space-y-4 px-3 sm:px-4">
@@ -166,6 +173,7 @@ export function SettingsDetailHeader({
             <h2 className="truncate text-lg font-semibold tracking-title text-foreground">
               {title}
             </h2>
+            {badge}
             <SettingsStatus tone={tone} label={statusLabel} />
           </div>
           {description ? (

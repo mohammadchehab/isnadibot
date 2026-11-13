@@ -29,6 +29,7 @@ import {
 } from "@isnadi/client-runtime/state/runtime";
 
 import { AppText as Text } from "../../components/AppText";
+import { SupportTierPillFor } from "../../components/SupportTierPill";
 import { ProviderAccessSummary } from "./ProviderAccessSummary";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
@@ -529,7 +530,12 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
 
               return (
                 <View key={provider.id} className="gap-3 border-b border-border-subtle py-3">
-                  <Text className="text-base font-t3-medium text-foreground">{provider.label}</Text>
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-base font-t3-medium text-foreground">
+                      {provider.label}
+                    </Text>
+                    <SupportTierPillFor kind="provider" id={provider.id} />
+                  </View>
                   {rows.map(({ status, account, instanceId }, index) => {
                     const apiKey = providerUsesApiKey(status);
                     const failover = instanceId === undefined && linked.length > 0;

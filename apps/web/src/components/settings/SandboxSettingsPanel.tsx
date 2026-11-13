@@ -21,6 +21,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Switch } from "../ui/switch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { SupportTierBadgeFor } from "./SupportTierBadge";
 import {
   canSaveSandboxProviderConnection,
   applyRailwayConnectionChange,
@@ -198,6 +199,7 @@ function EnvironmentSandboxSettingsPanel({
               title={definition.label}
               description={t(definition.description)}
               status={connected ? t("Connected") : t("Not connected")}
+              badge={<SupportTierBadgeFor kind="sandbox" id={definition.id} />}
               control={
                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                   <Button

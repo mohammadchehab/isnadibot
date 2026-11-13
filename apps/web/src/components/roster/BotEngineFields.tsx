@@ -3,7 +3,9 @@ import type { EnvironmentId } from "@isnadi/contracts";
 import { useI18n } from "../../i18n";
 import { ProviderUnavailableNotice } from "../chat/ProviderUnavailableNotice";
 import { TraitsPicker } from "../chat/TraitsPicker";
+import { providerCatalogEntryForDriver } from "../settings/providerCatalog";
 import { SettingsRow, SettingsSection } from "../settings/settingsLayout";
+import { SupportTierBadge } from "../settings/SupportTierBadge";
 import { BotEngineFallbackList } from "./BotEngineFallbackList";
 import { BotModelPicker } from "./BotModelPicker";
 import { BotUsageSection } from "./BotUsageSection";
@@ -22,11 +24,14 @@ export function BotEngineFields({
 }) {
   const { t } = useI18n();
 
+  const engineEntry = providerCatalogEntryForDriver(draft.activeEntry?.driverKind);
+
   return (
     <SettingsSection id="model" title={t("Model & usage")}>
       <SettingsRow
         title={t("Model")}
         description={t("The provider and model this bot runs on.")}
+        {...(engineEntry ? { badge: <SupportTierBadge tier={engineEntry.tier} /> } : {})}
         control={
           draft.model ? (
             <BotModelPicker

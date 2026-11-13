@@ -180,6 +180,7 @@ export function SettingsRow({
   description,
   status,
   resetAction,
+  badge,
   control,
   children,
   className,
@@ -188,6 +189,8 @@ export function SettingsRow({
   title: ReactNode;
   description?: ReactNode;
   status?: ReactNode;
+  /** A qualifier about the entry itself, e.g. its support tier, shown beside the title. */
+  badge?: ReactNode;
   resetAction?: ReactNode;
   control?: ReactNode;
   children?: ReactNode;
@@ -206,6 +209,7 @@ export function SettingsRow({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
             <h3 className="text-sm font-medium tracking-title-xs text-foreground">{title}</h3>
+            {badge}
             <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
               {resetAction}
             </span>

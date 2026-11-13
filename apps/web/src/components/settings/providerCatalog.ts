@@ -1,4 +1,4 @@
-import { ProviderDriverKind } from "@isnadi/contracts";
+import { type SupportTier, ProviderDriverKind, supportTierOf } from "@isnadi/contracts";
 
 import { CustomApiIcon, type Icon } from "../Icons";
 import {
@@ -21,6 +21,8 @@ export interface ProviderCatalogEntry {
   readonly description: string;
   readonly account: SubscriptionProviderDefinition | null;
   readonly drivers: ReadonlyArray<ProviderDriverKind>;
+  /** Whether we stand behind this provider, from the shared support-tier config. */
+  readonly tier: SupportTier;
 }
 
 function subscriptionEntry(
@@ -38,6 +40,7 @@ function subscriptionEntry(
     description: account.description,
     account,
     drivers: drivers.map((driver) => ProviderDriverKind.make(driver)),
+    tier: supportTierOf("provider", account.id),
   };
 }
 
@@ -55,6 +58,7 @@ export const PROVIDER_CATALOG: ReadonlyArray<ProviderCatalogEntry> = [
     description: "Bring any OpenAI-compatible API: set a base URL and pick its models.",
     account: null,
     drivers: [ProviderDriverKind.make("customOpenai")],
+    tier: "experimental",
   },
 ];
 

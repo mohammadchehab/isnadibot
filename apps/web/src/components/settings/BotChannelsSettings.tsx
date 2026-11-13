@@ -41,6 +41,7 @@ import type { ProviderConnectionState } from "./providerStatus";
 import { SettingsLinkRow, SettingsMessageRow } from "./settingsDetailLayout";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { SupportTierBadgeFor } from "./SupportTierBadge";
 
 // SAFETY: the empty ID is an inactive-query sentinel; no environment request is sent for it.
 const NO_ENVIRONMENT = "" as EnvironmentId;
@@ -567,6 +568,7 @@ export function BotChannelsSettingsPanel() {
                 description={meta.tagline}
                 tone={state.tone}
                 statusLabel={state.label}
+                badge={<SupportTierBadgeFor kind="channel" id={meta.provider} />}
               />
             );
           })
