@@ -8,6 +8,7 @@ import {
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import { decideOrchestrationCommand } from "./decider.ts";
 import {
   makeReadModel,
@@ -23,13 +24,13 @@ import {
 } from "./test-support/GroupDeciderFixtures.ts";
 
 /**
- * `group.delete` decides through `requireMutationActorAuthorized`
- * (decider/groups.ts), so being a person member of the group is enough to run it.
- * Unlike a bot delete, which only clears the bot's open items, the group cascade
- * deletes every work item the group holds — finished ones included — and detaches
- * every thread that belonged to it. This file holds the two halves of that
- * finding: what a plain member can do to a group today, and the refusal a guard
- * has to add once the architect rules on who may delete a group.
+ * `group.delete` is an environment-level act: only a person holding
+ * `access:write` (behind `canManageGroups`) may run it, plain membership is not
+ * enough. And because the cascade deletes every work item the group holds,
+ * finished ones included, a group that still has open work refuses to delete
+ * unless the caller passes `discardWorkItems` explicitly. Both refusals happen
+ * before any event is planned, so a failed delete leaves the group, its items
+ * and its threads exactly as they were.
  */
 const QUEUED_ITEM_ID = WorkItemId.make("item-queued");
 
@@ -61,35 +62,84 @@ const makeGroupWithWork = () => ({
   workItems: [makeItem(), makeItem({ id: DONE_ITEM_ID, title: "Ship the thing", state: "done" })],
 });
 
-const deleteGroupCommand = (commandId: string): OrchestrationCommand => ({
-  type: "group.delete",
-  commandId: CommandId.make(commandId),
-  groupId: GROUP_ID,
+/** The same group once its only open item is finished, so nothing is at stake. */
+const makeGroupWithFinishedWorkOnly = () => ({
+  ...makeGroupWithWork(),
+  workItems: [makeItem({ id: DONE_ITEM_ID, title: "Ship the thing", state: "done" })],
 });
 
-const member = { personId: PERSON_ID, canManageGroups: false } as const;
+const deleteGroupCommand = (input: {
+  readonly commandId: string;
+  readonly discardWorkItems?: boolean;
+}): OrchestrationCommand => ({
+  type: "group.delete",
+  commandId: CommandId.make(input.commandId),
+  groupId: GROUP_ID,
+  ...(input.discardWorkItems === undefined ? {} : { discardWorkItems: input.discardWorkItems }),
+});
 
-const decide = (actor: NonNullable<Parameters<typeof decideOrchestrationCommand>[0]["actor"]>) =>
+const MEMBER = { personId: PERSON_ID, canManageGroups: false } as const;
+
+const ADMIN = { personId: AuthSessionId.make("person-admin"), canManageGroups: true } as const;
+
+const decide = (input: {
+  readonly actor: { readonly personId: AuthSessionId; readonly canManageGroups: boolean };
+  readonly discardWorkItems?: boolean;
+  readonly readModel?: ReturnType<typeof makeGroupWithWork>;
+}) =>
   decideOrchestrationCommand({
-    command: deleteGroupCommand("cmd-member-delete"),
-    readModel: makeGroupWithWork(),
-    actor,
+    command: deleteGroupCommand({
+      commandId: "cmd-group-delete",
+      ...(input.discardWorkItems === undefined ? {} : { discardWorkItems: input.discardWorkItems }),
+    }),
+    readModel: input.readModel ?? makeGroupWithWork(),
+    actor: input.actor,
   });
+
+const failureDetail = (result: Result.Result<unknown, unknown>) =>
+  Result.isFailure(result) &&
+  typeof result.failure === "object" &&
+  result.failure !== null &&
+  "detail" in result.failure &&
+  typeof result.failure.detail === "string"
+    ? result.failure.detail
+    : "";
 
 it.layer(NodeServices.layer)("group delete authorization", (it) => {
   it.effect("refuses group.delete from a plain member who was never confirmed", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.result(decide(member));
+      const result = yield* Effect.result(decide({ actor: MEMBER }));
 
       expect(result._tag).toBe("Failure");
+      expect(failureDetail(result)).toContain("needs 'access:write'");
+    }),
+  );
+
+  it.effect("refuses group.delete from a plain member even when they ask to discard the work", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.result(decide({ actor: MEMBER, discardWorkItems: true }));
+
+      expect(result._tag).toBe("Failure");
+      expect(failureDetail(result)).toContain("needs 'access:write'");
     }),
   );
 
   it.effect(
-    "today: a member's group.delete wipes every item in the group, finished ones included",
+    "an administrator deleting a group that still holds open work must say discardWorkItems",
     () =>
       Effect.gen(function* () {
-        const result = yield* decide(member);
+        const result = yield* Effect.result(decide({ actor: ADMIN }));
+
+        expect(result._tag).toBe("Failure");
+        expect(failureDetail(result)).toContain("still holds 1 open work item(s)");
+      }),
+  );
+
+  it.effect(
+    "an administrator who says discardWorkItems deletes the group, its items and its thread",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* decide({ actor: ADMIN, discardWorkItems: true });
         const events = Array.isArray(result) ? result : [result];
 
         const deletedItemIds = events.flatMap((event) =>
@@ -104,16 +154,22 @@ it.layer(NodeServices.layer)("group delete authorization", (it) => {
       }),
   );
 
-  it.effect("still lets an administrator delete the group", () =>
-    Effect.gen(function* () {
-      const result = yield* decide({
-        personId: AuthSessionId.make("person-admin"),
-        canManageGroups: true,
-      });
+  it.effect(
+    "a group holding only finished work deletes without the flag, discarding that work",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* decide({
+          actor: ADMIN,
+          readModel: makeGroupWithFinishedWorkOnly(),
+        });
+        const events = Array.isArray(result) ? result : [result];
 
-      const events = Array.isArray(result) ? result : [result];
+        const deletedItemIds = events.flatMap((event) =>
+          event.type === "work-item.deleted" ? [event.payload.workItemId] : [],
+        );
 
-      expect(events.at(-1)?.type).toBe("group.deleted");
-    }),
+        expect(deletedItemIds).toEqual([DONE_ITEM_ID]);
+        expect(events.at(-1)?.type).toBe("group.deleted");
+      }),
   );
 });

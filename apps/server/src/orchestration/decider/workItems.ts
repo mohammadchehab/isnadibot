@@ -36,7 +36,7 @@ const MEMBER_BOT_COMMANDS: ReadonlySet<WorkItemCommand["type"]> = new Set([
   "work-item.unblock",
 ]);
 
-const isOpen = (item: WorkItem) => item.state !== "done" && item.state !== "closed";
+export const isOpen = (item: WorkItem) => item.state !== "done" && item.state !== "closed";
 
 const PROGRESS_SOURCES: ReadonlySet<WorkItem["state"]> = new Set([
   "assigned",

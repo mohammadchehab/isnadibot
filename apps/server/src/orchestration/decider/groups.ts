@@ -23,7 +23,7 @@ import {
   activeGroupBotIds,
   type DecideOrchestrationCommandResult,
 } from "./eventBase.ts";
-import { clearOwnedWorkItems } from "./workItems.ts";
+import { clearOwnedWorkItems, isOpen } from "./workItems.ts";
 
 export const decideGroups = Effect.fn("decideGroups")(function* ({
   command,
@@ -156,7 +156,19 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
 
     case "group.delete": {
       const group = yield* requireGroup({ readModel, command, groupId: command.groupId });
-      yield* requireMutationActorAuthorized({ group, command, actor });
+      // Deleting a group is an environment-level act, not a membership one.
+      yield* requireEnvironmentManageRights({ command, actor });
+
+      const openWorkItemCount = (readModel.workItems ?? []).filter(
+        (item) => item.groupId === command.groupId && isOpen(item),
+      ).length;
+
+      if (openWorkItemCount > 0 && command.discardWorkItems !== true) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Group '${command.groupId}' still holds ${openWorkItemCount} open work item(s). Pass discardWorkItems to delete it and discard them.`,
+        });
+      }
       const occurredAt = yield* nowIso;
 
       const deletedEvent: PlannedOrchestrationEvent = {

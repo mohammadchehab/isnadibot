@@ -573,13 +573,14 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
       }),
   );
 
-  it.effect("deletes a group's work items with the group", () =>
+  it.effect("deletes a group's work items with the group once the discard is explicit", () =>
     Effect.gen(function* () {
       const events = yield* decide(
         cmd({
           type: "group.delete",
           commandId: CommandId.make("cmd-group.delete"),
           groupId: GROUP_ID,
+          discardWorkItems: true,
         }),
         [makeItem(), makeItem({ id: WorkItemId.make("item-2"), state: "done", doneAt: NOW })],
       );
