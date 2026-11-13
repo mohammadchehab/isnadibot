@@ -13,6 +13,15 @@ export const fleetCatalog = {
   "Start empty": "Start empty",
   "{count} more": "{count} more",
   "This fleet is no longer available.": "This fleet is no longer available.",
+  "The bot that hands work out and answers for this space.":
+    "The bot that hands work out and answers for this space.",
+  "Bot replies one message can chain before the space stops.":
+    "Bot replies one message can chain before the space stops.",
+  "No provider can run this bot yet.": "No provider can run this bot yet.",
+  "Runs on another provider because the role's own is not set up.":
+    "Runs on another provider because the role's own is not set up.",
+  "The model has no such reasoning level, so it starts on the model's default.":
+    "The model has no such reasoning level, so it starts on the model's default.",
 
   // Templates
   Recruiting: "Recruiting",
