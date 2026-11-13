@@ -95,7 +95,7 @@ largest element and is shown as the normalized registrable domain, with an IDN a
 | `in_progress` | `in_progress` | flow reaches submitting                                                   | Cancel is refused from here on                                              |
 | `in_progress` | `asking`      | Cancel on a bot's request, or the flow is abandoned                       | not submitting; the asking clock resumes, it does not restart               |
 | `in_progress` | `dismissed`   | Cancel on an owner-started request                                        | not submitting; no bot is waiting, so there is no asking state to return to |
-| `in_progress` | `signed_in`   | the save at `generation + 1` is accepted                                  | the save is a compare-and-set on the generation                             |
+| `in_progress` | `signed_in`   | `browser-auth.request.complete` is accepted and saves                     | its `flowId` is the current flow and the generation is current, in one step |
 | `in_progress` | `failed`      | the flow ends with a class                                                | `in-use`, `signed-out-meanwhile`, `vault-disabled`, `signed-out`            |
 | `asking`      | `dismissed`   | Not now                                                                   | any client                                                                  |
 | `asking`      | `expired`     | the wait limit, turn end, interrupt, thread delete, bot archive or delete | never cuts a flow                                                           |
@@ -114,6 +114,14 @@ The precedence rule is the important half:
   while that id is the request's current flow. After Cancel ended that flow the request is back at `asking`
   with no current flow, so its late completion is dropped, and a later Start's flow is never satisfied by
   an earlier flow's result.
+- **The save is the completion, not a command after it.** `browser-auth.request.complete` is the only path
+  that writes a profile, and it decides both halves in one step: its `flowId` must still be the request's
+  current flow _and_ the profile's `generation` must be the one the flow started from. Only an accepted
+  complete appends the `browser-profile.saved` event and the request's `signed_in` together; a refused one
+  appends nothing, keeps whatever state Cancel put the request in, and leaves no ciphertext file behind
+  (the staged storage state is discarded). There is no standalone `browser-profile.save` command, because
+  Cancel does not move the generation — only Sign out's tombstone does — so a generation compare-and-set
+  on its own would accept a save the owner had already refused.
 - **`submitting` is a window, not a lock.** It clears on the submit's result, or when the flow service's
   step timeout dispatches `submit-settled`, whichever comes first; Cancel works again afterwards, and a
   completion that arrives after a timed-out settle and a Cancel is dropped by the same `flowId` match.
@@ -145,10 +153,22 @@ a member principal**: owner is the session principal, not `access:write`.
 | `browser-profile.delete { profileId }`                  | remove the row and its ciphertext                                                                           | a flow is open on that profile                                    |
 
 **Allow is the only client path to a grant.** `browser-auth.grant.create` stays internal, next to
-`browser-auth.request.create`, `.complete`, `.fail`, `.expire`, `browser-profile.save` and `.health-recorded`: they
-are not in `ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a
-request it was shown and the decider resolves that into a grant. One request yields at most one grant; a replayed
-Allow is refused.
+`browser-auth.request.create`, `.complete`, `.fail`, `.expire` and `.health-recorded`: they are not in
+`ClientOrchestrationCommand`, so no client and no bot tool can mint one. The client asks to allow a request it
+was shown and the decider resolves that into a grant. One request yields at most one grant; a replayed Allow is
+refused.
+
+**There is no `browser-profile.save` command.** Every profile write — a first sign-in, a re-sign-in after an
+expired session, the owner's automatic re-attempt — belongs to the flow that produced it, so the write rides on
+`browser-auth.request.complete` and cannot arrive without it. A save command of its own would be a second writer
+racing Cancel on the same request, which is the class the sweep ticket TASK-193 exists to close. The ciphertext
+is written by a reactor on the accepted `browser-profile.saved` event, never by the command that proposed it, so
+a refused complete persists nothing and encrypts nothing.
+
+Two alternatives were considered and rejected (TASK-193). Giving the save command its own `flowId` argument
+keeps two writers whose dispatch order decides the outcome, and the losing order is invisible in the event log.
+Making Cancel bump the profile generation gives the generation a second meaning and fails an unrelated health
+check that raced the Cancel.
 
 ### RPCs
 
@@ -193,8 +213,10 @@ reuses it rather than growing a second copy.
   `<stateDir>/browser-profiles/<profileId>.<generation>.enc`. The payload is a Playwright storage state;
   the key is per-profile, derived from the vault master key, and never stored beside the file.
 - **A generation** is a monotonic integer on the profile row. Every write says which generation it started
-  from and is refused if that is not current. This is what stops a late save or a health check from
-  resurrecting a profile the owner just signed out of.
+  from and is refused if that is not current. This is what stops a health check from resurrecting a profile
+  the owner just signed out of. It does not stop a save that lands after a Cancel, because Cancel moves the
+  request and not the generation: that save is refused by the `flowId` match inside
+  `browser-auth.request.complete`, and the generation is the second of the two guards, not the first.
 - **Sign out writes a tombstone** at `generation + 1`: ciphertext deleted, every session handle revoked, the
   saved vault password removed, the row kept. A fresh sign-in starts from the tombstone's generation, so a
   flow that began before the sign-out can never win. Tombstones stay in the shell for 24 hours, so Check and
@@ -334,6 +356,10 @@ did not intend to give.
 
 - **The cancel and dismiss races** (TASK-137) are the highest risk in the stack: a profile saved after the
   owner said no is an access bug, not a UI bug.
+- **The save cannot outlive the Cancel** (TASK-193). A generation compare-and-set is not enough, because
+  Cancel does not move the generation; the save is refused by the `flowId` match in the same decision that
+  would have written it. The test is Cancel-then-late-complete: no profile row, no ciphertext file, no
+  `signed_in`, and the request still reads `asking`.
 - **The tombstone and generation** (TASK-136) are what make sign-out mean something when two writers race.
 - **Cross-profile egress** (TASK-127): the binding, not the frame's `profileId`, decides.
 - **Prompt injection** asks a bot to request a site it has no business with; the card appears, and nothing
@@ -345,6 +371,9 @@ did not intend to give.
 
 - Decider tests for every transition in the table, including both race pairs: Cancel then completion, and a
   second client's Sign in while a flow runs.
+- Cancel before the submit, then a complete for the cancelled flow: refused, nothing persisted, no ciphertext
+  file at `generation + 1`, request still `asking`. A Cancel that arrives after a submit on another client
+  changes nothing, so the same complete is accepted and saved.
 - Expiry with `TestClock`: the asking clock resumes across a Cancel, turn end expires `asking` and never
   cuts a flow, and an abandoned flow returns the request to `asking`.
 - Sign out, sign in, sign out again: the first flow's late save is refused, and a check in flight cannot
