@@ -32,6 +32,10 @@
       "types": "./src/space/overview.ts",
       "default": "./src/space/overview.ts"
     },
+    "./context-window": {
+      "types": "./src/contextWindow.ts",
+      "default": "./src/contextWindow.ts"
+    },
     "./decisions": {
       "types": "./src/decisions.ts",
       "default": "./src/decisions.ts"
