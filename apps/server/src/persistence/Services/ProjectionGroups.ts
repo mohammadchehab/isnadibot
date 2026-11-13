@@ -1,4 +1,11 @@
-import { BotId, GroupHopBudget, GroupId, GroupMembership, IsoDateTime } from "@isnadi/contracts";
+import {
+  BotId,
+  FleetTemplateId,
+  GroupHopBudget,
+  GroupId,
+  GroupMembership,
+  IsoDateTime,
+} from "@isnadi/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -13,6 +20,7 @@ export const ProjectionGroup = Schema.Struct({
   members: Schema.Array(GroupMembership),
   hopBudget: Schema.NullOr(GroupHopBudget),
   keepBusy: Schema.Boolean,
+  fleetTemplateId: Schema.NullOr(FleetTemplateId),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

@@ -5,6 +5,7 @@ import {
   BotId,
   ChannelConnectionId,
   CommandId,
+  FleetTemplateId,
   GroupId,
   IsoDateTime,
   MessageId,
@@ -337,6 +338,8 @@ export const GroupCreateCommand = Schema.Struct({
   hopBudget: Schema.optional(GroupHopBudget),
   /** A fleet hired from a template starts keeping its members busy. Absent decodes to false. */
   keepBusy: Schema.optional(Schema.Boolean),
+  /** Set when a hire path creates the group from a fleet template; absent for a hand-made group. */
+  fleetTemplateId: Schema.optional(FleetTemplateId),
   createdAt: IsoDateTime,
 });
 

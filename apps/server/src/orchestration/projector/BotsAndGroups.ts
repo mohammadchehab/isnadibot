@@ -134,6 +134,7 @@ export function projectBotsAndGroups(
             members: payload.members,
             ...(payload.hopBudget === undefined ? {} : { hopBudget: payload.hopBudget }),
             keepBusy: payload.keepBusy,
+            fleetTemplateId: payload.fleetTemplateId,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
           };

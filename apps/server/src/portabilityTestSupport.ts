@@ -156,6 +156,7 @@ export function makeSnapshot(
         name: "Builders",
         bossBotId: BOT_ID,
         members: [{ kind: "bot", botId: BOT_ID, role: "boss" }],
+        fleetTemplateId: null,
         createdAt: NOW,
         updatedAt: NOW,
       },

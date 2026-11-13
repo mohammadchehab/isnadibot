@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 1904,
+  "directMessageCount": 1906,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -92,6 +92,9 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "DURABLE_MEMORY_DELETION_LABELS[fact.deletionState]),",
       "IMPORT_CLASSIFICATION_LABELS[group.classification]),",
       "choice.label)}",
+    ],
+    "apps/web/src/components/roster/FleetCapacityView.tsx": [
+      "STATUS_LABEL[row.status])}</span>",
     ],
     "apps/web/src/components/roster/GroupEditor.tsx": [
       "'Delete "{name}"? Its bots stay in your roster.', { name: group.name }),",
@@ -496,6 +499,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/DelegationCard.tsx",
     "apps/web/src/components/roster/DelegationDetail.tsx",
     "apps/web/src/components/roster/DurableMemoryPanels.tsx",
+    "apps/web/src/components/roster/FleetCapacityView.tsx",
     "apps/web/src/components/roster/GroupDetailsPanel.tsx",
     "apps/web/src/components/roster/GroupEditor.tsx",
     "apps/web/src/components/roster/GroupHopBudgetControl.tsx",

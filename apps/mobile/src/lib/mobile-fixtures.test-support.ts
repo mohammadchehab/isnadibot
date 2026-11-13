@@ -45,6 +45,7 @@ export function makeMobileGroup(overrides: Partial<OrchestrationGroup> = {}): Or
     name: "Mira and Ren",
     bossBotId: null,
     members: [],
+    fleetTemplateId: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides,

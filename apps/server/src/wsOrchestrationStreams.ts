@@ -329,6 +329,7 @@ export const createWsOrchestrationStreams = ({
                   name: nextGroup.name,
                   bossBotId: nextGroup.bossBotId,
                   members: nextGroup.members,
+                  fleetTemplateId: nextGroup.fleetTemplateId,
                   createdAt: nextGroup.createdAt,
                   updatedAt: nextGroup.updatedAt,
                 },

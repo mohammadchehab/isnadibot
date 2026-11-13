@@ -75,6 +75,15 @@ export const GroupId = makeEntityId("GroupId");
 
 export type GroupId = typeof GroupId.Type;
 
+/**
+ * Which fleet template a group was hired from. It lives here rather than in
+ * `fleet/roles.ts` because a group carries it, and `fleet/roles.ts` already
+ * imports the roster.
+ */
+export const FleetTemplateId = makeEntityId("FleetTemplateId");
+
+export type FleetTemplateId = typeof FleetTemplateId.Type;
+
 export const ChannelConnectionId = makeEntityId("ChannelConnectionId");
 
 export type ChannelConnectionId = typeof ChannelConnectionId.Type;

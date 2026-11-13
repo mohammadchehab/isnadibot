@@ -103,6 +103,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
           ],
           ...(command.hopBudget === undefined ? {} : { hopBudget: command.hopBudget }),
           ...(command.keepBusy === undefined ? {} : { keepBusy: command.keepBusy }),
+          fleetTemplateId: command.fleetTemplateId ?? null,
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },

@@ -69,7 +69,8 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
     execute: () => sql`
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
-        hop_budget AS "hopBudget", keep_busy AS "keepBusy", created_at AS "createdAt",
+        hop_budget AS "hopBudget", keep_busy AS "keepBusy",
+        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM projection_groups
       ORDER BY created_at ASC, group_id ASC
@@ -170,7 +171,8 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
     execute: ({ groupId }) => sql`
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
-        hop_budget AS "hopBudget", keep_busy AS "keepBusy", created_at AS "createdAt",
+        hop_budget AS "hopBudget", keep_busy AS "keepBusy",
+        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM projection_groups
       WHERE group_id = ${groupId}

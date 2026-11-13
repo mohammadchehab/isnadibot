@@ -381,4 +381,10 @@ export const rosterCatalog = {
   "Send a correction to {name}": "Send a correction to {name}",
   "Opens the chat and puts the caret in the composer":
     "Opens the chat and puts the caret in the composer",
+  Asking: "Asking",
+  Held: "Held",
+  Busy: "Busy",
+  Idle: "Idle",
+  "Context used: {percent}%": "Context used: {percent}%",
+  "Queued ({count})": "Queued ({count})",
 } as const;

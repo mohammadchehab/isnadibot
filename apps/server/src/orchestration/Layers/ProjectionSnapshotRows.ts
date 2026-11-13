@@ -532,6 +532,7 @@ export function mapGroupRow(
     members: row.members,
     ...(row.hopBudget === null ? {} : { hopBudget: row.hopBudget }),
     keepBusy: row.keepBusy === 1,
+    fleetTemplateId: row.fleetTemplateId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
