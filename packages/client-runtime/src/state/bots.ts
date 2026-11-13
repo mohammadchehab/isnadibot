@@ -2,6 +2,7 @@ import * as Crypto from "effect/Crypto";
 import { Atom } from "effect/unstable/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
+import { hireFleet, type HireFleetInput } from "../fleet/hireFleet.ts";
 import {
   type ArchiveBotInput,
   type AssignGroupMemberInput,
@@ -95,6 +96,12 @@ export function createBotEnvironmentAtoms<R, E>(
       JSON.stringify([environmentId, "group", input.groupId]),
   };
 
+  const hireConcurrency = {
+    mode: "serial" as const,
+    key: ({ environmentId, input }: { environmentId: string; input: HireFleetInput }) =>
+      JSON.stringify([environmentId, "hire", input.draft.groupId]),
+  };
+
   return {
     create: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:bot:create",
@@ -125,6 +132,13 @@ export function createBotEnvironmentAtoms<R, E>(
       execute: (input: DeleteBotInput) => deleteBot(input),
       scheduler,
       concurrency: botConcurrency,
+    }),
+    // The whole hire is one command: a squad is created or not, never half.
+    hire: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:group:hire",
+      execute: (input: HireFleetInput) => hireFleet(input.draft),
+      scheduler,
+      concurrency: hireConcurrency,
     }),
     channels: {
       saveConnection: createEnvironmentCommand(runtime, {
