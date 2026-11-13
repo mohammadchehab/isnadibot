@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./fleet": {
+      "types": "./src/fleet.ts",
+      "import": "./src/fleet.ts"
+    },
     "./themePalettes": {
       "types": "./src/themePalettes.ts",
       "import": "./src/themePalettes.ts"

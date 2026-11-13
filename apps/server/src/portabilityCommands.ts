@@ -37,10 +37,19 @@ export function nextCommandId(): CommandId {
   return CommandId.make(`portability-${NodeCrypto.randomUUID()}`);
 }
 
+/**
+ * A command a portability import can restore. `fleet.hire` is excluded: it
+ * mints the squad's group and bot ids during decide, so no archive record can
+ * name the row it would restore from, and portability never produces one.
+ */
+type PortabilityRestorableCommand = Exclude<OrchestrationCommand, { type: "fleet.hire" }>;
+
+type BotArchiveCommand = Extract<OrchestrationCommand, { type: "bot.archive" }>;
+
 export function mcpCommand(
   type: "mcp-server.create" | "mcp-server.update",
   record: Extract<PortabilityArchiveRecord, { type: "mcp-server" }>,
-): OrchestrationCommand {
+): PortabilityRestorableCommand {
   const config = record.data.configuration;
 
   const common = {
@@ -55,7 +64,7 @@ export function mcpCommand(
 }
 
 export function itemForCommand(
-  command: OrchestrationCommand,
+  command: PortabilityRestorableCommand,
   records: readonly PortabilityArchiveRecord[],
   projectSourceIdByTarget: ReadonlyMap<string, string>,
 ): PortabilityImportItem {
@@ -251,8 +260,8 @@ export function commandsForPortabilityImport(
     ),
   );
 
-  const commands: OrchestrationCommand[] = [];
-  const deferredBotArchiveCommands: OrchestrationCommand[] = [];
+  const commands: PortabilityRestorableCommand[] = [];
+  const deferredBotArchiveCommands: BotArchiveCommand[] = [];
   let settingsPatch: ServerSettingsPatch | undefined;
   let applied = 0;
 

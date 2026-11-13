@@ -7,6 +7,7 @@ import {
   AuthSessionId,
   BotId,
   ChannelConnectionId,
+  FleetRoleId,
   FleetTemplateId,
   GroupId,
   IsoDateTime,
@@ -333,6 +334,8 @@ export const OrchestrationBot = Schema.Struct({
   avatar: BotAvatar,
   engine: Schema.NullOr(BotEngine),
   sandbox: PersistedBotSandbox,
+  /** The fleet role this bot was hired as; absent on a bot created by hand. */
+  roleId: Schema.optional(FleetRoleId),
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE))),
   /**
    * The bot's image provider, independent of its chat engine (a Claude bot may

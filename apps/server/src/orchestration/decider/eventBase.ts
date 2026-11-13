@@ -27,6 +27,13 @@ export type DecideCommandSequence = (input: {
   readonly commands: ReadonlyArray<OrchestrationCommand>;
   readonly readModel: OrchestrationReadModel;
   readonly actor?: OrchestrationDispatchActor;
+  /**
+   * Groups this sequence creates later in the same call. A `bot.create` may
+   * point at one without the group existing in the read model yet, which is how
+   * `fleet.hire` builds a squad from nothing: the group needs its bots to exist
+   * and the bots need their group, and both land under one commandId.
+   */
+  readonly plannedGroupIds?: ReadonlyArray<GroupId>;
 }) => Effect.Effect<
   ReadonlyArray<PlannedOrchestrationEvent>,
   OrchestrationCommandInvariantError | PlatformError.PlatformError,

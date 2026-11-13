@@ -69,8 +69,16 @@ interface CommandEnvelope {
 
 type CommandAggregateRef = Pick<OrchestrationEvent, "aggregateKind" | "aggregateId">;
 
-function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateRef {
+/**
+ * The aggregate a command acts on. `fleet.hire` is the one command whose
+ * aggregate the client cannot name: the server mints the squad's group during
+ * decide, so at dispatch there is no aggregate yet and this returns undefined.
+ * Its receipt records the aggregate of the events it appended instead.
+ */
+function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateRef | undefined {
   switch (command.type) {
+    case "fleet.hire":
+      return undefined;
     case "project.create":
     case "project.meta.update":
     case "project.delete":
@@ -210,7 +218,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
 
     const baseMetricAttributes = {
       commandType: envelope.command.type,
-      aggregateKind: aggregateRef.aggregateKind,
+      aggregateKind: aggregateRef?.aggregateKind,
     } as const;
 
     const reconcileReadModelAfterDispatchFailure = Effect.gen(function* () {
@@ -235,8 +243,12 @@ const makeOrchestrationEngine = Effect.gen(function* () {
         yield* Effect.annotateCurrentSpan({
           "orchestration.command_id": envelope.command.commandId,
           "orchestration.command_type": envelope.command.type,
-          "orchestration.aggregate_kind": aggregateRef.aggregateKind,
-          "orchestration.aggregate_id": aggregateRef.aggregateId,
+          ...(aggregateRef === undefined
+            ? {}
+            : {
+                "orchestration.aggregate_kind": aggregateRef.aggregateKind,
+                "orchestration.aggregate_id": aggregateRef.aggregateId,
+              }),
         });
 
         const existingReceipt = yield* commandReceiptRepository.getByCommandId({
@@ -246,10 +258,13 @@ const makeOrchestrationEngine = Effect.gen(function* () {
         if (Option.isSome(existingReceipt)) {
           // A receipt only proves this exact command was handled. Replaying it
           // for a command aimed at another aggregate would report success for
-          // work that never happened.
+          // work that never happened. A command that mints its own aggregate
+          // has no aggregate to compare against, so its stored receipt is the
+          // only identity available.
           if (
-            existingReceipt.value.aggregateKind !== aggregateRef.aggregateKind ||
-            existingReceipt.value.aggregateId !== aggregateRef.aggregateId
+            aggregateRef !== undefined &&
+            (existingReceipt.value.aggregateKind !== aggregateRef.aggregateKind ||
+              existingReceipt.value.aggregateId !== aggregateRef.aggregateId)
           ) {
             return yield* new OrchestrationCommandIdConflictError({
               commandId: envelope.command.commandId,
@@ -460,7 +475,11 @@ const makeOrchestrationEngine = Effect.gen(function* () {
               ),
             );
 
-            if (isOrchestrationCommandInvariantError(error)) {
+            // A rejection appends no events, so a command that mints its own
+            // aggregate has nothing to record one against: fabricating an id
+            // would mislabel the row and hide a later conflicting reuse. Such a
+            // command is simply decided again when it is dispatched again.
+            if (isOrchestrationCommandInvariantError(error) && aggregateRef !== undefined) {
               yield* commandReceiptRepository
                 .upsert({
                   commandId: envelope.command.commandId,

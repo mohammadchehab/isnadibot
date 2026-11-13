@@ -1,14 +1,13 @@
 import * as Schema from "effect/Schema";
 
-import { FleetTemplateId, TrimmedNonEmptyString } from "../baseSchemas.ts";
+import { FleetRoleId, FleetTemplateId, TrimmedNonEmptyString } from "../baseSchemas.ts";
+
+export { FleetRoleId };
+
 import { DEFAULT_MODEL_BY_PROVIDER } from "../model.ts";
 import { BotAvatar } from "../orchestration/roster.ts";
 import { ProviderDriverKind } from "../providerInstance.ts";
 import { SkillId } from "../routines.ts";
-
-export const FleetRoleId = TrimmedNonEmptyString.pipe(Schema.brand("FleetRoleId"));
-
-export type FleetRoleId = typeof FleetRoleId.Type;
 
 export const FleetReasoningLevel = Schema.Literals(["low", "medium", "high"]);
 
