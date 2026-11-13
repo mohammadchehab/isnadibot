@@ -131,6 +131,19 @@ export const makeLocalSource = Effect.fn("link-monitor.localSource")(function* (
       Effect.catchCause(() => Effect.succeed(null)),
     );
 
+  // Resolved against the walked directory, not the process working directory,
+  // so a page linking to `../AGENTS.md` is found wherever the run started.
+  const hasFile: DocsSource["hasFile"] = (repositoryPath) =>
+    Effect.gen(function* () {
+      for (const candidate of pageCandidates(repositoryPath)) {
+        const info = yield* fileSystem.stat(absolute(candidate)).pipe(Effect.option);
+
+        if (info._tag === "Some" && info.value.type === "File") return true;
+      }
+
+      return false;
+    });
+
   return {
     site,
     directory: site,
@@ -152,6 +165,7 @@ const markdownPagesUnder = Effect.fn("link-monitor.pagesUnder")(function* (
 
   while (queue.length > 0 && found.length < maxPages) {
     const directory = queue.shift() ?? "";
+
     const entries = yield* fileSystem
       .readDirectory(directory)
       .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
@@ -192,23 +206,13 @@ const pageCandidates = (repositoryPath: string): ReadonlyArray<string> => {
   );
 };
 
-const hasFile = Effect.fn("link-monitor.hasFile")(function* (repositoryPath: string) {
-  const fileSystem = yield* FileSystem.FileSystem;
-
-  for (const candidate of pageCandidates(repositoryPath)) {
-    const info = yield* fileSystem.stat(candidate).pipe(Effect.option);
-
-    if (info._tag === "Some" && info.value.type === "File") return true;
-  }
-
-  return false;
-});
-
 const API_ROOT = "https://api.github.com";
+
 const RAW_ROOT = "https://raw.githubusercontent.com";
 
 /** How many raw files one walk reads at once. */
 const RAW_CONCURRENCY = 8;
+
 const REQUEST_TIMEOUT_MS = 15_000;
 
 const GithubTreeEntry = Schema.Struct({
@@ -235,8 +239,10 @@ export function makeGithubSource(
 ): DocsSource {
   const { owner, repo, ref } = target;
   const directory = target.directory.replace(/^\/+|\/+$/g, "");
+
   const rawUrl = (repositoryPath: string) =>
     `${RAW_ROOT}/${owner}/${repo}/${ref}/${repositoryPath}`;
+
   const request = (url: string) =>
     httpClient
       .get(url)
@@ -267,7 +273,7 @@ export function makeGithubSource(
     directory: directory || ".",
     pages: (maxPages) =>
       Effect.gen(function* () {
-        const tree = yield* listing;
+        const tree = yield* Effect.flatten(listing);
 
         const paths = tree.tree
           .filter(

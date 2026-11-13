@@ -64,6 +64,7 @@ export const runLinkCheck = (
     const budget = input.budget ?? defaultLinkCheckBudget;
     const startedAt = DateTime.formatIso(yield* DateTime.now);
     const judge = yield* makeLinkJudge(input.source);
+
     const pages = yield* input.source
       .pages(budget.maxPages)
       .pipe(

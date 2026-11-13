@@ -7,12 +7,14 @@
  * when a link is broken, so a scheduled run can tell the two outcomes apart
  * without parsing the file.
  */
-import { isCleanLinkCheck, type LinkCheckReport } from "@isnadi/contracts";
+import { isCleanLinkCheck, LinkCheckReport } from "@isnadi/contracts";
+import { fromJsonStringPretty } from "@isnadi/shared/schemaJson";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import { Command, Flag } from "effect/unstable/cli";
 
 import { docsSourceFromTarget } from "../link-monitor/DocsSource.ts";
@@ -20,6 +22,9 @@ import { runLinkCheck } from "../link-monitor/RunLinkCheck.ts";
 
 /** How many broken links the summary line lists before it says "and n more". */
 const SUMMARY_LIMIT = 5;
+
+/** The report as the file on disk reads: stable, human-readable JSON. */
+const encodeReportJson = Schema.encodeSync(fromJsonStringPretty(LinkCheckReport));
 
 export const linkMonitorCommand = Command.make(
   "link-monitor",
@@ -47,12 +52,13 @@ export const linkMonitorCommand = Command.make(
       const path = yield* Path.Path;
       const source = yield* docsSourceFromTarget(flags.docs, { projectRoot: flags.root });
       const report = yield* runLinkCheck({ source });
+
       const outputPath = Option.getOrElse(flags.out, () =>
         path.join(flags.root, ".isnadi", "link-check-report.json"),
       );
 
       yield* fileSystem.makeDirectory(path.dirname(outputPath), { recursive: true });
-      yield* fileSystem.writeFileString(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+      yield* fileSystem.writeFileString(outputPath, `${encodeReportJson(report)}\n`);
       yield* Console.log(renderReport(report, outputPath));
 
       if (!isCleanLinkCheck(report)) {

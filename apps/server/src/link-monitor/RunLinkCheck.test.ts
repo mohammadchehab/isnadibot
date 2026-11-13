@@ -44,6 +44,7 @@ const withServer = <A, E, R>(
   use: (base: string, hits: ReadonlyArray<string>) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> => {
   const hits: Array<string> = [];
+
   const server = NodeHTTP.createServer((request, response) => {
     const path = request.url ?? "/";
 
@@ -174,7 +175,7 @@ describe("runLinkCheck", () => {
       (root) =>
         Effect.gen(function* () {
           const report = yield* run(root);
-          const decoded = Schema.decodeUnknownSync(LinkCheckReport)(report);
+          const decoded = yield* Schema.decodeUnknownEffect(LinkCheckReport)(report);
 
           assert.strictEqual(decoded.checkedCount, 2);
           assert.strictEqual(decoded.brokenCount, 1);
