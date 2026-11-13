@@ -243,6 +243,7 @@ describe("hireFleet", () => {
         bossBotId: hire.members[0]?.botId,
         specialistBotIds: hire.members.slice(1).map((member) => member.botId),
         fleetTemplateId: template.id,
+        keepBusy: true,
         hopBudget: GroupHopBudget.make(6),
         createdAt: hire.createdAt,
       });

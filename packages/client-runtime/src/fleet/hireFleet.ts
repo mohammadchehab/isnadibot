@@ -252,6 +252,9 @@ export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (draft: HireDraf
       .filter((member) => member.roleId !== draft.bossRoleId)
       .map((member) => member.botId),
     hopBudget: draft.hopBudget,
+    // A hired fleet starts keeping its idle members busy: the group exists to
+    // hand work around, not to sit still until someone types.
+    keepBusy: true,
     fleetTemplateId: draft.templateId,
     createdAt: draft.createdAt,
   }).pipe(Effect.mapError((cause) => new HireFleetError({ step: "group", cause })));
