@@ -369,8 +369,12 @@ export const rosterCatalog = {
   "{count} idle to clear": "{count} idle to clear",
   "Could not interrupt the bot": "Could not interrupt the bot",
   "Could not clear the bot's context": "Could not clear the bot's context",
+  "Interrupted {count} bot": "Interrupted {count} bot",
   "Interrupted {count} bots": "Interrupted {count} bots",
+  "Interrupted {done} of {count} bot": "Interrupted {done} of {count} bot",
   "Interrupted {done} of {count} bots": "Interrupted {done} of {count} bots",
+  "Cleared {count} bot context": "Cleared {count} bot context",
   "Cleared {count} bot contexts": "Cleared {count} bot contexts",
+  "Cleared {done} of {count} bot context": "Cleared {done} of {count} bot context",
   "Cleared {done} of {count} bot contexts": "Cleared {done} of {count} bot contexts",
 } as const;

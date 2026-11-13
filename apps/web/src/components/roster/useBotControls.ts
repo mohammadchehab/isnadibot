@@ -113,7 +113,7 @@ export function useBotControlCommands() {
  * the shells the client already has rather than one environment's snapshot.
  */
 export function useBotFleetControls() {
-  const { t } = useI18n();
+  const { plural } = useI18n();
   const shells = useThreadShells();
   const { interruptThread, clearThread } = useBotControlCommands();
 
@@ -152,13 +152,20 @@ export function useBotFleetControls() {
 
     return report(
       outcomes,
-      t("Interrupted {count} bots", { count: running.length }),
-      t("Interrupted {done} of {count} bots", {
-        done: outcomes.filter(Boolean).length,
-        count: running.length,
+      plural(running.length, {
+        one: "Interrupted {count} bot",
+        other: "Interrupted {count} bots",
       }),
+      plural(
+        running.length,
+        {
+          one: "Interrupted {done} of {count} bot",
+          other: "Interrupted {done} of {count} bots",
+        },
+        { done: outcomes.filter(Boolean).length },
+      ),
     );
-  }, [interruptThread, report, running, t]);
+  }, [interruptThread, plural, report, running]);
 
   const clearAll = useCallback(async (): Promise<boolean> => {
     if (clearable.length === 0) return false;
@@ -169,13 +176,20 @@ export function useBotFleetControls() {
 
     return report(
       outcomes,
-      t("Cleared {count} bot contexts", { count: clearable.length }),
-      t("Cleared {done} of {count} bot contexts", {
-        done: outcomes.filter(Boolean).length,
-        count: clearable.length,
+      plural(clearable.length, {
+        one: "Cleared {count} bot context",
+        other: "Cleared {count} bot contexts",
       }),
+      plural(
+        clearable.length,
+        {
+          one: "Cleared {done} of {count} bot context",
+          other: "Cleared {done} of {count} bot contexts",
+        },
+        { done: outcomes.filter(Boolean).length },
+      ),
     );
-  }, [clearable, clearThread, report, t]);
+  }, [clearable, clearThread, plural, report]);
 
   return {
     running,
