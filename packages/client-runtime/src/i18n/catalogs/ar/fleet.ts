@@ -19,6 +19,8 @@ export const fleetCatalog = {
     "لا يوفر هذا النموذج مستوى التفكير المطلوب، لذا يبدأ على الوضع الافتراضي للنموذج.",
   "The provider or model this bot picked is no longer connected.":
     "لم يعد مزود الخدمة أو النموذج الذي اختاره هذا البوت متصلًا.",
+  "Every bot needs a name.": "يحتاج كل بوت إلى اسم.",
+  "Could not create the space": "تعذّر إنشاء المساحة",
 
   // Templates
   Recruiting: "التوظيف",

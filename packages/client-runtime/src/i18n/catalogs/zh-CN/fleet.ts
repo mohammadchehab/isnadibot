@@ -19,6 +19,8 @@ export const fleetCatalog = {
     "该模型没有这个推理等级，因此从模型默认等级开始。",
   "The provider or model this bot picked is no longer connected.":
     "该机器人选择的提供商或模型已不再连接。",
+  "Every bot needs a name.": "每个机器人都需要一个名称。",
+  "Could not create the space": "无法创建空间",
 
   // Templates
   Recruiting: "招聘",
