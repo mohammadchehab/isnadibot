@@ -80,7 +80,7 @@ const CHILD_DONE: IsnadiDelegationPhase = {
   childTurnId: null,
   startedAt: NOW,
   completedAt: NOW,
-  result: "done",
+  result: { summary: "done", childThreadId: ThreadId.make("child-1"), childTurnId: null },
   acknowledgedAt: null,
 };
 
