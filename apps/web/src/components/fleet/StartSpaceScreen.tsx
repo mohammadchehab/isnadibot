@@ -1,9 +1,6 @@
-import {
-  FLEET_TEMPLATES,
-  fleetTemplateRoles,
-  type FleetTemplate,
-  type FleetTemplateId,
-} from "@isnadi/contracts";
+import { FLEET_TEMPLATES, type FleetTemplate, type FleetTemplateId } from "@isnadi/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import { planFleetHire, type FleetHirePlan } from "@isnadi/client-runtime/fleet/hire-plan";
 import { useNavigate } from "@tanstack/react-router";
 import {
   FileTextIcon,
@@ -14,9 +11,10 @@ import {
   UserPlusIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useI18n } from "../../i18n";
+import { primaryServerProvidersAtom } from "../../state/server";
 import { BotAvatarView } from "../roster/BotAvatarView";
 import { NewGroupDialog } from "../roster/NewGroupDialog";
 import { useRosterStore } from "../roster/rosterStore";
@@ -44,15 +42,28 @@ const CARD_MEMBER_SLOTS = 4;
  * Screen 1 of the hire: the fleet the user wants, or an empty space. The card is
  * the whole choice — the squad's names, models and reply budget belong to squad
  * setup, so nothing here previews or edits them.
+ *
+ * The card previews the plan, not the template's roles, so the order the user
+ * sees here is the order squad setup and the hire use.
  */
 export function StartSpaceScreen() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const bots = useRosterStore((state) => state.bots);
+  const providers = useAtomValue(primaryServerProvidersAtom);
   const createGroup = useCreateGroup();
   const [selectedId, setSelectedId] = useState<FleetTemplateId | null>(null);
   const [startEmptyOpen, setStartEmptyOpen] = useState(false);
   const selected = FLEET_TEMPLATES.find((template) => template.id === selectedId) ?? null;
+
+  const cards = useMemo(
+    () =>
+      FLEET_TEMPLATES.map((template) => ({
+        template,
+        plan: planFleetHire({ template, providers }),
+      })),
+    [providers],
+  );
 
   return (
     <SidebarInset tone="foreground" className="h-dvh min-h-0 overflow-hidden">
@@ -69,10 +80,11 @@ export function StartSpaceScreen() {
               </p>
             </div>
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {FLEET_TEMPLATES.map((template) => (
+              {cards.map(({ template, plan }) => (
                 <li key={template.id}>
                   <TemplateCard
                     template={template}
+                    plan={plan}
                     selected={template.id === selectedId}
                     onSelect={() => setSelectedId(template.id)}
                   />
@@ -117,18 +129,24 @@ export function StartSpaceScreen() {
 
 function TemplateCard({
   template,
+  plan,
   selected,
   onSelect,
 }: {
   readonly template: FleetTemplate;
+  readonly plan: FleetHirePlan;
   readonly selected: boolean;
   readonly onSelect: () => void;
 }) {
   const { t } = useI18n();
   const Icon = TEMPLATE_ICONS[template.icon];
-  const roles = fleetTemplateRoles(template);
-  const members = roles.length > CARD_MEMBER_SLOTS ? roles.slice(0, CARD_MEMBER_SLOTS - 1) : roles;
-  const overflow = roles.length - members.length;
+
+  const members =
+    plan.members.length > CARD_MEMBER_SLOTS
+      ? plan.members.slice(0, CARD_MEMBER_SLOTS - 1)
+      : plan.members;
+
+  const overflow = plan.members.length - members.length;
 
   return (
     <Card
@@ -152,23 +170,19 @@ function TemplateCard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        {members.map((role) => {
-          const isBoss = role.id === template.bossRoleId;
-
-          return (
-            <span key={role.id} className="flex min-w-0 items-center gap-1.5">
-              <BotAvatarView avatar={role.avatar} name={role.name} className="size-5" />
-              <span className="max-w-24 truncate text-xs text-muted-foreground">
-                {t(role.name)}
-              </span>
-              {isBoss ? (
-                <Badge variant="secondary" size="sm">
-                  {t("Boss")}
-                </Badge>
-              ) : null}
+        {members.map((member) => (
+          <span key={member.roleId} className="flex min-w-0 items-center gap-1.5">
+            <BotAvatarView avatar={member.avatar} name={member.name} className="size-5" />
+            <span className="max-w-24 truncate text-xs text-muted-foreground">
+              {t(member.name)}
             </span>
-          );
-        })}
+            {member.isBoss ? (
+              <Badge variant="secondary" size="sm">
+                {t("Boss")}
+              </Badge>
+            ) : null}
+          </span>
+        ))}
         {overflow > 0 ? (
           <span className="text-xs text-muted-foreground">
             {t("{count} more", { count: overflow })}

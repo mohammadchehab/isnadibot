@@ -31,6 +31,7 @@ import type * as RpcSession from "../rpc/session.ts";
 import {
   HireFleetError,
   createHireDraft,
+  draftBlockers,
   hireFleet,
   setBoss,
   setHopBudget,
@@ -210,6 +211,7 @@ describe("createHireDraft", () => {
       hire.members.length,
     );
     expect(hire.members.every((member) => member.engine !== null)).toBe(true);
+    expect(hire.keepBusy).toBe(true);
   });
 });
 
@@ -358,6 +360,63 @@ describe("setMemberModel", () => {
     });
     expect(tailor?.notice).toBe("reasoning-adjusted");
   });
+
+  it("keeps a pick the server no longer offers, marks it, and blocks the hire", () => {
+    const changed = setMemberModel(
+      draft(),
+      FleetRoleId.make("tailor"),
+      { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-retired" },
+      PROVIDERS,
+    );
+
+    const tailor = changed.members.find((member) => member.roleId === "tailor");
+
+    expect(tailor?.engine).toMatchObject({ model: "claude-retired" });
+    expect(tailor?.notice).toBe("model-unavailable");
+    expect(draftBlockers(changed)).toContainEqual({
+      kind: "no-provider",
+      roleId: FleetRoleId.make("tailor"),
+    });
+  });
+
+  it("marks a pick whose provider is gone too, so the picker stays the way out", () => {
+    const changed = setMemberModel(
+      draft(),
+      FleetRoleId.make("tailor"),
+      { instanceId: ProviderInstanceId.make("claude-gone"), model: "claude-opus-5-5" },
+      PROVIDERS,
+    );
+
+    const tailor = changed.members.find((member) => member.roleId === "tailor");
+
+    expect(tailor?.engine).toMatchObject({ provider: "claude-gone" });
+    expect(tailor?.notice).toBe("model-unavailable");
+  });
+});
+
+describe("setBoss", () => {
+  it("puts the new boss first, so the plan's boss-first order stays true", () => {
+    const hire = draft();
+    const second = hire.members[1];
+
+    expect(second).toBeDefined();
+
+    if (second === undefined) return;
+
+    const changed = setBoss(hire, second.roleId);
+
+    expect(changed.bossRoleId).toBe(second.roleId);
+    expect(changed.members[0]?.roleId).toBe(second.roleId);
+    expect(changed.members.filter((member) => member.isBoss)).toHaveLength(1);
+  });
+
+  it("leaves the draft alone when the role is not in the squad", () => {
+    const hire = draft();
+
+    const changed = setBoss(hire, FleetRoleId.make("not-a-role"));
+
+    expect(changed).toBe(hire);
+  });
 });
 
 describe("setMemberReasoning", () => {
@@ -386,12 +445,14 @@ describe("a draft's ids", () => {
 
     const edited = setBoss(setHopBudget(hire, GroupHopBudget.make(2)), FleetRoleId.make("scout"));
 
-    expect(edited.members.map((member) => member.createCommandId)).toEqual(
-      hire.members.map((member) => member.createCommandId),
-    );
-    expect(edited.members.map((member) => member.botId)).toEqual(
-      hire.members.map((member) => member.botId),
-    );
+    // The boss edit reorders the members so the boss leads, so ids are compared
+    // by role: each role keeps the bot and command ids it was minted with.
+    const idsByRole = (draft: HireDraft) =>
+      new Map(
+        draft.members.map((member) => [member.roleId, [member.botId, member.createCommandId]]),
+      );
+
+    expect(idsByRole(edited)).toEqual(idsByRole(hire));
     expect(edited.groupCommandId).toBe(hire.groupCommandId);
   });
 });

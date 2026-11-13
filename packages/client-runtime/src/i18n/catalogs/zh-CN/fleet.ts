@@ -17,6 +17,8 @@ export const fleetCatalog = {
     "运行在其他服务商上，因为该角色所需的服务商尚未配置。",
   "The model has no such reasoning level, so it starts on the model's default.":
     "该模型没有这个推理等级，因此从模型默认等级开始。",
+  "The provider or model this bot picked is no longer connected.":
+    "该机器人选择的提供商或模型已不再连接。",
 
   // Templates
   Recruiting: "招聘",
