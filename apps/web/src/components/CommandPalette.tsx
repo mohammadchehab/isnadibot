@@ -6,6 +6,7 @@ import {
   ArchiveIcon,
   BotIcon,
   ChartNoAxesColumnIcon,
+  CornerDownRightIcon,
   EraserIcon,
   ImageIcon,
   LanguagesIcon,
@@ -273,8 +274,37 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   // Fleet-wide bot controls. The group is only there when one of them can act,
   // so the palette never lists a row that does nothing.
   const fleet = useBotFleetControls();
+  const rosters = useAtomValue(allEnvironmentRostersAtom);
+
+  // Steer names the bot it corrects, so one row per running bot chat: the
+  // palette cannot open a chat and put the caret in its composer without
+  // saying whose.
+  const botNameIn = buildEnvironmentOwnerNames(rosters);
+
+  const steerItems: CommandPaletteActionItem[] = fleet.steerable.flatMap((target) => {
+    const name =
+      target.botId === null ? null : botNameIn(target.environmentId, { botId: target.botId });
+
+    if (name === null) return [];
+
+    const title = t("Send a correction to {name}", { name });
+
+    return [
+      {
+        value: `bots:steer:${target.environmentId}:${target.threadId}`,
+        searchTerms: [title, t("Steer"), "steer", "correct", "redirect", name],
+        title,
+        description: t("Opens the chat and puts the caret in the composer"),
+        icon: <CornerDownRightIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await fleet.steer(target);
+        },
+      },
+    ];
+  });
 
   const botItems: CommandPaletteActionItem[] = [
+    ...steerItems,
     ...(fleet.canInterruptAll
       ? [
           {

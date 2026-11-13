@@ -377,4 +377,8 @@ export const rosterCatalog = {
   "Cleared {count} bot contexts": "Cleared {count} bot contexts",
   "Cleared {done} of {count} bot context": "Cleared {done} of {count} bot context",
   "Cleared {done} of {count} bot contexts": "Cleared {done} of {count} bot contexts",
+  Steer: "Steer",
+  "Send a correction to {name}": "Send a correction to {name}",
+  "Opens the chat and puts the caret in the composer":
+    "Opens the chat and puts the caret in the composer",
 } as const;

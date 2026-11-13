@@ -402,4 +402,7 @@ export const rosterCatalog = {
   "Cleared {done} of {count} bot contexts#two": "تم مسح سياق {done} من بوتين ({count})",
   "Cleared {done} of {count} bot contexts#few": "تم مسح سياق {done} من {count} بوتات",
   "Cleared {done} of {count} bot contexts#many": "تم مسح سياق {done} من {count} بوتًا",
+  Steer: "توجيه",
+  "Send a correction to {name}": "أرسل تصحيحًا إلى {name}",
+  "Opens the chat and puts the caret in the composer": "يفتح المحادثة ويضع المؤشر في حقل الكتابة",
 } as const;

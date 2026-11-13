@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   ArrowDownIcon,
   ArrowUpIcon,
+  CornerDownRightIcon,
   EraserIcon,
   PinIcon,
   SettingsIcon,
@@ -183,7 +184,7 @@ export const BotRosterRow = memo(function BotRosterRow({
 
   const unread = useBotRosterUnread(bot.id, chatRef, chatOpen);
   const controls = resolveBotControlAvailability(chatShell);
-  const { interruptBot, clearBot } = useBotControlCommands();
+  const { interruptBot, clearBot, steerBot } = useBotControlCommands();
 
   return (
     <li
@@ -301,6 +302,15 @@ export const BotRosterRow = memo(function BotRosterRow({
             >
               <SquareIcon />
               {t("Interrupt")}
+            </MenuItem>
+            <MenuItem
+              disabled={!controls.steer || chatRef === null}
+              onClick={() => {
+                if (chatRef !== null) void steerBot(chatRef, chatShell);
+              }}
+            >
+              <CornerDownRightIcon />
+              {t("Steer")}
             </MenuItem>
             <MenuItem
               disabled={!controls.clear || chatRef === null}

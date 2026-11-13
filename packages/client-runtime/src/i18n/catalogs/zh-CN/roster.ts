@@ -361,4 +361,7 @@ export const rosterCatalog = {
   "Cleared {count} bot contexts": "已清除 {count} 个机器人的上下文",
   "Cleared {done} of {count} bot context": "已清除 {count} 个机器人上下文中的 {done} 个",
   "Cleared {done} of {count} bot contexts": "已清除 {count} 个机器人上下文中的 {done} 个",
+  Steer: "纠正",
+  "Send a correction to {name}": "向 {name} 发送纠正",
+  "Opens the chat and puts the caret in the composer": "打开聊天并将光标放入输入框",
 } as const;

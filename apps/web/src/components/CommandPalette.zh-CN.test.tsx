@@ -17,10 +17,13 @@ vi.mock("./roster/useBotControls", () => ({
   useBotFleetControls: () => ({
     running: [],
     clearable: [],
+    steerable: [],
     canInterruptAll: false,
     canClearAll: false,
+    canSteer: false,
     interruptAll: async () => false,
     clearAll: async () => false,
+    steer: async () => false,
   }),
 }));
 

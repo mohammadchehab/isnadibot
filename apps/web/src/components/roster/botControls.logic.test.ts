@@ -11,6 +11,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildBotClearInput,
   buildBotInterruptInput,
+  buildBotSteerInput,
   collectClearableSessions,
   collectRunningTurns,
   isBotTurnRunning,
@@ -123,6 +124,22 @@ describe("buildBotInterruptInput", () => {
     expect(buildBotInterruptInput(null)).toBeNull();
     expect(buildBotInterruptInput(shell({ status: "ready" }))).toBeNull();
     expect(buildBotInterruptInput(shell({ status: "running" }))).toBeNull();
+  });
+});
+
+describe("buildBotSteerInput", () => {
+  it("names the bot chat to open while its turn runs", () => {
+    expect(buildBotSteerInput(RUNNING)).toEqual({ threadId: THREAD, botId: BOT });
+  });
+
+  it("is null without a running turn, a bot, or a live chat", () => {
+    expect(buildBotSteerInput(null)).toBeNull();
+    expect(buildBotSteerInput(shell({ status: "idle" }))).toBeNull();
+    expect(buildBotSteerInput(shell({ status: "running" }))).toBeNull();
+    expect(buildBotSteerInput(shell({ status: "running", archived: true }))).toBeNull();
+
+    // A group chat has no composer of its own to steer into.
+    expect(buildBotSteerInput({ ...RUNNING, botId: null })).toBeNull();
   });
 });
 

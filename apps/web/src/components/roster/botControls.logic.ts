@@ -101,6 +101,29 @@ export function buildBotClearInput(
   return { threadId: shell.id };
 }
 
+/**
+ * Where a steer goes: the bot's chat, and the composer that speaks for the bot.
+ * Steering a group chat is not offered, because its composer is keyed by the
+ * group and the correction has to name the bot it addresses.
+ */
+export interface BotSteerInput {
+  readonly threadId: ThreadId;
+  readonly botId: BotId;
+}
+
+/** The steer target for a bot's chat, or null while no turn is running there. */
+export function buildBotSteerInput(shell: BotControllableShell | null): BotSteerInput | null {
+  if (shell === null) return null;
+
+  const botId = shell.botId ?? null;
+
+  if (botId === null) return null;
+
+  if (!resolveBotControlAvailability(shell).steer) return null;
+
+  return { threadId: shell.id, botId };
+}
+
 /** One thread a fleet-wide control acts on. */
 export interface BotControlTarget {
   readonly environmentId: EnvironmentId;

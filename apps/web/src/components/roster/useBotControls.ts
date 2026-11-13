@@ -1,26 +1,55 @@
 import { Predicate } from "effect";
-import type { EnvironmentId, ScopedThreadRef, ThreadId, TurnId } from "@isnadi/contracts";
+import type { BotId, EnvironmentId, ScopedThreadRef, ThreadId, TurnId } from "@isnadi/contracts";
 import { useCallback } from "react";
 
 import { useI18n } from "../../i18n";
 import { useThreadShells } from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useOpenChat } from "../chat/useOpenChat";
 import { toastManager } from "../ui/toast";
 import {
   type BotControllableShell,
   type BotControlTarget,
   buildBotClearInput,
   buildBotInterruptInput,
+  buildBotSteerInput,
   collectClearableSessions,
   collectRunningTurns,
 } from "./botControls.logic";
+import { requestComposerFocus } from "./composerFocus";
 import { commandFailureMessage } from "./rosterCommands.logic";
 
 interface InterruptRequest {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly turnId?: TurnId;
+}
+
+/**
+ * Steer: open the bot's chat and ask its composer to take the caret, so the
+ * user's next keystrokes land as a correction to the turn that is running. The
+ * request is made before navigating, so a composer that mounts with the chat
+ * finds it waiting.
+ */
+function useSteerCommand() {
+  const openChat = useOpenChat();
+
+  return useCallback(
+    async (target: {
+      readonly environmentId: EnvironmentId;
+      readonly threadId: ThreadId;
+      readonly botId: BotId | null;
+    }): Promise<boolean> => {
+      if (target.botId === null) return false;
+
+      requestComposerFocus(target.botId);
+      await openChat({ environmentId: target.environmentId, threadId: target.threadId });
+
+      return true;
+    },
+    [openChat],
+  );
 }
 
 /**
@@ -32,6 +61,7 @@ export function useBotControlCommands() {
   const { t } = useI18n();
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const stopSession = useAtomCommand(threadEnvironment.stopSession, { reportFailure: false });
+  const steer = useSteerCommand();
 
   const interruptThread = useCallback(
     async ({ environmentId, threadId, turnId }: InterruptRequest): Promise<boolean> => {
@@ -104,7 +134,23 @@ export function useBotControlCommands() {
     [clearThread],
   );
 
-  return { interruptThread, clearThread, interruptBot, clearBot };
+  /** Opens a bot's chat on a running turn and puts the caret in its composer. */
+  const steerBot = useCallback(
+    async (ref: ScopedThreadRef, shell: BotControllableShell | null): Promise<boolean> => {
+      const input = buildBotSteerInput(shell);
+
+      if (input === null) return false;
+
+      return steer({
+        environmentId: ref.environmentId,
+        threadId: input.threadId,
+        botId: input.botId,
+      });
+    },
+    [steer],
+  );
+
+  return { interruptThread, clearThread, interruptBot, clearBot, steerBot };
 }
 
 /**
@@ -116,9 +162,13 @@ export function useBotFleetControls() {
   const { plural } = useI18n();
   const shells = useThreadShells();
   const { interruptThread, clearThread } = useBotControlCommands();
+  const steer = useSteerCommand();
 
   const running: readonly BotControlTarget[] = collectRunningTurns(shells);
   const clearable: readonly BotControlTarget[] = collectClearableSessions(shells);
+
+  // A group chat's composer is keyed by the group, so only bot chats can be steered.
+  const steerable: readonly BotControlTarget[] = running.filter((target) => target.botId !== null);
 
   const report = useCallback(
     (outcomes: readonly boolean[], doneMessage: string, partialMessage: string) => {
@@ -194,9 +244,12 @@ export function useBotFleetControls() {
   return {
     running,
     clearable,
+    steerable,
     interruptAll,
     clearAll,
+    steer,
     canInterruptAll: running.length > 0,
     canClearAll: clearable.length > 0,
+    canSteer: steerable.length > 0,
   };
 }
