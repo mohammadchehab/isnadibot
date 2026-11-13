@@ -168,6 +168,7 @@ export {
   GroupPersonAssignedPayload,
   GroupPersonUnassignedPayload,
   GroupBossSetPayload,
+  GroupKeepBusySetPayload,
   McpServerCreatedPayload,
   McpServerUpdatedPayload,
   McpServerDeletedPayload,

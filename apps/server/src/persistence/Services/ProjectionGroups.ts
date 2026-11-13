@@ -12,6 +12,7 @@ export const ProjectionGroup = Schema.Struct({
   bossBotId: Schema.NullOr(BotId),
   members: Schema.Array(GroupMembership),
   hopBudget: Schema.NullOr(GroupHopBudget),
+  keepBusy: Schema.Boolean,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

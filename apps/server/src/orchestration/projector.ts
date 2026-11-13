@@ -75,6 +75,7 @@ export function projectEvent(
     case "bot.deleted":
     case "group.created":
     case "group.renamed":
+    case "group.keep-busy-set":
     case "group.member-assigned":
     case "group.member-unassigned":
     case "group.person-assigned":

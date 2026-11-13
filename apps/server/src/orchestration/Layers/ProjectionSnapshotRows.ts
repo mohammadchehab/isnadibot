@@ -528,6 +528,7 @@ export function mapGroupRow(
     bossBotId: row.bossBotId,
     members: row.members,
     ...(row.hopBudget === null ? {} : { hopBudget: row.hopBudget }),
+    keepBusy: row.keepBusy,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

@@ -15,6 +15,7 @@ import {
   GroupPersonAssignedPayload,
   GroupPersonUnassignedPayload,
   GroupRenamedPayload,
+  GroupKeepBusySetPayload,
 } from "../Schemas.ts";
 import type { OrchestrationReadModel, OrchestrationEvent } from "@isnadi/contracts";
 import type { OrchestrationProjectorDecodeError } from "../Errors.ts";
@@ -132,6 +133,7 @@ export function projectBotsAndGroups(
             bossBotId: payload.bossBotId,
             members: payload.members,
             ...(payload.hopBudget === undefined ? {} : { hopBudget: payload.hopBudget }),
+            keepBusy: payload.keepBusy,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
           };
@@ -153,6 +155,17 @@ export function projectBotsAndGroups(
           groups: nextBase.groups.map((group) =>
             group.id === payload.groupId
               ? { ...group, name: payload.name, updatedAt: payload.updatedAt }
+              : group,
+          ),
+        })),
+      );
+    case "group.keep-busy-set":
+      return decodeForEvent(GroupKeepBusySetPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          groups: nextBase.groups.map((group) =>
+            group.id === payload.groupId
+              ? { ...group, keepBusy: payload.keepBusy, updatedAt: payload.updatedAt }
               : group,
           ),
         })),

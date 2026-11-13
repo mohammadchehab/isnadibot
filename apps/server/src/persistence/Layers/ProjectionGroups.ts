@@ -25,16 +25,17 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
     Request: ProjectionGroupDbRow,
     execute: (row) => sql`
       INSERT INTO projection_groups (
-        group_id, name, boss_bot_id, members_json, hop_budget, created_at, updated_at
+        group_id, name, boss_bot_id, members_json, hop_budget, keep_busy, created_at, updated_at
       )
       VALUES (
-        ${row.groupId}, ${row.name}, ${row.bossBotId}, ${row.members}, ${row.hopBudget}, ${row.createdAt}, ${row.updatedAt}
+        ${row.groupId}, ${row.name}, ${row.bossBotId}, ${row.members}, ${row.hopBudget}, ${row.keepBusy}, ${row.createdAt}, ${row.updatedAt}
       )
       ON CONFLICT (group_id) DO UPDATE SET
         name = excluded.name,
         boss_bot_id = excluded.boss_bot_id,
         members_json = excluded.members_json,
         hop_budget = excluded.hop_budget,
+        keep_busy = excluded.keep_busy,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
     `,
@@ -46,7 +47,7 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
     execute: ({ groupId }) => sql`
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
-        hop_budget AS "hopBudget", created_at AS "createdAt", updated_at AS "updatedAt"
+        hop_budget AS "hopBudget", keep_busy AS "keepBusy", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_groups
       WHERE group_id = ${groupId}
     `,
@@ -58,7 +59,7 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
     execute: () => sql`
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
-        hop_budget AS "hopBudget", created_at AS "createdAt", updated_at AS "updatedAt"
+        hop_budget AS "hopBudget", keep_busy AS "keepBusy", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_groups
       ORDER BY created_at ASC, group_id ASC
     `,

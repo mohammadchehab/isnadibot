@@ -44,6 +44,7 @@ import {
   BotRestoredPayload,
   BotDeletedPayload,
   GroupCreatedPayload,
+  GroupKeepBusySetPayload,
   GroupRenamedPayload,
   GroupDeletedPayload,
   GroupMemberAssignedPayload,
@@ -191,6 +192,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("group.renamed"),
     payload: GroupRenamedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("group.keep-busy-set"),
+    payload: GroupKeepBusySetPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,
