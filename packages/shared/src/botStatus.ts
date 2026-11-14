@@ -9,6 +9,7 @@ import {
 } from "@isnadi/contracts";
 
 import {
+  knownUnavailability,
   providerReasonNeedsSignIn,
   type ProviderAvailabilityReason,
 } from "./fleet/providerAvailability.ts";
@@ -98,10 +99,15 @@ function rootOf(chat: BotStatusChat, byId: ReadonlyMap<string, BotStatusChat>): 
  */
 function unavailability(chat: BotStatusChat): ProviderAvailabilityReason | undefined {
   if (chat.latestTurn?.state === "error") {
-    return chat.latestTurn.unavailability ?? chat.session?.unavailability;
+    return (
+      knownUnavailability(chat.latestTurn.unavailability) ??
+      knownUnavailability(chat.session?.unavailability)
+    );
   }
 
-  return chat.session?.status === "error" ? chat.session.unavailability : undefined;
+  return chat.session?.status === "error"
+    ? knownUnavailability(chat.session.unavailability)
+    : undefined;
 }
 
 /** Whether signing in is the one fix for a chat, rather than a transient failure. */

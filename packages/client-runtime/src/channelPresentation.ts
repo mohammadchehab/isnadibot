@@ -87,6 +87,31 @@ export function channelCommandFailureReason(
     : failure.message;
 }
 
+/**
+ * The words for a channel binding's last failure. `failureCategory` crosses the wire as a plain
+ * string, so this is where it is narrowed: a category this build does not know — a newer server,
+ * an older app — shows the binding's own error text instead, and a sentence rather than nothing
+ * when the server sent no text with it. Returns nothing only when the binding has no failure to
+ * explain at all.
+ */
+export function channelBindingFailureReason(
+  binding: Pick<ChannelBinding, "failureCategory" | "lastError">,
+  provider: ChannelProvider,
+  t: ChannelTranslate = englishTranslate,
+): string | undefined {
+  if (isChannelFailureCategory(binding.failureCategory)) {
+    return channelFailureReason(binding.failureCategory, provider, t);
+  }
+
+  if (binding.lastError) return binding.lastError;
+
+  if (!binding.failureCategory) return undefined;
+
+  return t("{name} is saved but could not connect. Try again or check the connection settings.", {
+    name: channelProviderLabel(provider),
+  });
+}
+
 export function channelHealthLabel(status: ChannelBindingStatus): string {
   switch (status) {
     case "connecting":

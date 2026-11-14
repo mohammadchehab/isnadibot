@@ -1,6 +1,6 @@
 import { Predicate, Option, Schema } from "effect";
 import {
-  isServerProviderUnavailability,
+  knownUnavailability,
   latestTurnFailure,
 } from "@isnadi/client-runtime/provider-availability";
 import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
@@ -98,13 +98,16 @@ export function commandFailure(
   const error = squashAtomCommandFailure(result);
 
   const unavailability =
-    error && Predicate.isObjectOrArray(error) && "unavailability" in error
+    error &&
+    Predicate.isObjectOrArray(error) &&
+    "unavailability" in error &&
+    Predicate.isString(error.unavailability)
       ? error.unavailability
       : null;
 
   return {
     message: error instanceof Error ? error.message : "Could not send the message.",
-    unavailability: isServerProviderUnavailability(unavailability) ? unavailability : null,
+    unavailability: knownUnavailability(unavailability) ?? null,
   };
 }
 
@@ -143,7 +146,10 @@ export function latestBotThreadFailure(input: {
     return {
       message,
       unavailability:
-        latestTurn.unavailability ?? session?.unavailability ?? failure?.unavailability ?? null,
+        knownUnavailability(latestTurn.unavailability) ??
+        knownUnavailability(session?.unavailability) ??
+        failure?.unavailability ??
+        null,
       ...(failure?.providerInstanceId ? { providerInstanceId: failure.providerInstanceId } : {}),
     };
   }
@@ -160,7 +166,7 @@ export function latestBotThreadFailure(input: {
 
   return {
     message,
-    unavailability: failure?.unavailability ?? session.unavailability ?? null,
+    unavailability: failure?.unavailability ?? knownUnavailability(session.unavailability) ?? null,
     ...(failure?.providerInstanceId ? { providerInstanceId: failure.providerInstanceId } : {}),
   };
 }

@@ -1,9 +1,9 @@
 import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import {
+  channelBindingFailureReason,
   channelBindingNeedsProject,
   channelBindingPresentation,
-  channelFailureReason,
 } from "@isnadi/client-runtime/channel-presentation";
 import {
   AuthAccessWriteScope,
@@ -71,7 +71,7 @@ export function ThreadChannels(props: {
         const needsProject = channelBindingNeedsProject(binding, projects);
 
         const warning = binding.failureCategory
-          ? channelFailureReason(binding.failureCategory, binding.provider, t)
+          ? channelBindingFailureReason(binding, binding.provider, t)
           : needsProject
             ? channel.warning
             : (binding.lastError ?? channel.warning);
