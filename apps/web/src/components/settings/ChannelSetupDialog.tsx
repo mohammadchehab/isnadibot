@@ -7,14 +7,14 @@ import {
   type ProjectId,
 } from "@isnadi/contracts";
 import {
-  channelFailureReason,
+  channelCommandFailureReason,
   channelPickerProjectId,
 } from "@isnadi/client-runtime/channel-presentation";
 import { defaultProjectIdForBot } from "@isnadi/shared/channelProject";
 import { ExternalLinkIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
-import { channelFailureCategoryOf, isChannelIdentityConflict } from "../../channelAccess";
+import { channelCommandFailureOf, isChannelIdentityConflict } from "../../channelAccess";
 import { useI18n } from "../../i18n";
 import { cn } from "../../lib/utils";
 import { botEnvironment } from "../../state/bots";
@@ -150,10 +150,10 @@ export function ChannelSetupDialog({
     "Another bot already uses this account. Unassign it there, then connect again.",
   );
 
-  const failureReason = (result: Parameters<typeof channelFailureCategoryOf>[0]) => {
-    const category = channelFailureCategoryOf(result);
+  const failureReason = (result: Parameters<typeof channelCommandFailureOf>[0]) => {
+    const failure = channelCommandFailureOf(result);
 
-    return category ? channelFailureReason(category, provider, t) : null;
+    return failure ? channelCommandFailureReason(failure, provider, t) : null;
   };
 
   const finish = (connectionId: ChannelConnectionId) => {

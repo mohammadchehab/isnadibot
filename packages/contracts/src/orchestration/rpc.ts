@@ -14,7 +14,6 @@ import {
 } from "../baseSchemas.ts";
 import { FleetHirePlan, FleetTemplateIndex } from "../fleet/hire.ts";
 import { ProviderApprovalDecision } from "./modelSelection.ts";
-import { ChannelFailureCategory } from "./roster.ts";
 import { OrchestrationCheckpointFile, OrchestrationCheckpointStatus } from "./thread.ts";
 import {
   OrchestrationShellSnapshot,
@@ -287,8 +286,12 @@ export class OrchestrationDispatchCommandError extends Schema.TaggedErrorClass<O
      * rather than fail the decode and lose `message` too.
      */
     refusal: Schema.optional(TrimmedNonEmptyString),
-    /** Why a channel command failed, when the failure has a channel repair. */
-    channelFailureCategory: Schema.optional(ChannelFailureCategory),
+    /**
+     * Why a channel command failed, when the failure has a channel repair. A plain string on the
+     * wire for the same reason as `refusal`: producers still type it as `ChannelFailureCategory`,
+     * and clients narrow it at the presentation boundary.
+     */
+    channelFailureCategory: Schema.optional(TrimmedNonEmptyString),
   },
 ) {}
 

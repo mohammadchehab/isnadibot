@@ -1,9 +1,10 @@
-import type {
-  ChannelBinding,
-  ChannelBindingStatus,
+import * as Schema from "effect/Schema";
+import {
+  type ChannelBinding,
+  type ChannelBindingStatus,
   ChannelFailureCategory,
-  ChannelProvider,
-  ProjectId,
+  type ChannelProvider,
+  type ProjectId,
 } from "@isnadi/contracts";
 
 import { createTranslator, type MessageKey, type TranslationParams } from "./i18n/index.ts";
@@ -66,6 +67,24 @@ export function channelFailureReason(
         provider: name,
       });
   }
+}
+
+const isChannelFailureCategory = Schema.is(ChannelFailureCategory);
+
+/**
+ * The words for a channel command that failed, from the error the server returned. The category
+ * crosses the wire as a plain string, so this is where it is narrowed: one this build does not
+ * know — a newer server, an older app — shows the server's own message instead of an empty
+ * reason. The server only ever sends fixed, client-safe text here.
+ */
+export function channelCommandFailureReason(
+  failure: { readonly category?: string; readonly message: string },
+  provider: ChannelProvider,
+  t: ChannelTranslate = englishTranslate,
+): string {
+  return isChannelFailureCategory(failure.category)
+    ? channelFailureReason(failure.category, provider, t)
+    : failure.message;
 }
 
 export function channelHealthLabel(status: ChannelBindingStatus): string {

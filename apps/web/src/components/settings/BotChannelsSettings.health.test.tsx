@@ -1,6 +1,10 @@
 import { Schema } from "effect";
 import { Predicate } from "effect";
-import { AuthAccessWriteScope, type ChannelBinding } from "@isnadi/contracts";
+import {
+  AuthAccessWriteScope,
+  type ChannelBinding,
+  OrchestrationDispatchCommandError,
+} from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { cloneElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -18,6 +22,8 @@ import {
 } from "./botChannelsRender.test-support";
 
 const decodeConnectionProfile = Schema.decodeUnknownSync(ChannelConnectionProfile);
+
+const decodeDispatchError = Schema.decodeUnknownSync(OrchestrationDispatchCommandError);
 
 const fixtures = vi.hoisted(() => ({
   bots: [] as Array<{
@@ -373,10 +379,13 @@ describe("failed channel attempts", () => {
       "connectionId" in value.input && "botId" in value.input && value.input.botId === "bot-other"
         ? {
             _tag: "Failure",
-            cause: Cause.fail({
-              message: "The channel credentials were rejected.",
-              channelFailureCategory: "credentials",
-            }),
+            cause: Cause.fail(
+              decodeDispatchError({
+                _tag: "OrchestrationDispatchCommandError",
+                message: "The channel credentials were rejected.",
+                channelFailureCategory: "credentials",
+              }),
+            ),
           }
         : { _tag: "Success" },
     );
