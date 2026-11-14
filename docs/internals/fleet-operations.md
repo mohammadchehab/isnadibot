@@ -99,10 +99,10 @@ queued item has no thread yet, may wait for days, and may be reassigned.
 When a bot goes idle (no running turn, nothing pending, no item in progress):
 
 1. If a queued item matches its role (or has no role and the bot is not the boss), plain code assigns the
-   oldest one and starts a turn in the bot's chat with the item's brief. No model call.
-2. If items are queued but none matches, or several bots could take one, the boss is woken once with the
-   choice: judgement, not routing.
-3. If the whole team is idle and the queue is empty, the boss is woken once to plan the next work. If the team
+   oldest one and starts a turn in the bot's chat with the item's brief. No model call. When several members
+   are free, the one idle longest takes it, and a bot with no turn yet counts as idle longest; a tie goes to
+   the lowest bot id. One item never wakes two bots.
+2. If the whole team is idle and the queue is empty, the boss is woken once to plan the next work. If the team
    is still idle after the boss's turn, the owner is told through the bot inbox and push.
 
 Wakes are capped. The second boss wake for an idle team waits 15 minutes, doubling up to 4 hours. Any user

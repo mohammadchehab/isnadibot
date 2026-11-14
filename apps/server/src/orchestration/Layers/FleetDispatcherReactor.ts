@@ -5,6 +5,7 @@ import {
   MessageId,
   WorkItemId,
   isGroupBotMember,
+  type IsoDateTime,
   type OrchestrationBot,
   type OrchestrationCommand,
   type OrchestrationEvent,
@@ -16,7 +17,12 @@ import {
   type WorkItem,
 } from "@isnadi/contracts";
 import { makeDrainableWorker } from "@isnadi/shared/DrainableWorker";
-import { deriveBotStatus, isLiveSessionStatus } from "@isnadi/shared/botStatus";
+import {
+  deriveBotStatus,
+  idleSince,
+  isLiveSessionStatus,
+  type BotStatusInput,
+} from "@isnadi/shared/botStatus";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -454,6 +460,20 @@ export function botChat(
 }
 
 /**
+ * The shared status rule's input for one bot, built from the command read model. The dispatcher
+ * reacts fast enough that a stale read is unlikely and harmless: the claim is what decides who
+ * owns an item.
+ */
+function statusInput(readModel: OrchestrationReadModel, botId: BotId): BotStatusInput {
+  return {
+    botId,
+    chats: readModel.threads.filter((thread) => thread.deletedAt === null),
+    workItems: readModel.workItems ?? [],
+    delegations: readModel.delegations ?? [],
+  };
+}
+
+/**
  * Whether the dispatcher may hand this bot the next queued item: it exists, it is not archived, and
  * the shared status rule (`@isnadi/shared/botStatus`) reads it as idle. Asking, held and busy all
  * mean the bot is not free, so only `idle` is dispatchable.
@@ -463,19 +483,40 @@ export function isBotIdle(readModel: OrchestrationReadModel, botId: BotId): bool
 
   if (bot === undefined || bot.archivedAt !== null) return false;
 
-  return (
-    deriveBotStatus({
-      botId,
-      chats: readModel.threads.filter((thread) => thread.deletedAt === null),
-      workItems: readModel.workItems ?? [],
-      delegations: readModel.delegations ?? [],
-    }) === "idle"
-  );
+  return deriveBotStatus(statusInput(readModel, botId)) === "idle";
 }
 
 /**
- * The member that takes the next item: any idle specialist, or the boss when it is the only bot
- * in the group. Ties go to the lowest bot id until AC7 picks the one idle longest.
+ * A free member ranked by who has been free longest. A bot with no turn at all has no idle time,
+ * which ranks it above every bot with one; the total order means the same read model always picks
+ * the same bot. Nothing here calls a model: the pick is the receipt's `botId`.
+ */
+interface IdleRank {
+  readonly idleSince: IsoDateTime | null;
+  readonly botId: BotId;
+}
+
+const idleRank = (readModel: OrchestrationReadModel, botId: BotId): IdleRank => ({
+  idleSince: idleSince(statusInput(readModel, botId)),
+  botId,
+});
+
+function compareIdleRank(left: IdleRank, right: IdleRank): number {
+  if (left.idleSince !== right.idleSince) {
+    if (left.idleSince === null) return -1;
+
+    if (right.idleSince === null) return 1;
+
+    return left.idleSince.localeCompare(right.idleSince);
+  }
+
+  return left.botId.localeCompare(right.botId);
+}
+
+/**
+ * The member that takes the next item: the idle specialist who has been free longest, or the boss
+ * when it is the only bot in the group. Two idle members are never both woken for one item, and no
+ * model is asked to choose between them.
  */
 export function pickIdleMember(
   readModel: OrchestrationReadModel,
@@ -486,11 +527,12 @@ export function pickIdleMember(
   const specialists = members.filter((botId) => botId !== group.bossBotId);
   const candidates = specialists.length > 0 ? specialists : members;
 
-  return candidates
-    .filter((botId) => !busy.has(botId) && isBotIdle(readModel, botId))
-    .toSorted((left, right) => left.localeCompare(right))
-    .map((botId) => readModel.bots.find((bot) => bot.id === botId))
-    .find((bot): bot is OrchestrationBot => bot !== undefined);
+  const botId = candidates
+    .filter((candidate) => !busy.has(candidate) && isBotIdle(readModel, candidate))
+    .map((candidate) => idleRank(readModel, candidate))
+    .toSorted(compareIdleRank)[0]?.botId;
+
+  return botId === undefined ? undefined : readModel.bots.find((bot) => bot.id === botId);
 }
 
 export const FleetDispatcherReactorLive = Layer.effect(FleetDispatcherReactor, make);
