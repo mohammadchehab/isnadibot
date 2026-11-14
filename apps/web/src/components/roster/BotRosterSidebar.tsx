@@ -3,7 +3,7 @@ import { DndContext } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
 import { useAtomValue } from "@effect/atom-react";
 import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
-import { ARCHIVED_BOT_RETENTION_DAYS, BotId, GroupId } from "@isnadi/contracts";
+import { ARCHIVED_BOT_RETENTION_DAYS, BotId } from "@isnadi/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
