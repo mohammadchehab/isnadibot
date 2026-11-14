@@ -6,8 +6,8 @@ import {
   AuthAccessWriteScope,
   type AuthSessionState,
   type ChannelBinding,
-  ChannelFailureCategory,
   type ChannelProvider,
+  OrchestrationDispatchCommandError,
 } from "@isnadi/contracts";
 
 export function canManageChannels(
@@ -55,21 +55,23 @@ export function isChannelIdentityConflict(result: {
   return Predicate.isString(message) && CHANNEL_IDENTITY_CONFLICT.test(message);
 }
 
-const isChannelFailureCategory = Schema.is(ChannelFailureCategory);
+const isDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
 
-/** Why a failed channel command failed, when the server sent a category for it. */
-export function channelFailureCategoryOf(result: {
+/**
+ * The server's failure for a channel command, when that is what the command returned. Only a
+ * dispatch error carries fixed, client-safe text; the category on it is a plain string that this
+ * build may not know yet, and the presentation layer narrows it.
+ */
+export function channelCommandFailureOf(result: {
   readonly cause?: Cause.Cause<unknown>;
-}): ChannelFailureCategory | undefined {
+}): { readonly category?: string; readonly message: string } | undefined {
   if (!result.cause) return undefined;
   const error = Cause.squash(result.cause);
 
-  const category =
-    (error === null || Predicate.isObjectOrArray(error)) &&
-    error !== null &&
-    "channelFailureCategory" in error
-      ? error.channelFailureCategory
-      : undefined;
+  if (!isDispatchCommandError(error)) return undefined;
 
-  return isChannelFailureCategory(category) ? category : undefined;
+  return {
+    message: error.message,
+    ...(error.channelFailureCategory ? { category: error.channelFailureCategory } : {}),
+  };
 }

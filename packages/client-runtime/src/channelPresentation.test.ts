@@ -5,6 +5,7 @@ import {
   canChangeChannelProject,
   channelReconnectProject,
   channelBindingNeedsProject,
+  channelCommandFailureReason,
   channelFailureReason,
   channelBindingPresentation,
   channelPickerProjectId,
@@ -272,6 +273,26 @@ describe("channelFailureReason", () => {
     expect(channelFailureReason("credentials", "telegram", zh)).toBe("Telegram 拒绝了机器人令牌。");
     expect(channelFailureReason("network", "slack", zh)).toBe(
       "无法连接到 Slack。请检查网络后重试。",
+    );
+  });
+});
+
+describe("channelCommandFailureReason", () => {
+  it("explains the categories this build knows", () => {
+    expect(
+      channelCommandFailureReason({ category: "network", message: "Server text." }, "telegram"),
+    ).toBe("Could not reach Telegram. Check the network and try again.");
+  });
+
+  it("shows the server's message for a category this build does not know", () => {
+    expect(
+      channelCommandFailureReason(
+        { category: "billing", message: "The provider rejected the plan." },
+        "telegram",
+      ),
+    ).toBe("The provider rejected the plan.");
+    expect(channelCommandFailureReason({ message: "Channel command failed." }, "telegram")).toBe(
+      "Channel command failed.",
     );
   });
 });

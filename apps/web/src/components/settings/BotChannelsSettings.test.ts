@@ -1,10 +1,17 @@
-import { AuthAccessWriteScope, BotId, ChannelConnectionId, ProjectId } from "@isnadi/contracts";
+import {
+  AuthAccessWriteScope,
+  BotId,
+  ChannelConnectionId,
+  OrchestrationDispatchCommandError,
+  ProjectId,
+} from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   canManageChannels,
-  channelFailureCategoryOf,
+  channelCommandFailureOf,
   connectedChannelBinding,
   isChannelIdentityConflict,
   resolveChannelSettingsAccess,
@@ -256,24 +263,39 @@ describe("isChannelIdentityConflict", () => {
   });
 });
 
-describe("channelFailureCategoryOf", () => {
+const decodeDispatchError = Schema.decodeUnknownSync(OrchestrationDispatchCommandError);
+
+describe("channelCommandFailureOf", () => {
   it("reads the category the server sent with a channel failure", () => {
-    const failure = <E>(error: E) => ({ cause: Cause.fail(error) });
-    expect(
-      channelFailureCategoryOf(
-        failure({ message: "Rejected.", channelFailureCategory: "credentials" }),
-      ),
-    ).toBe("credentials");
-    expect(channelFailureCategoryOf(failure({ channelFailureCategory: "network" }))).toBe(
-      "network",
-    );
+    const error = decodeDispatchError({
+      _tag: "OrchestrationDispatchCommandError",
+      message: "Rejected.",
+      channelFailureCategory: "credentials",
+    });
+
+    expect(channelCommandFailureOf({ cause: Cause.fail(error) })).toEqual({
+      category: "credentials",
+      message: "Rejected.",
+    });
   });
 
-  it("ignores unknown categories and failures without one", () => {
-    expect(
-      channelFailureCategoryOf({ cause: Cause.fail({ channelFailureCategory: "billing" }) }),
-    ).toBeUndefined();
-    expect(channelFailureCategoryOf({ cause: Cause.fail(new Error("Rejected.")) })).toBeUndefined();
-    expect(channelFailureCategoryOf({})).toBeUndefined();
+  // A newer server may name a category this build predates. The category crosses the wire as a
+  // plain string, so the exit still decodes and the message survives; only the category is dropped.
+  it("keeps the server message when the category is one this build does not know", () => {
+    const error = decodeDispatchError({
+      _tag: "OrchestrationDispatchCommandError",
+      message: "The channel provider rejected the plan.",
+      channelFailureCategory: "billing",
+    });
+
+    expect(channelCommandFailureOf({ cause: Cause.fail(error) })).toEqual({
+      category: "billing",
+      message: "The channel provider rejected the plan.",
+    });
+  });
+
+  it("ignores failures that are not the server's dispatch error", () => {
+    expect(channelCommandFailureOf({ cause: Cause.fail(new Error("Rejected.")) })).toBeUndefined();
+    expect(channelCommandFailureOf({})).toBeUndefined();
   });
 });

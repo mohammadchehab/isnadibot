@@ -1,6 +1,7 @@
 import { Predicate } from "effect";
 import { BotId, ChannelConnectionId, OrchestrationDispatchCommandError } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
+import * as Schema from "effect/Schema";
 import { act, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { ChannelSetupDialog } from "./ChannelSetupDialog";
@@ -11,6 +12,8 @@ import {
   createChannelSetupActions,
   createChannelSetupProps,
 } from "./channelSetupDialog.test-support";
+
+const decodeDispatchError = Schema.decodeUnknownSync(OrchestrationDispatchCommandError);
 
 const mocks = vi.hoisted(() => ({
   save: vi.fn<
@@ -239,6 +242,26 @@ describe("ChannelSetupDialog recovery", () => {
       "Test line is saved but could not connect. Telegram rejected the bot token.",
     );
     expect(container.textContent).not.toContain("Test bot");
+  });
+
+  it("shows the server's message for a category this build does not know", async () => {
+    // Decoded from the wire shape the server sends: a category newer than this build still
+    // decodes, so the fixed message reaches the user instead of a decode failure.
+    mocks.attach.mockResolvedValueOnce({
+      _tag: "Failure",
+      cause: Cause.fail(
+        decodeDispatchError({
+          _tag: "OrchestrationDispatchCommandError",
+          message: "The channel provider rejected the workspace plan.",
+          channelFailureCategory: "billing",
+        }),
+      ),
+    });
+    await completeSetup();
+    await click("Connect");
+    expect(container.textContent).toContain(
+      "Test line is saved but could not connect. The channel provider rejected the workspace plan.",
+    );
   });
 
   it("updates the same saved profile when credentials are corrected before retry", async () => {

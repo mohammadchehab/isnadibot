@@ -2,7 +2,7 @@ import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import {
   channelBindingNeedsProject,
-  channelFailureReason,
+  channelCommandFailureReason,
 } from "@isnadi/client-runtime/channel-presentation";
 import {
   createTranslator,
@@ -22,7 +22,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  channelFailureCategoryOf,
+  channelCommandFailureOf,
   isChannelIdentityConflict,
   resolveChannelSettingsAccess,
 } from "../../channelAccess";
@@ -257,7 +257,7 @@ export function useChannelSettings(environmentId: EnvironmentId | null) {
 
   // Toast detail for a failed channel command: the conflict or the category's reason, if known.
   const failureDescription = (
-    result: Parameters<typeof channelFailureCategoryOf>[0],
+    result: Parameters<typeof channelCommandFailureOf>[0],
     provider: ChannelProvider,
   ) => {
     if (isChannelIdentityConflict(result)) {
@@ -268,9 +268,9 @@ export function useChannelSettings(environmentId: EnvironmentId | null) {
       };
     }
 
-    const category = channelFailureCategoryOf(result);
+    const failure = channelCommandFailureOf(result);
 
-    return category ? { description: channelFailureReason(category, provider, t) } : {};
+    return failure ? { description: channelCommandFailureReason(failure, provider, t) } : {};
   };
 
   useEffect(() => {
