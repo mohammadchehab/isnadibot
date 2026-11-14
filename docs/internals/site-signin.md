@@ -438,6 +438,11 @@ Same rule as the skills registry and chat recall:
 The fixture source is not a gallery of cards. It implements the same seam the RPC will, so every state is
 reached by a click or a declared input, and the card stays a derivation of the request record.
 
+- **Opt-in per run.** A normal `dev` or `dev:desktop` run shows no fixture at all: set
+  `VITE_SITE_SIGNIN_FIXTURE=1`, or open the app with `?fixture=site-signin`, and only then does the fixture
+  source load, seed a request for the open chat and show the dev picker. Without it there is no fake card on
+  any chat and no picker, so a demo run cannot be mistaken for a real bot asking for a password.
+
 - **Drive the real machine.** The fixture source holds one request record per (thread, site) and implements
   start, join, cancel, dismiss, allow and the flow's advance. The card's buttons call those and the card
   re-derives. Nothing renders a state by hand, so a click that works on fixtures works after phase 1.
