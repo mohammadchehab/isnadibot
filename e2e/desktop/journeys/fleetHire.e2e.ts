@@ -53,6 +53,11 @@ describe("E13 step 1: hire a fleet", () => {
     await page.getByRole("main").getByRole("button", { name: "Create", exact: true }).click();
     await page.waitForURL(/\/groups\//, { timeout: 60_000 });
     expect(await page.getByText("Could not create the space").count()).toBe(0);
+    // The hired squad must be in the space: the Recruiting boss is "Tracker".
+    await page
+      .getByText("Tracker", { exact: true })
+      .first()
+      .waitFor({ state: "visible", timeout: 30_000 });
     await session.shot("1-4-space-created");
   });
 });
