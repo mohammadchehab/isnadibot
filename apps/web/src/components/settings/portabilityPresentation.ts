@@ -1,8 +1,8 @@
 import { Predicate } from "effect";
 import {
   type AtomCommandResult,
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import { useI18n } from "../../i18n";
 import { toastManager } from "../ui/toast";
@@ -24,10 +24,9 @@ export function reportFailure(
   t: Translate,
 ): void {
   if (!Predicate.isTagged(result, "Failure") || isAtomCommandInterrupted(result)) return;
-  const error = squashAtomCommandFailure(result);
   toastManager.add({
     type: "error",
     title,
-    description: error instanceof Error ? error.message : t("The command failed."),
+    description: commandFailureMessage(result, { t }),
   });
 }

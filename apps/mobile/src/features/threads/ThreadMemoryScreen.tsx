@@ -7,7 +7,10 @@ import {
   describeDurableFactFailure,
   durableFactMutation,
 } from "@isnadi/client-runtime/durable-memory";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import {
+  commandFailureMessage,
+  squashAtomCommandFailure,
+} from "@isnadi/client-runtime/state/runtime";
 import type {
   IsnadiMemoryDocument,
   IsnadiMemoryDocumentTarget,
@@ -37,13 +40,6 @@ type MemoryRouteParams = {
     readonly environmentId: EnvironmentId;
     readonly threadId: ThreadId;
   };
-};
-
-/** The server's own error text, shown as received, or null when it sent none. */
-const commandFailureMessage = (result: Parameters<typeof squashAtomCommandFailure>[0]) => {
-  const failure = squashAtomCommandFailure(result);
-
-  return failure instanceof Error ? failure.message : null;
 };
 
 const titles: Record<IsnadiMemoryDocumentTarget, string> = {
@@ -237,7 +233,7 @@ export function ThreadMemoryScreen() {
     if (Predicate.isTagged(result, "Failure")) {
       Alert.alert(
         t("Could not save memory"),
-        commandFailureMessage(result) ?? t("Memory request failed."),
+        commandFailureMessage(result, { t, fallback: "Memory request failed." }),
       );
     }
   };
@@ -328,7 +324,10 @@ export function ThreadMemoryScreen() {
                             if (Predicate.isTagged(result, "Failure")) {
                               Alert.alert(
                                 t("Could not clear memory"),
-                                commandFailureMessage(result) ?? t("Memory request failed."),
+                                commandFailureMessage(result, {
+                                  t,
+                                  fallback: "Memory request failed.",
+                                }),
                               );
                             }
                           },

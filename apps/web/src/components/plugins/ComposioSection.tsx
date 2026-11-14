@@ -1,7 +1,7 @@
 import { Predicate } from "effect";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import type {
   ComposioConnection,
@@ -191,11 +191,10 @@ export function ComposioSection({
     if (!Predicate.isTagged(result, "Failure")) return false;
 
     if (isAtomCommandInterrupted(result)) return true;
-    const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : t("The command failed."),
+      description: commandFailureMessage(result, { t }),
     });
 
     return true;

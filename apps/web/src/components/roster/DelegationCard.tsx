@@ -12,7 +12,7 @@ import {
   presentDelegation,
 } from "@isnadi/client-runtime/delegation-presentation";
 import { scopeThreadRef } from "@isnadi/client-runtime/environment";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { formatDuration } from "@isnadi/shared/orchestrationTiming";
 import { useUsageFormat } from "../usage/useUsageFormat";
 import { useMemo, useState, type ReactNode } from "react";
@@ -65,12 +65,6 @@ function DelegationElapsed({
   return elapsed === null ? null : <span className="tabular-nums">{formatDuration(elapsed)}</span>;
 }
 
-function commandFailureMessage(result: Parameters<typeof squashAtomCommandFailure>[0]) {
-  const error = squashAtomCommandFailure(result);
-
-  return error instanceof Error ? error.message : undefined;
-}
-
 /**
  * The reverse-state controls for one piece of bot work. Only the moves
  * `delegationActions` allows show: Let it finish and Cancel while the work is
@@ -115,11 +109,11 @@ function DelegationActions({
     return request
       .then((result) => {
         if (!isTagged(result, "Failure")) return;
-        const description = commandFailureMessage(result);
+        const description = commandFailureMessage(result, { t });
         toastManager.add({
           type: "error",
           title: actionCopy(action, t, childName).failure,
-          ...(description ? { description } : {}),
+          description,
         });
       })
       .finally(() => setPending(null));

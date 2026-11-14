@@ -13,7 +13,7 @@ import { useI18n } from "../../i18n";
 import { botEnvironment, environmentBotsAtom } from "../../state/bots";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { BotAvatarView } from "../roster/BotAvatarView";
-import { commandFailureMessage } from "../roster/rosterCommands.logic";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
@@ -63,7 +63,7 @@ export function ArchivedBotsSection({ environmentId }: { readonly environmentId:
       toastManager.add({
         type: "error",
         title: t("Could not restore {name}", { name: bot.name }),
-        description: commandFailureMessage(result, t),
+        description: commandFailureMessage(result, { t }),
       });
     }
   };
@@ -86,7 +86,7 @@ export function ArchivedBotsSection({ environmentId }: { readonly environmentId:
       toastManager.add({
         type: "error",
         title: t("Could not delete {name}", { name: bot.name }),
-        description: commandFailureMessage(result, t),
+        description: commandFailureMessage(result, { t }),
       });
     }
   };

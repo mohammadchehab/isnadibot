@@ -1,8 +1,8 @@
 import { Match, Predicate } from "effect";
 import type { MessageKey } from "@isnadi/client-runtime/i18n";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import { type KeybindingCommand, type ServerUpsertKeybindingInput } from "@isnadi/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -138,11 +138,12 @@ export function KeybindingsSettingsPanel() {
         return;
       }
 
-      const error = squashAtomCommandFailure(result);
       toastManager.add({
         title: t("Unable to open keybindings file"),
-        description:
-          error instanceof Error ? error.message : t("The keybindings file was not opened."),
+        description: commandFailureMessage(result, {
+          t,
+          fallback: "The keybindings file was not opened.",
+        }),
         type: "error",
       });
     })();
@@ -175,11 +176,12 @@ export function KeybindingsSettingsPanel() {
         }
 
         if (!isAtomCommandInterrupted(result)) {
-          const error = squashAtomCommandFailure(result);
           toastManager.add({
             title: t("Unable to save keybinding"),
-            description:
-              error instanceof Error ? error.message : t("The keybinding was not saved."),
+            description: commandFailureMessage(result, {
+              t,
+              fallback: "The keybinding was not saved.",
+            }),
             type: "error",
           });
         }
@@ -201,11 +203,12 @@ export function KeybindingsSettingsPanel() {
         setSavingCommand(null);
 
         if (Predicate.isTagged(result, "Failure") && !isAtomCommandInterrupted(result)) {
-          const error = squashAtomCommandFailure(result);
           toastManager.add({
             title: t("Unable to remove keybinding"),
-            description:
-              error instanceof Error ? error.message : t("The keybinding was not removed."),
+            description: commandFailureMessage(result, {
+              t,
+              fallback: "The keybinding was not removed.",
+            }),
             type: "error",
           });
         }
