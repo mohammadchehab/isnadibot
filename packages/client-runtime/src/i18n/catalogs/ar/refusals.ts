@@ -7,5 +7,9 @@ export const refusalsCatalog = {
     "هذا البوت يقود مساحة. اختر قائدًا جديدًا أو احذف المساحة.",
   "This space needs at least two bots. Add another bot before you remove one.":
     "تحتاج هذه المساحة إلى بوتين على الأقل. أضف بوتًا آخر قبل إزالة أحدهم.",
+  "This bot already has as many delegations open as it can take. Wait for one to finish.":
+    "هذا البوت لديه بالفعل أكبر عدد ممكن من التفويضات المفتوحة. انتظر حتى ينتهي أحدها.",
+  "This delegation would loop back on itself. Choose a different bot.":
+    "هذا التفويض سيعود على نفسه. اختر بوتًا آخر.",
   "The command failed.": "فشل الأمر.",
 } as const;
