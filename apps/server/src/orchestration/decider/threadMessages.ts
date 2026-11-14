@@ -4,12 +4,7 @@ import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import { OrchestrationCommandInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
-import {
-  requireActiveGroupMember,
-  requireBot,
-  requireGroup,
-  requireThread,
-} from "../commandInvariants.ts";
+import { requireActiveGroupMember, requireGroup, requireThread } from "../commandInvariants.ts";
 import {
   requireActiveResponder,
   withEventBase,
@@ -49,37 +44,32 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
       });
 
       // An archived bot takes no new speech, but the tail of a reply already in
-      // flight when it was archived still lands in the transcript. The web client
-      // omits respondingBotId for user speech, so resolve it the way a turn would.
+      // flight when it was archived still lands in the transcript. The client
+      // names no speaker: the server attributes reply speech to this chat's
+      // responder, and addresses user speech the way a turn would.
+      const group =
+        command.role === "user" && thread.groupId !== null && thread.groupId !== undefined
+          ? yield* requireGroup({ readModel, command, groupId: thread.groupId })
+          : null;
+
       if (command.role === "user") {
-        const group =
-          thread.groupId === null || thread.groupId === undefined
-            ? null
-            : yield* requireGroup({ readModel, command, groupId: thread.groupId });
-
-        if (
-          group === null &&
-          thread.botId !== null &&
-          command.respondingBotId !== undefined &&
-          command.respondingBotId !== thread.botId
-        ) {
-          return yield* new OrchestrationCommandInvariantError({
-            commandType: command.type,
-            detail: `Chat '${thread.id}' cannot address a different bot.`,
-          });
-        }
-
         yield* requireActiveResponder({
           readModel,
           command,
           groupId: group?.id,
-          botId: group
-            ? (command.respondingBotId ?? group.bossBotId)
-            : (thread.botId ?? command.respondingBotId),
+          botId: group === null ? thread.botId : group.bossBotId,
         });
-      } else if (command.respondingBotId !== undefined) {
-        yield* requireBot({ readModel, command, botId: command.respondingBotId });
       }
+
+      const respondingBotId =
+        command.role === "user"
+          ? undefined
+          : yield* resolveAssistantMessageBot({
+              readModel,
+              command,
+              thread,
+              fallback: thread.respondingBotId ?? thread.botId ?? null,
+            });
 
       return {
         ...(yield* withEventBase({
@@ -95,9 +85,7 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
           role: command.role,
           text: command.text,
           turnId: null,
-          ...(command.respondingBotId !== undefined
-            ? { respondingBotId: command.respondingBotId }
-            : {}),
+          ...(respondingBotId !== undefined ? { respondingBotId } : {}),
           streaming: false,
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
@@ -112,7 +100,12 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
         threadId: command.threadId,
       });
 
-      const respondingBotId = yield* resolveAssistantMessageBot({ readModel, command, thread });
+      const respondingBotId = yield* resolveAssistantMessageBot({
+        readModel,
+        command,
+        thread,
+        fallback: thread.respondingBotId ?? null,
+      });
 
       return {
         ...(yield* withEventBase({
@@ -144,7 +137,12 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
         threadId: command.threadId,
       });
 
-      const respondingBotId = yield* resolveAssistantMessageBot({ readModel, command, thread });
+      const respondingBotId = yield* resolveAssistantMessageBot({
+        readModel,
+        command,
+        thread,
+        fallback: thread.respondingBotId ?? null,
+      });
 
       return {
         ...(yield* withEventBase({

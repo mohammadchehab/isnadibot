@@ -618,7 +618,6 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
           messageId: newMessageId(),
           role,
           text: trimmed,
-          ...(role === "assistant" ? { respondingBotId: BotId.make(botId) } : {}),
         },
       });
     },
