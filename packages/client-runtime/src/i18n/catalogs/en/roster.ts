@@ -113,10 +113,10 @@ export const rosterCatalog = {
   "Delete and discard": "Delete and discard",
   'Delete "{name}"? Its bots stay in your roster.':
     'Delete "{name}"? Its bots stay in your roster.',
-  'Delete "{name}" and discard {count} open work item? This cannot be undone.':
-    'Delete "{name}" and discard {count} open work item? This cannot be undone.',
-  'Delete "{name}" and discard {count} open work items? This cannot be undone.':
-    'Delete "{name}" and discard {count} open work items? This cannot be undone.',
+  'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.':
+    'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.',
+  'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.':
+    'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.',
   "Could not delete group": "Could not delete group",
   "You cannot delete this group": "You cannot delete this group",
   "Deleting a group needs permission to change this environment. Ask the person who runs it.":

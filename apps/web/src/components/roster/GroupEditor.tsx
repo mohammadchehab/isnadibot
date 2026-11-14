@@ -310,9 +310,9 @@ export function GroupEditor({
               ? plural(
                   openWorkItemCount,
                   {
-                    one: 'Delete "{name}" and discard {count} open work item? This cannot be undone.',
+                    one: 'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.',
                     other:
-                      'Delete "{name}" and discard {count} open work items? This cannot be undone.',
+                      'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.',
                   },
                   { name: group.name },
                 )

@@ -109,10 +109,10 @@ export const rosterCatalog = {
   "Delete and discard": "删除并丢弃",
   'Delete "{name}"? Its bots stay in your roster.':
     "删除“{name}”？其中的机器人会保留在你的机器人列表中。",
-  'Delete "{name}" and discard {count} open work item? This cannot be undone.':
-    "删除“{name}”并丢弃 {count} 个未完成的工作项？此操作无法撤销。",
-  'Delete "{name}" and discard {count} open work items? This cannot be undone.':
-    "删除“{name}”并丢弃 {count} 个未完成的工作项？此操作无法撤销。",
+  'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.':
+    "删除“{name}”？其中的机器人会保留在你的机器人列表中。{count} 个未完成的工作项将被丢弃。此操作无法撤销。",
+  'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.':
+    "删除“{name}”？其中的机器人会保留在你的机器人列表中。{count} 个未完成的工作项将被丢弃。此操作无法撤销。",
   "You cannot delete this group": "你无法删除此群组",
   "Deleting a group needs permission to change this environment. Ask the person who runs it.":
     "删除群组需要更改此环境的权限。请向运行此环境的人申请。",

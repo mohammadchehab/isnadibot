@@ -112,10 +112,10 @@ export const rosterCatalog = {
   "Delete group": "حذف المجموعة",
   "Delete and discard": "حذف وتجاهل",
   'Delete "{name}"? Its bots stay in your roster.': 'حذف "{name}"؟ تبقى بوتاتها في قائمة بوتاتك.',
-  'Delete "{name}" and discard {count} open work item? This cannot be undone.':
-    'حذف "{name}" وتجاهل {count} من عناصر العمل المفتوحة؟ لا يمكن التراجع عن ذلك.',
-  'Delete "{name}" and discard {count} open work items? This cannot be undone.':
-    'حذف "{name}" وتجاهل {count} من عناصر العمل المفتوحة؟ لا يمكن التراجع عن ذلك.',
+  'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.':
+    'حذف "{name}"؟ تبقى بوتاتها في قائمة بوتاتك. سيتم تجاهل {count} من عناصر العمل المفتوحة. لا يمكن التراجع عن ذلك.',
+  'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.':
+    'حذف "{name}"؟ تبقى بوتاتها في قائمة بوتاتك. سيتم تجاهل {count} من عناصر العمل المفتوحة. لا يمكن التراجع عن ذلك.',
   "Could not delete group": "تعذر حذف المجموعة",
   "You cannot delete this group": "لا يمكنك حذف هذه المجموعة",
   "Deleting a group needs permission to change this environment. Ask the person who runs it.":
