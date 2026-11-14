@@ -447,8 +447,10 @@ export const rosterCatalog = {
   Bug: "Bug",
   Owner: "Owner",
   Tasks: "Tasks",
-  "Keep this group busy": "Keep this group busy",
-  "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.":
-    "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.",
+  "Keep everyone busy": "Keep everyone busy",
+  "When a bot goes idle, it gets the next card. The boss is woken only to judge.":
+    "When a bot goes idle, it gets the next card. The boss is woken only to judge.",
+  "Turn it off and bots stop taking new cards; cards already running finish.":
+    "Turn it off and bots stop taking new cards; cards already running finish.",
   "Could not change keep-busy for this group": "Could not change keep-busy for this group",
 } as const;

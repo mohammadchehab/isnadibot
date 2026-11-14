@@ -471,8 +471,10 @@ export const rosterCatalog = {
   Bug: "علّة",
   Owner: "المالك",
   Tasks: "المهام",
-  "Keep this group busy": "أبقِ هذه المجموعة منشغلة",
-  "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.":
-    "البوتات هنا تلتقط العمل الجديد فور وصوله. عند الإيقاف تتوقف عن أخذ عناصر جديدة، ويكتمل العمل الجاري بالفعل.",
+  "Keep everyone busy": "أبقِ الجميع منشغلين",
+  "When a bot goes idle, it gets the next card. The boss is woken only to judge.":
+    "حين يفرغ أحد البوتات، يحصل على البطاقة التالية. لا يُوقَظ الرئيس إلا للحكم.",
+  "Turn it off and bots stop taking new cards; cards already running finish.":
+    "أوقفه فتتوقف البوتات عن أخذ بطاقات جديدة، أما البطاقات الجارية فتُكمل عملها.",
   "Could not change keep-busy for this group": "تعذر تغيير إبقاء هذه المجموعة منشغلة",
 } as const;

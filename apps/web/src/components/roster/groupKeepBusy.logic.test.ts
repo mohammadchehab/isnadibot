@@ -12,18 +12,23 @@ describe("groupKeepBusyCopy", () => {
   it("routes every word it shows through the translator", () => {
     const copy = groupKeepBusyCopy(markingTranslate);
 
-    expect(copy.label).toBe("t:Keep this group busy");
+    expect(copy.label).toBe("t:Keep everyone busy");
     expect(copy.failureTitle).toBe("t:Could not change keep-busy for this group");
     expect(copy.hint.startsWith("t:")).toBe(true);
+    expect(copy.offHint.startsWith("t:")).toBe(true);
   });
 
-  // Turning the switch off reads a turn still running finish, so the hint has to
-  // say both halves: what on buys, and what off leaves running.
-  it("says that off stops new items but finishes work in progress", () => {
+  // The designer signed off these two sentences word for word, so a rewrite here
+  // is a design change, not a copy tweak.
+  it("shows the approved sentences verbatim", () => {
     const copy = groupKeepBusyCopy(markingTranslate);
 
-    expect(copy.hint).toContain("new items");
-    expect(copy.hint).toContain("in progress");
+    expect(copy.hint).toBe(
+      "t:When a bot goes idle, it gets the next card. The boss is woken only to judge.",
+    );
+    expect(copy.offHint).toBe(
+      "t:Turn it off and bots stop taking new cards; cards already running finish.",
+    );
   });
 });
 

@@ -209,6 +209,9 @@ export function GroupEditor({
             <span className="block text-xs font-normal text-muted-foreground">
               {keepBusyCopy.hint}
             </span>
+            <span className="block text-xs font-normal text-muted-foreground">
+              {keepBusyCopy.offHint}
+            </span>
           </span>
           <Switch
             aria-label={keepBusyCopy.label}
