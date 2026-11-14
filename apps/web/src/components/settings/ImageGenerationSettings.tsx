@@ -7,7 +7,7 @@ import type {
 } from "@isnadi/contracts";
 import { IMAGE_PROVIDER_IDS } from "@isnadi/contracts";
 import {
-  squashAtomCommandFailure,
+  commandFailureMessage,
   type AtomCommandResult,
 } from "@isnadi/client-runtime/state/runtime";
 import { LoaderIcon } from "lucide-react";
@@ -52,9 +52,8 @@ const IMAGE_PROVIDER_ICONS: Readonly<Record<ImageProviderId, string>> = {
 
 function commandError(result: AtomCommandResult<unknown, unknown>): string {
   if (!Predicate.isTagged(result, "Failure")) return "The request failed.";
-  const error = squashAtomCommandFailure(result);
 
-  return error instanceof Error ? error.message : "The request failed.";
+  return commandFailureMessage(result, { fallback: "The request failed." });
 }
 
 // The confirm host is mounted at the app root, so a missing host means the

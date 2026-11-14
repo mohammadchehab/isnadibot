@@ -4,6 +4,7 @@ import { type DesktopSshEnvironmentTarget, type EnvironmentId } from "@isnadi/co
 import {
   type AtomCommand,
   type AtomCommandResult,
+  commandFailureMessage,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
@@ -149,8 +150,7 @@ export function useSavedBackendCommands({
 
     if (Predicate.isTagged(result, "Failure")) {
       if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        const message = error instanceof Error ? error.message : "Failed to add backend.";
+        const message = commandFailureMessage(result, { fallback: "Failed to add backend." });
         setSavedBackendError(message);
         toastManager.add(
           stackedThreadToast({

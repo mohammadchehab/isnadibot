@@ -3,6 +3,7 @@ import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import { safeErrorLogAttributes } from "@isnadi/client-runtime/errors";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
@@ -212,17 +213,16 @@ export function ProviderInstancesSection({
       });
 
       if (Predicate.isTagged(result, "Failure") && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
         toastManager.add(
           stackedThreadToast({
             type: "error",
             title: t("Could not update {provider}", {
               provider: PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver,
             }),
-            description:
-              error instanceof Error
-                ? error.message
-                : t("The provider update command could not be started."),
+            description: commandFailureMessage(result, {
+              t,
+              fallback: "The provider update command could not be started.",
+            }),
           }),
         );
       }

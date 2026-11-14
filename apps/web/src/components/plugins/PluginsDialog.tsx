@@ -1,8 +1,8 @@
 import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import {
   McpServerId,
@@ -210,11 +210,10 @@ function PluginsDialogForEnvironment({
     result: Awaited<ReturnType<typeof createServer>>,
   ): boolean => {
     if (!Predicate.isTagged(result, "Failure") || isAtomCommandInterrupted(result)) return false;
-    const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : t("The command failed."),
+      description: commandFailureMessage(result, { t }),
     });
 
     return true;
@@ -322,12 +321,13 @@ function PluginsDialogForEnvironment({
                 }
 
                 if (!isAtomCommandInterrupted(result)) {
-                  const error = squashAtomCommandFailure(result);
                   toastManager.add({
                     type: "error",
                     title: t("Could not connect {name}", { name: plugin.title }),
-                    description:
-                      error instanceof Error ? error.message : t("Authentication failed."),
+                    description: commandFailureMessage(result, {
+                      t,
+                      fallback: "Authentication failed.",
+                    }),
                   });
                 }
 

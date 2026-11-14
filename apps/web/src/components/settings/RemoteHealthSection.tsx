@@ -1,8 +1,8 @@
 import { recordLookup } from "../recordLookup";
 import { Predicate } from "effect";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import type {
   EnvironmentId,
@@ -91,11 +91,10 @@ export function RemoteHealthSection({ environmentId }: { readonly environmentId:
     setRepairingCheckId(null);
 
     if (Predicate.isTagged(result, "Failure") && !isAtomCommandInterrupted(result)) {
-      const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
         title: "Could not repair",
-        description: error instanceof Error ? error.message : "The repair failed.",
+        description: commandFailureMessage(result, { fallback: "The repair failed." }),
       });
 
       return;

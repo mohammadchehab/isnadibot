@@ -291,3 +291,9 @@ export {
   createAtomCommandScheduler,
   scheduleAtomCommandEffect,
 } from "./atomCommandScheduler.ts";
+
+export {
+  type CommandFailureRefusal,
+  classifyCommandFailure,
+  commandFailureMessage,
+} from "./commandFailure.ts";

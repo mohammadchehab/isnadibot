@@ -18,7 +18,7 @@ import {
   collectRunningTurns,
 } from "./botControls.logic";
 import { requestComposerFocus } from "./composerFocus";
-import { commandFailureMessage } from "./rosterCommands.logic";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 
 interface InterruptRequest {
   readonly environmentId: EnvironmentId;
@@ -76,7 +76,7 @@ export function useBotControlCommands() {
         toastManager.add({
           type: "error",
           title: t("Could not interrupt the bot"),
-          description: commandFailureMessage(result, t),
+          description: commandFailureMessage(result, { t }),
         });
 
         return false;
@@ -95,7 +95,7 @@ export function useBotControlCommands() {
         toastManager.add({
           type: "error",
           title: t("Could not clear the bot's context"),
-          description: commandFailureMessage(result, t),
+          description: commandFailureMessage(result, { t }),
         });
 
         return false;

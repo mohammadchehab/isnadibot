@@ -1,5 +1,5 @@
 import { Predicate } from "effect";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import type { EnvironmentId, SandboxProvider, SandboxSettings } from "@isnadi/contracts";
 import { useState } from "react";
 
@@ -48,15 +48,6 @@ const SANDBOX_PROVIDER_LABELS: Readonly<Record<SandboxProvider, string>> = {
   tenki: "Tenki",
 };
 
-function errorMessage(
-  result: Parameters<typeof squashAtomCommandFailure>[0],
-  fallback: string,
-): string {
-  const error = squashAtomCommandFailure(result);
-
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
 export function SandboxSettingsPanel() {
   const { t } = useI18n();
   const environmentId = useSettingsEnvironmentId();
@@ -93,7 +84,12 @@ function EnvironmentSandboxSettingsPanel({
     setSaving(false);
 
     if (Predicate.isTagged(result, "Failure")) {
-      setError(errorMessage(result, t("The server rejected these sandbox settings.")));
+      setError(
+        commandFailureMessage(result, {
+          t,
+          fallback: "The server rejected these sandbox settings.",
+        }),
+      );
 
       return false;
     }
