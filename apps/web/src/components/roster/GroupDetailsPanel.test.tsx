@@ -55,6 +55,17 @@ describe("GroupDetailsPanel", () => {
     expect(source).toContain("Every bot is already in this group.");
   });
 
+  // The toggle goes through the typed command, never a raw wire string, so a
+  // rename of the command breaks the build here instead of at runtime.
+  it("turns keep-busy on and off through the group command", () => {
+    const source = readGroupDetailsSources();
+
+    expect(source).toContain("botEnvironment.groups.setKeepBusy");
+    expect(source).not.toContain("group.keep-busy");
+    expect(source).toContain("aria-busy={busy}");
+    expect(source).toContain("checked={groupKeepsBusy(group)}");
+  });
+
   it("mounts beside the group conversation", () => {
     const source = NodeFS.readFileSync(
       new URL("../../routes/_chat.groups.$groupId.tsx", import.meta.url),

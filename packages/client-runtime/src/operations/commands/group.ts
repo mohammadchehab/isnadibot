@@ -25,6 +25,8 @@ export type LeaveGroupInput = CommandInput<"group.leave">;
 
 export type SetGroupBossInput = CommandInput<"group.boss.set">;
 
+export type SetGroupKeepBusyInput = CommandInput<"group.keep-busy.set">;
+
 export const createGroup: (input: CreateGroupInput) => CommandEffect = Effect.fn(
   "EnvironmentCommands.createGroup",
 )(function* (input) {
@@ -114,6 +116,16 @@ export const setGroupBoss: (input: SetGroupBossInput) => CommandEffect = Effect.
   return yield* dispatch({
     ...input,
     type: "group.boss.set",
+    commandId: yield* commandId(input),
+  });
+});
+
+export const setGroupKeepBusy: (input: SetGroupKeepBusyInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.setGroupKeepBusy",
+)(function* (input) {
+  return yield* dispatch({
+    ...input,
+    type: "group.keep-busy.set",
     commandId: yield* commandId(input),
   });
 });
