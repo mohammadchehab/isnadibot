@@ -64,6 +64,9 @@ describe("classifyBotDeleteFailure", () => {
     expect(classifyBotDeleteFailure(failed({ refusal: "open-work-items" }))).toBe(
       "open-work-items",
     );
+    expect(classifyBotDeleteFailure(failed({ refusal: "group-would-be-undersized" }))).toBe(
+      "group-would-be-undersized",
+    );
   });
 
   it("is unknown for a code this client does not know, and for a failure with none", () => {
@@ -162,6 +165,26 @@ describe("botDeleteFailureToast", () => {
     expect(toast.title).toBe("ar:Boss of {space}");
     expect(toast.description).toBe("ar:Pick a new boss, or delete the space.");
     expect(toast.actionLabel).toBe("ar:Pick a new boss");
+  });
+
+  it("names the two-bot floor instead of the invariant sentence", () => {
+    // Deleting one of two bots in a space is refused by the decider. The old
+    // toast printed that sentence verbatim, group id included.
+    const toast = botDeleteFailureToast({
+      refusal: "group-would-be-undersized",
+      message:
+        "Orchestration command invariant failed (bot.delete): Group 'grp-9f2' requires at least two active bots.",
+      botName: "Ada",
+      bossSpaceName: null,
+    });
+
+    expect(toast).toEqual({
+      title: "This group needs at least two bots",
+      description:
+        "Deleting this bot would leave this space with fewer than two. Add another bot first.",
+      actionLabel: null,
+    });
+    expect(toast.description).not.toContain("grp-9f2");
   });
 
   it("never shows the invariant sentence for a boss refusal", () => {

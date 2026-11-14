@@ -319,6 +319,8 @@ it.layer(NodeServices.layer)("bot delete decider", (it) => {
       }
 
       expect(error.detail).toContain("at least two active bots");
+      // The client picks its copy from the code, never from the sentence.
+      expect(error.refusal).toBe("group-would-be-undersized");
     }),
   );
 
