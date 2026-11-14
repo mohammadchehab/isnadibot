@@ -11,5 +11,7 @@ export const refusalsCatalog = {
     "此机器人已开启尽可能多的委派。请等待其中一个完成。",
   "This delegation would loop back on itself. Choose a different bot.":
     "此委派会循环回自身。请选择其他机器人。",
+  "You are not a member of this space. Ask the person who runs it for access.":
+    "你不是此空间的成员。请向管理此空间的人申请访问权限。",
   "The command failed.": "命令失败。",
 } as const;

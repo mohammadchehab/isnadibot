@@ -322,6 +322,7 @@ export function requireMutationActorAuthorized(input: {
     invariantError(
       input.command.type,
       `Person '${actor.personId}' is not a member of group '${input.group.id}'.`,
+      "actor-not-a-group-member",
     ),
   );
 }

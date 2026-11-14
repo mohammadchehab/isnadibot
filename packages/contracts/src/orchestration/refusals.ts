@@ -17,6 +17,14 @@ export const CommandRefusalCodes = [
   "group-would-be-undersized",
   "delegation-limit-reached",
   "delegation-would-cycle",
+  /**
+   * Authorization, not a business rule: the actor is neither a member of the
+   * group nor allowed to manage groups, so no change to the group would let the
+   * command through. Its remedy is access, not a different edit, which is why it
+   * stays a literal of its own instead of folding into the boss or undersized
+   * refusals above.
+   */
+  "actor-not-a-group-member",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);

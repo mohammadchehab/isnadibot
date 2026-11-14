@@ -14,8 +14,8 @@ import { useThemeColor } from "../../lib/useThemeColor";
 import { themeColorWithAlpha } from "../../lib/mobileTheme";
 import { useFontFamily } from "../../lib/useFontFamily";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { composerActionIsDictation } from "@isnadi/client-runtime/dictation";
@@ -471,10 +471,9 @@ export function NewTaskDraftScreen(props: {
 
     if (Predicate.isTagged(result, "Failure")) {
       if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
         Alert.alert(
           t("Could not start chat"),
-          error instanceof Error ? error.message : t("The chat could not be started."),
+          commandFailureMessage(result, { t, fallback: "The chat could not be started." }),
         );
       }
 

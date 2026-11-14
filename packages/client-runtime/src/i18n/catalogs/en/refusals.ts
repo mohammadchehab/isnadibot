@@ -11,5 +11,7 @@ export const refusalsCatalog = {
     "This bot already has as many delegations open as it can take. Wait for one to finish.",
   "This delegation would loop back on itself. Choose a different bot.":
     "This delegation would loop back on itself. Choose a different bot.",
+  "You are not a member of this space. Ask the person who runs it for access.":
+    "You are not a member of this space. Ask the person who runs it for access.",
   "The command failed.": "The command failed.",
 } as const;
