@@ -28,6 +28,9 @@ export const fleetCatalog = {
   "Every bot needs a name.": "Every bot needs a name.",
   "Could not create the space": "Could not create the space",
   "Checking what happened…": "Checking what happened…",
+  "Change the boss": "Change the boss",
+  "{name} was the boss. It stays in the squad as a member.":
+    "{name} was the boss. It stays in the squad as a member.",
 
   // Templates
   Recruiting: "Recruiting",

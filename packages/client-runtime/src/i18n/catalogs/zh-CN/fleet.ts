@@ -23,6 +23,9 @@ export const fleetCatalog = {
   "Every bot needs a name.": "每个机器人都需要一个名称。",
   "Could not create the space": "无法创建空间",
   "Checking what happened…": "正在确认结果…",
+  "Change the boss": "更换负责人",
+  "{name} was the boss. It stays in the squad as a member.":
+    "{name} 原为负责人，现作为成员留在团队中。",
 
   // Templates
   Recruiting: "招聘",
