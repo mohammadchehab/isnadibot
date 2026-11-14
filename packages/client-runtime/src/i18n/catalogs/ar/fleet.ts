@@ -21,6 +21,7 @@ export const fleetCatalog = {
     "لم يعد مزود الخدمة أو النموذج الذي اختاره هذا البوت متصلًا.",
   "Every bot needs a name.": "يحتاج كل بوت إلى اسم.",
   "Could not create the space": "تعذّر إنشاء المساحة",
+  "Checking what happened…": "جارٍ التحقق مما حدث…",
 
   // Templates
   Recruiting: "التوظيف",

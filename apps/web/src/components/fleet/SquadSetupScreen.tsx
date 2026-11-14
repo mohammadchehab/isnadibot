@@ -73,6 +73,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
   const {
     draft,
     blockers,
+    locked,
     instanceEntries,
     modelOptionsByInstance,
     pickBoss,
@@ -82,7 +83,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
     recordFailure,
   } = useHireDraft(template);
 
-  const createSquad = useCreateSquad();
+  const { create, pending } = useCreateSquad();
   const [creating, setCreating] = useState(false);
 
   const boss =
@@ -91,6 +92,11 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
   const less = stepHopBudget(draft.hopBudget, -1);
   const more = stepHopBudget(draft.hopBudget, 1);
   const blocker = blockers[0];
+
+  // A send that went out owns the draft until it answers: while it is in flight,
+  // and while its outcome is unknown, nothing on screen may change what it sent.
+  const busy = creating || pending;
+  const frozen = busy || locked;
 
   return (
     <SidebarInset tone="foreground" className="h-dvh min-h-0 overflow-hidden">
@@ -116,6 +122,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
               </div>
               <Select
                 value={draft.bossRoleId}
+                disabled={frozen}
                 onValueChange={(next) => {
                   const member = draft.members.find((candidate) => candidate.roleId === next);
 
@@ -143,6 +150,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
                   modelOptionsByInstance={modelOptionsByInstance}
                   onModelChange={(instanceId, model) => pickModel(member.roleId, instanceId, model)}
                   onReasoningChange={(options) => pickReasoning(member.roleId, options)}
+                  disabled={frozen}
                 />
               ))}
             </ul>
@@ -158,7 +166,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
                   size="icon-sm"
                   variant="outline"
                   aria-label={t("Fewer replies")}
-                  disabled={less === null}
+                  disabled={frozen || less === null}
                   onClick={() => less !== null && pickHopBudget(less)}
                 >
                   <MinusIcon aria-hidden />
@@ -170,7 +178,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
                   size="icon-sm"
                   variant="outline"
                   aria-label={t("More replies")}
-                  disabled={more === null}
+                  disabled={frozen || more === null}
                   onClick={() => more !== null && pickHopBudget(more)}
                 >
                   <PlusIcon aria-hidden />
@@ -181,15 +189,21 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-6">
           <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
-            {blocker ? <BlockerNotice blocker={blocker} /> : null}
+            {locked ? (
+              t("Checking what happened…")
+            ) : blocker ? (
+              <BlockerNotice blocker={blocker} />
+            ) : null}
           </p>
           <Button
-            disabled={creating || blocker !== undefined}
+            // While the outcome is unknown the send may still land, so Create
+            // stays live: pressing it asks the server the same question again.
+            disabled={busy || blocker !== undefined}
             onClick={() => {
-              if (creating) return;
+              if (busy) return;
 
               setCreating(true);
-              void createSquad(draft, recordFailure).finally(() => setCreating(false));
+              void create(draft, recordFailure).finally(() => setCreating(false));
             }}
           >
             {t("Create")}
