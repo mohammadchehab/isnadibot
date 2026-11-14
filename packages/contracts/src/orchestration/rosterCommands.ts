@@ -364,6 +364,13 @@ export const GroupDeleteCommand = Schema.Struct({
   type: Schema.Literal("group.delete"),
   commandId: CommandId,
   groupId: GroupId,
+  /**
+   * Deleting a group cascades to every work item it holds, finished ones
+   * included. A group that still has open work refuses to delete unless the
+   * caller passes this explicitly, so the discard is a decision and not a
+   * side effect. Absent decodes to false.
+   */
+  discardWorkItems: Schema.optional(Schema.Boolean),
 });
 
 export const GroupMemberAssignCommand = Schema.Struct({

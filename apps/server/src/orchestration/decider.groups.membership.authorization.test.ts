@@ -45,6 +45,9 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
       ],
     });
 
+  // `group.delete` is deliberately absent: it is environment-level, not a
+  // membership-level configuration, and is pinned in
+  // `decider.groupsDelete.authorization.test.ts`.
   const groupConfigCommands: ReadonlyArray<OrchestrationCommand> = [
     {
       type: "group.rename",
@@ -57,11 +60,6 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
       commandId: CommandId.make("cmd-config-keep-busy"),
       groupId: GROUP_ID,
       keepBusy: true,
-    },
-    {
-      type: "group.delete",
-      commandId: CommandId.make("cmd-config-delete"),
-      groupId: GROUP_ID,
     },
     {
       type: "group.member.assign",
@@ -95,7 +93,6 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
       );
 
       expect(results.map((result) => result._tag)).toEqual([
-        "Success",
         "Success",
         "Success",
         "Success",
