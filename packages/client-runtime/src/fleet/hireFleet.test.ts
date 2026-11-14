@@ -4,6 +4,7 @@ import {
   FleetRoleId,
   GROUP_HOP_BUDGET_DEFAULT,
   GroupHopBudget,
+  GroupId,
   ORCHESTRATION_WS_METHODS,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -141,6 +142,8 @@ interface DispatchLog {
    * dropped socket is `socket`, whose outcome the client cannot know.
    */
   readonly failAs?: "defect" | "socket";
+  /** The squad the server mints for the hire, as a current server answers it. */
+  readonly createdGroupId?: GroupId;
 }
 
 /** The failure a dispatch at `failAt` answers with, the way a real client would see it. */
@@ -169,7 +172,10 @@ const makeSupervisor = Effect.fn("TestHireFleet.makeSupervisor")(function* (log:
           return yield* dispatchFailure(log.failAs);
         }
 
-        return { sequence: log.commands.length };
+        return {
+          sequence: log.commands.length,
+          ...(log.createdGroupId === undefined ? {} : { createdGroupId: log.createdGroupId }),
+        };
       }),
   });
 
@@ -276,6 +282,28 @@ describe("hireFleet", () => {
       expect(hireCommands(log)[0]).not.toHaveProperty("fleetTemplateId");
       expect(hireCommands(log)[0]).not.toHaveProperty("groupId");
       expect(result).toEqual({ status: "sent", sequence: 1 });
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
+  it.effect("lands on the squad the server answered with", () =>
+    Effect.gen(function* () {
+      const log: DispatchLog = {
+        commands: [],
+        createdGroupId: GroupId.make("group-minted-by-server"),
+      };
+
+      const result = yield* hireFleet({ draft: draft(), makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(log),
+        ),
+      );
+
+      expect(result).toEqual({
+        status: "sent",
+        sequence: 1,
+        groupId: "group-minted-by-server",
+      });
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
 

@@ -16,7 +16,7 @@ import {
   UserPlusIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import { primaryServerProvidersAtom } from "../../state/server";
@@ -59,6 +59,7 @@ export function StartSpaceScreen() {
   const createGroup = useCreateGroup();
   const [selectedId, setSelectedId] = useState<FleetTemplateId | null>(null);
   const [startEmptyOpen, setStartEmptyOpen] = useState(false);
+  const hintId = useId();
   const selected = FLEET_TEMPLATES.find((template) => template.id === selectedId) ?? null;
 
   const cards = useMemo(
@@ -102,18 +103,30 @@ export function StartSpaceScreen() {
           <Button variant="ghost" onClick={() => setStartEmptyOpen(true)}>
             {t("Start empty")}
           </Button>
-          <Button
-            disabled={selected === null}
-            onClick={() => {
-              if (selected === null) return;
-              void navigate({
-                to: "/spaces/new/$templateId",
-                params: { templateId: selected.id },
-              });
-            }}
-          >
-            {t("Hire fleet")}
-          </Button>
+          <div className="flex min-w-0 items-center justify-end gap-3">
+            {/* Why the primary action is off, said next to it rather than left to
+                the grey to explain. The button stays on the row at 360: the hint
+                wraps, it does not push. */}
+            {selected === null ? (
+              <p id={hintId} className="min-w-0 text-xs text-muted-foreground">
+                {t("Pick a fleet to continue.")}
+              </p>
+            ) : null}
+            <Button
+              className="shrink-0"
+              disabled={selected === null}
+              aria-describedby={selected === null ? hintId : undefined}
+              onClick={() => {
+                if (selected === null) return;
+                void navigate({
+                  to: "/spaces/new/$templateId",
+                  params: { templateId: selected.id },
+                });
+              }}
+            >
+              {t("Hire fleet")}
+            </Button>
+          </div>
         </div>
       </div>
       {startEmptyOpen ? (
@@ -159,6 +172,9 @@ function TemplateCard({
 
   const overflow = plan.members.length - members.length;
 
+  // The Card border stays underneath, so the ring is what changes: 1px at rest,
+  // 2px and the selected surface once picked. Focus draws its own 2px ring
+  // outside the selected one, so selection and focus never read as one state.
   return (
     <Card
       render={
@@ -169,7 +185,7 @@ function TemplateCard({
           data-template-id={template.id}
         />
       }
-      className="h-full cursor-pointer gap-3 p-4 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-primary aria-pressed:bg-muted/40"
+      className="h-full cursor-pointer gap-3 p-4 text-left ring-1 ring-border/70 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-pressed:bg-selected aria-pressed:ring-2 aria-pressed:ring-ring"
     >
       <div className="flex items-start gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">

@@ -12,10 +12,11 @@ import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { toastManager } from "../ui/toast";
 
-/** A squad the server accepted, waiting for the snapshot to carry the group it made. */
+/** A hire the server accepted without saying which group it made, waiting on the snapshot. */
 interface PendingHire {
   readonly templateId: FleetTemplateId;
-  readonly createdAt: string;
+  /** The groups the snapshot already showed, so the hire's own group is the new one. */
+  readonly knownGroupIds: ReadonlySet<string>;
   /** The sequence the dispatch answered with; the group cannot be in an earlier snapshot. */
   readonly sequence: number;
 }
@@ -32,11 +33,12 @@ interface CreateSquad {
  *
  * The hire is one command, so what it returns says what happened: a blocked or
  * failed hire hands the draft back so the screen keeps it, with the ids it
- * already sent still standing. A sent hire does not carry the group's id — the
- * server mints it — so the screen waits for the shell snapshot to pass the
- * sequence the dispatch answered with and lands on the group it finds there.
- * A snapshot past that sequence without the group means the hire did not land;
- * the screen says so rather than navigating somewhere else.
+ * already sent still standing. A sent hire names the group the server minted,
+ * so the screen lands on it at once. An environment that predates that id in
+ * its answer leaves it out; then the screen waits for the shell snapshot to
+ * pass the sequence the dispatch answered with and lands on the group that
+ * hire added. A snapshot past that sequence without a new group means the hire
+ * did not land; the screen says so rather than navigating somewhere else.
  */
 export function useCreateSquad(): CreateSquad {
   const { t } = useI18n();
@@ -56,7 +58,7 @@ export function useCreateSquad(): CreateSquad {
     const group = snapshot.groups.find(
       (candidate) =>
         candidate.fleetTemplateId === pending.templateId &&
-        candidate.createdAt === pending.createdAt,
+        !pending.knownGroupIds.has(candidate.id),
     );
 
     setPending(null);
@@ -102,13 +104,23 @@ export function useCreateSquad(): CreateSquad {
         return;
       }
 
+      if (outcome.groupId !== undefined) {
+        void navigate({
+          to: "/groups/$groupId",
+          params: { groupId: outcome.groupId },
+          search: { tab: "overview" },
+        });
+
+        return;
+      }
+
       setPending({
         templateId: draft.templateId,
-        createdAt: draft.createdAt,
+        knownGroupIds: new Set((snapshot?.groups ?? []).map((group) => group.id)),
         sequence: outcome.sequence,
       });
     },
-    [environmentId, hireCommand, t],
+    [environmentId, hireCommand, navigate, snapshot, t],
   );
 
   return { create, pending: pending !== null };

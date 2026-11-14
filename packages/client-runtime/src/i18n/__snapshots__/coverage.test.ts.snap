@@ -51,6 +51,22 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/chat/SettingsLinkChip.tsx": [
       "destination.label) });",
     ],
+    "apps/web/src/components/fleet/HireMemberRow.tsx": [
+      "member.name)}</p>",
+      "member.title)}</p>",
+      "noticeCopy(member.notice))}</p>",
+    ],
+    "apps/web/src/components/fleet/SquadSetupScreen.tsx": [
+      "template.name)}</h1>",
+      "template.description)}</p>",
+      "boss.name) : null}</SelectValue>",
+      "member.name)}",
+    ],
+    "apps/web/src/components/fleet/StartSpaceScreen.tsx": [
+      "template.name)}</p>",
+      "template.description)}</p>",
+      "member.name)}",
+    ],
     "apps/web/src/components/onboarding/OnboardingSubscriptionStep.tsx": [
       "definition.subscription)}",
     ],
@@ -440,6 +456,10 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/chat/traitsPicker.logic.ts",
     "apps/web/src/components/computer/ComputerViewerDialog.tsx",
     "apps/web/src/components/computer/ComputerViewerPanel.tsx",
+    "apps/web/src/components/fleet/HireMemberRow.tsx",
+    "apps/web/src/components/fleet/SquadSetupScreen.tsx",
+    "apps/web/src/components/fleet/StartSpaceScreen.tsx",
+    "apps/web/src/components/fleet/useCreateSquad.ts",
     "apps/web/src/components/markdown/MarkdownCodeBlock.tsx",
     "apps/web/src/components/markdown/MarkdownFileLink.tsx",
     "apps/web/src/components/markdown/MarkdownImages.tsx",
@@ -531,6 +551,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/useBotEngineAvailability.ts",
     "apps/web/src/components/roster/useBotLandingTimeline.ts",
     "apps/web/src/components/roster/useBotProfileDraft.ts",
+    "apps/web/src/components/roster/useCreateGroup.ts",
     "apps/web/src/components/roster/useMessageReactionUpdater.ts",
     "apps/web/src/components/settings/ArchivedBotsSettings.tsx",
     "apps/web/src/components/settings/ArchivedChatsSettings.tsx",
