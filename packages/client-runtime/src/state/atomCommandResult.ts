@@ -1,7 +1,8 @@
-import * as Predicate from "effect/Predicate";
+import { CommandRefusal } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import { Predicate, Schema } from "effect";
 import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
 import {
   type AtomCommandOptions,
@@ -55,6 +56,29 @@ export function isAtomCommandInterrupted(result: AtomCommandResult<unknown, unkn
 
 export function squashAtomCommandFailure(result: { readonly cause: Cause.Cause<unknown> }) {
   return Cause.squash(result.cause);
+}
+
+const isCommandRefusal = Schema.is(CommandRefusal);
+
+/** A refusal code this client understands, or `"unknown"` for one a newer server added. */
+export type CommandRefusalCode = CommandRefusal | "unknown";
+
+/**
+ * Read the refusal code a failed command carries. The wire field is a permissive
+ * string, so a code this client does not know comes back as `"unknown"` and the
+ * caller decides what to say instead of printing the server's own sentence.
+ */
+export function commandRefusalOf(result: {
+  readonly cause: Cause.Cause<unknown>;
+}): CommandRefusalCode {
+  const error = Cause.squash(result.cause);
+
+  const refusal =
+    Predicate.isObjectOrArray(error) && error !== null && "refusal" in error
+      ? error.refusal
+      : undefined;
+
+  return isCommandRefusal(refusal) ? refusal : "unknown";
 }
 
 export async function settleAsyncResult<A, E>(
