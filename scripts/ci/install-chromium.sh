@@ -13,6 +13,13 @@ set -euo pipefail
 # One exact Chrome for Testing version. Bump it together with the version in
 # docs/internals/ci.md so the documented pin and the installed browser never disagree.
 CHROME_VERSION="157.0.8103.78"
+# The bytes of that version's chrome-linux64.zip, so the pin binds the archive and not just its
+# name: whoever can answer for storage.googleapis.com cannot run code on the runner by swapping
+# what that path serves. Google publishes no checksum file for Chrome for Testing (SHA256SUMS and
+# chrome-linux64.zip.sha256 both 404 for this build), so this is a maintainer-recorded
+# trust-on-first-use pin: on a bump, download the new archive once, record its sha256sum here and
+# in docs/internals/ci.md, and the reviewer checks it in that pull request.
+CHROME_SHA256="9223832977a13db3646201b1341c1f9cf08afa3ceae92540116d7b0c062364fb"
 # chrome-linux64 carries the browser itself, not the headless shell, so the same install drives
 # playwright-core now and the web e2e suite later.
 CHROME_ARTIFACT="chrome-linux64"
@@ -37,6 +44,11 @@ url="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/
 mkdir -p "${PREFIX}"
 echo "Installing Chrome for Testing ${CHROME_VERSION} into ${PREFIX}" >&2
 curl --fail --silent --show-error --location --retry 3 --output "${workdir}/${archive}" "${url}"
+
+# Refuse anything the pinned hash does not describe, before it reaches unzip, so a bucket-side swap
+# fails the job instead of installing a browser nobody reviewed.
+echo "Verifying ${archive} against the pinned checksum" >&2
+( cd "${workdir}" && printf '%s  %s\n' "${CHROME_SHA256}" "${archive}" | sha256sum -c - )
 
 # Unpack beside the final path and rename into place, so a job that dies mid-install never leaves
 # a partial ${VERSION_DIR} that a later run would take for a working browser.

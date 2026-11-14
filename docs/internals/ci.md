@@ -40,6 +40,14 @@ and is the Chrome for Testing `chrome-linux64` build, not the headless shell, so
 can drive the web e2e suite later. `scripts/ci-workflow-policy.test.ts` fails when this page and
 the installer disagree, so bump both together.
 
+The archive's bytes are pinned next to the version, in `CHROME_SHA256`, currently
+`9223832977a13db3646201b1341c1f9cf08afa3ceae92540116d7b0c062364fb`, and the installer runs
+`sha256sum -c` before it unpacks, so whatever answers for the download host cannot install a
+browser nobody reviewed. Google publishes no checksum file for Chrome for Testing, so this is a
+maintainer-recorded trust-on-first-use pin rather than a verified signature: to bump, download the
+new `chrome-linux64.zip`, record `sha256sum` of it here and in the installer, and the reviewer
+checks that value in the pull request. The same test fails if the two disagree.
+
 To provision a new box, or to repair an install, create the directory once and run the installer as
 `runner`:
 
