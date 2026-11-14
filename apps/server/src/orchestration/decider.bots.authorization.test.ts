@@ -155,6 +155,19 @@ it.layer(NodeServices.layer)("bot command authorization", (it) => {
       expect(details[3]).toBe(
         `Person '${OUTSIDER_ID}' needs 'access:write' to change the environment.`,
       );
+
+      // The detail stays for the log, but a client now reads the code instead of
+      // echoing prose that carries the person id and the group id.
+      const refusals = errors.map((error) =>
+        Predicate.isTagged(error, "OrchestrationCommandInvariantError") ? error.refusal : undefined,
+      );
+
+      expect(refusals).toEqual([
+        "actor-not-a-group-member",
+        "actor-not-a-group-member",
+        "actor-not-a-group-member",
+        "environment-rights",
+      ]);
     }),
   );
 

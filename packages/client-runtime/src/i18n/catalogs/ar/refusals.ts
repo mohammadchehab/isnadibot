@@ -11,5 +11,7 @@ export const refusalsCatalog = {
     "هذا البوت لديه بالفعل أكبر عدد ممكن من التفويضات المفتوحة. انتظر حتى ينتهي أحدها.",
   "This delegation would loop back on itself. Choose a different bot.":
     "هذا التفويض سيعود على نفسه. اختر بوتًا آخر.",
+  "You are not a member of this space. Ask the person who runs it for access.":
+    "أنت لست عضوًا في هذه المساحة. اطلب صلاحية الوصول من الشخص الذي يديرها.",
   "The command failed.": "فشل الأمر.",
 } as const;

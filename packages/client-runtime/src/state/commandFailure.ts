@@ -36,6 +36,8 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "delegation-limit-reached":
     "This bot already has as many delegations open as it can take. Wait for one to finish.",
   "delegation-would-cycle": "This delegation would loop back on itself. Choose a different bot.",
+  "actor-not-a-group-member":
+    "You are not a member of this space. Ask the person who runs it for access.",
 };
 
 /**
