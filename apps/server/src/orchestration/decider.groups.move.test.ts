@@ -1,5 +1,12 @@
 import * as Predicate from "effect/Predicate";
-import { BotId, CommandId, GroupId, type OrchestrationReadModel } from "@isnadi/contracts";
+import {
+  BotId,
+  CommandId,
+  GroupId,
+  WorkItemId,
+  type OrchestrationReadModel,
+  type WorkItem,
+} from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -13,6 +20,7 @@ import {
   makeGroup,
   OTHER_SPECIALIST_ID,
   applyCommand,
+  NOW,
 } from "./test-support/GroupDeciderFixtures.ts";
 
 const SALES_ID = GroupId.make("group-sales");
@@ -116,6 +124,54 @@ it.layer(NodeServices.layer)("moving a bot between groups", (it) => {
         groupId: SALES_ID,
         member: { kind: "bot", botId: SPECIALIST_ID, role: "specialist" },
       });
+    }),
+  );
+
+  it.effect("releases the items the bot owned in the group it leaves", () =>
+    Effect.gen(function* () {
+      // TASK-259: a bot that moved to another group kept its open items assigned
+      // to it in the group it left, where nobody could pick them up. The release
+      // lands in the same transaction as the departure, before the bot's own row
+      // moves, so no reader sees the item owned by a bot that already left.
+      const item: WorkItem = {
+        id: WorkItemId.make("item-source"),
+        groupId: GROUP_ID,
+        title: "Source item",
+        brief: "Owned by the specialist before the move.",
+        kind: "task",
+        ownerBotId: SPECIALIST_ID,
+        state: "assigned",
+        createdAt: NOW,
+        updatedAt: NOW,
+      };
+
+      const result = yield* decideOrchestrationCommand({
+        command: moveCommand({}),
+        readModel: { ...twoGroups(), workItems: [item] },
+      });
+
+      const events = Array.isArray(result) ? result : [result];
+
+      expect(events.map((event) => event.type)).toEqual([
+        "group.member-unassigned",
+        "work-item.assigned",
+        "bot.updated",
+        "group.member-assigned",
+      ]);
+
+      const released = events[1];
+
+      if (released?.type !== "work-item.assigned") {
+        throw new Error("Expected work-item.assigned");
+      }
+
+      // The item waits in the group it belongs to: it does not follow the bot.
+      expect(released.payload.workItem).toMatchObject({
+        id: item.id,
+        groupId: GROUP_ID,
+        state: "queued",
+      });
+      expect(released.payload.workItem.ownerBotId).toBeUndefined();
     }),
   );
 
