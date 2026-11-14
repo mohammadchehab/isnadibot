@@ -22,7 +22,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
 import { ServerActivation } from "../../serverActivation.ts";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { type OrchestrationDispatchError } from "../Errors.ts";
 import { FleetDispatcherReactor } from "../Services/FleetDispatcherReactor.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
@@ -177,9 +177,10 @@ export const workItemCreated = (sequence: number, item: WorkItem) =>
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];
 
-  // When set, every dispatch of that command type fails, as the engine does for a lost claim.
+  // When set, every dispatch of that command type fails, as the engine does for a lost claim or a
+  // refused turn start. Any dispatch error works, so a test can tell a refusal from a crash.
   const rejection = yield* Ref.make<
-    { readonly type: string; readonly error: OrchestrationCommandInvariantError } | undefined
+    { readonly type: string; readonly error: OrchestrationDispatchError } | undefined
   >(undefined);
 
   const events = yield* PubSub.unbounded<OrchestrationEvent>();
