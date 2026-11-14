@@ -1,3 +1,5 @@
+import * as NodeOS from "node:os";
+
 import type { LaunchOptions } from "playwright-core";
 
 /**
@@ -22,6 +24,13 @@ export function chromiumBinaryPath(): string | undefined {
  * `--no-sandbox` is required, not defensive: the Hetzner box runs Ubuntu 24.04, whose AppArmor
  * restrictions on unprivileged user namespaces make Chromium abort with "No usable sandbox"
  * unless the sandbox is off. `--disable-dev-shm-usage` keeps rendering inside a small `/dev/shm`.
+ *
+ * `XDG_CONFIG_HOME` moves Chromium's config and crash database out of `$HOME`. Without it a
+ * browser launched by an account whose `~/.config` it cannot write dies before it opens a page:
+ * the crash handler reports `chrome_crashpad_handler: --database is required` and the browser
+ * exits with SIGTRAP. That is the Hetzner runners, where the runner user owns a root-owned
+ * `~/.config`, and no launch flag works around it. A directory per process keeps concurrent test
+ * workers from sharing one crash database.
  */
 export function chromiumLaunchOptions(): LaunchOptions | undefined {
   const executablePath = chromiumBinaryPath();
@@ -34,5 +43,9 @@ export function chromiumLaunchOptions(): LaunchOptions | undefined {
     executablePath,
     headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    env: {
+      ...process.env,
+      XDG_CONFIG_HOME: `${NodeOS.tmpdir()}/isnadi-chromium-${process.pid}`,
+    },
   };
 }

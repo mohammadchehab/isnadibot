@@ -56,6 +56,14 @@ a later run would take for a working browser. A missing install is not repaired 
 unless a job runs as a user that can write `/opt/chrome-for-testing`; the step fails the job instead
 of silently skipping the browser tests.
 
+Chromium needs a writable config directory even when it is told where to keep its profile. The
+runner user's `~/.config` on this box is owned by `root`, so a launch that leaves `XDG_CONFIG_HOME`
+unset dies inside the crash handler with `chrome_crashpad_handler: --database is required` and
+exits with SIGTRAP. No launch flag avoids it; `chromiumLaunchOptions()` sets `XDG_CONFIG_HOME` to a
+per-process directory under the temp dir and keeps browser tests independent of the host's home
+directory. A browser test that fails with that crash-handler line is a config-home problem, not a
+missing library.
+
 Chromium's sandbox cannot run on the box: Ubuntu 24.04 restricts unprivileged user namespaces with
 AppArmor and the browser aborts with `No usable sandbox`. Launch options therefore pass
 `--no-sandbox`, plus `--disable-dev-shm-usage`. That is safe here because the binary only ever
