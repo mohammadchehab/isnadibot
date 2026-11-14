@@ -77,9 +77,9 @@ export interface BotDeleteFailureToast {
  *
  * A boss refusal offers the way out as a toast action. A code this client does
  * not know keeps the server's own sentence, the same fallback group delete
- * uses, so a newer server's refusal still says something true; only the boss
- * refusal is rewritten, because only it used to leak ids and invariant prose
- * on a path the app has copy for.
+ * uses, so a newer server's refusal still says something true. The boss and
+ * undersized-group refusals are rewritten, because both used to leak ids and
+ * invariant prose on paths the app has copy for.
  */
 export function botDeleteFailureToast(
   input: {
