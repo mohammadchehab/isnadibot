@@ -254,9 +254,10 @@
     --sidebar-foreground: var(--foreground);
     --sidebar-muted-foreground: var(--muted-foreground);
     --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
+    /* A 3-point ladder under --accent, so the row you are on outranks the row you hover. */
+    --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 5%, transparent);
     --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
-    --sidebar-row-selected: color-mix(in srgb, var(--contrast-foreground) 7%, transparent);
+    --sidebar-row-selected: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
     --sidebar-border: var(--border);
     --sidebar-stage-fade: var(--card);
   }
