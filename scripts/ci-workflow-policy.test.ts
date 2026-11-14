@@ -260,7 +260,7 @@ describe("CI workflow budget", () => {
     expect(chromiumStep?.run).toContain('echo "ISNADI_CHROMIUM_PATH=${binary}" >> "$GITHUB_ENV"');
   });
 
-  it("pins one Chrome for Testing version for the runners and documents it", () => {
+  it("pins one Chrome for Testing version and archive for the runners and documents both", () => {
     const installer = NodeFS.readFileSync(
       new URL("../scripts/ci/install-chromium.sh", import.meta.url),
       "utf8",
@@ -270,10 +270,24 @@ describe("CI workflow budget", () => {
 
     expect(version).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
 
-    // The documented pin is the one the installer downloads, so the runbook cannot drift from the box.
-    expect(
-      NodeFS.readFileSync(new URL("../docs/internals/ci.md", import.meta.url), "utf8"),
-    ).toContain(version);
+    // The version string alone pins a name, not bytes, so the archive is pinned by hash next to it.
+    const sha256 = /^CHROME_SHA256="([^"]+)"$/m.exec(installer)?.[1] ?? "";
+
+    expect(sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(installer).toContain('printf \'%s  %s\\n\' "${CHROME_SHA256}" "${archive}"');
+
+    // The check must run before the archive is unpacked, or the pin decides nothing.
+    const verifyAt = installer.indexOf("sha256sum -c");
+    const unzipAt = installer.indexOf("unzip -q");
+
+    expect(verifyAt).toBeGreaterThan(-1);
+    expect(unzipAt).toBeGreaterThan(verifyAt);
+
+    // Both pins are documented, so a bump cannot leave a stale hash that only fails in CI.
+    const docs = NodeFS.readFileSync(new URL("../docs/internals/ci.md", import.meta.url), "utf8");
+
+    expect(docs).toContain(version);
+    expect(docs).toContain(sha256);
   });
 
   it("coalesces version updates on a 4-vCPU runner", () => {
