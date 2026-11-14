@@ -9,7 +9,10 @@ import {
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import * as Option from "effect/Option";
-import { latestTurnFailure } from "@isnadi/client-runtime/provider-availability";
+import {
+  latestTurnFailure,
+  providerReasonNeedsSignIn,
+} from "@isnadi/client-runtime/provider-availability";
 import {
   EnvironmentId,
   PLACEHOLDER_THREAD_TITLE,
@@ -506,6 +509,9 @@ function ThreadRouteContent(
           onResumeThread={handleResumeThread}
           canResumeThread={
             selectedThread.session?.status === "error" &&
+            // Resume re-runs the turn on a credential the provider already
+            // refused, so the same failure returns. Sign in again instead.
+            !providerReasonNeedsSignIn(resumeFailureUnavailability) &&
             (selectedThread.latestTurn?.state === "error" ||
               selectedThread.latestTurn?.state === "interrupted" ||
               (selectedThread.latestTurn === null &&

@@ -33,7 +33,7 @@ export const settingsCatalog = {
   "Prompt font": "提示字体",
   Provider: "提供商",
   "Provider default": "提供商默认",
-  "Provider sign-in expired": "提供商登录已过期",
+  "Provider sign-in expired or revoked": "提供商登录已过期或被撤销",
   "Provider update checks": "提供商更新检查",
   Providers: "提供商",
   "Save chat settings": "保存聊天设置",
@@ -209,7 +209,7 @@ export const settingsCatalog = {
     "请在“设置 > 提供商”中安装 {provider}，或为此机器人选择其他模型。",
   "Install the provider from Settings > Providers, or pick another model for this bot.":
     "请在“设置 > 提供商”中安装提供商，或为此机器人选择其他模型。",
-  "{provider} sign-in expired": "{provider} 登录已过期",
+  "{provider} sign-in expired or revoked": "{provider} 登录已过期或被撤销",
   "{model} is not available on {provider}": "{model} 在 {provider} 上不可用",
   "{model} is not available on the provider": "{model} 在该提供商上不可用",
   "This model is not available on {provider}": "此模型在 {provider} 上不可用",

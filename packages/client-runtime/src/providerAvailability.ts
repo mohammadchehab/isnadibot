@@ -105,7 +105,10 @@ function presentReason(
       };
     case "expired-login":
       return {
-        title: named("{provider} sign-in expired", "Provider sign-in expired"),
+        title: named(
+          "{provider} sign-in expired or revoked",
+          "Provider sign-in expired or revoked",
+        ),
         description: named(
           "Reconnect {provider} in Settings > Providers, then send your message again.",
           "Reconnect the provider in Settings > Providers, then send your message again.",

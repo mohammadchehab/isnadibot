@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { normalizeCustomModelSlug } from "@isnadi/shared/model";
+import { isProviderSignInRevocation } from "@isnadi/shared/providerSignIn";
 import { isWindowsCommandNotFound } from "../processRunner.ts";
 import { createProviderVersionAdvisory } from "./providerMaintenance.ts";
 import { collectUint8StreamText } from "../stream/collectUint8StreamText.ts";
@@ -61,6 +62,15 @@ export function providerUnavailabilityFromDetail(
   detail: string,
 ): ServerProviderUnavailability {
   const text = detail.toLowerCase();
+
+  // A revoked sign-in is a lost sign-in, whichever driver said it. The rows
+  // below describe each driver's own wording for an expired token, and a
+  // driver that reports a revocation instead of an expiry (or one this table
+  // has no row for) would otherwise fall through to `temporary-failure` and
+  // read as an unknown failure the user cannot repair.
+  if (isProviderSignInRevocation(text)) {
+    return "expired-login";
+  }
 
   const mappings = new Map<string, ReadonlyArray<readonly [RegExp, ServerProviderUnavailability]>>(
     Object.entries({

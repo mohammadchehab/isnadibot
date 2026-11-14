@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
-import { ProviderDriverKind } from "@isnadi/contracts";
+import * as Stream from "effect/Stream";
+import { ProviderDriverKind, ProviderInstanceId, type OrchestrationEvent } from "@isnadi/contracts";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import {
   asEventId,
@@ -42,6 +43,71 @@ describe("ProviderRuntimeIngestion", () => {
 
     expect(thread.session?.status).toBe("error");
     expect(thread.session?.lastError).toBe("runtime exploded");
+  });
+
+  it("carries a revoked sign-in's category to the session event and the activity", async () => {
+    const harness = await createHarness();
+    const now = "2026-01-01T00:00:00.000Z";
+
+    harness.emit({
+      type: "runtime.error",
+      eventId: asEventId("evt-runtime-error-revoked"),
+      provider: ProviderDriverKind.make("claudeAgent"),
+      providerInstanceId: ProviderInstanceId.make("claude"),
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-revoked"),
+      payload: {
+        message: "OAuth access token has been revoked.",
+        class: "provider_error",
+      },
+    });
+
+    const thread = await waitForThread(harness, (entry) =>
+      entry.activities.some((activity) => activity.id === "evt-runtime-error-revoked"),
+    );
+
+    expect(thread.session?.status).toBe("error");
+    expect(thread.session?.providerInstanceId).toBe("claude");
+
+    const activity = thread.activities.find(
+      (entry: ProviderRuntimeTestActivity) => entry.id === "evt-runtime-error-revoked",
+    );
+
+    const activityPayload =
+      activity?.payload &&
+      (activity.payload === null || Predicate.isObjectOrArray(activity.payload))
+        ? (activity.payload as Record<string, Schema.Json>)
+        : undefined;
+
+    expect(activityPayload?.unavailability).toBe("expired-login");
+    expect(activityPayload?.providerInstanceId).toBe("claude");
+    expect(activityPayload?.class).toBe("provider_error");
+
+    // The persisted session row has no `unavailability` column and no migration
+    // is in scope, so the session's category is asserted where it is produced:
+    // the `thread.session-set` event the ingestion dispatches. The activity
+    // asserting first also proves that event is already durable.
+    const threadEvents = await harness.run(
+      Stream.runCollect(
+        harness.engine.readThreadEvents({
+          threadId: asThreadId("thread-1"),
+          fromSequenceExclusive: 0,
+          toSequenceInclusive: 1_000_000,
+          limit: 500,
+        }),
+      ),
+    );
+
+    const sessionSets = Array.from(threadEvents).filter(
+      (event): event is Extract<OrchestrationEvent, { type: "thread.session-set" }> =>
+        event.type === "thread.session-set",
+    );
+
+    expect(sessionSets.at(-1)?.payload.session.unavailability).toBe("expired-login");
+    expect(sessionSets.at(-1)?.payload.session.lastError).toBe(
+      "OAuth access token has been revoked.",
+    );
   });
 
   it("records runtime.error activities from the typed payload message", async () => {

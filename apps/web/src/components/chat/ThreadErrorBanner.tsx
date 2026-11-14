@@ -2,6 +2,7 @@ import { CircleAlertIcon, XIcon } from "lucide-react";
 import { memo, useState } from "react";
 
 import { presentThreadError, type ThreadErrorContext } from "@isnadi/client-runtime/errors";
+import { providerReasonNeedsSignIn } from "@isnadi/client-runtime/provider-availability";
 import type { EnvironmentId } from "@isnadi/contracts";
 
 import { useI18n } from "../../i18n";
@@ -117,7 +118,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
             </p>
 
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              {onResume ? (
+              {onResume && !providerReasonNeedsSignIn(presentation.reason) ? (
                 <Button size="sm" type="button" onClick={onResume} disabled={resuming}>
                   {resuming ? t("Resuming…") : t("Resume")}
                 </Button>

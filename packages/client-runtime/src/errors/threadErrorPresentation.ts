@@ -1,3 +1,4 @@
+import { isProviderSignInRevocation } from "@isnadi/shared/providerSignIn";
 import {
   PROVIDER_ACCOUNT_NAMES,
   isProviderDriverKind,
@@ -100,6 +101,13 @@ export function presentThreadError(
 
   if (/rate.?limit|usage limit|too many requests|quota exceeded/i.test(error)) {
     return present("limit-reached");
+  }
+
+  // A revoked or expired sign-in is the same repair as a missing one, but it
+  // reads differently: the user did sign in, and the provider took it away.
+  // Checked before the missing-login wording so the honest sentence wins.
+  if (isProviderSignInRevocation(error)) {
+    return present("expired-login");
   }
 
   if (

@@ -28,6 +28,10 @@
       "types": "./src/errorText.ts",
       "import": "./src/errorText.ts"
     },
+    "./providerSignIn": {
+      "types": "./src/providerSignIn.ts",
+      "import": "./src/providerSignIn.ts"
+    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"

@@ -33,7 +33,7 @@ export const settingsCatalog = {
   "Prompt font": "خط المطالبة",
   Provider: "المزود",
   "Provider default": "الافتراضي للمزود",
-  "Provider sign-in expired": "انتهت صلاحية تسجيل الدخول إلى المزود",
+  "Provider sign-in expired or revoked": "انتهت صلاحية تسجيل الدخول إلى المزود أو تم إلغاؤه",
   "Provider update checks": "فحص تحديثات المزودين",
   Providers: "المزودون",
   "Save chat settings": "حفظ إعدادات المحادثة",
@@ -216,7 +216,7 @@ export const settingsCatalog = {
     "ثبّت {provider} من الإعدادات > المزودون، أو اختر نموذجا آخر لهذا البوت.",
   "Install the provider from Settings > Providers, or pick another model for this bot.":
     "ثبّت المزود من الإعدادات > المزودون، أو اختر نموذجا آخر لهذا البوت.",
-  "{provider} sign-in expired": "انتهت صلاحية تسجيل الدخول إلى {provider}",
+  "{provider} sign-in expired or revoked": "انتهت صلاحية تسجيل الدخول إلى {provider} أو تم إلغاؤه",
   "{model} is not available on {provider}": "{model} غير متاح على {provider}",
   "{model} is not available on the provider": "{model} غير متاح لدى المزود",
   "This model is not available on {provider}": "هذا النموذج غير متاح على {provider}",
