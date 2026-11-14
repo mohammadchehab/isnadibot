@@ -228,25 +228,6 @@ IsnadiBot مستودع pnpm متعدد الحزم. خادم البيئة يقو�
 
 ---
 
-## 🤝 المساهمون
-
-يبحث IsnadiBot عن مساهمين. [خارطة الطريق](ROADMAP.md) تسرد المزايا المفتوحة لمن يريد تبنّيها، من اختبارات
-شاملة للمحادثات الجماعية إلى التكامل المستمر، و[CONTRIBUTING.md](CONTRIBUTING.md) يشرح كيف تبدأ. علّق على
-مشكلة (issue) أو افتح واحدة لتحجزها.
-
-إن كان IsnadiBot مفيدًا لك، فنجمة ⭐ تساعد الآخرين على اكتشافه.
-
-بدأ IsnadiBot نسخةً متفرعة من نسخة OpenCore المتفرعة من T3 Code. كل الإيداعات من المشروعين ما زالت في هذا
-المستودع، لذا ساهم كل من في الأسفل في بنائه. شكرًا لكم.
-
-<p align="center">
-  <a href="https://github.com/mohammadchehab/isnadibot/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=mohammadchehab/isnadibot&max=200&columns=12" alt="المساهمون في IsnadiBot">
-  </a>
-</p>
-
----
-
 ## 🙏 شكر وتقدير
 
 IsnadiBot نسخة متفرعة من مشروع مرخّص بـ MIT من [OpenCore](https://github.com/opencoredev)، وهو بدوره نسخة متفرعة من
