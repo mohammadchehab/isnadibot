@@ -2,6 +2,7 @@ import {
   isIsnadiDelegationTerminal,
   type BotId,
   type IsnadiDelegationRecord,
+  type OrchestrationSessionStatus,
   type OrchestrationThreadShell,
   type WorkItemSummary,
 } from "@isnadi/contracts";
@@ -22,17 +23,22 @@ export type BotStatus = (typeof BOT_STATUSES)[number];
  */
 export type BotStatusChat = Pick<
   OrchestrationThreadShell,
-  | "id"
-  | "botId"
-  | "respondingBotId"
-  | "parentThreadId"
-  | "archivedAt"
-  | "latestTurn"
-  | "hasPendingApprovals"
-  | "hasPendingUserInput"
->;
+  "id" | "botId" | "respondingBotId" | "parentThreadId" | "archivedAt" | "latestTurn" | "session"
+> & {
+  /** Absent reads as nothing pending: only the command read model may omit it. */
+  readonly hasPendingApprovals?: boolean | undefined;
+  readonly hasPendingUserInput?: boolean | undefined;
+};
 
 export type BotStatusWorkItem = Pick<WorkItemSummary, "ownerBotId" | "state">;
+
+/**
+ * Whether a session still owes its bot work. A turn is in flight from the moment
+ * the provider starts answering, which is before the turn itself reports running.
+ */
+export function isLiveSessionStatus(status: OrchestrationSessionStatus): boolean {
+  return status === "starting" || status === "running";
+}
 
 export type BotStatusDelegation = Pick<IsnadiDelegationRecord, "parentThreadId" | "phase">;
 
@@ -84,7 +90,9 @@ function rootOf(chat: BotStatusChat, byId: ReadonlyMap<string, BotStatusChat>): 
  * - held: the bot owns an item in state `blocked`, or its running turn is
  *   waiting on a delegated child that has not finished. It is not free to take
  *   more work, and it is not working either.
- * - busy: a turn is running.
+ * - busy: a turn is running, a session is still starting or running for one of
+ *   its chats, or it owns an item in `assigned` or `in-progress` — the bot has
+ *   been given work and has not finished it.
  * - idle: none of the above.
  *
  * Only chats that are not archived or deleted count; a deleted chat is not in
@@ -101,7 +109,8 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
 
   const chats = input.chats.filter(owns);
 
-  if (chats.some((chat) => chat.hasPendingApprovals || chat.hasPendingUserInput)) return "asking";
+  if (chats.some((chat) => chat.hasPendingApprovals === true || chat.hasPendingUserInput === true))
+    return "asking";
 
   const running = chats.filter((chat) => chat.latestTurn?.state === "running");
 
@@ -118,7 +127,17 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
 
   if (blockedItem || waitingOnChildren) return "held";
 
-  return running.length > 0 ? "busy" : "idle";
+  const workingItem = input.workItems.some(
+    (item) =>
+      item.ownerBotId === input.botId &&
+      (item.state === "assigned" || item.state === "in-progress"),
+  );
+
+  const liveSession = chats.some(
+    (chat) => chat.session !== null && isLiveSessionStatus(chat.session.status),
+  );
+
+  return running.length > 0 || workingItem || liveSession ? "busy" : "idle";
 }
 
 /** How many bots are in each state, for a header that wants a total. */

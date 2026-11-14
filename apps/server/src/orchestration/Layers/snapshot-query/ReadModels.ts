@@ -384,6 +384,8 @@ export function createReadModels({
                 activities: activitiesByThread.get(row.threadId) ?? [],
                 checkpoints: checkpointsByThread.get(row.threadId) ?? [],
                 session: sessionsByThread.get(row.threadId) ?? null,
+                hasPendingApprovals: row.pendingApprovalCount > 0,
+                hasPendingUserInput: row.pendingUserInputCount > 0,
               }));
 
               const snapshot = {

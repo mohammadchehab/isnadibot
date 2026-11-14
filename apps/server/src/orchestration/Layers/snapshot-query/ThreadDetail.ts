@@ -334,6 +334,8 @@ export function createThreadDetail({
           completedAt: row.completedAt,
         })),
         session: Option.isSome(sessionRow) ? mapSessionRow(sessionRow.value) : null,
+        hasPendingApprovals: threadRow.value.pendingApprovalCount > 0,
+        hasPendingUserInput: threadRow.value.pendingUserInputCount > 0,
       };
 
       return Option.some(

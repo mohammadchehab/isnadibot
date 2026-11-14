@@ -50,6 +50,7 @@ function chat(overrides: Partial<StandupChat> = {}): StandupChat {
     parentThreadId: null,
     archivedAt: null,
     latestTurn: null,
+    session: null,
     hasPendingApprovals: false,
     hasPendingUserInput: false,
     ...overrides,

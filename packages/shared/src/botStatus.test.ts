@@ -6,6 +6,8 @@ import {
   TurnId,
   type IsnadiDelegationPhase,
   type OrchestrationLatestTurn,
+  type OrchestrationSession,
+  type OrchestrationSessionStatus,
 } from "@isnadi/contracts";
 
 import {
@@ -14,6 +16,7 @@ import {
   deriveBotStatus,
   type BotStatus,
   type BotStatusChat,
+  type BotStatusWorkItem,
 } from "./botStatus.ts";
 
 const BOSS = BotId.make("boss");
@@ -30,9 +33,22 @@ function chat(overrides: Partial<BotStatusChat> = {}): BotStatusChat {
     parentThreadId: null,
     archivedAt: null,
     latestTurn: null,
+    session: null,
     hasPendingApprovals: false,
     hasPendingUserInput: false,
     ...overrides,
+  };
+}
+
+function session(status: OrchestrationSessionStatus): OrchestrationSession {
+  return {
+    threadId: ThreadId.make("chat-1"),
+    status,
+    providerName: "codex",
+    runtimeMode: "full-access",
+    activeTurnId: null,
+    lastError: null,
+    updatedAt: NOW,
   };
 }
 
@@ -87,16 +103,17 @@ const CHILD_DONE: IsnadiDelegationPhase = {
 function status(input: {
   chats?: ReadonlyArray<BotStatusChat>;
   blockedItem?: boolean;
+  items?: ReadonlyArray<BotStatusWorkItem>;
   delegations?: ReadonlyArray<{ parentThreadId: ThreadId; phase: IsnadiDelegationPhase }>;
   botId?: BotId;
 }): BotStatus {
+  const ownerBotId = input.botId ?? BOSS;
+
   return deriveBotStatus({
-    botId: input.botId ?? BOSS,
+    botId: ownerBotId,
     chats: input.chats ?? [],
     workItems:
-      input.blockedItem === true
-        ? [{ ownerBotId: input.botId ?? BOSS, state: "blocked" }]
-        : [{ ownerBotId: input.botId ?? BOSS, state: "in-progress" }],
+      input.items ?? (input.blockedItem === true ? [{ ownerBotId, state: "blocked" }] : []),
     delegations: input.delegations ?? [],
   });
 }
@@ -207,6 +224,33 @@ describe("deriveBotStatus", () => {
 
     expect(status({ chats: [group] })).toBe("busy");
     expect(status({ chats: [group], botId: OTHER })).toBe("idle");
+  });
+
+  it("is busy while it owns an item in assigned or in-progress", () => {
+    for (const state of ["assigned", "in-progress"] as const) {
+      expect(status({ items: [{ ownerBotId: BOSS, state }] })).toBe("busy");
+    }
+
+    // A queued item has no owner yet, and a closed one is finished work.
+    expect(status({ items: [{ ownerBotId: BOSS, state: "queued" }] })).toBe("idle");
+    expect(status({ items: [{ ownerBotId: BOSS, state: "closed" }] })).toBe("idle");
+    expect(status({ items: [{ ownerBotId: OTHER, state: "in-progress" }] })).toBe("idle");
+  });
+
+  it("is busy while a session is starting or running, before any turn reports", () => {
+    for (const running of ["starting", "running"] as const) {
+      expect(status({ chats: [chat({ session: session(running) })] })).toBe("busy");
+    }
+
+    for (const stopped of ["idle", "ready", "interrupted", "stopped", "error"] as const) {
+      expect(status({ chats: [chat({ session: session(stopped) })] })).toBe("idle");
+    }
+  });
+
+  it("counts a session on an archived chat for nothing", () => {
+    expect(status({ chats: [chat({ archivedAt: NOW, session: session("running") })] })).toBe(
+      "idle",
+    );
   });
 
   it("counts each state", () => {

@@ -410,6 +410,13 @@ export const OrchestrationThread = Schema.Struct({
   activities: Schema.Array(OrchestrationThreadActivity),
   checkpoints: Schema.Array(OrchestrationCheckpointSummary),
   session: Schema.NullOr(OrchestrationSession),
+  // Pending-only state, computed by the read model from the same columns the
+  // shell snapshot uses. The command read model carries it so a decision made
+  // here sees the approval or question the user is looking at. Optional
+  // because a full thread is also rebuilt from older server payloads, where
+  // absent means nothing is pending.
+  hasPendingApprovals: Schema.optional(Schema.Boolean),
+  hasPendingUserInput: Schema.optional(Schema.Boolean),
 });
 
 export type OrchestrationThread = typeof OrchestrationThread.Type;
