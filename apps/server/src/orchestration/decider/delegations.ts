@@ -111,6 +111,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Delegation '${delegation.delegationId}' would create a bot cycle.`,
+          refusal: "delegation-would-cycle",
         });
       }
 
@@ -124,6 +125,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Bot '${delegation.parentBotId}' already has ${activeDelegationCount} active delegations.`,
+          refusal: "delegation-limit-reached",
         });
       }
 
