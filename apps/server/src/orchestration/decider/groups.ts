@@ -283,6 +283,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (command.role === "boss" && group.bossBotId !== null && group.bossBotId !== bot.id) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "group-already-has-boss",
           detail: `Group '${group.id}' already has boss bot '${group.bossBotId}'. Use 'group.boss.set' to replace it.`,
         });
       }
@@ -290,6 +291,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (command.role === "specialist" && group.bossBotId === bot.id) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "bot-is-group-boss",
           detail: `Bot '${bot.id}' is the boss of group '${group.id}' and cannot be assigned as a specialist.`,
         });
       }
@@ -303,6 +305,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         if (refusal === "is-boss") {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
+            refusal: "bot-is-group-boss",
             detail: `Bot '${bot.id}' is the boss of group '${sourceGroup.id}'. Replace it with 'group.boss.set' before moving it to another group.`,
           });
         }
@@ -310,6 +313,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         if (refusal === "too-few-members") {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
+            refusal: "group-would-be-undersized",
             detail: `Group '${sourceGroup.id}' requires at least two active bots.`,
           });
         }
@@ -385,6 +389,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (!member) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "bot-not-a-group-member",
           detail: `Bot '${command.botId}' is not a member of group '${group.id}'.`,
         });
       }
@@ -394,6 +399,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (refusal === "is-boss") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "bot-is-group-boss",
           detail: `Bot '${command.botId}' is the last boss of group '${group.id}'. Set a new boss and unassign the previous boss with one 'group.boss.set' command.`,
         });
       }
@@ -401,6 +407,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (refusal === "too-few-members") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "group-would-be-undersized",
           detail: `Group '${group.id}' requires at least two active bots.`,
         });
       }

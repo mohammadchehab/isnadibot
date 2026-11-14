@@ -2,7 +2,11 @@ import * as Cause from "effect/Cause";
 import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import { BotId, GroupId, isGroupBotMember, type EnvironmentId } from "@isnadi/contracts";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import {
+  commandFailureMessage,
+  squashAtomCommandFailure,
+  type AtomCommandResult,
+} from "@isnadi/client-runtime/state/runtime";
 import { BotIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -97,6 +101,32 @@ export function GroupEditor({
 
     if (Predicate.isTagged(result, "Failure")) {
       toastManager.add({ type: "error", title: failure });
+
+      return false;
+    }
+
+    return true;
+  };
+
+  // Adding and removing a member are the two editor actions whose every refusal
+  // the server codes, so their toast names the reason under the title. The other
+  // three stay on `run`'s title-only toast on purpose: their throws are still
+  // uncoded, and the helper would echo the server's own sentence, raw ids and
+  // all, exactly as it did before the codes existed.
+  const runMemberChange = async (
+    action: () => Promise<AtomCommandResult<unknown, unknown>>,
+    title: string,
+  ) => {
+    setBusy(true);
+    const result = await action();
+    setBusy(false);
+
+    if (Predicate.isTagged(result, "Failure")) {
+      toastManager.add({
+        type: "error",
+        title,
+        description: commandFailureMessage(result, { t }),
+      });
 
       return false;
     }
@@ -266,7 +296,7 @@ export function GroupEditor({
                     size="icon-sm"
                     variant="ghost"
                     onClick={() =>
-                      void run(
+                      void runMemberChange(
                         () =>
                           unassignMember({
                             environmentId,
@@ -317,7 +347,7 @@ export function GroupEditor({
               size="icon"
               variant="outline"
               onClick={() =>
-                void run(
+                void runMemberChange(
                   () =>
                     assignMember({
                       environmentId,
