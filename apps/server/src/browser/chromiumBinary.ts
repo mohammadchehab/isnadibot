@@ -2,6 +2,8 @@ import * as NodeOS from "node:os";
 
 import type { LaunchOptions } from "playwright-core";
 
+import { withoutMasterKeyEnv } from "../vault/masterKeyEnv.ts";
+
 /**
  * Absolute path of the Chromium build the host provides for browser tests, read from
  * `ISNADI_CHROMIUM_PATH`. CI sets it to the pinned install that `scripts/ci/install-chromium.sh`
@@ -44,7 +46,8 @@ export function chromiumLaunchOptions(): LaunchOptions | undefined {
     headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
     env: {
-      ...process.env,
+      // The browser is a child process like any other, so vault key material stays out of its env.
+      ...withoutMasterKeyEnv(process.env),
       XDG_CONFIG_HOME: `${NodeOS.tmpdir()}/isnadi-chromium-${process.pid}`,
     },
   };
