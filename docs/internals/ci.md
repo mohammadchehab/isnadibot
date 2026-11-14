@@ -40,6 +40,14 @@ and is the Chrome for Testing `chrome-linux64` build, not the headless shell, so
 can drive the web e2e suite later. `scripts/ci-workflow-policy.test.ts` fails when this page and
 the installer disagree, so bump both together.
 
+The Playwright harness reads the same variable. `e2e/web/support/journey.ts` launches the pinned
+binary by `executablePath` when `ISNADI_CHROMIUM_PATH` is set, because `channel: "chrome"` asks for
+a _system_ Chrome the runner image does not have and the suite would die at launch. An explicit
+`E2E_BROWSER_CHANNEL` still wins, so a developer with a real Chrome keeps their setup, and with
+neither variable set the channel default stands. The harness copies the launch flags from
+`chromiumBinary.ts` rather than importing it — `e2e/web` is its own package — so a change to one set
+of flags belongs in the other.
+
 The archive's bytes are pinned next to the version, in `CHROME_SHA256`, currently
 `9223832977a13db3646201b1341c1f9cf08afa3ceae92540116d7b0c062364fb`, and the installer runs
 `sha256sum -c` before it unpacks, so whatever answers for the download host cannot install a
