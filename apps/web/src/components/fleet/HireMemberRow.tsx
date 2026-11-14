@@ -67,11 +67,8 @@ export function HireMemberRow({
           </div>
           <p className="truncate text-xs text-muted-foreground">{t(member.title)}</p>
         </div>
-        <span className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t("Skills")}</span>
-          <span className="text-sm" data-testid="hire-member-skill-count">
-            {member.skills.length === 0 ? "—" : member.skills.length}
-          </span>
+        <span className="w-12 shrink-0 text-right text-sm" data-testid="hire-member-skill-count">
+          {member.skills.length === 0 ? "—" : member.skills.length}
         </span>
         {engine === null ? (
           <span className="text-sm text-muted-foreground">{t("No model yet")}</span>

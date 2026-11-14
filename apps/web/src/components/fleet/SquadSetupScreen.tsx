@@ -2,7 +2,7 @@ import { FLEET_TEMPLATES, type FleetTemplate } from "@isnadi/contracts";
 import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeftIcon, MinusIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 
 import { useI18n } from "../../i18n";
@@ -93,6 +93,11 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
   const more = stepHopBudget(draft.hopBudget, 1);
   const blocker = blockers[0];
 
+  // Picking a boss other than the template's is its own state: the heading names
+  // the change and the note says what happens to the bot that had the role.
+  const bossChanged = draft.bossRoleId !== template.bossRoleId;
+  const originalBoss = draft.members.find((member) => member.roleId === template.bossRoleId);
+
   // A send that went out owns the draft until it answers: while it is in flight,
   // and while its outcome is unknown, nothing on screen may change what it sent.
   const busy = creating || pending;
@@ -110,7 +115,9 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold">{t(template.name)}</h1>
+              <h1 className="text-xl font-semibold">
+                {bossChanged ? t("Change the boss") : t(template.name)}
+              </h1>
               <p className="text-sm text-muted-foreground">{t(template.description)}</p>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -141,19 +148,44 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
                 </SelectPopup>
               </Select>
             </div>
-            <ul className="divide-y divide-border rounded-xl border border-border">
-              {draft.members.map((member) => (
-                <HireMemberRow
-                  key={member.roleId}
-                  member={member}
-                  instanceEntries={instanceEntries}
-                  modelOptionsByInstance={modelOptionsByInstance}
-                  onModelChange={(instanceId, model) => pickModel(member.roleId, instanceId, model)}
-                  onReasoningChange={(options) => pickReasoning(member.roleId, options)}
-                  disabled={frozen}
-                />
-              ))}
-            </ul>
+            {bossChanged && originalBoss ? (
+              <p
+                role="note"
+                className="flex items-start gap-2 rounded-lg p-2 text-xs leading-4 text-muted-foreground"
+              >
+                <InfoIcon aria-hidden className="mt-px size-4 shrink-0" />
+                <span>
+                  {t("{name} was the boss. It stays in the squad as a member.", {
+                    name: t(originalBoss.name),
+                  })}
+                </span>
+              </p>
+            ) : null}
+            <div className="rounded-xl border border-border">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground">
+                <span className="min-w-0 flex-1" />
+                <span className="w-12 shrink-0 text-right">{t("Skills")}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span>{t("Model")}</span>
+                  <span>{t("Reasoning")}</span>
+                </span>
+              </div>
+              <ul className="divide-y divide-border">
+                {draft.members.map((member) => (
+                  <HireMemberRow
+                    key={member.roleId}
+                    member={member}
+                    instanceEntries={instanceEntries}
+                    modelOptionsByInstance={modelOptionsByInstance}
+                    onModelChange={(instanceId, model) =>
+                      pickModel(member.roleId, instanceId, model)
+                    }
+                    onReasoningChange={(options) => pickReasoning(member.roleId, options)}
+                    disabled={frozen}
+                  />
+                ))}
+              </ul>
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{t("Reply budget")}</p>

@@ -23,6 +23,9 @@ export const fleetCatalog = {
   "Every bot needs a name.": "يحتاج كل بوت إلى اسم.",
   "Could not create the space": "تعذّر إنشاء المساحة",
   "Checking what happened…": "جارٍ التحقق مما حدث…",
+  "Change the boss": "تغيير القائد",
+  "{name} was the boss. It stays in the squad as a member.":
+    "كان {name} هو القائد. سيبقى في الفريق كعضو.",
 
   // Templates
   Recruiting: "التوظيف",
