@@ -47,6 +47,8 @@ export function createTurns({
       mcpServerIds: [...(event.payload.session.mcpServerIds ?? [])],
       activeTurnId: event.payload.session.activeTurnId,
       lastError: event.payload.session.lastError,
+      // A session-set with no category clears it, so a recovered sign-in stops reading as a problem.
+      unavailability: event.payload.session.unavailability ?? null,
       updatedAt: event.payload.session.updatedAt,
     });
   });

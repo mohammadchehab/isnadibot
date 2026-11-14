@@ -473,6 +473,7 @@ export function mapSessionRow(
     mcpServerIds: row.mcpServerIds,
     activeTurnId: row.activeTurnId,
     lastError: row.lastError,
+    ...(row.unavailability !== null ? { unavailability: row.unavailability } : {}),
     updatedAt: row.updatedAt,
   };
 }

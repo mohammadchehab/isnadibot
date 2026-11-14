@@ -12,6 +12,7 @@ import {
   McpServerId,
   OrchestrationSessionStatus,
   ProviderInstanceId,
+  ServerProviderUnavailability,
   ThreadId,
   TurnId,
 } from "@isnadi/contracts";
@@ -31,6 +32,9 @@ export const ProjectionThreadSession = Schema.Struct({
   mcpServerIds: Schema.Array(McpServerId),
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(Schema.String),
+  // Why the session cannot be used right now, so a reload still shows a sign-in problem. Null for
+  // sessions that were written before this was tracked.
+  unavailability: Schema.NullOr(ServerProviderUnavailability),
   updatedAt: IsoDateTime,
 });
 
