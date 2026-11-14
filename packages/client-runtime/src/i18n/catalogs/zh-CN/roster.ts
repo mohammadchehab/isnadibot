@@ -430,4 +430,10 @@ export const rosterCatalog = {
   Bug: "缺陷",
   Owner: "负责人",
   Tasks: "任务",
+  "Keep everyone busy": "让所有人保持忙碌",
+  "When a bot goes idle, it gets the next card. The boss is woken only to judge.":
+    "当某个机器人空闲下来时，它会拿到下一张卡片。只有在需要裁决时才会唤醒负责人。",
+  "Turn it off and bots stop taking new cards; cards already running finish.":
+    "关闭后，机器人不再领取新卡片；已在运行的卡片会继续完成。",
+  "Could not change keep-busy for this group": "无法更改此分组的保持忙碌设置",
 } as const;
