@@ -143,7 +143,7 @@ export function BotSettingsForm({
 
     const confirmation = requestConfirmDialog(
       botDeleteConfirmMessage({ botName: bot.name, bossSpaceName: bossSpace?.name ?? null }, t),
-      { variant: "destructive" },
+      { variant: "destructive", confirmLabel: t("Delete") },
     );
 
     if (!confirmation) return;
