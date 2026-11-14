@@ -118,7 +118,7 @@ export function HireMemberRow({
           ) : null}
         </div>
         <span
-          className={`${SQUAD_CELL.skills} flex items-center gap-1.5 text-sm`}
+          className={`${SQUAD_CELL.skills} flex items-center gap-1.5 text-xs`}
           data-testid="hire-member-skill-count"
         >
           {member.skills.length === 0 ? (
