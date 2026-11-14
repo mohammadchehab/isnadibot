@@ -22,6 +22,7 @@ import {
   nowIso,
   botGroupUpdatedEvent,
   activeGroupBotIds,
+  groupDepartureRefusal,
   type DecideOrchestrationCommandResult,
 } from "./eventBase.ts";
 import { clearOwnedWorkItems, isOpen } from "./workItems.ts";
@@ -263,6 +264,11 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       yield* requireMutationActorAuthorized({ group, command, actor });
       const bot = yield* requireBotNotArchived({ readModel, command, botId: command.botId });
 
+      const sourceGroup =
+        bot.groupId === null || bot.groupId === group.id
+          ? undefined
+          : yield* requireGroup({ readModel, command, groupId: bot.groupId });
+
       // A bot that already belongs to another group is pulled across a boundary, so target-group
       // rights are not enough: this needs the same two-sided rights `bot.update` needs to move it.
       if (bot.groupId === null) {
@@ -270,9 +276,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         // reaches it: only environment manage rights can put it into one. `bot.update` moves the
         // same bot under the same rule.
         yield* requireEnvironmentManageRights({ command, actor });
-      } else if (bot.groupId !== group.id) {
-        const sourceGroup = yield* requireGroup({ readModel, command, groupId: bot.groupId });
-
+      } else if (sourceGroup !== undefined) {
         yield* requireMutationActorAuthorized({ group: sourceGroup, command, actor });
       }
 
@@ -290,9 +294,56 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         });
       }
 
-      const occurredAt = yield* nowIso;
+      // A move is one move, not an addition: the bot has to leave the group it came from before
+      // it joins this one, or it is a member of both and its own groupId names neither. The
+      // source group has to survive losing it, on the same rules `group.member.unassign` applies.
+      if (sourceGroup !== undefined) {
+        const refusal = groupDepartureRefusal({ readModel, group: sourceGroup, botId: bot.id });
 
-      const assignedEvent: PlannedOrchestrationEvent = {
+        if (refusal === "is-boss") {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `Bot '${bot.id}' is the boss of group '${sourceGroup.id}'. Replace it with 'group.boss.set' before moving it to another group.`,
+          });
+        }
+
+        if (refusal === "too-few-members") {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `Group '${sourceGroup.id}' requires at least two active bots.`,
+          });
+        }
+      }
+
+      const occurredAt = yield* nowIso;
+      const events: Array<PlannedOrchestrationEvent> = [];
+
+      if (sourceGroup !== undefined) {
+        events.push({
+          ...(yield* withEventBase({
+            aggregateKind: "group",
+            aggregateId: sourceGroup.id,
+            occurredAt,
+            commandId: command.commandId,
+          })),
+          type: "group.member-unassigned",
+          payload: { groupId: sourceGroup.id, botId: bot.id, updatedAt: occurredAt },
+        });
+      }
+
+      // The roster and `bot.groupId` have to agree, whichever group the bot came from.
+      if (bot.groupId !== group.id) {
+        events.push(
+          yield* botGroupUpdatedEvent({
+            botId: bot.id,
+            groupId: group.id,
+            occurredAt,
+            commandId: command.commandId,
+          }),
+        );
+      }
+
+      events.push({
         ...(yield* withEventBase({
           aggregateKind: "group",
           aggregateId: group.id,
@@ -305,9 +356,9 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
           member: { kind: "bot", botId: bot.id, role: command.role },
           updatedAt: occurredAt,
         },
-      };
+      });
 
-      return assignedEvent;
+      return events;
     }
 
     case "group.member.unassign": {
@@ -325,17 +376,16 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         });
       }
 
-      if (member.role === "boss" || group.bossBotId === command.botId) {
+      const refusal = groupDepartureRefusal({ readModel, group, botId: command.botId });
+
+      if (refusal === "is-boss") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Bot '${command.botId}' is the last boss of group '${group.id}'. Set a new boss and unassign the previous boss with one 'group.boss.set' command.`,
         });
       }
 
-      const remainingBotIds = activeGroupBotIds(readModel, group);
-      remainingBotIds.delete(command.botId);
-
-      if (remainingBotIds.size < 2) {
+      if (refusal === "too-few-members") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Group '${group.id}' requires at least two active bots.`,

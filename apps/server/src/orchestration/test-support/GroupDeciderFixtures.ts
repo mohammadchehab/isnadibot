@@ -90,13 +90,15 @@ export function makeBot(input: {
 
 export function makeGroup(
   input: {
+    readonly id?: OrchestrationGroup["id"];
+    readonly name?: string;
     readonly bossBotId?: OrchestrationGroup["bossBotId"];
     readonly members?: OrchestrationGroup["members"];
   } = {},
 ): OrchestrationGroup {
   return {
-    id: GROUP_ID,
-    name: "Product",
+    id: input.id ?? GROUP_ID,
+    name: input.name ?? "Product",
     bossBotId: input.bossBotId === undefined ? BOSS_ID : input.bossBotId,
     members: input.members ?? [
       { kind: "bot", botId: BOSS_ID, role: "boss" },

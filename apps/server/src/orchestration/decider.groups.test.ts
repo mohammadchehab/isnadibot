@@ -1,5 +1,11 @@
 import * as Predicate from "effect/Predicate";
-import { AuthSessionId, CommandId, GroupId, type OrchestrationReadModel } from "@isnadi/contracts";
+import {
+  AuthSessionId,
+  BotId,
+  CommandId,
+  GroupId,
+  type OrchestrationReadModel,
+} from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -127,7 +133,7 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
     }),
   );
 
-  it.effect("assigns one bot to several groups", () =>
+  it.effect("moves one bot out of the group it belongs to instead of adding it twice", () =>
     Effect.gen(function* () {
       const otherGroupId = GroupId.make("group-other");
 
@@ -140,15 +146,24 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
           role: "specialist",
         },
         readModel: makeReadModel({
-          bots: [makeBot({ id: BOSS_ID }), makeBot({ id: SPECIALIST_ID, groupId: otherGroupId })],
+          bots: [
+            makeBot({ id: BOSS_ID }),
+            makeBot({ id: SPECIALIST_ID, groupId: otherGroupId }),
+            makeBot({ id: OTHER_SPECIALIST_ID, groupId: otherGroupId }),
+            makeBot({ id: BotId.make("bot-other-3"), groupId: otherGroupId }),
+          ],
           groups: [
             makeGroup({ members: [{ kind: "bot", botId: BOSS_ID, role: "boss" }] }),
             {
               ...makeGroup({
-                bossBotId: SPECIALIST_ID,
-                members: [{ kind: "bot", botId: SPECIALIST_ID, role: "boss" }],
+                members: [
+                  { kind: "bot", botId: OTHER_SPECIALIST_ID, role: "boss" },
+                  { kind: "bot", botId: SPECIALIST_ID, role: "specialist" },
+                  { kind: "bot", botId: BotId.make("bot-other-3"), role: "specialist" },
+                ],
               }),
               id: otherGroupId,
+              bossBotId: OTHER_SPECIALIST_ID,
             },
           ],
         }),
@@ -156,7 +171,11 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
 
       const events = Array.isArray(result) ? result : [result];
 
-      expect(events.map((event) => event.type)).toEqual(["group.member-assigned"]);
+      expect(events.map((event) => event.type)).toEqual([
+        "group.member-unassigned",
+        "bot.updated",
+        "group.member-assigned",
+      ]);
     }),
   );
 

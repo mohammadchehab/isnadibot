@@ -1,5 +1,11 @@
 import * as Predicate from "effect/Predicate";
-import { AuthSessionId, CommandId, GroupId, type OrchestrationCommand } from "@isnadi/contracts";
+import {
+  AuthSessionId,
+  BotId,
+  CommandId,
+  GroupId,
+  type OrchestrationCommand,
+} from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
@@ -173,12 +179,18 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
     Effect.gen(function* () {
       const otherGroupId = GroupId.make("group-other");
       const otherGroupOwnerId = AuthSessionId.make("person-other-group");
+      const otherGroupBossId = BotId.make("bot-other-boss");
+      const otherGroupThirdId = BotId.make("bot-other-3");
 
+      // The other group can spare `OTHER_SPECIALIST_ID` on its own rules: it keeps a boss and a
+      // third bot. What it cannot do is let a stranger to it take the bot, which is the point.
       const model = makeReadModel({
         bots: [
           makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
           makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
           makeBot({ id: OTHER_SPECIALIST_ID, groupId: otherGroupId }),
+          makeBot({ id: otherGroupBossId, groupId: otherGroupId }),
+          makeBot({ id: otherGroupThirdId, groupId: otherGroupId }),
         ],
         groups: [
           makeGroup(),
@@ -186,9 +198,11 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
             ...makeGroup(),
             id: otherGroupId,
             name: "Other",
-            bossBotId: OTHER_SPECIALIST_ID,
+            bossBotId: otherGroupBossId,
             members: [
-              { kind: "bot" as const, botId: OTHER_SPECIALIST_ID, role: "boss" as const },
+              { kind: "bot" as const, botId: otherGroupBossId, role: "boss" as const },
+              { kind: "bot" as const, botId: OTHER_SPECIALIST_ID, role: "specialist" as const },
+              { kind: "bot" as const, botId: otherGroupThirdId, role: "specialist" as const },
               { kind: "person" as const, personId: otherGroupOwnerId, displayName: "Other owner" },
             ],
           },
@@ -222,7 +236,13 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
         actor: admin,
       });
 
-      expect("type" in adminResult && adminResult.type).toBe("group.member-assigned");
+      const events = Array.isArray(adminResult) ? adminResult : [adminResult];
+
+      expect(events.map((event) => event.type)).toEqual([
+        "group.member-unassigned",
+        "bot.updated",
+        "group.member-assigned",
+      ]);
     }),
   );
 
@@ -266,7 +286,11 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
         actor: admin,
       });
 
-      expect("type" in adminResult && adminResult.type).toBe("group.member-assigned");
+      // A group-less bot still has to carry its own `groupId`, so the move is two events even
+      // when there is no source group to leave.
+      const events = Array.isArray(adminResult) ? adminResult : [adminResult];
+
+      expect(events.map((event) => event.type)).toEqual(["bot.updated", "group.member-assigned"]);
     }),
   );
 
