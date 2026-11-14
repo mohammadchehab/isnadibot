@@ -106,8 +106,19 @@ export const rosterCatalog = {
   "Could not add bot": "无法添加机器人",
   "Every bot is already in this group.": "所有机器人都已在此群组中。",
   "Delete group": "删除群组",
+  "Delete and discard": "删除并丢弃",
   'Delete "{name}"? Its bots stay in your roster.':
     "删除“{name}”？其中的机器人会保留在你的机器人列表中。",
+  'Delete "{name}" and discard {count} open work item? This cannot be undone.':
+    "删除“{name}”并丢弃 {count} 个未完成的工作项？此操作无法撤销。",
+  'Delete "{name}" and discard {count} open work items? This cannot be undone.':
+    "删除“{name}”并丢弃 {count} 个未完成的工作项？此操作无法撤销。",
+  "You cannot delete this group": "你无法删除此群组",
+  "Deleting a group needs permission to change this environment. Ask the person who runs it.":
+    "删除群组需要更改此环境的权限。请向运行此环境的人申请。",
+  "This group still holds open work": "此群组仍有未完成的工作",
+  "Its work changed while you were deleting it. Delete again to see how many items would be discarded.":
+    "删除时其工作发生了变化。请再次删除，以查看将丢弃多少个工作项。",
   "Could not delete group": "无法删除群组",
   Group: "群组",
   "{name} group sidebar": "{name} 群组侧边栏",

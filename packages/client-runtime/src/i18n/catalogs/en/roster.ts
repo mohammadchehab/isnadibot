@@ -110,9 +110,20 @@ export const rosterCatalog = {
   "Could not add bot": "Could not add bot",
   "Every bot is already in this group.": "Every bot is already in this group.",
   "Delete group": "Delete group",
+  "Delete and discard": "Delete and discard",
   'Delete "{name}"? Its bots stay in your roster.':
     'Delete "{name}"? Its bots stay in your roster.',
+  'Delete "{name}" and discard {count} open work item? This cannot be undone.':
+    'Delete "{name}" and discard {count} open work item? This cannot be undone.',
+  'Delete "{name}" and discard {count} open work items? This cannot be undone.':
+    'Delete "{name}" and discard {count} open work items? This cannot be undone.',
   "Could not delete group": "Could not delete group",
+  "You cannot delete this group": "You cannot delete this group",
+  "Deleting a group needs permission to change this environment. Ask the person who runs it.":
+    "Deleting a group needs permission to change this environment. Ask the person who runs it.",
+  "This group still holds open work": "This group still holds open work",
+  "Its work changed while you were deleting it. Delete again to see how many items would be discarded.":
+    "Its work changed while you were deleting it. Delete again to see how many items would be discarded.",
   Group: "Group",
   "{name} group sidebar": "{name} group sidebar",
   "Collapse {name} group sidebar": "Collapse {name} group sidebar",

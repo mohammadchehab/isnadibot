@@ -24,7 +24,10 @@ describe("GroupDetailsPanel", () => {
     expect(source).toContain("input.memberCount <= 2");
     expect(source).not.toContain("Invite people");
     expect(source).toContain("dialogs.confirm(");
-    expect(source).toContain('confirmLabel: t("Delete group")');
+    expect(source).toContain(
+      'confirmLabel: openWorkItemCount > 0 ? t("Delete and discard") : t("Delete group")',
+    );
+    expect(source).toContain("discardWorkItems: true");
     expect(source).toContain('variant="destructive-outline"');
   });
 

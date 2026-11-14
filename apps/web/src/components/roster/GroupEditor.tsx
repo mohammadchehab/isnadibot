@@ -1,11 +1,14 @@
 import { Predicate } from "effect";
+import { useAtomValue } from "@effect/atom-react";
 import { BotId, GroupId, isGroupBotMember, type EnvironmentId } from "@isnadi/contracts";
+import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { BotIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import { ensureLocalApi } from "../../localApi";
 import { botEnvironment } from "../../state/bots";
+import { environmentSnapshotAtom } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -15,6 +18,7 @@ import { GroupMemberStack } from "./GroupMemberStack";
 import { GroupPeopleSection } from "./GroupPeopleSection";
 import { groupBotMembers, groupContainsBot } from "./roster.logic";
 import type { Bot, Group } from "./types";
+import { classifyGroupDeleteFailure, openWorkItemCountForGroup } from "./groupDelete.logic";
 import { groupMemberRemovalHint, isGroupMemberRemovalBlocked } from "./groupMemberRemoval.logic";
 
 export function GroupEditor({
@@ -37,6 +41,11 @@ export function GroupEditor({
   const deleteGroup = useAtomCommand(botEnvironment.groups.delete, {
     reportFailure: false,
   });
+
+  // The shell carries the group's open items, and it updates as they land, so
+  // the count named below is the one the server would refuse the delete over.
+  const snapshot = useAtomValue(environmentSnapshotAtom(environmentId));
+  const openWorkItemCount = openWorkItemCountForGroup(snapshot?.workItems ?? [], group.id);
 
   const assignMember = useAtomCommand(botEnvironment.groups.assignMember, {
     reportFailure: false,
@@ -85,6 +94,29 @@ export function GroupEditor({
     }
 
     return true;
+  };
+
+  // The refusals arrive as prose, so each one gets its own message rather than
+  // the generic "Could not delete group" the other editor actions use.
+  const deleteFailureToast = (message: string) => {
+    switch (classifyGroupDeleteFailure(message)) {
+      case "environment-rights":
+        return {
+          title: t("You cannot delete this group"),
+          description: t(
+            "Deleting a group needs permission to change this environment. Ask the person who runs it.",
+          ),
+        };
+      case "open-work-items":
+        return {
+          title: t("This group still holds open work"),
+          description: t(
+            "Its work changed while you were deleting it. Delete again to see how many items would be discarded.",
+          ),
+        };
+      case "unknown":
+        return { title: t("Could not delete group"), description: message };
+    }
   };
 
   return (
@@ -274,22 +306,51 @@ export function GroupEditor({
         variant="destructive-outline"
         onClick={async () => {
           const confirmed = await ensureLocalApi().dialogs.confirm(
-            t('Delete "{name}"? Its bots stay in your roster.', { name: group.name }),
-            { variant: "destructive", confirmLabel: t("Delete group") },
+            openWorkItemCount > 0
+              ? plural(
+                  openWorkItemCount,
+                  {
+                    one: 'Delete "{name}" and discard {count} open work item? This cannot be undone.',
+                    other:
+                      'Delete "{name}" and discard {count} open work items? This cannot be undone.',
+                  },
+                  { name: group.name },
+                )
+              : t('Delete "{name}"? Its bots stay in your roster.', { name: group.name }),
+            {
+              variant: "destructive",
+              confirmLabel: openWorkItemCount > 0 ? t("Delete and discard") : t("Delete group"),
+            },
           );
 
           if (!confirmed) return;
 
-          const success = await run(
-            () =>
-              deleteGroup({
-                environmentId,
-                input: { groupId: GroupId.make(group.id) },
-              }),
-            t("Could not delete group"),
-          );
+          setBusy(true);
 
-          if (success) onDeleted();
+          const result = await deleteGroup({
+            environmentId,
+            input: {
+              groupId: GroupId.make(group.id),
+              // Only once the dialog has named the items and the user confirmed
+              // discarding them; a group with no open work never sends the flag.
+              ...(openWorkItemCount > 0 ? { discardWorkItems: true } : {}),
+            },
+          });
+
+          setBusy(false);
+
+          if (Predicate.isTagged(result, "Failure")) {
+            const error = squashAtomCommandFailure(result);
+
+            toastManager.add({
+              type: "error",
+              ...deleteFailureToast(error instanceof Error ? error.message : ""),
+            });
+
+            return;
+          }
+
+          onDeleted();
         }}
       >
         {t("Delete group")}
