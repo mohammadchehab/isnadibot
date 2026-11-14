@@ -236,6 +236,17 @@ jobs:
       - name: Ensure Electron runtime is installed
         run: vp run --filter @isnadi/desktop ensure:electron
 
+      # The browser tests need a real Chromium. Only the Hetzner box has one, so the step is
+      # self-hosted only and the tests skip on a fork pull request's GitHub-hosted runner. All
+      # four shards run it: the install is a no-op after the first one, and any shard may be the
+      # one that holds the browser test file.
+      - name: Provide Chromium
+        if: runner.environment == 'self-hosted'
+        run: |
+          binary="$(scripts/ci/install-chromium.sh /opt/chrome-for-testing)"
+          "${binary}" --version
+          echo "ISNADI_CHROMIUM_PATH=${binary}" >> "$GITHUB_ENV"
+
       - name: Test isolated server suite
         run: >-
           vp run --filter isnadibot test

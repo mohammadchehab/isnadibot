@@ -249,6 +249,31 @@ describe("CI workflow budget", () => {
     expect(serverCommand).toContain(`--shard=\${{ matrix.shard }}/${shards.length}`);
     expect(ci.jobs.server?.name).toBe(`Server tests (shard \${{ matrix.shard }}/${shards.length})`);
     expect(ci.jobs.server?.strategy).toEqual({ "fail-fast": false, matrix: { shard: shards } });
+
+    // The server suite's browser tests need a real Chromium, which only the Hetzner box has. The
+    // step is self-hosted only and exports the resolved binary, so a fork pull request's
+    // GitHub-hosted shards skip those tests instead of failing them.
+    const chromiumStep = ci.jobs.server?.steps?.find((step) => step.name === "Provide Chromium");
+
+    expect(chromiumStep?.if).toBe("runner.environment == 'self-hosted'");
+    expect(chromiumStep?.run).toContain("scripts/ci/install-chromium.sh");
+    expect(chromiumStep?.run).toContain('echo "ISNADI_CHROMIUM_PATH=${binary}" >> "$GITHUB_ENV"');
+  });
+
+  it("pins one Chrome for Testing version for the runners and documents it", () => {
+    const installer = NodeFS.readFileSync(
+      new URL("../scripts/ci/install-chromium.sh", import.meta.url),
+      "utf8",
+    );
+
+    const version = /^CHROME_VERSION="([^"]+)"$/m.exec(installer)?.[1] ?? "";
+
+    expect(version).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+
+    // The documented pin is the one the installer downloads, so the runbook cannot drift from the box.
+    expect(
+      NodeFS.readFileSync(new URL("../docs/internals/ci.md", import.meta.url), "utf8"),
+    ).toContain(version);
   });
 
   it("coalesces version updates on a 4-vCPU runner", () => {
