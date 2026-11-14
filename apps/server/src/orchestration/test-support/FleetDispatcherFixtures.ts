@@ -2,10 +2,15 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   type BotId,
   CheckpointRef,
+  DEFAULT_PROVIDER_INTERACTION_MODE,
+  DEFAULT_RUNTIME_MODE,
   EventId,
+  ProjectId,
+  ProviderInstanceId,
   ThreadId,
   TurnId,
   WorkItemId,
+  type GroupId,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationGroup,
@@ -14,6 +19,7 @@ import {
   type OrchestrationThreadShell,
   type WorkItem,
 } from "@isnadi/contracts";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -75,9 +81,10 @@ export const workItem = (input: {
   readonly state?: WorkItem["state"];
   readonly ownerBotId?: BotId;
   readonly createdAt?: string;
+  readonly groupId?: GroupId;
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
-  groupId: GROUP_ID,
+  groupId: input.groupId ?? GROUP_ID,
   title: `Item ${input.id}`,
   brief: "Fix the thing.",
   kind: "task",
@@ -174,13 +181,68 @@ export const workItemCreated = (sequence: number, item: WorkItem) =>
     payload: { workItem: item },
   }) satisfies OrchestrationEvent;
 
+/** The chat that makes a chatless member dispatchable: a bot's own chat has no groupId. */
+export const threadCreated = (
+  sequence: number,
+  input: { readonly threadId: ThreadId; readonly botId: BotId; readonly groupId?: GroupId },
+) =>
+  ({
+    ...base(sequence, "thread.created"),
+    aggregateId: input.threadId,
+    type: "thread.created",
+    payload: {
+      threadId: input.threadId,
+      projectId: ProjectId.make("project-1"),
+      botId: input.botId,
+      groupId: input.groupId ?? null,
+      parentThreadId: null,
+      parentDelegationId: null,
+      title: "New chat",
+      modelSelection: { instanceId: ProviderInstanceId.make("default"), model: "default-model" },
+      runtimeMode: DEFAULT_RUNTIME_MODE,
+      interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+      branch: null,
+      worktreePath: null,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  }) satisfies OrchestrationEvent;
+
+/**
+ * A dispatch the engine refuses, the way a lost claim is refused: another group already took the
+ * item. `workItemId` narrows it to one item, and `remaining` spends the refusal so a later pass
+ * succeeds — that is how a pass that re-reads the read model is tested.
+ */
+export interface Rejection {
+  readonly type: string;
+  readonly error: OrchestrationCommandInvariantError;
+  readonly workItemId?: WorkItemId;
+  readonly remaining?: number;
+}
+
+const rejects = (rule: Rejection, command: OrchestrationCommand) =>
+  rule.type === command.type &&
+  (rule.workItemId === undefined ||
+    ("workItemId" in command && command.workItemId === rule.workItemId));
+
+/**
+ * Runs after every dispatch decision, standing in for the projector that follows the command. A
+ * test uses it to move the read model forward the way the real events would; without it a pass
+ * that re-reads the model sees the same queue twice.
+ */
+export type OnCommand = (
+  command: OrchestrationCommand,
+  outcome: "accepted" | "rejected",
+) => Effect.Effect<void>;
+
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];
 
-  // When set, every dispatch of that command type fails, as the engine does for a lost claim.
-  const rejection = yield* Ref.make<
-    { readonly type: string; readonly error: OrchestrationCommandInvariantError } | undefined
-  >(undefined);
+  // When set, a matching dispatch fails, as the engine does for a lost claim.
+  const rejection = yield* Ref.make<Rejection | undefined>(undefined);
+
+  // When set, runs after each decision so a test can project the command into the read model.
+  const onCommand = yield* Ref.make<OnCommand | undefined>(undefined);
 
   const events = yield* PubSub.unbounded<OrchestrationEvent>();
 
@@ -198,16 +260,33 @@ export const harness = Effect.gen(function* () {
     readThreadEvents: () => Stream.die("unused"),
     getThreadReplayStats: () => Effect.die("unused"),
     dispatch: (command) =>
-      Ref.get(rejection).pipe(
-        Effect.flatMap((reject) => {
-          if (reject !== undefined && reject.type === command.type) {
-            return Effect.fail(reject.error);
-          }
+      Effect.all([Ref.get(rejection), Ref.get(onCommand)]).pipe(
+        Effect.flatMap(([rule, hook]) =>
+          Effect.gen(function* () {
+            const refused = rule !== undefined && rejects(rule, command);
 
-          dispatched.push(command);
+            if (!refused) dispatched.push(command);
 
-          return Effect.succeed({ sequence: dispatched.length });
-        }),
+            // A refusal with `remaining` is spent once, so a later pass can win the claim.
+            if (refused && rule.remaining !== undefined)
+              yield* Ref.update(rejection, (current) =>
+                current?.remaining === undefined || current.remaining <= 1
+                  ? undefined
+                  : { ...current, remaining: current.remaining - 1 },
+              );
+
+            if (hook !== undefined)
+              yield* hook(command, refused ? "rejected" : "accepted").pipe(
+                Effect.catchCause((cause) =>
+                  Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.void,
+                ),
+              );
+
+            if (refused) return yield* rule.error;
+
+            return { sequence: dispatched.length };
+          }),
+        ),
       ),
     get streamDomainEvents() {
       return Stream.die("start should subscribe") as Stream.Stream<OrchestrationEvent>;
@@ -223,7 +302,17 @@ export const harness = Effect.gen(function* () {
   // those events would.
   const model = yield* Ref.make<OrchestrationReadModel>(idleTeamModel());
 
-  return { dispatched, rejection, events, engine, activation, model, receipts, receiptBus };
+  return {
+    dispatched,
+    rejection,
+    onCommand,
+    events,
+    engine,
+    activation,
+    model,
+    receipts,
+    receiptBus,
+  };
 });
 
 export const run = <A, E>(

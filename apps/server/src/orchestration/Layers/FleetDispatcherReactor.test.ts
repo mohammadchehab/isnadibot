@@ -1,12 +1,12 @@
 import { it } from "@effect/vitest";
 import {
-  type BotId,
-  type GroupId,
+  BotId,
+  GroupId,
   ThreadId,
   TurnId,
+  WorkItemId,
   type OrchestrationReadModel,
   type OrchestrationThread,
-  type WorkItem,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
@@ -21,11 +21,10 @@ import {
   SPECIALIST_ID,
   makeBot,
   makeGroup,
-  makeGroupThread,
   makeReadModel,
 } from "../test-support/GroupDeciderFixtures.ts";
 import {
-  type Ac3Thread,
+  type OnCommand,
   BOT_A,
   BOT_B,
   BOT_THREAD,
@@ -39,10 +38,48 @@ import {
   keepBusySet,
   run,
   sessionSet,
+  threadCreated,
   turnDiffCompleted,
   workItem,
   workItemCreated,
 } from "../test-support/FleetDispatcherFixtures.ts";
+
+/** A second keep-busy group, so one pass can be seen deciding two. */
+const SECOND_GROUP_ID = GroupId.make("group-second");
+
+/** An owner outside the group: the item was taken by someone else. */
+const OTHER_BOT_ID = BotId.make("bot-other");
+
+/**
+ * The projector's effect for a claim, so a pass that re-reads the model sees what the command
+ * did. A claimed item belongs to the bot; a refused one was taken elsewhere, so it belongs to a
+ * stranger. Either way it leaves the queue.
+ */
+const takeWorkItem =
+  (h: Effect.Success<typeof harness>): OnCommand =>
+  (command, outcome) =>
+    Effect.gen(function* () {
+      if (command.type !== "work-item.claim") return;
+
+      yield* Ref.update(h.model, (model) => ({
+        ...model,
+        workItems: (model.workItems ?? []).map((item) =>
+          item.id === command.workItemId
+            ? {
+                ...item,
+                state: "in-progress" as const,
+                ownerBotId: outcome === "accepted" ? command.botId : OTHER_BOT_ID,
+              }
+            : item,
+        ),
+      }));
+    });
+
+/** The decisions themselves: a re-run that finds the queue empty says so, and is not one. */
+const decisions = (receipts: ReadonlyArray<OrchestrationRuntimeReceipt>) =>
+  receipts.filter(
+    (receipt) => receipt.type === "fleet.dispatch.decided" && receipt.reason !== "queue-empty",
+  );
 
 describe("FleetDispatcherReactor", () => {
   it.effect("hands the queued item to the idle specialist when a turn ends", () =>
@@ -320,11 +357,53 @@ describe("FleetDispatcherReactor", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("reports a member with no chat instead of starting a turn it cannot start", () =>
+  it.effect("does not let one chatless member stop the group", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      // The group has an idle member, but the bot never opened a chat.
+      const members = [
+        { kind: "bot" as const, botId: BOT_A.id, role: "specialist" as const },
+        { kind: "bot" as const, botId: BOT_B.id, role: "specialist" as const },
+      ];
+
+      // BOT_A never opened a chat, so with no turn it ranks first; BOT_B has one and takes the item.
+      yield* Ref.set(h.model, {
+        ...makeReadModel({
+          bots: [BOT_A, BOT_B],
+          groups: [keepBusyGroup({ bossBotId: null, members })],
+          threads: [botThread(BOT_B.id, "thread-b")],
+        }),
+        workItems: [workItem({ id: "item-1" })],
+      });
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: BOT_B.id, workItemId: "item-1" });
+          expect(h.dispatched[1]).toMatchObject({ threadId: ThreadId.make("thread-b") });
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "assigned",
+              itemId: "item-1",
+              botId: BOT_B.id,
+            },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("skips a group whose members have no chat once, and names the bot", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      // A freshly hired group: nothing in the decider creates a chat, so none exists yet.
       yield* Ref.set(h.model, {
         ...makeReadModel({
           bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
@@ -338,16 +417,223 @@ describe("FleetDispatcherReactor", () => {
         Effect.gen(function* () {
           yield* reactor.drain;
 
-          expect(h.dispatched.filter((command) => command.type === "thread.turn.start")).toEqual(
-            [],
-          );
-          expect(yield* receipts).toMatchObject([
-            {
+          expect(h.dispatched).toEqual([]);
+          expect(yield* receipts).toEqual([
+            expect.objectContaining({
               type: "fleet.dispatch.decided",
               kind: "skipped",
               reason: "no-chat",
               botId: SPECIALIST_ID,
+            }),
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("drains the queue when the missing chat appears", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      const chatless: OrchestrationReadModel = {
+        ...makeReadModel({
+          bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
+          groups: [keepBusyGroup()],
+          threads: [],
+        }),
+        workItems: [workItem({ id: "item-1" })],
+      };
+
+      yield* Ref.set(h.model, chatless);
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched).toEqual([]);
+          expect(yield* receipts).toMatchObject([{ kind: "skipped", reason: "no-chat" }]);
+
+          // The user opens the bot's chat: the thread is projected and its event arrives. That
+          // event alone is what wakes the group — no turn ends and no item is touched.
+          yield* Ref.set(h.model, {
+            ...chatless,
+            threads: [botThread(SPECIALIST_ID, "thread-bot-specialist")],
+          });
+          yield* PubSub.publish(
+            h.events,
+            threadCreated(1, { threadId: BOT_THREAD, botId: SPECIALIST_ID }),
+          );
+          yield* reactor.drainThrough(1);
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "assigned",
+              itemId: "item-1",
+              botId: SPECIALIST_ID,
             },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("spends a bot once per pass across two keep-busy groups", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      const members = [{ kind: "bot" as const, botId: BOT_A.id, role: "specialist" as const }];
+
+      // One free bot, a member of two groups, each with its own item waiting. One pass decides
+      // both groups from one snapshot, so the second group must not be handed the same bot.
+      yield* Ref.set(h.model, {
+        ...makeReadModel({
+          bots: [BOT_A],
+          groups: [
+            keepBusyGroup({ bossBotId: null, members }),
+            { ...keepBusyGroup({ bossBotId: null, members }), id: SECOND_GROUP_ID },
+          ],
+          threads: [botThread(BOT_A.id, "thread-a")],
+        }),
+        workItems: [
+          workItem({ id: "item-first", createdAt: NOW }),
+          workItem({ id: "item-second", createdAt: LATER, groupId: SECOND_GROUP_ID }),
+        ],
+      });
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: BOT_A.id, workItemId: "item-first" });
+          // The second group had nothing left to hand out, and says nothing about it.
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "assigned",
+              itemId: "item-first",
+              botId: BOT_A.id,
+            },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("dispatches the rest of the queue after a lost claim", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      // Someone else took the first item: the read model in hand still shows it queued.
+      yield* Ref.set(h.rejection, {
+        type: "work-item.claim",
+        workItemId: WorkItemId.make("item-taken"),
+        error: new OrchestrationCommandInvariantError({
+          commandType: "work-item.claim",
+          detail: "Work item 'item-taken' is no longer queued.",
+        }),
+      });
+      yield* Ref.set(h.onCommand, takeWorkItem(h));
+      yield* Ref.set(
+        h.model,
+        idleTeamModel([
+          workItem({ id: "item-taken", createdAt: NOW }),
+          workItem({ id: "item-next", createdAt: LATER }),
+        ]),
+      );
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: SPECIALIST_ID, workItemId: "item-next" });
+          // The rest of the queue drains on the loss alone: the re-run that follows finds it empty.
+          expect(decisions(yield* receipts)).toMatchObject([
+            { kind: "skipped", reason: "claim-lost", itemId: "item-taken" },
+            { kind: "assigned", itemId: "item-next", botId: SPECIALIST_ID },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("publishes one claim-lost receipt however many claims are lost", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "work-item.claim",
+        error: new OrchestrationCommandInvariantError({
+          commandType: "work-item.claim",
+          detail: "Work item is no longer queued.",
+        }),
+      });
+      yield* Ref.set(h.onCommand, takeWorkItem(h));
+      yield* Ref.set(
+        h.model,
+        idleTeamModel([
+          workItem({ id: "item-1", createdAt: NOW }),
+          workItem({ id: "item-2", createdAt: LATER }),
+          workItem({ id: "item-3", createdAt: LATEST }),
+        ]),
+      );
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched).toEqual([]);
+
+          const lost = (yield* receipts).filter(
+            (receipt) =>
+              receipt.type === "fleet.dispatch.decided" && receipt.reason === "claim-lost",
+          );
+
+          expect(lost).toHaveLength(1);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("retries the queue after a lost claim with no further event", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      // The claim is refused once, as a stale pass is, and succeeds when the group re-reads.
+      yield* Ref.set(h.rejection, {
+        type: "work-item.claim",
+        error: new OrchestrationCommandInvariantError({
+          commandType: "work-item.claim",
+          detail: "Work item 'item-1' is no longer queued.",
+        }),
+        remaining: 1,
+      });
+      yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // Nothing else arrives between the two passes: the loss itself wakes the group.
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(yield* receipts).toMatchObject([
+            { kind: "skipped", reason: "claim-lost" },
+            { kind: "assigned", itemId: "item-1", botId: SPECIALIST_ID },
           ]);
         }),
       );
@@ -473,294 +759,6 @@ describe("FleetDispatcherReactor", () => {
           expect(yield* receipts).toMatchObject([
             { type: "fleet.dispatch.decided", kind: "skipped", reason: "no-idle-member" },
           ]);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-});
-
-describe("FleetDispatcherReactor idle rule (AC3)", () => {
-  const runningTurn = (botId: BotId) => ({
-    turnId: TurnId.make("turn-1"),
-    state: "running" as const,
-    requestedAt: NOW,
-    startedAt: NOW,
-    completedAt: null,
-    assistantMessageId: null,
-    respondingBotId: botId,
-  });
-
-  /** A bot's own chat, as the shell serves it: a thread plus the pending flags AC3 reads. */
-  const botShell = (input: {
-    readonly botId: BotId | null;
-    readonly id: string;
-    readonly groupId?: GroupId | null;
-    readonly respondingBotId?: BotId | null;
-    readonly hasPendingApprovals?: boolean;
-    readonly hasPendingUserInput?: boolean;
-    readonly running?: BotId | null;
-  }): Ac3Thread => ({
-    ...makeGroupThread(),
-    id: ThreadId.make(input.id),
-    botId: input.botId,
-    groupId: input.groupId ?? null,
-    respondingBotId: input.respondingBotId ?? null,
-    session: null,
-    latestTurn:
-      input.running === undefined || input.running === null ? null : runningTurn(input.running),
-    hasPendingApprovals: input.hasPendingApprovals ?? false,
-    hasPendingUserInput: input.hasPendingUserInput ?? false,
-  });
-
-  const modelWith = (
-    threads: ReadonlyArray<Ac3Thread>,
-    items: ReadonlyArray<WorkItem>,
-  ): OrchestrationReadModel => ({
-    ...idleTeamModel(items),
-    threads,
-  });
-
-  const expectSkipped = (
-    h: Effect.Success<typeof harness>,
-    receipts: Effect.Effect<ReadonlyArray<OrchestrationRuntimeReceipt>>,
-  ) =>
-    Effect.gen(function* () {
-      expect(h.dispatched).toEqual([]);
-      expect(yield* receipts).toMatchObject([
-        { type: "fleet.dispatch.decided", kind: "skipped", reason: "no-idle-member" },
-      ]);
-    });
-
-  it.effect("does not wake a bot that is waiting on the user's answer", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [
-            botShell({
-              botId: SPECIALIST_ID,
-              id: "thread-bot-specialist",
-              hasPendingUserInput: true,
-            }),
-          ],
-          [workItem({ id: "item-1" })],
-        ),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          yield* expectSkipped(h, receipts);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("does not wake a bot that has an approval pending", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [
-            botShell({
-              botId: SPECIALIST_ID,
-              id: "thread-bot-specialist",
-              hasPendingApprovals: true,
-            }),
-          ],
-          [workItem({ id: "item-1" })],
-        ),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          yield* expectSkipped(h, receipts);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("does not wake a bot that holds a blocked item", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [botShell({ botId: SPECIALIST_ID, id: "thread-bot-specialist" })],
-          [
-            workItem({ id: "item-held", state: "blocked", ownerBotId: SPECIALIST_ID }),
-            workItem({ id: "item-1", createdAt: LATER }),
-          ],
-        ),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          yield* expectSkipped(h, receipts);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("does not start a turn inside a group responder queue that is running", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      // The specialist is answering in the group chat while its own chat sits idle, so only the
-      // shared rule — which follows who a chat's responder is — can see it is busy.
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [
-            botShell({ botId: SPECIALIST_ID, id: "thread-bot-specialist" }),
-            botShell({
-              botId: null,
-              id: "thread-group",
-              groupId: GROUP_ID,
-              respondingBotId: SPECIALIST_ID,
-              running: SPECIALIST_ID,
-            }),
-          ],
-          [workItem({ id: "item-1" })],
-        ),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          yield* expectSkipped(h, receipts);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-});
-
-describe("FleetDispatcherReactor pick order (AC7)", () => {
-  const MEMBERS = [
-    { kind: "bot" as const, botId: BOT_A.id, role: "specialist" as const },
-    { kind: "bot" as const, botId: BOT_B.id, role: "specialist" as const },
-  ];
-
-  /** A bot's own chat whose last turn finished at `completedAt`, or none when it never had one. */
-  const finished = (botId: BotId, id: string, completedAt?: string): Ac3Thread => ({
-    ...makeGroupThread(),
-    id: ThreadId.make(id),
-    botId,
-    groupId: null,
-    session: null,
-    latestTurn:
-      completedAt === undefined
-        ? null
-        : {
-            turnId: TurnId.make(`turn-${botId}`),
-            state: "completed",
-            requestedAt: completedAt,
-            startedAt: completedAt,
-            completedAt,
-            assistantMessageId: null,
-          },
-    hasPendingApprovals: false,
-    hasPendingUserInput: false,
-  });
-
-  /** Two free specialists, one item waiting, and nothing for a model to decide. */
-  const twoIdleBots = (
-    threads: ReadonlyArray<Ac3Thread>,
-    items: ReadonlyArray<WorkItem> = [workItem({ id: "item-1" })],
-  ): OrchestrationReadModel => ({
-    ...makeReadModel({
-      bots: [BOT_A, BOT_B],
-      groups: [keepBusyGroup({ bossBotId: null, members: MEMBERS })],
-      threads,
-    }),
-    workItems: items,
-  });
-
-  it.effect("gives the item to the member idle longest, not the lowest id", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        twoIdleBots([
-          // BOT_A finished a second ago, BOT_B has been free since the start of the day.
-          finished(BOT_A.id, "thread-a", LATEST),
-          finished(BOT_B.id, "thread-b", NOW),
-        ]),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          expect(h.dispatched.map((command) => command.type)).toEqual([
-            "work-item.claim",
-            "thread.turn.start",
-          ]);
-          expect(h.dispatched[0]).toMatchObject({ botId: BOT_B.id, workItemId: "item-1" });
-          expect(h.dispatched[1]).toMatchObject({ threadId: ThreadId.make("thread-b") });
-          // No second bot is woken for the same item, and nothing was asked to choose.
-          expect(yield* receipts).toMatchObject([
-            {
-              type: "fleet.dispatch.decided",
-              kind: "assigned",
-              itemId: "item-1",
-              botId: BOT_B.id,
-            },
-          ]);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("gives it to the member that never had a turn before one that just finished", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        twoIdleBots([finished(BOT_A.id, "thread-a"), finished(BOT_B.id, "thread-b", NOW)]),
-      );
-
-      yield* run(h, ({ reactor }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          expect(h.dispatched[0]).toMatchObject({ botId: BOT_A.id, workItemId: "item-1" });
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("breaks an equal idle time with the lowest bot id", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        twoIdleBots([finished(BOT_A.id, "thread-a", NOW), finished(BOT_B.id, "thread-b", NOW)]),
-      );
-
-      yield* run(h, ({ reactor }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          expect(h.dispatched.map((command) => command.type)).toEqual([
-            "work-item.claim",
-            "thread.turn.start",
-          ]);
-          expect(h.dispatched[0]).toMatchObject({ botId: BOT_A.id });
         }),
       );
     }).pipe(Effect.scoped),

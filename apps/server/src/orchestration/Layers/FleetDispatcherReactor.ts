@@ -47,6 +47,14 @@ import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 /** Why a group was left exactly as it was. */
 type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost";
 
+/** What one pass carries across every group it decides, so a member is spent once per pass. */
+interface SweepState {
+  /** Members this pass has already been given an item. */
+  readonly busied: Set<BotId>;
+  /** Set once the pass published its one skip receipt, so a queue never becomes a receipt storm. */
+  skipped: boolean;
+}
+
 /**
  * Runs a keep-busy group: when one of its members stops running a turn, or a queued item
  * arrives, the dispatcher hands the oldest waiting item to a member that has nothing to do. The
@@ -192,71 +200,116 @@ const make = Effect.gen(function* () {
 
   // Hands out as many waiting items as the group has idle members. A claim changes neither the
   // read model in hand nor the read model's view of who is free, so both are kept current here.
-  const dispatchGroup = (readModel: OrchestrationReadModel, group: OrchestrationGroup) =>
+  const dispatchGroup = (
+    readModel: OrchestrationReadModel,
+    group: OrchestrationGroup,
+    sweepState: SweepState,
+  ) =>
     Effect.gen(function* () {
       const waiting = queuedWorkItems(readModel, group.id);
-      const busied = new Set<BotId>();
 
-      if (waiting.length === 0)
-        return yield* publishDecision(group.id, "skipped", { reason: "queue-empty" });
+      if (waiting.length === 0) {
+        yield* publishDecision(group.id, "skipped", { reason: "queue-empty" });
+
+        return false;
+      }
+
+      // One skip per pass, and only while the pass has handed nothing out: a lost claim or a group
+      // with nobody free is a note about the pass, not about every item waiting in it.
+      const skip = (fields: {
+        readonly itemId: WorkItemId;
+        readonly botId?: BotId;
+        readonly reason: SkipReason;
+      }) => {
+        if (sweepState.busied.size > 0 || sweepState.skipped) return Effect.void;
+
+        sweepState.skipped = true;
+
+        return publishDecision(group.id, "skipped", fields);
+      };
+
+      let lostClaim = false;
 
       for (const item of waiting) {
-        const bot = pickIdleMember(readModel, group, busied);
+        const pick = pickIdleMember(readModel, group, sweepState.busied);
 
-        if (bot === undefined) {
-          if (busied.size === 0) {
-            yield* publishDecision(group.id, "skipped", {
-              itemId: item.id,
-              reason: "no-idle-member",
-            });
-          }
-
-          return;
-        }
-
-        const chat = botChat(readModel, bot.id);
-
-        if (chat === undefined) {
-          yield* publishDecision(group.id, "skipped", {
+        if (pick.kind === "none") {
+          yield* skip({
             itemId: item.id,
-            botId: bot.id,
-            reason: "no-chat",
+            reason: pick.reason,
+            ...(pick.botId === undefined ? {} : { botId: pick.botId }),
           });
 
-          return;
+          break;
         }
 
-        if (!(yield* claim(bot.id, item.id))) {
-          yield* publishDecision(group.id, "skipped", {
-            itemId: item.id,
-            botId: bot.id,
-            reason: "claim-lost",
-          });
+        const chat = botChat(readModel, pick.bot.id);
 
-          return;
+        // The pick only names a member that has a chat; this keeps that narrowing honest.
+        if (chat === undefined) continue;
+
+        if (!(yield* claim(pick.bot.id, item.id))) {
+          yield* skip({ itemId: item.id, botId: pick.bot.id, reason: "claim-lost" });
+          lostClaim = true;
+
+          // The claim took another item; it says nothing about the rest of the queue.
+          continue;
         }
 
         yield* startTurn(chat, item);
-        yield* publishDecision(group.id, "assigned", { itemId: item.id, botId: bot.id });
-        busied.add(bot.id);
+        yield* publishDecision(group.id, "assigned", { itemId: item.id, botId: pick.bot.id });
+        sweepState.busied.add(pick.bot.id);
       }
+
+      // The caller re-reads the model once when this is true: a refused claim means the snapshot
+      // in hand is stale, and the items behind the lost one deserve the fresh one.
+      return lostClaim;
     });
+
+  // A refused claim means the pass decided from a snapshot the engine had already left behind. One
+  // fresh read and one more decision is enough to drain what waited behind the lost item, and it is
+  // bounded: re-waking the worker instead would spin for as long as the projection takes to catch
+  // up, and a claim that keeps being refused would never let it settle.
+  const reReadAndDispatch = (groupId: GroupId, sweepState: SweepState) =>
+    projectionSnapshotQuery.getCommandReadModel().pipe(
+      Effect.flatMap((readModel) => {
+        const group = readModel.groups.find((candidate) => candidate.id === groupId);
+
+        return group === undefined || group.keepBusy !== true
+          ? Effect.void
+          : dispatchGroup(readModel, group, sweepState).pipe(Effect.asVoid);
+      }),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not re-read a group", {
+              cause: Cause.pretty(cause),
+            }),
+      ),
+    );
 
   const sweep = (groupIds: ReadonlyArray<GroupId>) =>
     projectionSnapshotQuery.getCommandReadModel().pipe(
-      Effect.flatMap((readModel) =>
-        Effect.forEach(
+      Effect.flatMap((readModel) => {
+        // One pass decides every group from one snapshot, so it also spends each member once.
+        const sweepState: SweepState = { busied: new Set(), skipped: false };
+
+        return Effect.forEach(
           groupIds,
           (groupId) => {
             const group = readModel.groups.find((candidate) => candidate.id === groupId);
 
-            return group !== undefined && group.keepBusy === true
-              ? dispatchGroup(readModel, group)
-              : Effect.void;
+            if (group === undefined || group.keepBusy !== true) return Effect.void;
+
+            return dispatchGroup(readModel, group, sweepState).pipe(
+              Effect.flatMap((lostClaim) =>
+                lostClaim ? reReadAndDispatch(groupId, sweepState) : Effect.void,
+              ),
+            );
           },
           { discard: true },
-        ),
-      ),
+        );
+      }),
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.failCause(cause)
@@ -355,6 +408,11 @@ const make = Effect.gen(function* () {
           ? Effect.void
           : turnEnded(threadId, lastTurnId.get(threadId) ?? `event:${event.sequence}`);
       }
+
+      // A new chat is what a chatless member was missing: the queued item can run now. Losing a
+      // chat only removes dispatchability, so thread.deleted and thread.archived wake nobody.
+      case "thread.created":
+        return scheduleAfterRead(event.payload.groupId ?? undefined, event.payload.threadId);
 
       case "group.keep-busy-set":
         return event.payload.keepBusy ? schedule(event.payload.groupId) : Effect.void;
@@ -517,22 +575,47 @@ function compareIdleRank(left: IdleRank, right: IdleRank): number {
  * The member that takes the next item: the idle specialist who has been free longest, or the boss
  * when it is the only bot in the group. Two idle members are never both woken for one item, and no
  * model is asked to choose between them.
+ *
+ * A member with no chat is not a candidate: there is no turn to start for it, and a fresh hire has
+ * no chat until the user opens one. When every free member is chatless the result names the one
+ * that ranked first, so the receipt says which bot to open a chat with.
  */
+export type PickResult =
+  | { readonly kind: "member"; readonly bot: OrchestrationBot }
+  | {
+      readonly kind: "none";
+      readonly reason: "no-idle-member" | "no-chat";
+      readonly botId?: BotId;
+    };
+
 export function pickIdleMember(
   readModel: OrchestrationReadModel,
   group: OrchestrationGroup,
   busy: ReadonlySet<BotId> = new Set(),
-): OrchestrationBot | undefined {
+): PickResult {
   const members = group.members.filter(isGroupBotMember).map((member) => member.botId);
   const specialists = members.filter((botId) => botId !== group.bossBotId);
   const candidates = specialists.length > 0 ? specialists : members;
 
-  const botId = candidates
+  const free = candidates
     .filter((candidate) => !busy.has(candidate) && isBotIdle(readModel, candidate))
-    .map((candidate) => idleRank(readModel, candidate))
-    .toSorted(compareIdleRank)[0]?.botId;
+    .flatMap((candidate) => {
+      const bot = readModel.bots.find((candidateBot) => candidateBot.id === candidate);
 
-  return botId === undefined ? undefined : readModel.bots.find((bot) => bot.id === botId);
+      return bot === undefined ? [] : [{ bot, rank: idleRank(readModel, candidate) }];
+    })
+    .toSorted((left, right) => compareIdleRank(left.rank, right.rank));
+
+  const dispatchable = free.find(({ bot }) => botChat(readModel, bot.id) !== undefined);
+
+  if (dispatchable !== undefined) return { kind: "member", bot: dispatchable.bot };
+
+  const firstFree = free[0];
+
+  // A chatless member is a state the user can fix; "everyone is busy" is not.
+  return firstFree === undefined
+    ? { kind: "none", reason: "no-idle-member" }
+    : { kind: "none", reason: "no-chat", botId: firstFree.bot.id };
 }
 
 export const FleetDispatcherReactorLive = Layer.effect(FleetDispatcherReactor, make);
