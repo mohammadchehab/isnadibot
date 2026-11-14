@@ -409,6 +409,7 @@ export const rosterCatalog = {
   Held: "معلّق",
   Busy: "مشغول",
   Idle: "متاح",
+  "Sign in": "تسجيل الدخول",
   "Context used: {percent}%": "السياق المستخدم: {percent}%",
   "Queued ({count})": "في الانتظار ({count})",
   Standup: "التقرير اليومي",

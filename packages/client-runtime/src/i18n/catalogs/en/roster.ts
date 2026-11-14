@@ -385,6 +385,7 @@ export const rosterCatalog = {
   Held: "Held",
   Busy: "Busy",
   Idle: "Idle",
+  "Sign in": "Sign in",
   "Context used: {percent}%": "Context used: {percent}%",
   "Queued ({count})": "Queued ({count})",
   Standup: "Standup",

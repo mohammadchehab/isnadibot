@@ -368,6 +368,7 @@ export const rosterCatalog = {
   Held: "受阻",
   Busy: "忙碌",
   Idle: "空闲",
+  "Sign in": "登录",
   "Context used: {percent}%": "上下文已用：{percent}%",
   "Queued ({count})": "排队中（{count}）",
   Standup: "站会",

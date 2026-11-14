@@ -25,6 +25,22 @@ const OTHER = BotId.make("other");
 
 const NOW = "2026-11-13T10:00:00.000Z";
 
+/** The session a chat holds, as the wire shape refuses to leave a field out. */
+type ChatSession = NonNullable<BotStatusChat["session"]>;
+
+function chatSession(overrides: Partial<ChatSession> = {}): ChatSession {
+  return {
+    threadId: ThreadId.make("chat-1"),
+    status: "ready",
+    providerName: null,
+    runtimeMode: "auto",
+    activeTurnId: null,
+    lastError: null,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
 function chat(overrides: Partial<BotStatusChat> = {}): BotStatusChat {
   return {
     id: ThreadId.make("chat-1"),
@@ -82,6 +98,16 @@ const ERRORED: OrchestrationLatestTurn = {
   completedAt: NOW,
 };
 
+/** A turn that died because the provider's login is gone, which only the user can fix. */
+const EXPIRED_TURN: OrchestrationLatestTurn = { ...ERRORED, unavailability: "expired-login" };
+
+/** A session that never got a turn off the ground because its login is gone. */
+const SESSION_SIGNED_OUT: ChatSession = chatSession({
+  status: "error",
+  lastError: "login expired",
+  unavailability: "expired-login",
+});
+
 const CHILD_RUNNING: IsnadiDelegationPhase = {
   _tag: "Running",
   childThreadId: ThreadId.make("child-1"),
@@ -99,6 +125,39 @@ const CHILD_DONE: IsnadiDelegationPhase = {
   result: { summary: "done", childThreadId: ThreadId.make("child-1"), childTurnId: null },
   acknowledgedAt: null,
 };
+
+/** One flag per state a chat can signal, so a case can name the pair it puts in conflict. */
+interface Signals {
+  readonly asking?: boolean;
+  readonly signIn?: boolean;
+  readonly held?: boolean;
+  readonly busy?: boolean;
+}
+
+/**
+ * The chats that carry each signal. Asking and sign-in each need a chat of
+ * their own, because a single chat cannot both wait on the user and fail to
+ * reach its provider.
+ */
+function chatsFor(signals: Signals): ReadonlyArray<BotStatusChat> {
+  const chats: BotStatusChat[] = [];
+
+  if (signals.asking === true) {
+    chats.push(
+      chat({ id: ThreadId.make("asking"), latestTurn: COMPLETED, hasPendingUserInput: true }),
+    );
+  }
+
+  if (signals.signIn === true) {
+    chats.push(chat({ id: ThreadId.make("signin"), latestTurn: EXPIRED_TURN }));
+  }
+
+  if (signals.busy === true) {
+    chats.push(chat({ id: ThreadId.make("busy"), latestTurn: RUNNING }));
+  }
+
+  return chats;
+}
 
 function status(input: {
   chats?: ReadonlyArray<BotStatusChat>;
@@ -256,14 +315,126 @@ describe("deriveBotStatus", () => {
   it("counts each state", () => {
     expect(countBotStatuses(["asking", "busy", "busy", "idle"])).toEqual({
       asking: 1,
+      "sign-in-required": 0,
       held: 0,
       busy: 2,
       idle: 1,
     });
-    expect(countBotStatuses([])).toEqual({ asking: 0, held: 0, busy: 0, idle: 0 });
+    expect(countBotStatuses([])).toEqual({
+      asking: 0,
+      "sign-in-required": 0,
+      held: 0,
+      busy: 0,
+      idle: 0,
+    });
   });
 
-  it("lists the four states in precedence order", () => {
-    expect(BOT_STATUSES).toEqual(["asking", "held", "busy", "idle"]);
+  it("lists the five states in precedence order", () => {
+    expect(BOT_STATUSES).toEqual(["asking", "sign-in-required", "held", "busy", "idle"]);
+  });
+
+  it("counts a sign-in requirement", () => {
+    expect(countBotStatuses(["asking", "sign-in-required", "busy", "busy", "idle"])).toEqual({
+      asking: 1,
+      "sign-in-required": 1,
+      held: 0,
+      busy: 2,
+      idle: 1,
+    });
+  });
+});
+
+describe("deriveBotStatus sign-in-required", () => {
+  it("reads the need to sign in from the turn that died, or from the session when none started", () => {
+    expect(status({ chats: [chat({ latestTurn: EXPIRED_TURN })] })).toBe("sign-in-required");
+    expect(status({ chats: [chat({ session: SESSION_SIGNED_OUT })] })).toBe("sign-in-required");
+  });
+
+  it("trusts the turn's own reason over the session's", () => {
+    expect(
+      status({
+        chats: [
+          chat({
+            latestTurn: EXPIRED_TURN,
+            session: chatSession({ status: "error", unavailability: "usage-cap" }),
+          }),
+        ],
+      }),
+    ).toBe("sign-in-required");
+  });
+
+  it("is not a sign-in state for an error signing in cannot fix", () => {
+    for (const latestTurn of [COMPLETED, INTERRUPTED, ERRORED]) {
+      expect(status({ chats: [chat({ latestTurn })] })).toBe("idle");
+    }
+
+    expect(
+      status({ chats: [chat({ latestTurn: { ...ERRORED, unavailability: "usage-cap" } })] }),
+    ).toBe("idle");
+    expect(status({ chats: [chat({ session: chatSession() })] })).toBe("idle");
+    expect(
+      status({
+        chats: [
+          chat({ session: chatSession({ status: "error", unavailability: "temporary-failure" }) }),
+        ],
+      }),
+    ).toBe("idle");
+  });
+
+  it("counts an archived chat's sign-in requirement for nothing", () => {
+    expect(status({ chats: [chat({ archivedAt: NOW, latestTurn: EXPIRED_TURN })] })).toBe("idle");
+  });
+
+  it("counts another bot's sign-in requirement for nothing", () => {
+    const theirs = chat({
+      id: ThreadId.make("theirs"),
+      botId: OTHER,
+      latestTurn: EXPIRED_TURN,
+    });
+
+    expect(status({ chats: [theirs] })).toBe("idle");
+    expect(status({ chats: [theirs], botId: OTHER })).toBe("sign-in-required");
+  });
+
+  it("counts a delegated sub-chat's sign-in requirement toward its root chat's bot", () => {
+    const root = chat({ id: ThreadId.make("root") });
+
+    const sub = chat({
+      id: ThreadId.make("sub"),
+      botId: OTHER,
+      parentThreadId: ThreadId.make("root"),
+      latestTurn: EXPIRED_TURN,
+    });
+
+    expect(status({ chats: [root, sub] })).toBe("sign-in-required");
+    expect(status({ chats: [root, sub], botId: OTHER })).toBe("idle");
+  });
+
+  it("picks the higher state for every pair of signals, and for all of them at once", () => {
+    const cases: ReadonlyArray<{
+      readonly signals: Signals;
+      readonly expected: BotStatus;
+    }> = [
+      { signals: {}, expected: "idle" },
+      { signals: { asking: true }, expected: "asking" },
+      { signals: { signIn: true }, expected: "sign-in-required" },
+      { signals: { held: true }, expected: "held" },
+      { signals: { busy: true }, expected: "busy" },
+      { signals: { asking: true, signIn: true }, expected: "asking" },
+      { signals: { asking: true, held: true }, expected: "asking" },
+      { signals: { asking: true, busy: true }, expected: "asking" },
+      { signals: { signIn: true, held: true }, expected: "sign-in-required" },
+      { signals: { signIn: true, busy: true }, expected: "busy" },
+      { signals: { held: true, busy: true }, expected: "held" },
+      { signals: { asking: true, signIn: true, held: true, busy: true }, expected: "asking" },
+      { signals: { signIn: true, held: true, busy: true }, expected: "held" },
+    ];
+
+    for (const { signals, expected } of cases) {
+      expect(
+        status({ chats: chatsFor(signals), blockedItem: signals.held === true }),
+        JSON.stringify(signals),
+      ).toBe(expected);
+    }
   });
 });
