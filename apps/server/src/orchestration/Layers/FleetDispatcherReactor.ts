@@ -45,7 +45,7 @@ import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts"
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 
 /** Why a group was left exactly as it was. */
-type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost";
+type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost" | "turn-running";
 
 /**
  * Runs a keep-busy group: when one of its members stops running a turn, or a queued item
@@ -201,6 +201,17 @@ const make = Effect.gen(function* () {
         return yield* publishDecision(group.id, "skipped", { reason: "queue-empty" });
 
       for (const item of waiting) {
+        // The item is back in the queue but the turn that was working it has not finished.
+        // Handing it out now would put a second bot on it; the turn-end wake clears this.
+        if (runningDispatcherTurnItem(readModel, item.id) !== undefined) {
+          yield* publishDecision(group.id, "skipped", {
+            itemId: item.id,
+            reason: "turn-running",
+          });
+
+          continue;
+        }
+
         const bot = pickIdleMember(readModel, group, busied);
 
         if (bot === undefined) {
@@ -309,32 +320,42 @@ const make = Effect.gen(function* () {
     return readModel.bots.find((bot) => bot.id === botId)?.groupId ?? undefined;
   };
 
-  // The event names a thread or a group, but only the read model says which group that is — and
-  // the decision that follows reads the read model anyway.
-  const scheduleAfterRead = (groupId: GroupId | undefined, threadId?: ThreadId) =>
-    groupId !== undefined
-      ? schedule(groupId)
-      : projectionSnapshotQuery.getCommandReadModel().pipe(
-          Effect.flatMap((readModel) => {
-            const found = threadId === undefined ? undefined : groupOfThread(readModel, threadId);
+  // The event names a thread, but only the read model says which groups are worth a look — and the
+  // decision that follows reads the read model anyway.
+  const scheduleGroupsAfterRead = (
+    resolve: (readModel: OrchestrationReadModel) => Iterable<GroupId | undefined>,
+  ) =>
+    projectionSnapshotQuery.getCommandReadModel().pipe(
+      Effect.flatMap((readModel) => {
+        const groups = new Set<GroupId>();
 
-            return found === undefined ? Effect.void : schedule(found);
-          }),
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.logWarning("fleet dispatcher could not resolve a group", {
-                  cause: Cause.pretty(cause),
-                }),
-          ),
-        );
+        for (const groupId of resolve(readModel)) {
+          if (groupId !== undefined) groups.add(groupId);
+        }
 
+        return Effect.forEach(groups, (groupId) => schedule(groupId), { discard: true });
+      }),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not resolve a group", {
+              cause: Cause.pretty(cause),
+            }),
+      ),
+    );
+
+  // The turn that just ended may have been working an item that a group move has since put in
+  // another group. The release-time sweep skipped it while this turn was live, so the wake that
+  // clears the guard has to reach the item's current group or the item never gets picked up.
   const turnEnded = (threadId: ThreadId, turnId: TurnId | string) => {
     if (handledTurnEnd.get(threadId) === turnId) return Effect.void;
 
     handledTurnEnd.set(threadId, turnId);
 
-    return scheduleAfterRead(undefined, threadId);
+    return scheduleGroupsAfterRead((readModel) => [
+      groupOfThread(readModel, threadId),
+      dispatcherTurnItemGroup(readModel, threadId),
+    ]);
   };
 
   const observe = (event: OrchestrationEvent) => {
@@ -445,6 +466,57 @@ export function queuedWorkItems(
       (left, right) =>
         left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
     );
+}
+
+/**
+ * The item a live dispatcher turn is still working, if the read model can still see that turn.
+ *
+ * A group move or a human unassign releases an in-progress item back to queued and unowned, which
+ * is what stops it stranding — but the turn that was working it keeps running against it. Handing
+ * the item out again would put two bots on one item, so the dispatcher leaves it alone until that
+ * turn reports terminal.
+ *
+ * Keyed on the turn's trigger, not on the item's chat: `work-item.claim` never sets `threadId`, so
+ * an item the dispatcher has just claimed usually has no chat to key on.
+ *
+ * Fails open. A turn the read model cannot see — settled, interrupted, or a thread that was
+ * deleted — releases the item, which is the safe direction: an item nobody is working must not sit
+ * in the queue forever.
+ */
+export function runningDispatcherTurnItem(
+  readModel: OrchestrationReadModel,
+  itemId: WorkItemId,
+): ThreadId | undefined {
+  const thread = readModel.threads.find((candidate) => {
+    const turn = candidate.latestTurn;
+    const trigger = turn?.trigger;
+
+    return (
+      candidate.deletedAt === null &&
+      turn?.state === "running" &&
+      trigger?.kind === "dispatcher" &&
+      trigger.workItemId === itemId
+    );
+  });
+
+  return thread?.id;
+}
+
+/**
+ * The group that currently owns the item a thread's dispatcher turn is working, if that turn is
+ * the thread's latest and it was a dispatcher turn. A moved item belongs to its new group, which is
+ * not the group of the thread the turn ran in.
+ */
+export function dispatcherTurnItemGroup(
+  readModel: OrchestrationReadModel,
+  threadId: ThreadId,
+): GroupId | undefined {
+  const trigger = readModel.threads.find((candidate) => candidate.id === threadId)?.latestTurn
+    ?.trigger;
+
+  if (trigger?.kind !== "dispatcher") return undefined;
+
+  return (readModel.workItems ?? []).find((item) => item.id === trigger.workItemId)?.groupId;
 }
 
 /** The chat a bot works in: its own, most recently active one first. */
