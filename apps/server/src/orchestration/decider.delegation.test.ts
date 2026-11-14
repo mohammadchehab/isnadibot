@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { BotId, CommandId, DelegationId, type IsnadiDelegationRecord } from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import { decideOrchestrationCommand } from "./decider.ts";
 import {
   makeDelegation,
@@ -291,6 +292,65 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
       }).pipe(Effect.flip);
 
       expect(String(concurrencyError)).toContain("3 active delegations");
+    }),
+  );
+
+  it.effect("a cycle refusal carries the code the client switches on", () =>
+    Effect.gen(function* () {
+      const parent = makeDelegation();
+
+      const cycle = makeDelegation({
+        delegationId: DelegationId.make("delegation-cycle"),
+        parentDelegationId: parent.delegationId,
+        parentBotId: CHILD_BOT_ID,
+        childBotId: PARENT_BOT_ID,
+        parentThreadId: CHILD_THREAD_ID,
+        ancestorBotIds: [PARENT_BOT_ID, CHILD_BOT_ID],
+        depth: 2,
+        billedBotId: PARENT_BOT_ID,
+      });
+
+      const error = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([parent]),
+        command: {
+          type: "delegation.create",
+          commandId: CommandId.make("command-cycle-refusal"),
+          delegation: cycle,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected cycle invariant error");
+      }
+
+      // The client picks its copy from the code, never from the sentence, so a
+      // copyedit must not be the only thing this test covers.
+      expect(error.refusal).toBe("delegation-would-cycle");
+      expect(error.detail).toContain("cycle");
+    }),
+  );
+
+  it.effect("a delegation-limit refusal carries the code the client switches on", () =>
+    Effect.gen(function* () {
+      const active = [1, 2, 3].map((index) =>
+        makeDelegation({ delegationId: DelegationId.make(`delegation-${index}`) }),
+      );
+
+      const error = yield* decideOrchestrationCommand({
+        readModel: makeReadModel(active),
+        command: {
+          type: "delegation.create",
+          commandId: CommandId.make("command-limit-refusal"),
+          delegation: makeDelegation({ delegationId: DelegationId.make("delegation-4") }),
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected delegation-limit invariant error");
+      }
+
+      expect(error.refusal).toBe("delegation-limit-reached");
+      expect(error.detail).toContain("3 active delegations");
     }),
   );
 

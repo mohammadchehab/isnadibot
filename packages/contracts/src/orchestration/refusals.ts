@@ -15,6 +15,8 @@ export const CommandRefusalCodes = [
   "environment-rights",
   "bot-is-group-boss",
   "group-would-be-undersized",
+  "delegation-limit-reached",
+  "delegation-would-cycle",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);
