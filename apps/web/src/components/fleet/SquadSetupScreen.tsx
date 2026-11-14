@@ -11,7 +11,7 @@ import { Empty, EmptyHeader } from "../ui/empty";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
-import { HireMemberRow } from "./HireMemberRow";
+import { HireMemberRow, SQUAD_CELL, SQUAD_COLUMNS } from "./HireMemberRow";
 import { useCreateSquad } from "./useCreateSquad";
 import { useHireDraft } from "./useHireDraft";
 
@@ -115,10 +115,12 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold">
-                {bossChanged ? t("Change the boss") : t(template.name)}
-              </h1>
-              <p className="text-sm text-muted-foreground">{t(template.description)}</p>
+              <h1 className="text-xl font-semibold">{t("Set up your recruiting squad")}</h1>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.",
+                )}
+              </p>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
@@ -162,13 +164,13 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
               </p>
             ) : null}
             <div className="rounded-xl border border-border">
-              <div className="flex items-center gap-3 border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground">
-                <span className="min-w-0 flex-1" />
-                <span className="w-12 shrink-0 text-right">{t("Skills")}</span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span>{t("Model")}</span>
-                  <span>{t("Reasoning")}</span>
-                </span>
+              <div
+                className={`${SQUAD_COLUMNS} border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground`}
+              >
+                <span className={SQUAD_CELL.bot}>{t("Bot")}</span>
+                <span className={SQUAD_CELL.model}>{t("Model")}</span>
+                <span className={SQUAD_CELL.reasoning}>{t("Reasoning")}</span>
+                <span className={SQUAD_CELL.skills}>{t("Skills")}</span>
               </div>
               <ul className="divide-y divide-border">
                 {draft.members.map((member) => (
