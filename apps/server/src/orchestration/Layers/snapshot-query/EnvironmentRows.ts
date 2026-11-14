@@ -441,6 +441,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           mcp_server_ids_json AS "mcpServerIds",
           active_turn_id AS "activeTurnId",
           last_error AS "lastError",
+          unavailability,
           updated_at AS "updatedAt"
         FROM projection_thread_sessions
         ORDER BY thread_id ASC
@@ -463,6 +464,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           sessions.mcp_server_ids_json AS "mcpServerIds",
           sessions.active_turn_id AS "activeTurnId",
           sessions.last_error AS "lastError",
+          sessions.unavailability,
           sessions.updated_at AS "updatedAt"
         FROM projection_thread_sessions sessions
         INNER JOIN projection_threads threads
@@ -489,6 +491,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           sessions.mcp_server_ids_json AS "mcpServerIds",
           sessions.active_turn_id AS "activeTurnId",
           sessions.last_error AS "lastError",
+          sessions.unavailability,
           sessions.updated_at AS "updatedAt"
         FROM projection_thread_sessions sessions
         INNER JOIN projection_threads threads

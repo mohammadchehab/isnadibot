@@ -1,7 +1,6 @@
 import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
-import * as Stream from "effect/Stream";
-import { ProviderDriverKind, ProviderInstanceId, type OrchestrationEvent } from "@isnadi/contracts";
+import { ProviderDriverKind, ProviderInstanceId } from "@isnadi/contracts";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import {
   asEventId,
@@ -69,6 +68,9 @@ describe("ProviderRuntimeIngestion", () => {
 
     expect(thread.session?.status).toBe("error");
     expect(thread.session?.providerInstanceId).toBe("claude");
+    // Read back from the projection store, which is what a reload renders: the category has to
+    // survive the round trip, not just ride along on the event.
+    expect(thread.session?.unavailability).toBe("expired-login");
 
     const activity = thread.activities.find(
       (entry: ProviderRuntimeTestActivity) => entry.id === "evt-runtime-error-revoked",
@@ -84,30 +86,26 @@ describe("ProviderRuntimeIngestion", () => {
     expect(activityPayload?.providerInstanceId).toBe("claude");
     expect(activityPayload?.class).toBe("provider_error");
 
-    // The persisted session row has no `unavailability` column and no migration
-    // is in scope, so the session's category is asserted where it is produced:
-    // the `thread.session-set` event the ingestion dispatches. The activity
-    // asserting first also proves that event is already durable.
-    const threadEvents = await harness.run(
-      Stream.runCollect(
-        harness.engine.readThreadEvents({
-          threadId: asThreadId("thread-1"),
-          fromSequenceExclusive: 0,
-          toSequenceInclusive: 1_000_000,
-          limit: 500,
-        }),
-      ),
+    expect(thread.session?.lastError).toBe("OAuth access token has been revoked.");
+
+    harness.emit({
+      type: "thread.started",
+      eventId: asEventId("evt-thread-started-recovered"),
+      provider: ProviderDriverKind.make("claudeAgent"),
+      providerInstanceId: ProviderInstanceId.make("claude"),
+      createdAt: "2026-01-01T00:00:01.000Z",
+      threadId: asThreadId("thread-1"),
+    });
+
+    const recovered = await waitForThread(
+      harness,
+      (entry) => entry.session?.unavailability === undefined,
     );
 
-    const sessionSets = Array.from(threadEvents).filter(
-      (event): event is Extract<OrchestrationEvent, { type: "thread.session-set" }> =>
-        event.type === "thread.session-set",
-    );
-
-    expect(sessionSets.at(-1)?.payload.session.unavailability).toBe("expired-login");
-    expect(sessionSets.at(-1)?.payload.session.lastError).toBe(
-      "OAuth access token has been revoked.",
-    );
+    // A session update that carries no category clears the stored one, so a sign-in that works
+    // again stops reading as a problem.
+    expect(recovered.session?.status).toBe("running");
+    expect(recovered.session?.unavailability).toBeUndefined();
   });
 
   it("records runtime.error activities from the typed payload message", async () => {

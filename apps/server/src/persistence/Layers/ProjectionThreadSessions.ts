@@ -39,6 +39,7 @@ const makeProjectionThreadSessionRepository = Effect.gen(function* () {
           mcp_server_ids_json,
           active_turn_id,
           last_error,
+          unavailability,
           updated_at
         )
         VALUES (
@@ -50,6 +51,7 @@ const makeProjectionThreadSessionRepository = Effect.gen(function* () {
           ${JSON.stringify(row.mcpServerIds)},
           ${row.activeTurnId},
           ${row.lastError},
+          ${row.unavailability},
           ${row.updatedAt}
         )
         ON CONFLICT (thread_id)
@@ -61,6 +63,7 @@ const makeProjectionThreadSessionRepository = Effect.gen(function* () {
           mcp_server_ids_json = excluded.mcp_server_ids_json,
           active_turn_id = excluded.active_turn_id,
           last_error = excluded.last_error,
+          unavailability = excluded.unavailability,
           updated_at = excluded.updated_at
       `,
   });
@@ -79,6 +82,7 @@ const makeProjectionThreadSessionRepository = Effect.gen(function* () {
           mcp_server_ids_json AS "mcpServerIds",
           active_turn_id AS "activeTurnId",
           last_error AS "lastError",
+          unavailability,
           updated_at AS "updatedAt"
         FROM projection_thread_sessions
         WHERE thread_id = ${threadId}
