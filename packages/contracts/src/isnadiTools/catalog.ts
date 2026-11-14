@@ -1,7 +1,12 @@
 import * as Schema from "effect/Schema";
 import type { IsnadiComputerBoundary } from "./inputs.ts";
 
-export const IsnadiToolId = Schema.Literals([
+/**
+ * Every tool id a bot session can be handed, as a value so a test can walk the
+ * whole vocabulary. `IsnadiToolId` is derived from it, so adding a tool here is
+ * the only way to add one.
+ */
+export const ISNADI_TOOL_IDS = [
   "Shell",
   "Read",
   "Screenshot",
@@ -43,7 +48,9 @@ export const IsnadiToolId = Schema.Literals([
   "CheckSubagent",
   "MessageSubagent",
   "StopSubagent",
-]);
+] as const;
+
+export const IsnadiToolId = Schema.Literals(ISNADI_TOOL_IDS);
 
 export type IsnadiToolId = typeof IsnadiToolId.Type;
 
