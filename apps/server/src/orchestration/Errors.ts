@@ -1,6 +1,8 @@
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as Schema from "effect/Schema";
 
+import { CommandRefusal } from "@isnadi/contracts";
+
 import type { ProjectionRepositoryError } from "../persistence/Errors.ts";
 
 export class OrchestrationCommandJsonParseError extends Schema.TaggedErrorClass<OrchestrationCommandJsonParseError>()(
@@ -35,6 +37,8 @@ export class OrchestrationCommandInvariantError extends Schema.TaggedErrorClass<
   {
     commandType: Schema.String,
     detail: Schema.String,
+    /** Why the command was refused, when a client has a dedicated path for it. */
+    refusal: Schema.optional(CommandRefusal),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {

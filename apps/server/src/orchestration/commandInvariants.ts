@@ -1,5 +1,6 @@
 import { isGroupBotMember } from "@isnadi/contracts";
 import type {
+  CommandRefusal,
   IsnadiDelegationRecord,
   BotId,
   DelegationId,
@@ -22,10 +23,15 @@ import { OrchestrationCommandInvariantError } from "./Errors.ts";
 import { findProjectedThread } from "./projector.ts";
 import type { OrchestrationDispatchActor } from "./Services/OrchestrationEngine.ts";
 
-function invariantError(commandType: string, detail: string): OrchestrationCommandInvariantError {
+function invariantError(
+  commandType: string,
+  detail: string,
+  refusal?: CommandRefusal,
+): OrchestrationCommandInvariantError {
   return new OrchestrationCommandInvariantError({
     commandType,
     detail,
+    ...(refusal === undefined ? {} : { refusal }),
   });
 }
 
@@ -341,6 +347,7 @@ export function requireEnvironmentManageRights(input: {
     invariantError(
       input.command.type,
       `Person '${actor.personId}' needs 'access:write' to change the environment.`,
+      "environment-rights",
     ),
   );
 }

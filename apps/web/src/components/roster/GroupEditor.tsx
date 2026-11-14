@@ -1,3 +1,4 @@
+import * as Cause from "effect/Cause";
 import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import { BotId, GroupId, isGroupBotMember, type EnvironmentId } from "@isnadi/contracts";
@@ -96,10 +97,14 @@ export function GroupEditor({
     return true;
   };
 
-  // The refusals arrive as prose, so each one gets its own message rather than
-  // the generic "Could not delete group" the other editor actions use.
-  const deleteFailureToast = (message: string) => {
-    switch (classifyGroupDeleteFailure(message)) {
+  // Each refusal the server codes gets its own message rather than the generic
+  // "Could not delete group" the other editor actions use. A refusal this
+  // client does not know falls back to the server's own sentence.
+  const deleteFailureToast = (failure: { readonly cause: Cause.Cause<unknown> }) => {
+    const error = squashAtomCommandFailure(failure);
+    const message = error instanceof Error ? error.message : "";
+
+    switch (classifyGroupDeleteFailure(failure)) {
       case "environment-rights":
         return {
           title: t("You cannot delete this group"),
@@ -340,11 +345,9 @@ export function GroupEditor({
           setBusy(false);
 
           if (Predicate.isTagged(result, "Failure")) {
-            const error = squashAtomCommandFailure(result);
-
             toastManager.add({
               type: "error",
-              ...deleteFailureToast(error instanceof Error ? error.message : ""),
+              ...deleteFailureToast(result),
             });
 
             return;

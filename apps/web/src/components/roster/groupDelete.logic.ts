@@ -1,5 +1,9 @@
 import { isOpenWorkItem } from "@isnadi/client-runtime/space/work-items";
-import type { WorkItemSummary } from "@isnadi/contracts";
+import { CommandRefusal, type WorkItemSummary } from "@isnadi/contracts";
+import * as Cause from "effect/Cause";
+import { Predicate, Schema } from "effect";
+
+const isCommandRefusal = Schema.is(CommandRefusal);
 
 /**
  * How many open items a group still holds. The shell carries open items only,
@@ -14,22 +18,23 @@ export function openWorkItemCountForGroup(
 }
 
 /** Which of `group.delete`'s refusals came back. */
-export type GroupDeleteRefusal = "open-work-items" | "environment-rights" | "unknown";
+export type GroupDeleteRefusal = CommandRefusal | "unknown";
 
 /**
- * Read the refusal out of the server's message. The wire carries the
- * invariant's prose and no typed code, so these two markers are the contract:
- * `commandInvariants.ts` for the rights refusal and `decider/groups.ts` for the
- * open-work refusal. Anything else is shown as the server wrote it.
+ * Read the refusal code the server attached to a failed delete. The wire field
+ * is a permissive string, so a code this client does not know — one a newer
+ * server added — is `unknown`, and the caller falls back to the server's own
+ * sentence instead of guessing.
  */
-export function classifyGroupDeleteFailure(message: string): GroupDeleteRefusal {
-  if (message.includes("open work item(s)") && message.includes("discardWorkItems")) {
-    return "open-work-items";
-  }
+export function classifyGroupDeleteFailure(failure: {
+  readonly cause: Cause.Cause<unknown>;
+}): GroupDeleteRefusal {
+  const error = Cause.squash(failure.cause);
 
-  if (message.includes("needs 'access:write' to change the environment")) {
-    return "environment-rights";
-  }
+  const refusal =
+    Predicate.isObjectOrArray(error) && error !== null && "refusal" in error
+      ? error.refusal
+      : undefined;
 
-  return "unknown";
+  return isCommandRefusal(refusal) ? refusal : "unknown";
 }
