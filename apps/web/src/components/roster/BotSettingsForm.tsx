@@ -142,7 +142,7 @@ export function BotSettingsForm({
     const bossSpace = bossGroupOf(groups, bot.id);
 
     const confirmation = requestConfirmDialog(
-      botDeleteConfirmMessage({ botName: bot.name, bossSpaceName: bossSpace?.name ?? null }),
+      botDeleteConfirmMessage({ botName: bot.name, bossSpaceName: bossSpace?.name ?? null }, t),
       { variant: "destructive" },
     );
 
@@ -167,12 +167,15 @@ export function BotSettingsForm({
 
         const space = bossGroupOf(groups, bot.id);
 
-        const copy = botDeleteFailureToast({
-          refusal: classifyBotDeleteFailure(result),
-          message: error instanceof Error ? error.message : "",
-          botName: bot.name,
-          bossSpaceName: space?.name ?? null,
-        });
+        const copy = botDeleteFailureToast(
+          {
+            refusal: classifyBotDeleteFailure(result),
+            message: error instanceof Error ? error.message : "",
+            botName: bot.name,
+            bossSpaceName: space?.name ?? null,
+          },
+          t,
+        );
 
         toastManager.add({
           type: "error",

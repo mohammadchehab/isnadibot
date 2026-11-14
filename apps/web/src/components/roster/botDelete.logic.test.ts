@@ -9,6 +9,12 @@ import {
   classifyBotDeleteFailure,
 } from "./botDelete.logic";
 
+/**
+ * A translator that marks every key it sees, so a caller that forgets to pass
+ * the UI's `t` shows up as English and fails the test rather than shipping.
+ */
+const arabicTranslate = (message: string) => `ar:${message}`;
+
 /** Anything a failure's cause can squash to, so each case below reads on its own. */
 type SquashedFailure = Error | Record<string, string> | string | null | undefined;
 
@@ -87,6 +93,16 @@ describe("botDeleteConfirmMessage", () => {
     );
   });
 
+  it("asks in the caller's language, not English", () => {
+    // TASK-237 regression: the component called this without its translator, so
+    // the shipped ar and zh-CN roster keys never reached the dialog.
+    expect(
+      botDeleteConfirmMessage({ botName: "Ada", bossSpaceName: "Bookkeeping" }, arabicTranslate),
+    ).toBe(
+      "ar:Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.",
+    );
+  });
+
   it("keeps the question first so the dialog splits into title and description", () => {
     // The shipped renderer cuts at the first question mark: everything up to it
     // is the dialog title, the rest is its description.
@@ -129,6 +145,23 @@ describe("botDeleteFailureToast", () => {
       description: "Pick a new boss, or delete the space.",
       actionLabel: null,
     });
+  });
+
+  it("shows the toast in the caller's language, not English", () => {
+    // Same regression as the confirmation above, on the failure path.
+    const toast = botDeleteFailureToast(
+      {
+        refusal: "bot-is-group-boss",
+        message: "",
+        botName: "Ada",
+        bossSpaceName: "Bookkeeping",
+      },
+      arabicTranslate,
+    );
+
+    expect(toast.title).toBe("ar:Boss of {space}");
+    expect(toast.description).toBe("ar:Pick a new boss, or delete the space.");
+    expect(toast.actionLabel).toBe("ar:Pick a new boss");
   });
 
   it("never shows the invariant sentence for a boss refusal", () => {
