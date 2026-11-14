@@ -35,7 +35,9 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/hero.png" alt="IsnadiBot on desktop and iPhone: the Chief bot explains what it can do" width="100%">
+  <img src=".github/assets/fleet-demo.gif" alt="Hiring a Software engineering fleet in IsnadiBot: the Planner splits a task and hands it to the Architect, UI designer, and Engineer, who answer in the group chat" width="100%">
+  <br>
+  <sub>Hire a fleet, give the boss a task, and watch it hand the work out. Real Claude replies, sped up. <a href=".github/assets/fleet-demo.mp4">Watch the video</a>.</sub>
 </p>
 
 ---
@@ -49,6 +51,10 @@
 >
 > IsnadiBot started as a fork of an MIT-licensed project by [OpenCore](https://github.com/opencoredev)
 > and keeps its full history. See [Credits](#-credits).
+
+<p align="center">
+  <img src=".github/assets/hero.png" alt="IsnadiBot on desktop and iPhone: the Chief bot explains what it can do" width="100%">
+</p>
 
 ---
 

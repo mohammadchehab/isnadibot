@@ -29,7 +29,9 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/hero.png" alt="IsnadiBot على سطح المكتب والآيفون" width="100%">
+  <img src=".github/assets/fleet-demo.gif" alt="توظيف فريق هندسة برمجيات في IsnadiBot: المخطِّط يقسّم المهمة ويوزّعها على المعماري ومصمم الواجهات والمهندس" width="100%">
+  <br>
+  <sub>وظّف فريقًا، أعطِ القائد مهمة، وشاهده يوزّع العمل. ردود Claude حقيقية، بسرعة مضاعفة. <a href=".github/assets/fleet-demo.mp4">شاهد الفيديو</a>.</sub>
 </p>
 
 ---
@@ -42,6 +44,10 @@
 >
 > بدأ IsnadiBot نسخةً متفرعة من مشروع مرخّص بـ MIT من [OpenCore](https://github.com/opencoredev) ويحتفظ بتاريخه
 > الكامل. راجع قسم «شكر وتقدير» في الأسفل.
+
+<p align="center">
+  <img src=".github/assets/hero.png" alt="IsnadiBot على سطح المكتب والآيفون" width="100%">
+</p>
 
 ---
 
