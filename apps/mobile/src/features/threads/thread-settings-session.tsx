@@ -11,6 +11,7 @@ import type {
 import { getProviderOptionDescriptors } from "@isnadi/shared/model";
 import * as Haptics from "expo-haptics";
 import { createContext, use, useCallback, useMemo, useState, type ReactNode } from "react";
+import type { DeleteBotFailure } from "./botDeleteRefusal";
 import type { ModelOption, ProviderGroup } from "../../lib/modelOptions";
 import { applyProviderOptionSelection } from "../../lib/providerOptions";
 import {
@@ -50,9 +51,8 @@ export type ThreadSettingsSessionProps = {
     readonly value: number;
     readonly onChange: (hopBudget: GroupHopBudget) => Promise<boolean>;
   };
-  /** Deletes the chat's bot. Resolves false when the server refuses. */
-  /** Resolves to null on success, or the reason the delete failed. */
-  readonly onDeleteBot?: () => Promise<string | null>;
+  /** Deletes the chat's bot. Resolves null on success, or why the server refused. */
+  readonly onDeleteBot?: () => Promise<DeleteBotFailure | null>;
 };
 
 export type ExistingThreadSettingsRouteSession = ThreadSettingsSessionProps & {

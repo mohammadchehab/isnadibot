@@ -16,6 +16,7 @@ import {
   NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET,
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
+import { botDeleteRefusalCopy } from "./botDeleteRefusal";
 import { RUNTIME_MODE_CHOICES, selectableChoices } from "./thread-settings-options";
 import {
   type ThreadSettingsSubmenuPage,
@@ -401,7 +402,8 @@ function DeleteBotSection() {
     setDeleting(false);
 
     if (failure !== null) {
-      Alert.alert(t("Could not delete {name}", { name: botName }), failure);
+      const copy = botDeleteRefusalCopy({ failure, botName }, t);
+      Alert.alert(copy.title, copy.description);
 
       return;
     }

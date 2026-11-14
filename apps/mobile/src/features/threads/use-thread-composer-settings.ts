@@ -9,7 +9,7 @@ import type {
   ServerConfig,
   SubscriptionProviderStatus,
 } from "@isnadi/contracts";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandRefusalOf, squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { effectiveHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -19,6 +19,7 @@ import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { botEnvironment } from "../../state/bots";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import type { DeleteBotFailure } from "./botDeleteRefusal";
 import type { ExistingThreadSettingsRouteSession } from "./ThreadSettingsSheet";
 
 /**
@@ -91,8 +92,8 @@ export function useThreadComposerSettings(input: {
     [currentModelOption?.capabilities, currentModelSelection.options],
   );
 
-  const deleteThreadBot = useCallback(async () => {
-    if (!bot) return t("The command failed.");
+  const deleteThreadBot = useCallback(async (): Promise<DeleteBotFailure | null> => {
+    if (!bot) return { refusal: "unknown", message: t("The command failed.") };
 
     const result = await deleteBot({
       environmentId: environmentId,
@@ -102,7 +103,10 @@ export function useThreadComposerSettings(input: {
     if (!Predicate.isTagged(result, "Failure")) return null;
     const error = squashAtomCommandFailure(result);
 
-    return error instanceof Error ? error.message : t("The command failed.");
+    return {
+      refusal: commandRefusalOf(result),
+      message: error instanceof Error ? error.message : t("The command failed."),
+    };
   }, [bot, deleteBot, environmentId, t]);
 
   const settingsRouteSession = useMemo<ExistingThreadSettingsRouteSession>(

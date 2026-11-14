@@ -276,6 +276,8 @@ export {
   mapAtomCommandResult,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
+  type CommandRefusalCode,
+  commandRefusalOf,
   settleAsyncResult,
   executeAtomCommand,
   executeAtomQuery,
