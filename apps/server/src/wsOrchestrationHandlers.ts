@@ -5,7 +5,9 @@ import * as Option from "effect/Option";
 import {
   AuthAccessWriteScope,
   CommandId,
+  FLEET_TEMPLATES,
   OrchestrationDispatchCommandError,
+  OrchestrationFleetPlanError,
   OrchestrationGetFullThreadDiffError,
   OrchestrationGetSnapshotError,
   OrchestrationSearchThreadsError,
@@ -30,6 +32,7 @@ import { resolveGroupResponderBotId } from "./orchestration/groupResponder.ts";
 import { readWorkflowScript } from "./orchestration/workflowScriptQuery.ts";
 import { validateEngineFallbacks } from "./provider/engineFallbackPolicy.ts";
 import { preflightProvider } from "./provider/providerPreflight.ts";
+import { planFleetHire } from "@isnadi/shared/fleet";
 
 import { isOrchestrationDispatchCommandError, nowIso } from "./wsSupport.ts";
 import type { WsConnection } from "./wsConnection.ts";
@@ -463,9 +466,31 @@ export const createWsOrchestrationHandlers = ({
         ),
         { "rpc.aggregate": "orchestration" },
       ),
+    [ORCHESTRATION_WS_METHODS.fleetPlan]: (input) =>
+      observeRpcEffect(
+        ORCHESTRATION_WS_METHODS.fleetPlan,
+        Effect.gen(function* () {
+          const template = FLEET_TEMPLATES[input.templateIndex];
+
+          if (template === undefined) {
+            return yield* new OrchestrationFleetPlanError({
+              message: `There is no fleet template at index ${input.templateIndex}`,
+            });
+          }
+
+          // Squad setup's preview and the decider's hire are the same pure call,
+          // so what the user sees on screen 1 is exactly what `fleet.hire` builds.
+          return planFleetHire({
+            template,
+            providers: yield* providerRegistry.getProviders,
+          });
+        }),
+        { "rpc.aggregate": "orchestration" },
+      ),
   }) satisfies Pick<
     RpcGroup.HandlersFrom<RpcGroup.Rpcs<typeof WsRpcGroup>>,
     | typeof ORCHESTRATION_WS_METHODS.dispatchCommand
+    | typeof ORCHESTRATION_WS_METHODS.fleetPlan
     | typeof ORCHESTRATION_WS_METHODS.getWorkflowScript
     | typeof ORCHESTRATION_WS_METHODS.getTurnDiff
     | typeof ORCHESTRATION_WS_METHODS.getFullThreadDiff

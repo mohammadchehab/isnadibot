@@ -180,6 +180,32 @@ default model and reasoning level, and default skills ([skills-registry.md](./sk
 template lists its roles and its boss. The hire flow reads them and seeds squad setup; nothing writes back to
 the library.
 
+### Hiring a fleet is one command (TASK-213)
+
+Squad setup creates the whole squad in one server command, `fleet.hire`. The client sends a template
+index, one engine pick per template role, and any names the user typed; the server mints the group id
+and every bot id and returns one receipt. A dropped socket cannot leave a half-built squad behind,
+because there is no second write to lose.
+
+Two decisions hold this together:
+
+- **The decider cannot resolve engines.** It is pure and replays deterministically, so it cannot see
+  which providers the environment has. `fleet.hire.picks` is therefore required — one
+  `{ roleId, engine }` per template role — and the client fills it from `fleet.plan`. A client-chosen
+  engine is not a new trust boundary: `bot.create` already takes one.
+- **The group and its bots create each other.** `bot.create` refuses a `groupId` that is not in the
+  read model, and `group.create` refuses bot ids that do not exist, so a squad built from nothing has
+  no legal order. `decideCommandSequence` therefore takes `plannedGroupIds`: a group id the same
+  sequence creates later. A bot may point at one, it carries the id from the start (the roster groups
+  bots by `bot.groupId`), and it emits no `group.member-assigned` because the group's own
+  `group.created` names it. The group command runs last, so every check on it is honest.
+
+`fleet.plan` is the read that feeds screen 1. It is an RPC handler, not a `ProjectionSnapshotQueryShape`
+method, because it needs the provider registry rather than the read model. It runs the same
+`planFleetHire` the decider runs, so the preview and the hire cannot drift, and it is refused for a
+template index the catalogue does not have — never defaulted. A plan with any blocker is a preview the
+Create button disables; `fleet.hire` refuses the same blockers instead of creating a partial squad.
+
 ### Team rules (TASK-93)
 
 A group holds `teamRules`, plain text that the hire flow seeds from the template: the report format, one merge
@@ -214,6 +240,17 @@ The Tasks tile and board wait for TASK-87.
 - Thread gains `contextEpoch` and `handoff` (the latest doc), with a decoding default.
 - Receipt `fleet.dispatch.decided` in `RuntimeReceiptBus`.
 - Roles and templates in `packages/contracts/src/fleet/roles.ts`.
+- `packages/contracts/src/fleet/hire.ts`: `FleetTemplateIndex`, `FleetHirePlan` (members and blockers)
+  and the `fleet.hire` command. `bot.created` and `group.created` carry an optional `roleId` and
+  `fleetTemplateId` so older events still decode.
+- `fleet.plan` is an orchestration RPC on the read scope; `fleet.hire` is a command through
+  `dispatchCommand` on the operate scope.
+- A hire has no aggregate at dispatch: the server mints the group during decide, so the engine records
+  the aggregate of the events it appended (`group.created`) rather than a client-supplied id, and a
+  rejected hire records no receipt because it appended nothing. Portability excludes `fleet.hire`,
+  since ids a hire mints have no archive record to restore from.
+- `planFleetHire`, `seedSquadMember` and `providerAvailability` live in `packages/shared/src/fleet`, so
+  the client shows and the server creates from one implementation.
 
 ## Clients
 

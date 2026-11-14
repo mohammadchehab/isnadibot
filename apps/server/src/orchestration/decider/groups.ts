@@ -1,4 +1,5 @@
 import {
+  FLEET_TEMPLATES,
   isGroupBotMember,
   type OrchestrationCommand,
   type OrchestrationReadModel,
@@ -57,6 +58,20 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
     case "group.create": {
       yield* requireEnvironmentManageRights({ command, actor });
       yield* requireGroupAbsent({ readModel, command, groupId: command.groupId });
+
+      // A fleet hire always goes through `fleet.hire`, which derives the
+      // template itself. A group.create that names a template is the old
+      // client path, so refuse one the catalogue does not have rather than
+      // persist an id nothing can resolve.
+      if (
+        command.fleetTemplateId !== undefined &&
+        !FLEET_TEMPLATES.some((template) => template.id === command.fleetTemplateId)
+      ) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Unknown fleet template '${command.fleetTemplateId}'.`,
+        });
+      }
 
       if (command.bossBotId === undefined) {
         return yield* new OrchestrationCommandInvariantError({

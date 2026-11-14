@@ -41,6 +41,7 @@ export function projectBotsAndGroups(
             avatar: payload.avatar,
             engine: payload.engine,
             sandbox: payload.sandbox,
+            ...(payload.roleId === undefined ? {} : { roleId: payload.roleId }),
             runtimeMode: payload.runtimeMode,
             imageProvider: payload.imageProvider,
             personalityTone: payload.personalityTone,

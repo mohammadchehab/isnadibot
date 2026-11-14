@@ -1,4 +1,8 @@
-import { type OrchestrationCommand, type OrchestrationReadModel } from "@isnadi/contracts";
+import {
+  type GroupId,
+  type OrchestrationCommand,
+  type OrchestrationReadModel,
+} from "@isnadi/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
@@ -8,6 +12,7 @@ import { requireGroupOwnedThreadMutationAuthorized, requireThread } from "./comm
 import { projectEvent } from "./projector.ts";
 import { decideProjects } from "./decider/projects.ts";
 import { decideBots } from "./decider/bots.ts";
+import { decideFleet } from "./decider/fleet.ts";
 import { decideGroups } from "./decider/groups.ts";
 import { decideWorkItems } from "./decider/workItems.ts";
 import { decideMcpServers } from "./decider/mcpServers.ts";
@@ -27,10 +32,12 @@ export const decideCommandSequence = Effect.fn("decideCommandSequence")(function
   commands,
   readModel,
   actor,
+  plannedGroupIds,
 }: {
   readonly commands: ReadonlyArray<OrchestrationCommand>;
   readonly readModel: OrchestrationReadModel;
   readonly actor?: OrchestrationDispatchActor;
+  readonly plannedGroupIds?: ReadonlyArray<GroupId>;
 }): Effect.fn.Return<
   ReadonlyArray<PlannedOrchestrationEvent>,
   OrchestrationCommandInvariantError | PlatformError.PlatformError,
@@ -45,6 +52,7 @@ export const decideCommandSequence = Effect.fn("decideCommandSequence")(function
       command: nextCommand,
       readModel: nextReadModel,
       ...(actor !== undefined ? { actor } : {}),
+      ...(plannedGroupIds === undefined ? {} : { plannedGroupIds }),
     });
 
     const nextEvents = Array.isArray(decided) ? decided : [decided];
@@ -66,10 +74,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
   command,
   readModel,
   actor,
+  plannedGroupIds,
 }: {
   readonly command: OrchestrationCommand;
   readonly readModel: OrchestrationReadModel;
   readonly actor?: OrchestrationDispatchActor;
+  readonly plannedGroupIds?: ReadonlyArray<GroupId>;
 }): Effect.fn.Return<
   DecideOrchestrationCommandResult,
   OrchestrationCommandInvariantError | PlatformError.PlatformError,
@@ -120,7 +130,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "bot.archive":
     case "bot.restore":
     case "bot.delete":
-      return yield* decideBots({ command, readModel, ...(actor !== undefined ? { actor } : {}) });
+      return yield* decideBots({
+        command,
+        readModel,
+        ...(actor !== undefined ? { actor } : {}),
+        ...(plannedGroupIds === undefined ? {} : { plannedGroupIds }),
+      });
     case "group.create":
     case "group.rename":
     case "group.keep-busy.set":
@@ -132,6 +147,13 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "group.leave":
     case "group.boss.set":
       return yield* decideGroups({ command, readModel, ...(actor !== undefined ? { actor } : {}) });
+    case "fleet.hire":
+      return yield* decideFleet({
+        command,
+        readModel,
+        decideCommandSequence,
+        ...(actor !== undefined ? { actor } : {}),
+      });
     case "work-item.create":
     case "work-item.assign":
     case "work-item.update":

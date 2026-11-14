@@ -84,6 +84,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
   command,
   readModel,
   actor,
+  plannedGroupIds,
 }: {
   readonly command: Extract<
     OrchestrationCommand,
@@ -91,6 +92,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
   >;
   readonly readModel: OrchestrationReadModel;
   readonly actor?: OrchestrationDispatchActor;
+  readonly plannedGroupIds?: ReadonlyArray<GroupId>;
 }): Effect.fn.Return<
   DecideOrchestrationCommandResult,
   OrchestrationCommandInvariantError | PlatformError.PlatformError,
@@ -101,8 +103,14 @@ export const decideBots = Effect.fn("decideBots")(function* ({
       yield* requireBotAbsent({ readModel, command, botId: command.botId });
       yield* authorizeBotInGroup({ readModel, command, actor, groupId: command.groupId });
 
+      // A group the same sequence creates later is not in the read model yet.
+      // The bot carries the id now and the group's own `group.created` names it
+      // as a member, so no `group.member-assigned` belongs here.
+      const groupIsPlanned =
+        command.groupId !== null && (plannedGroupIds ?? []).includes(command.groupId);
+
       const group =
-        command.groupId === null
+        command.groupId === null || groupIsPlanned
           ? null
           : yield* requireGroup({ readModel, command, groupId: command.groupId });
 
@@ -126,6 +134,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
           avatar: command.avatar,
           engine: command.engine,
           sandbox: command.sandbox,
+          ...(command.roleId === undefined ? {} : { roleId: command.roleId }),
           runtimeMode:
             command.runtimeMode ??
             (command.sandbox === null || command.sandbox === "local"

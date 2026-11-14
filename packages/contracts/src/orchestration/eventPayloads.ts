@@ -6,6 +6,7 @@ import {
   AuthSessionId,
   BotId,
   CheckpointRef,
+  FleetRoleId,
   FleetTemplateId,
   GroupId,
   IsoDateTime,
@@ -207,6 +208,8 @@ export const BotCreatedPayload = Schema.Struct({
   avatar: BotAvatar,
   engine: Schema.NullOr(BotEngine),
   sandbox: PersistedBotSandbox,
+  /** The fleet role this bot was hired as. Absent on every bot created by hand. */
+  roleId: Schema.optional(FleetRoleId),
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE))),
   imageProvider: Schema.NullOr(ImageProviderId).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),

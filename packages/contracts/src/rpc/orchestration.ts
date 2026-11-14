@@ -8,6 +8,8 @@ import {
   OrchestrationGetFullThreadDiffError,
   OrchestrationGetFullThreadDiffInput,
   OrchestrationGetSnapshotError,
+  OrchestrationFleetPlanError,
+  OrchestrationFleetPlanInput,
   OrchestrationSearchThreadsError,
   OrchestrationSearchThreadsInput,
   OrchestrationGetTurnDiffError,
@@ -53,6 +55,12 @@ export const WsOrchestrationSearchThreadsRpc = Rpc.make(ORCHESTRATION_WS_METHODS
   payload: OrchestrationSearchThreadsInput,
   success: OrchestrationRpcSchemas.searchThreads.output,
   error: Schema.Union([OrchestrationSearchThreadsError, EnvironmentAuthorizationError]),
+});
+
+export const WsOrchestrationFleetPlanRpc = Rpc.make(ORCHESTRATION_WS_METHODS.fleetPlan, {
+  payload: OrchestrationFleetPlanInput,
+  success: OrchestrationRpcSchemas.fleetPlan.output,
+  error: Schema.Union([OrchestrationFleetPlanError, EnvironmentAuthorizationError]),
 });
 
 export const WsOrchestrationGetArchivedShellSnapshotRpc = Rpc.make(

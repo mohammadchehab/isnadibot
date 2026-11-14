@@ -12,6 +12,7 @@ import {
   TrimmedString,
   TurnId,
 } from "../baseSchemas.ts";
+import { FleetHirePlan, FleetTemplateIndex } from "../fleet/hire.ts";
 import { ProviderApprovalDecision } from "./modelSelection.ts";
 import { ChannelFailureCategory } from "./roster.ts";
 import { OrchestrationCheckpointFile, OrchestrationCheckpointStatus } from "./thread.ts";
@@ -150,6 +151,21 @@ export const OrchestrationSearchThreadsResult = Schema.Struct({
 
 export type OrchestrationSearchThreadsResult = typeof OrchestrationSearchThreadsResult.Type;
 
+/**
+ * What squad setup asks the server before it hires. The server reads the live
+ * provider list, which the decider cannot, and returns the same plan
+ * `fleet.hire` will recompute from the picks the client sends back.
+ */
+export const OrchestrationFleetPlanInput = Schema.Struct({
+  templateIndex: FleetTemplateIndex,
+});
+
+export type OrchestrationFleetPlanInput = typeof OrchestrationFleetPlanInput.Type;
+
+export const OrchestrationFleetPlanResult = FleetHirePlan;
+
+export type OrchestrationFleetPlanResult = typeof OrchestrationFleetPlanResult.Type;
+
 export const OrchestrationGetWorkflowScriptInput = Schema.Struct({
   threadId: ThreadId,
   /** Absolute path from the workflow's runHandles.scriptPath. The server
@@ -221,6 +237,10 @@ export const OrchestrationRpcSchemas = {
     input: OrchestrationSearchThreadsInput,
     output: OrchestrationSearchThreadsResult,
   },
+  fleetPlan: {
+    input: OrchestrationFleetPlanInput,
+    output: OrchestrationFleetPlanResult,
+  },
   getArchivedShellSnapshot: {
     input: Schema.Struct({}),
     output: OrchestrationShellSnapshot,
@@ -275,6 +295,14 @@ export class OrchestrationGetTurnDiffError extends Schema.TaggedErrorClass<Orche
 
 export class OrchestrationGetFullThreadDiffError extends Schema.TaggedErrorClass<OrchestrationGetFullThreadDiffError>()(
   "OrchestrationGetFullThreadDiffError",
+  {
+    message: TrimmedNonEmptyString,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {}
+
+export class OrchestrationFleetPlanError extends Schema.TaggedErrorClass<OrchestrationFleetPlanError>()(
+  "OrchestrationFleetPlanError",
   {
     message: TrimmedNonEmptyString,
     cause: Schema.optional(Schema.Defect()),

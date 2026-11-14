@@ -5,6 +5,7 @@ import {
   BotId,
   ChannelConnectionId,
   CommandId,
+  FleetRoleId,
   FleetTemplateId,
   GroupId,
   IsoDateTime,
@@ -76,6 +77,8 @@ export const BotCreateCommand = Schema.Struct({
   avatar: BotAvatar,
   engine: Schema.NullOr(BotEngine),
   sandbox: Schema.NullOr(BotSandbox),
+  /** The fleet role this bot was hired as, when it came from a squad template. */
+  roleId: Schema.optional(FleetRoleId),
   runtimeMode: Schema.optional(RuntimeMode),
   imageProvider: Schema.optional(Schema.NullOr(ImageProviderId)),
   personalityTone: Schema.optional(BotPersonalityTone),

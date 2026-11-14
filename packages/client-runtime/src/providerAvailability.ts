@@ -1,23 +1,20 @@
 import { asRecord } from "./work-log-command.ts";
 import * as Predicate from "effect/Predicate";
-import type {
-  OrchestrationThreadActivity,
-  ServerProvider,
-  ServerProviderUnavailability,
-} from "@isnadi/contracts";
+import type { OrchestrationThreadActivity, ServerProviderUnavailability } from "@isnadi/contracts";
+import type { ProviderAvailabilityReason } from "@isnadi/shared/fleet";
 
 import { createTranslator, type MessageKey, type TranslationParams } from "./i18n/index.ts";
 
 /**
- * Why a provider instance cannot run a turn right now. The server's turn
- * preflight uses the same order, so a client that shows a reason shows the one
- * the server would refuse with.
+ * Why a provider instance cannot run a turn right now. The rule itself lives in
+ * `@isnadi/shared/fleet` because the server resolves a role's engine when it
+ * hires; this module only presents the reason and is the client's import.
  */
-export type ProviderAvailabilityReason =
-  | ServerProviderUnavailability
-  | "disabled"
-  | "not-installed"
-  | "missing-provider";
+export {
+  providerAvailabilityReason,
+  providerReasonNeedsSignIn,
+  type ProviderAvailabilityReason,
+} from "@isnadi/shared/fleet";
 
 /** One next step. Clients map "providers" to Settings > Providers and "usage" to bot settings. */
 export type ProviderAvailabilityAction = "providers" | "usage" | "feedback" | "none";
@@ -29,47 +26,6 @@ export interface ProviderAvailabilityPresentation {
   readonly action: ProviderAvailabilityAction;
   /** Set when a known provider state caused the failure, so a client can name the fix. */
   readonly reason?: ProviderAvailabilityReason | undefined;
-}
-
-/** Whether signing in is the fix, so a repair button can say "Connect". */
-export function providerReasonNeedsSignIn(
-  reason: ProviderAvailabilityReason | null | undefined,
-): boolean {
-  return reason === "missing-login" || reason === "expired-login" || reason === "missing-provider";
-}
-
-export function providerAvailabilityReason(
-  provider: ServerProvider | undefined,
-  model?: string | null,
-): ProviderAvailabilityReason | null {
-  if (!provider) return "missing-provider";
-
-  if (!provider.enabled) return "disabled";
-
-  if (provider.unavailability && provider.unavailability !== "temporary-failure") {
-    return provider.unavailability;
-  }
-
-  if (
-    !provider.installed ||
-    (provider.availability === "unavailable" && provider.status !== "error")
-  ) {
-    return "not-installed";
-  }
-
-  if (provider.auth.status === "unauthenticated") return "missing-login";
-
-  if (
-    model &&
-    provider.models.length > 0 &&
-    !provider.models.some((candidate) => candidate.slug === model)
-  ) {
-    return "unsupported-model";
-  }
-
-  if (provider.unavailability === "temporary-failure") return "temporary-failure";
-
-  return null;
 }
 
 /** Translates presentation copy. Defaults to English so callers without a locale keep working. */

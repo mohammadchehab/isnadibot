@@ -12,6 +12,7 @@ import {
 } from "../baseSchemas.ts";
 import { IsnadiDelegationRecord } from "../isnadiDelegation.ts";
 import { BotWorkItemCommand, ClientWorkItemCommand, WorkItemClaimCommand } from "./workItems.ts";
+import { FleetHireCommand } from "../fleet/hire.ts";
 import { ClientRoutineCommand, InternalRoutineCommand } from "../routines.ts";
 import { ChatAttachment } from "./attachments.ts";
 import {
@@ -90,6 +91,7 @@ import {
 } from "./threadCommands.ts";
 
 const DispatchableClientOrchestrationCommand = Schema.Union([
+  FleetHireCommand,
   ProjectCreateCommand,
   ProjectMetaUpdateCommand,
   ProjectDeleteCommand,
@@ -148,6 +150,7 @@ export type DispatchableClientOrchestrationCommand =
   typeof DispatchableClientOrchestrationCommand.Type;
 
 export const ClientOrchestrationCommand = Schema.Union([
+  FleetHireCommand,
   ProjectCreateCommand,
   ProjectMetaUpdateCommand,
   ProjectDeleteCommand,

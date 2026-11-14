@@ -84,6 +84,15 @@ export const FleetTemplateId = makeEntityId("FleetTemplateId");
 
 export type FleetTemplateId = typeof FleetTemplateId.Type;
 
+/**
+ * A role in `FLEET_ROLES`. It lives here, next to the other entity ids, because
+ * a bot's roster record names the role it was hired as and the roster must not
+ * depend on the fleet catalogue that names it.
+ */
+export const FleetRoleId = TrimmedNonEmptyString.pipe(Schema.brand("FleetRoleId"));
+
+export type FleetRoleId = typeof FleetRoleId.Type;
+
 export const ChannelConnectionId = makeEntityId("ChannelConnectionId");
 
 export type ChannelConnectionId = typeof ChannelConnectionId.Type;

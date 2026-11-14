@@ -95,3 +95,5 @@ export * from "./rpc.ts";
 export * from "./remoteDiagnostics.ts";
 
 export * from "./fleet/roles.ts";
+
+export * from "./fleet/hire.ts";
