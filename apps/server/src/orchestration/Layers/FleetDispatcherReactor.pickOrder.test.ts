@@ -142,4 +142,27 @@ describe("FleetDispatcherReactor pick order (AC7)", () => {
       );
     }).pipe(Effect.scoped),
   );
+
+  it.effect("passes over a member with no chat for one that has one", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      // BOT_A never opened a chat, so having no turn at all it ranks first; a chatless member
+      // cannot be started, and the item goes to BOT_B rather than to nobody.
+      yield* Ref.set(h.model, twoIdleBots([finished(BOT_B.id, "thread-b", LATEST)]));
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ botId: BOT_B.id, workItemId: "item-1" });
+          expect(h.dispatched[1]).toMatchObject({ threadId: ThreadId.make("thread-b") });
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
 });
