@@ -1,0 +1,106 @@
+export const fleetCatalog = {
+  // Screens
+  "New space": "新建空间",
+  "Start from a fleet": "从团队开始",
+  "Pick the team you need. You can adjust it before it starts.":
+    "选择你需要的团队。开始前可以调整。",
+  "Hire fleet": "聘用团队",
+  "Pick a fleet to continue.": "选择一个团队以继续。",
+  "Start empty": "从空白开始",
+  "{count} more": "另外 {count} 个",
+  "This fleet is no longer available.": "该团队已不可用。",
+  "The bot that hands work out and answers for this space.":
+    "负责分配工作并代表该空间答复的机器人。",
+  "Bot replies one message can chain before the space stops.":
+    "一条消息可以串联的机器人回复数，达到后该空间停止。",
+  "No provider can run this bot yet.": "暂无服务商可以运行该机器人。",
+  "Runs on another provider because the role's own is not set up.":
+    "运行在其他服务商上，因为该角色所需的服务商尚未配置。",
+  "The model has no such reasoning level, so it starts on the model's default.":
+    "该模型没有这个推理等级，因此从模型默认等级开始。",
+  "The provider or model this bot picked is no longer connected.":
+    "该机器人选择的提供商或模型已不再连接。",
+  "Every bot needs a name.": "每个机器人都需要一个名称。",
+  "Could not create the space": "无法创建空间",
+  "Checking what happened…": "正在确认结果…",
+  "Set up your recruiting squad": "设置你的招聘团队",
+  "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.":
+    "选择负责人。负责人默认回复每条消息，并通过 @mentions 把工作交给其他机器人。",
+  "{count} on demand": "{count} 个按需加载",
+  "{name} was the boss. It stays in the squad as a member.":
+    "{name} 原为负责人，现作为成员留在团队中。",
+
+  // Templates
+  Recruiting: "招聘",
+  "Sources candidates, writes outreach, and tracks every opening.":
+    "寻找候选人、撰写主动联系文案，并跟踪每个职位。",
+  "Video editing": "视频剪辑",
+  "Turns raw footage into cut, captioned, publish-ready videos.":
+    "把原始素材变成已剪辑、带字幕、可直接发布的视频。",
+  "Software engineering": "软件工程",
+  "Plans, builds, reviews, and ships changes in your repository.":
+    "在你的仓库中规划、实现、评审并交付改动。",
+  "Health research": "健康研究",
+  "Searches public health data, screens evidence, and summarises what holds up.":
+    "检索公共卫生数据、筛选证据，并总结可靠的结论。",
+  "Customer support": "客户支持",
+  "Triages the inbox, answers what it can, and escalates the rest.":
+    "分类收件箱，能回答的直接回答，其余升级处理。",
+  "Bookkeeping & procurement": "记账与采购",
+  "Records spend, matches invoices, and runs purchase requests.":
+    "记录支出、核对发票，并处理采购申请。",
+
+  // Roles
+  Scout: "猎头",
+  "Sources candidates": "寻找候选人",
+  Tailor: "职位文案",
+  "Job posts and outreach": "职位发布与主动联系",
+  Tracker: "追踪专员",
+  "Pipeline and follow-ups": "候选人流程与跟进",
+  Coach: "面试教练",
+  "Interview kits": "面试资料包",
+  Producer: "制片人",
+  "Plans the cut and the schedule": "规划剪辑与排期",
+  Editor: "剪辑师",
+  "Cuts footage into a story": "把素材剪成故事",
+  Captioner: "字幕员",
+  "Captions and subtitles": "字幕与译文",
+  Designer: "设计师",
+  "Thumbnails and title cards": "封面图与标题卡",
+  Planner: "规划师",
+  "Plans the work and assigns it": "规划工作并分派任务",
+  Engineer: "工程师",
+  "Builds and tests changes": "实现并测试改动",
+  Reviewer: "评审员",
+  "Reviews and merges pull requests": "评审并合并拉取请求",
+  Architect: "架构师",
+  "Designs and finds root causes": "设计方案并定位根因",
+  "UI designer": "界面设计师",
+  "Screens and design specs": "界面与设计规范",
+  "Security reviewer": "安全评审员",
+  "Reviews security-relevant changes": "评审与安全相关的改动",
+  "Lead researcher": "首席研究员",
+  "Frames questions and signs off findings": "构建问题并确认结论",
+  "Literature scout": "文献调研员",
+  "Finds and screens papers": "查找并筛选论文",
+  "Trials analyst": "试验分析师",
+  "Reads trial registries": "查阅临床试验登记库",
+  "Data analyst": "数据分析师",
+  "Runs the numbers on public data": "分析公开数据中的数字",
+  Triage: "分诊员",
+  "Sorts the inbox and routes it": "分类收件箱并转派",
+  Responder: "回复专员",
+  "Drafts replies": "起草回复",
+  Escalations: "升级处理员",
+  "Handles the hard cases": "处理棘手案例",
+  Knowledge: "知识库专员",
+  "Keeps help articles current": "维护帮助文章",
+  Controller: "财务主管",
+  "Approves spend and closes the books": "审批支出并结账",
+  Bookkeeper: "记账员",
+  "Records spend and matches invoices": "记录支出并核对发票",
+  Buyer: "采购员",
+  "Runs purchase requests": "处理采购申请",
+  Auditor: "审计员",
+  "Checks entries for mistakes": "检查分录错误",
+} as const;

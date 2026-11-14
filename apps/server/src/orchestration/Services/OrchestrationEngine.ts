@@ -12,6 +12,7 @@
  */
 import type {
   AuthSessionId,
+  DispatchResult,
   OrchestrationClientOrigin,
   OrchestrationCommand,
   OrchestrationEvent,
@@ -76,7 +77,8 @@ export interface OrchestrationEngineShape {
    *   dispatches omit the actor. A caller that admitted a turn start before
    *   earlier setup passes its admission so the start cannot be blocked by
    *   an update that would otherwise begin in between.
-   * @returns Effect containing the sequence of the persisted event.
+   * @returns Effect containing the sequence of the persisted event, and for a
+   *   `fleet.hire` the id of the group it minted.
    *
    * Dispatch is serialized through an internal queue and deduplicated via
    * command receipts.
@@ -88,7 +90,7 @@ export interface OrchestrationEngineShape {
       readonly origin?: OrchestrationClientOrigin;
       readonly admission?: TurnStartAdmission;
     },
-  ) => Effect.Effect<{ sequence: number }, OrchestrationDispatchError, never>;
+  ) => Effect.Effect<DispatchResult, OrchestrationDispatchError, never>;
 
   /**
    * Stream persisted domain events in dispatch order.

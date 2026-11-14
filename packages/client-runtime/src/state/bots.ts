@@ -2,6 +2,7 @@ import * as Crypto from "effect/Crypto";
 import { Atom } from "effect/unstable/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
+import { hireFleet, type HireFleetInput } from "../fleet/hireFleet.ts";
 import {
   type ArchiveBotInput,
   type AssignGroupMemberInput,
@@ -95,6 +96,15 @@ export function createBotEnvironmentAtoms<R, E>(
       JSON.stringify([environmentId, "group", input.groupId]),
   };
 
+  // One `fleet.hire` command creates the whole squad, so a retry replays the id
+  // the draft minted rather than topping up a half-made group. The key is the
+  // draft's command id: one draft sends serially, two drafts may not collide.
+  const hireConcurrency = {
+    mode: "serial" as const,
+    key: ({ environmentId, input }: { environmentId: string; input: HireFleetInput }) =>
+      JSON.stringify([environmentId, "hire", input.draft.commandId]),
+  };
+
   return {
     create: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:bot:create",
@@ -125,6 +135,14 @@ export function createBotEnvironmentAtoms<R, E>(
       execute: (input: DeleteBotInput) => deleteBot(input),
       scheduler,
       concurrency: botConcurrency,
+    }),
+    // One `fleet.hire` commands the whole squad at once, so nothing here is left
+    // half-created: a retry carries the draft's own id and replays what landed.
+    hire: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:group:hire",
+      execute: (input: HireFleetInput) => hireFleet(input),
+      scheduler,
+      concurrency: hireConcurrency,
     }),
     channels: {
       saveConnection: createEnvironmentCommand(runtime, {

@@ -2,7 +2,7 @@ import { Match, Predicate } from "effect";
 import { DndContext } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
 import { useAtomValue } from "@effect/atom-react";
-import { ARCHIVED_BOT_RETENTION_DAYS, BotId, GroupId } from "@isnadi/contracts";
+import { ARCHIVED_BOT_RETENTION_DAYS, BotId } from "@isnadi/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,7 +33,6 @@ import { SidebarContent, SidebarGroup } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
 import { DEFAULT_BOT_RUNTIME_MODE } from "./botSandbox";
 import { NewBotDialog } from "./NewBotDialog";
-import { NewGroupDialog, type NewGroupInput } from "./NewGroupDialog";
 import {
   buildRosterListItems,
   filterRosterBots,
@@ -91,10 +90,6 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
   const environmentId = usePrimaryEnvironmentId();
 
   const createBotCommand = useAtomCommand(botEnvironment.create, {
-    reportFailure: false,
-  });
-
-  const createGroupCommand = useAtomCommand(botEnvironment.groups.create, {
     reportFailure: false,
   });
 
@@ -283,7 +278,6 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
   }, [botRouteActive, keybindings, navigate, previewOpen, shortcutBots]);
 
   const [newBotOpen, setNewBotOpen] = useState(false);
-  const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [archivingBot, setArchivingBot] = useState<Bot | null>(null);
   const [pendingArchivedBotId, setPendingArchivedBotId] = useState<string | null>(null);
   // Archiving is the one close that cannot go back where it came from: the row
@@ -376,7 +370,8 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
   const [creatingBot, setCreatingBot] = useState(false);
   const creatingBotRef = useRef(false);
   const handleNewBot = () => setNewBotOpen(true);
-  const handleNewGroup = () => setNewGroupOpen(true);
+  // A space starts on its own screen: the fleet picker, or an empty one.
+  const handleNewGroup = () => void navigate({ to: "/spaces/new" });
 
   const handleCreateBot = ({ name, avatar }: { name: string; avatar: BotAvatar }) =>
     runCreateBotOnce(creatingBotRef, async () => {
@@ -422,38 +417,6 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
         setCreatingBot(false);
       }
     });
-
-  const handleCreateGroup = async (input: NewGroupInput) => {
-    if (environmentId === null) {
-      toastManager.add({
-        type: "error",
-        title: t("Connect an environment first"),
-      });
-
-      return;
-    }
-
-    const groupId = GroupId.make(`group-${randomUUID()}`);
-
-    const result = await createGroupCommand({
-      environmentId,
-      input: {
-        groupId,
-        name: input.name,
-        bossBotId: BotId.make(input.bossBotId),
-        specialistBotIds: input.specialistBotIds.map((botId) => BotId.make(botId)),
-      },
-    });
-
-    if (Predicate.isTagged(result, "Failure")) {
-      toastManager.add({ type: "error", title: t("Could not create group") });
-
-      return;
-    }
-
-    setNewGroupOpen(false);
-    void navigate({ to: "/groups/$groupId", params: { groupId } });
-  };
 
   const handleSelectGroup = useCallback(
     (group: Group) => {
@@ -714,14 +677,6 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
           submitting={creatingBot}
           onOpenChange={setNewBotOpen}
           onCreate={(input) => void handleCreateBot(input)}
-        />
-      ) : null}
-      {newGroupOpen ? (
-        <NewGroupDialog
-          open
-          bots={bots}
-          onOpenChange={setNewGroupOpen}
-          onCreate={(input) => void handleCreateGroup(input)}
         />
       ) : null}
       <AlertDialog
