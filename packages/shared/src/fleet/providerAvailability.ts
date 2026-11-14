@@ -1,4 +1,5 @@
-import type { ServerProvider, ServerProviderUnavailability } from "@isnadi/contracts";
+import { ServerProviderUnavailability, type ServerProvider } from "@isnadi/contracts";
+import * as Schema from "effect/Schema";
 
 /**
  * Why a provider instance cannot run a turn right now. The server's turn
@@ -14,6 +15,24 @@ export type ProviderAvailabilityReason =
   | "disabled"
   | "not-installed"
   | "missing-provider";
+
+/**
+ * Narrows a wire value — an error field, an activity payload, a stored snapshot — to a reason this
+ * build knows. `unavailability` crosses the wire as a plain string so that a category a newer
+ * server sends cannot fail an older client's decode; this is where that string becomes a type
+ * again, and an unknown one reads as `undefined` rather than inventing a reason.
+ */
+export const isServerProviderUnavailability = Schema.is(ServerProviderUnavailability);
+
+/**
+ * The reason a wire value names, or undefined when this build does not know it. Callers keep the
+ * server's own text for that case rather than inventing a reason it did not give.
+ */
+export function knownUnavailability(
+  value: string | null | undefined,
+): ServerProviderUnavailability | undefined {
+  return isServerProviderUnavailability(value) ? value : undefined;
+}
 
 /** Whether signing in is the fix, so a repair button can say "Connect". */
 export function providerReasonNeedsSignIn(

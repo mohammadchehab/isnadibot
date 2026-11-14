@@ -2,6 +2,7 @@ import { Predicate } from "effect";
 import { useBotConversationMessageProjection } from "./botConversationMessageProjection";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@isnadi/client-runtime/environment";
+import { knownUnavailability } from "@isnadi/client-runtime/provider-availability";
 import {
   BotId,
   PLACEHOLDER_THREAD_TITLE,
@@ -637,7 +638,10 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
     error ??
     turnFailure ??
     (session?.lastError
-      ? { message: session.lastError, unavailability: session.unavailability ?? null }
+      ? {
+          message: session.lastError,
+          unavailability: knownUnavailability(session.unavailability) ?? null,
+        }
       : null);
 
   return {

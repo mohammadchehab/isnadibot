@@ -121,16 +121,12 @@ export const OrchestrationSession = Schema.Struct({
   mcpServerIds: Schema.optional(Schema.Array(McpServerId)),
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(TrimmedNonEmptyString),
-  unavailability: Schema.optional(
-    Schema.Literals([
-      "missing-login",
-      "expired-login",
-      "unsupported-model",
-      "limit-reached",
-      "usage-cap",
-      "temporary-failure",
-    ]),
-  ),
+  /**
+   * Why the provider could not start a turn. A plain string on the wire: a session is decoded
+   * inside the shell snapshot, so a category an older client has never heard of must arrive as a
+   * value it can ignore rather than fail the decode of the whole snapshot.
+   */
+  unavailability: Schema.optional(TrimmedNonEmptyString),
   updatedAt: IsoDateTime,
 });
 
@@ -312,16 +308,11 @@ export const OrchestrationLatestTurn = Schema.Struct({
   trigger: Schema.optional(ResponderTrigger),
   sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
   errorMessage: Schema.optional(TrimmedNonEmptyString),
-  unavailability: Schema.optional(
-    Schema.Literals([
-      "missing-login",
-      "expired-login",
-      "unsupported-model",
-      "limit-reached",
-      "usage-cap",
-      "temporary-failure",
-    ]),
-  ),
+  /**
+   * Why the provider could not run this turn. A plain string on the wire, for the same reason as
+   * the session's: the turn is decoded inside a snapshot every client reads as one object.
+   */
+  unavailability: Schema.optional(TrimmedNonEmptyString),
 });
 
 export type OrchestrationLatestTurn = typeof OrchestrationLatestTurn.Type;

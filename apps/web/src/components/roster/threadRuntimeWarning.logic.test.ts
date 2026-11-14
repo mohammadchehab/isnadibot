@@ -200,6 +200,31 @@ describe("latestBotThreadFailure", () => {
     });
   });
 
+  it("keeps the message when a newer server names an unavailability this build does not know", () => {
+    const failedTurn = {
+      ...runningTurn,
+      state: "error" as const,
+      completedAt: timestamp,
+      unavailability: "quota-exhausted",
+    };
+
+    expect(
+      latestBotThreadFailure({
+        activities: [
+          {
+            ...warning,
+            kind: "runtime.error",
+            tone: "error",
+            payload: { message: "Codex is out of credits." },
+          },
+        ],
+        latestTurn: failedTurn,
+        session: null,
+        lastUserMessageAt: timestamp,
+      }),
+    ).toEqual({ message: "Codex is out of credits.", unavailability: null });
+  });
+
   it("uses a newer start failure instead of an earlier failed turn", () => {
     const failedTurn = {
       ...runningTurn,

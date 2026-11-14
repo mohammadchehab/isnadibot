@@ -268,16 +268,14 @@ export class OrchestrationDispatchCommandError extends Schema.TaggedErrorClass<O
     message: TrimmedNonEmptyString,
     cause: Schema.optional(Schema.Defect()),
     bootstrapThreadDisposition: Schema.optional(Schema.Literal("deleted")),
-    unavailability: Schema.optional(
-      Schema.Literals([
-        "missing-login",
-        "expired-login",
-        "unsupported-model",
-        "limit-reached",
-        "usage-cap",
-        "temporary-failure",
-      ]),
-    ),
+    /**
+     * Why the provider could not run the command, when that has a repair. A plain string on the
+     * wire for the same reason as `refusal`: producers still type it as
+     * `ServerProviderUnavailability`, and a client narrows it where it shows the reason. A category
+     * an older client has never heard of must not fail the decode, because that would lose
+     * `message` and `repairAction` too.
+     */
+    unavailability: Schema.optional(TrimmedNonEmptyString),
     repairAction: Schema.optional(TrimmedNonEmptyString),
     /**
      * Why the command was refused, when the client has a path for that reason.

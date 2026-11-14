@@ -1,7 +1,11 @@
 import { asRecord } from "./work-log-command.ts";
 import * as Predicate from "effect/Predicate";
 import type { OrchestrationThreadActivity, ServerProviderUnavailability } from "@isnadi/contracts";
-import type { ProviderAvailabilityReason } from "@isnadi/shared/fleet";
+import {
+  isServerProviderUnavailability,
+  knownUnavailability,
+  type ProviderAvailabilityReason,
+} from "@isnadi/shared/fleet";
 
 import { createTranslator, type MessageKey, type TranslationParams } from "./i18n/index.ts";
 
@@ -234,21 +238,8 @@ export function latestTurnFailure(
   return null;
 }
 
-const UNAVAILABILITY_VALUES = new Set<string>([
-  "missing-login",
-  "expired-login",
-  "unsupported-model",
-  "limit-reached",
-  "usage-cap",
-  "temporary-failure",
-]);
-
 /** Narrows an unknown wire value, such as an error field or activity payload, to a failure category. */
-export function isServerProviderUnavailability(
-  value: unknown,
-): value is ServerProviderUnavailability {
-  return Predicate.isString(value) && UNAVAILABILITY_VALUES.has(value);
-}
+export { isServerProviderUnavailability, knownUnavailability };
 
 function boundedDetail(detail: string | null | undefined): string {
   const firstLine = detail?.split("\n", 1)[0]?.trim() ?? "";

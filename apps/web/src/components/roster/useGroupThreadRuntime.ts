@@ -3,6 +3,7 @@ import { Predicate } from "effect";
 import { useBotConversationMessageProjection } from "./botConversationMessageProjection";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@isnadi/client-runtime/environment";
+import { knownUnavailability } from "@isnadi/client-runtime/provider-availability";
 import {
   type SendableComposerAddressing,
   groupAddressing,
@@ -503,7 +504,10 @@ export function useGroupThreadRuntime(groupId: string) {
     error ??
     turnFailure ??
     (session?.lastError
-      ? { message: session.lastError, unavailability: session.unavailability ?? null }
+      ? {
+          message: session.lastError,
+          unavailability: knownUnavailability(session.unavailability) ?? null,
+        }
       : null);
 
   return {

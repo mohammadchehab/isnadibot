@@ -7,6 +7,7 @@ import {
   channelBindingNeedsProject,
   channelCommandFailureReason,
   channelFailureReason,
+  channelBindingFailureReason,
   channelBindingPresentation,
   channelPickerProjectId,
   channelRestoreProjectId,
@@ -293,6 +294,53 @@ describe("channelCommandFailureReason", () => {
     ).toBe("The provider rejected the plan.");
     expect(channelCommandFailureReason({ message: "Channel command failed." }, "telegram")).toBe(
       "Channel command failed.",
+    );
+  });
+});
+
+describe("channelBindingFailureReason", () => {
+  it("explains a category this build knows", () => {
+    expect(
+      channelBindingFailureReason({ failureCategory: "network", lastError: "ENOTFOUND" }, "slack"),
+    ).toBe("Could not reach Slack. Check the network and try again.");
+  });
+
+  it("shows the binding's own error text for a category this build does not know", () => {
+    expect(
+      channelBindingFailureReason(
+        { failureCategory: "billing", lastError: "The provider rejected the plan." },
+        "slack",
+      ),
+    ).toBe("The provider rejected the plan.");
+  });
+
+  it("still says something when an unknown category arrives with no error text", () => {
+    expect(channelBindingFailureReason({ failureCategory: "billing" }, "slack")).toBe(
+      "Slack is saved but could not connect. Try again or check the connection settings.",
+    );
+  });
+
+  it("says nothing for a binding that has not failed", () => {
+    expect(channelBindingFailureReason({}, "slack")).toBeUndefined();
+  });
+});
+
+describe("channelRepairAction", () => {
+  it("offers the repair a known category names", () => {
+    expect(channelRepairAction({ status: "failed", failureCategory: "credentials" })).toBe(
+      "update-credentials",
+    );
+    expect(channelRepairAction({ status: "connected", failureCategory: "restore" })).toBe(
+      "reconnect",
+    );
+  });
+
+  it("falls back to the status when a newer server sends a category it does not know", () => {
+    expect(channelRepairAction({ status: "disconnected", failureCategory: "rate-limited" })).toBe(
+      "connect",
+    );
+    expect(channelRepairAction({ status: "connected", failureCategory: "rate-limited" })).toBe(
+      "none",
     );
   });
 });

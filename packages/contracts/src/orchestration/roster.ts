@@ -311,8 +311,13 @@ export const ChannelBinding = Schema.Struct({
   /** Most recent successful connect or confirmed delivery. Survives later failures. */
   lastSucceededAt: Schema.optional(IsoDateTime),
   lastError: Schema.optional(TrimmedNonEmptyString),
-  /** Present only with `lastError`. */
-  failureCategory: Schema.optional(ChannelFailureCategory),
+  /**
+   * Present only with `lastError`. A plain string on the wire, unlike `ChannelFailureCategory`,
+   * which still types every producer: a binding is decoded inside the snapshot every client reads
+   * as one object, so a category an older client has never heard of must not fail that decode and
+   * take `lastError` and the rest of the space with it. Clients narrow it where they show it.
+   */
+  failureCategory: Schema.optional(TrimmedNonEmptyString),
   sentMessageIds: Schema.Array(MessageId).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 });
 

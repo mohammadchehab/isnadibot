@@ -10,6 +10,7 @@ import { StackActions, useNavigation, type StaticScreenProps } from "@react-navi
 import { useCallback, useMemo, useState } from "react";
 import * as Option from "effect/Option";
 import {
+  knownUnavailability,
   latestTurnFailure,
   providerReasonNeedsSignIn,
 } from "@isnadi/client-runtime/provider-availability";
@@ -174,11 +175,13 @@ function ThreadRouteContent(
   const selectedThreadDetail = Option.getOrNull(selectedThreadDetailState.data);
 
   // The session keeps only the raw error text, so the failure category comes
-  // from the turn or the start-failed activity when the session lacks it.
+  // from the turn or the start-failed activity when the session lacks it. The
+  // wire carries a category as a plain string, so one this build does not know
+  // reads as none and the raw text below still explains the failure.
   const resumeFailureUnavailability = useMemo(
     () =>
-      selectedThread?.latestTurn?.unavailability ??
-      selectedThread?.session?.unavailability ??
+      knownUnavailability(selectedThread?.latestTurn?.unavailability) ??
+      knownUnavailability(selectedThread?.session?.unavailability) ??
       latestTurnFailure(
         selectedThreadDetail?.activities ?? [],
         selectedThreadDetail?.messages.findLast((message) => message.role === "user")?.createdAt,

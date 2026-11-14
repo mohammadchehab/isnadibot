@@ -2,7 +2,7 @@ import { Predicate } from "effect";
 import type { ChannelBinding, ChannelConnectionProfile } from "@isnadi/contracts";
 import {
   type ChannelRepairAction,
-  channelFailureReason,
+  channelBindingFailureReason,
 } from "@isnadi/client-runtime/channel-presentation";
 
 import type { ReactNode } from "react";
@@ -134,20 +134,14 @@ export function ChannelStatusNotice({
   }
 
   // Server failure text is fixed per category and never carries provider error details, so a
-  // known category reads better in the client's own words.
-  if (binding.failureCategory) {
-    return notice(
-      <>
-        <p>{channelFailureReason(binding.failureCategory, binding.provider, t)}</p>
-        {webhookLine}
-      </>,
-    );
-  }
+  // known category reads better in the client's own words. A category this build does not know
+  // still says something: the binding's own error text, or a sentence when it has none.
+  const failureReason = channelBindingFailureReason(binding, binding.provider, t);
 
-  if (binding.lastError) {
+  if (failureReason) {
     return notice(
       <>
-        <p>{binding.lastError}</p>
+        <p>{failureReason}</p>
         {webhookLine}
       </>,
     );
