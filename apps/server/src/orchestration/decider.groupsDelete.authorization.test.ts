@@ -107,7 +107,30 @@ const failureDetail = (
     ? result.failure.detail
     : "";
 
+const failureRefusal = (
+  result: Result.Result<unknown, OrchestrationCommandInvariantError | PlatformError.PlatformError>,
+) =>
+  Result.isFailure(result) &&
+  Predicate.isTagged(result.failure, "OrchestrationCommandInvariantError")
+    ? result.failure.refusal
+    : undefined;
+
 it.layer(NodeServices.layer)("group delete authorization", (it) => {
+  /**
+   * The client picks its toast from the refusal code, not from the sentence, so
+   * a copyedit of either message must not be the only thing a test covers. This
+   * fails if a throw site loses its code.
+   */
+  it.effect("each refusal carries the code the client switches on", () =>
+    Effect.gen(function* () {
+      const denied = yield* Effect.result(decide({ actor: MEMBER }));
+      expect(failureRefusal(denied)).toBe("environment-rights");
+
+      const workInTheWay = yield* Effect.result(decide({ actor: ADMIN }));
+      expect(failureRefusal(workInTheWay)).toBe("open-work-items");
+    }),
+  );
+
   it.effect("refuses group.delete from a plain member who was never confirmed", () =>
     Effect.gen(function* () {
       const result = yield* Effect.result(decide({ actor: MEMBER }));

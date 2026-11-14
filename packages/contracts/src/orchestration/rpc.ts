@@ -280,6 +280,13 @@ export class OrchestrationDispatchCommandError extends Schema.TaggedErrorClass<O
       ]),
     ),
     repairAction: Schema.optional(TrimmedNonEmptyString),
+    /**
+     * Why the command was refused, when the client has a path for that reason.
+     * Permissive on purpose: the client decodes the whole exit, so a code an
+     * older client has never heard of must reach it as a string it can ignore
+     * rather than fail the decode and lose `message` too.
+     */
+    refusal: Schema.optional(TrimmedNonEmptyString),
     /** Why a channel command failed, when the failure has a channel repair. */
     channelFailureCategory: Schema.optional(ChannelFailureCategory),
   },

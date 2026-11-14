@@ -182,6 +182,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Group '${command.groupId}' still holds ${openWorkItemCount} open work item(s). Pass discardWorkItems to delete it and discard them.`,
+          refusal: "open-work-items",
         });
       }
 

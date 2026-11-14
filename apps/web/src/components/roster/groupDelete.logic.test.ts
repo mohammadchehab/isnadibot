@@ -1,7 +1,13 @@
 import { GroupId, WorkItemId, type WorkItemSummary } from "@isnadi/contracts";
+import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import { classifyGroupDeleteFailure, openWorkItemCountForGroup } from "./groupDelete.logic";
+
+/** Anything a failure's cause can squash to, so each case below reads on its own. */
+type SquashedFailure = Error | Record<string, string> | string | null | undefined;
+
+const failed = (error: SquashedFailure) => ({ cause: Cause.fail(error) });
 
 function summary(id: string, overrides: Partial<WorkItemSummary> = {}): WorkItemSummary {
   return {
@@ -37,26 +43,31 @@ describe("openWorkItemCountForGroup", () => {
 });
 
 describe("classifyGroupDeleteFailure", () => {
-  // Pinned to the prose the decider writes, so a change to either message
-  // surfaces here instead of degrading the toast to a generic error.
-  it("recognises the open-work refusal from decider/groups.ts", () => {
-    expect(
-      classifyGroupDeleteFailure(
-        "Group 'group-1' still holds 3 open work item(s). Pass discardWorkItems to delete it and discard them.",
-      ),
-    ).toBe("open-work-items");
+  // The server attaches the code at the throw site, so these cases assert the
+  // discriminant and never the sentence: a copyedit of either message must not
+  // reach this test.
+  it("reads the open-work refusal code", () => {
+    expect(classifyGroupDeleteFailure(failed({ refusal: "open-work-items" }))).toBe(
+      "open-work-items",
+    );
   });
 
-  it("recognises the rights refusal from commandInvariants.ts", () => {
-    expect(
-      classifyGroupDeleteFailure(
-        "Person 'person-1' needs 'access:write' to change the environment.",
-      ),
-    ).toBe("environment-rights");
+  it("reads the environment-rights refusal code", () => {
+    expect(classifyGroupDeleteFailure(failed({ refusal: "environment-rights" }))).toBe(
+      "environment-rights",
+    );
   });
 
   it("leaves anything else to the server's own wording", () => {
-    expect(classifyGroupDeleteFailure("Group 'group-1' not found")).toBe("unknown");
-    expect(classifyGroupDeleteFailure("")).toBe("unknown");
+    // A code a newer server added, and a failure with no code at all: both fall
+    // back so the caller shows the prose the server sent.
+    expect(classifyGroupDeleteFailure(failed({ refusal: "group-not-found" }))).toBe("unknown");
+    expect(classifyGroupDeleteFailure(failed({ message: "Group 'group-1' not found" }))).toBe(
+      "unknown",
+    );
+    expect(classifyGroupDeleteFailure(failed(new Error("Boom")))).toBe("unknown");
+    expect(classifyGroupDeleteFailure(failed(undefined))).toBe("unknown");
+    expect(classifyGroupDeleteFailure(failed(null))).toBe("unknown");
+    expect(classifyGroupDeleteFailure(failed("open-work-items"))).toBe("unknown");
   });
 });
