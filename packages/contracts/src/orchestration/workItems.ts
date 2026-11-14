@@ -4,6 +4,7 @@ import * as Struct from "effect/Struct";
 import {
   BotId,
   CommandId,
+  FleetRoleId,
   GroupId,
   IsoDateTime,
   NonNegativeInt,
@@ -95,7 +96,8 @@ export const WorkItem = Schema.Struct({
   title: WorkItemTitle,
   brief: WorkItemBrief,
   kind: WorkItemKind,
-  role: Schema.optional(TrimmedNonEmptyString),
+  /** The fleet role this item needs, when it names one. */
+  role: Schema.optional(FleetRoleId),
   ownerBotId: Schema.optional(BotId),
   assignedByBotId: Schema.optional(BotId),
   state: WorkItemState,
@@ -154,7 +156,7 @@ export const WorkItemCreateCommand = Schema.Struct({
   title: WorkItemTitle,
   brief: WorkItemBrief,
   kind: WorkItemKind,
-  role: Schema.optional(TrimmedNonEmptyString),
+  role: Schema.optional(FleetRoleId),
   trackerLink: Schema.optional(TrackerLink),
 });
 
