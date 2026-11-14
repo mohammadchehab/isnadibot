@@ -18,6 +18,7 @@ import type { Bot } from "./types";
 const atoms = vi.hoisted(() => ({
   providers: Symbol("providers"),
   mcpServers: Symbol("mcpServers"),
+  groups: Symbol("environmentGroups"),
   update: Symbol("botUpdate"),
 }));
 
@@ -67,7 +68,10 @@ vi.mock("../../state/server", () => ({
 
 vi.mock("../../state/mcpServers", () => ({ environmentMcpServersAtom: () => atoms.mcpServers }));
 
-vi.mock("../../state/bots", () => ({ botEnvironment: { update: atoms.update } }));
+vi.mock("../../state/bots", () => ({
+  botEnvironment: { update: atoms.update },
+  environmentGroupsAtom: () => atoms.groups,
+}));
 
 vi.mock("../../state/environments", () => ({
   usePrimaryEnvironmentId: () => EnvironmentId.make("environment-1"),
