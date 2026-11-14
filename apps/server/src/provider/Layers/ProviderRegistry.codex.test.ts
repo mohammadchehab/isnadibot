@@ -68,7 +68,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
           assert.strictEqual(status.auth.status, "authenticated");
           assert.strictEqual(status.auth.type, "chatgpt");
           assert.strictEqual(status.auth.label, "ChatGPT Pro 20x Subscription");
-          assert.strictEqual(status.auth.email, "test@example.com");
+          assert.strictEqual(status.auth.email, "t***@example.com");
           assert.deepStrictEqual(status.models, [
             {
               slug: "gpt-live-codex",

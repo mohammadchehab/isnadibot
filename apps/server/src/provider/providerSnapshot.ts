@@ -17,6 +17,7 @@ import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { normalizeCustomModelSlug } from "@isnadi/shared/model";
 import { isProviderSignInRevocation } from "@isnadi/shared/providerSignIn";
+import { maskAccountHandle } from "@isnadi/shared/maskAccountHandle";
 import { isWindowsCommandNotFound } from "../processRunner.ts";
 import { createProviderVersionAdvisory } from "./providerMaintenance.ts";
 import { collectUint8StreamText } from "../stream/collectUint8StreamText.ts";
@@ -264,6 +265,18 @@ export function buildBooleanOptionDescriptor(input: {
   };
 }
 
+// Every driver's probe goes through here, so masking the handle once keeps the
+// full account address off the wire for web, desktop and mobile alike. The
+// label can carry the address too (Cursor reports its account email as one).
+function maskedAuth(auth: ServerProviderAuth): ServerProviderAuth {
+  return {
+    status: auth.status,
+    ...(auth.type ? { type: auth.type } : {}),
+    ...(auth.label ? { label: maskAccountHandle(auth.label) } : {}),
+    ...(auth.email ? { email: maskAccountHandle(auth.email) } : {}),
+  };
+}
+
 // Probes also report informational messages ("not checked yet", upgrade
 // notices) on usable providers. Only an error probe falls back to
 // "temporary-failure"; other states count only when the message names a
@@ -311,7 +324,7 @@ export function buildServerProvider(input: {
     installed: input.probe.installed,
     version: input.probe.version,
     status: input.enabled ? input.probe.status : "disabled",
-    auth: input.probe.auth,
+    auth: maskedAuth(input.probe.auth),
     checkedAt: input.checkedAt,
     ...(input.probe.message ? { message: input.probe.message } : {}),
     ...(unavailability ? { unavailability } : {}),

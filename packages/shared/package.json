@@ -32,6 +32,10 @@
       "types": "./src/providerSignIn.ts",
       "import": "./src/providerSignIn.ts"
     },
+    "./maskAccountHandle": {
+      "types": "./src/maskAccountHandle.ts",
+      "import": "./src/maskAccountHandle.ts"
+    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"

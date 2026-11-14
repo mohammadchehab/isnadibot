@@ -438,7 +438,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
   "ProviderRegistry",
   (it) => {
     describe("checkClaudeProviderStatus", () => {
-      it.effect("returns claude auth email from initialization result", () =>
+      it.effect("masks the claude auth email from the initialization result", () =>
         Effect.gen(function* () {
           const status = yield* checkClaudeProviderStatus(
             defaultClaudeSettings,
@@ -446,7 +446,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
           );
 
           assert.strictEqual(status.auth.status, "authenticated");
-          assert.strictEqual(status.auth.email, "claude@example.com");
+          assert.strictEqual(status.auth.email, "c***@example.com");
         }).pipe(
           Effect.provide(
             mockSpawnerLayer((args) => {

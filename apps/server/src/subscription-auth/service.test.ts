@@ -215,6 +215,30 @@ describe("subscription auth storage", () => {
     expect(JSON.stringify(status)).not.toContain("private-");
   });
 
+  it("masks the account email in the status it hands to clients", async () => {
+    const { authPath } = fixture();
+    NodeFS.writeFileSync(
+      authPath,
+      JSON.stringify({
+        "openai-codex": {
+          type: "oauth",
+          access: "private-access",
+          refresh: "private-refresh",
+          expires: Date.now() + 60_000,
+          accountId: "account-123",
+          email: "person@example.com",
+        },
+      }),
+    );
+
+    const status = (await makeTestSubscriptionAuthService(authPath))
+      .statuses()
+      .find((entry) => entry.provider === "openai-codex");
+
+    expect(status?.accountLabel).toBe("p***@example.com");
+    expect(JSON.stringify(status)).not.toContain("person@example.com");
+  });
+
   it("keeps API keys away from subscription plan endpoints except default OpenCode Go", async () => {
     const { authPath } = fixture();
     const service = await makeTestSubscriptionAuthService(authPath);
