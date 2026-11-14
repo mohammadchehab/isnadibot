@@ -28,7 +28,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
 import { ServerActivation } from "../../serverActivation.ts";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { type OrchestrationDispatchError } from "../Errors.ts";
 import { FleetDispatcherReactor } from "../Services/FleetDispatcherReactor.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
@@ -246,13 +246,13 @@ export const threadCreated = (
   }) satisfies OrchestrationEvent;
 
 /**
- * A dispatch the engine refuses, the way a lost claim is refused: another group already took the
- * item. `workItemId` narrows it to one item, and `remaining` spends the refusal so a later pass
- * succeeds — that is how a pass that re-reads the read model is tested.
+ * A dispatch the engine refuses: a lost claim, because another group already took the item, or a
+ * turn that could not start. `workItemId` narrows it to one item, and `remaining` spends the
+ * refusal so a later pass succeeds — that is how a pass that re-reads the read model is tested.
  */
 export interface Rejection {
   readonly type: string;
-  readonly error: OrchestrationCommandInvariantError;
+  readonly error: OrchestrationDispatchError;
   readonly workItemId?: WorkItemId;
   readonly remaining?: number;
 }
@@ -288,7 +288,8 @@ export const workItemAssigned = (sequence: number, item: WorkItem) =>
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];
 
-  // When set, a matching dispatch fails, as the engine does for a lost claim.
+  // When set, a matching dispatch fails, as the engine does for a lost claim or a refused turn
+  // start. Any dispatch error works, so a test can tell a refusal from a crash.
   const rejection = yield* Ref.make<Rejection | undefined>(undefined);
 
   // When set, runs after each decision so a test can project the command into the read model.
