@@ -27,12 +27,21 @@ export interface SquadSeed {
 
 const REASONING_OPTION_IDS = new Set(["reasoningEffort", "effort"]);
 
-interface ReasoningSeed {
+/** The reasoning options a model offers, and whether the wanted level survived. */
+export interface ReasoningSeed {
   readonly options: ProviderOptionSelection[];
   readonly adjusted: boolean;
 }
 
-function reasoningOptions(model: ServerProviderModel | undefined, wanted: string): ReasoningSeed {
+/**
+ * The reasoning options a member saves for `wanted` on `model`. Squad setup
+ * re-checks a member's level the same way after a model change, so it reads
+ * this instead of copying the rule.
+ */
+export function reasoningOptions(
+  model: ServerProviderModel | undefined,
+  wanted: string,
+): ReasoningSeed {
   const descriptor = model?.capabilities?.optionDescriptors?.find(
     (candidate) => candidate.type === "select" && REASONING_OPTION_IDS.has(candidate.id),
   );

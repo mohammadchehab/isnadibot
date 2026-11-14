@@ -21,6 +21,7 @@ export const fleetCatalog = {
     "该机器人选择的提供商或模型已不再连接。",
   "Every bot needs a name.": "每个机器人都需要一个名称。",
   "Could not create the space": "无法创建空间",
+  "Checking what happened…": "正在确认结果…",
 
   // Templates
   Recruiting: "招聘",
