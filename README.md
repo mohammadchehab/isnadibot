@@ -35,7 +35,9 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/hero.png" alt="IsnadiBot on desktop and iPhone: the Chief bot explains what it can do" width="100%">
+  <img src=".github/assets/fleet-demo.gif" alt="Hiring a Software engineering fleet in IsnadiBot: the Planner splits a task and hands it to the Architect, UI designer, and Engineer, who answer in the group chat" width="100%">
+  <br>
+  <sub>Hire a fleet, give the boss a task, and watch it hand the work out. Real Claude replies, sped up. <a href=".github/assets/fleet-demo.mp4">Watch the video</a>.</sub>
 </p>
 
 ---
@@ -49,6 +51,10 @@
 >
 > IsnadiBot started as a fork of an MIT-licensed project by [OpenCore](https://github.com/opencoredev)
 > and keeps its full history. See [Credits](#-credits).
+
+<p align="center">
+  <img src=".github/assets/hero.png" alt="IsnadiBot on desktop and iPhone: the Chief bot explains what it can do" width="100%">
+</p>
 
 ---
 
@@ -238,25 +244,6 @@ over the same authenticated WebSocket connection.
 | [`docs`](docs)                                                         | User guides (`docs/user`), architecture notes (`docs/internals`), and runbooks (`docs/operations`).                  |
 
 </details>
-
----
-
-## 🤝 Contributors
-
-IsnadiBot is looking for collaborators. The [roadmap](ROADMAP.md) lists features that are open to
-pick up, from end-to-end tests for group chats to CI, and [CONTRIBUTING.md](CONTRIBUTING.md)
-explains how to get started. Comment on an issue, or open one, to claim it.
-
-If IsnadiBot is useful to you, a ⭐ helps other people find it.
-
-IsnadiBot started as a fork of OpenCore's fork of T3 Code. Every commit from both projects
-is still in this repository, so everyone below helped build it. Thank you.
-
-<p align="center">
-  <a href="https://github.com/mohammadchehab/isnadibot/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=mohammadchehab/isnadibot&max=200&columns=12" alt="IsnadiBot contributors">
-  </a>
-</p>
 
 ---
 
