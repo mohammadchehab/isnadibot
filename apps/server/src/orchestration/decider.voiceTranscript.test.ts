@@ -6,6 +6,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   ThreadId,
+  ThreadVoiceTranscriptAppendCommand,
   type OrchestrationBot,
   type OrchestrationReadModel,
   type OrchestrationThread,
@@ -13,6 +14,7 @@ import {
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import { decideOrchestrationCommand } from "./decider.ts";
 import { createEmptyReadModel } from "./projector.ts";
@@ -20,6 +22,10 @@ import { createEmptyReadModel } from "./projector.ts";
 const NOW = "2026-08-27T12:00:00.000Z";
 
 const BOT_ID = BotId.make("bot-isnadi");
+
+const OTHER_BOT_ID = BotId.make("bot-other");
+
+const decodeVoiceTranscriptAppend = Schema.decodeUnknownSync(ThreadVoiceTranscriptAppendCommand);
 
 const THREAD_ID = ThreadId.make("thread-voice");
 
@@ -49,13 +55,13 @@ function makeBot(archivedAt: string | null = null): OrchestrationBot {
   };
 }
 
-function makeThread(group = false): OrchestrationThread {
+function makeThread(group = false, respondingBotId: BotId | null = null): OrchestrationThread {
   return {
     id: THREAD_ID,
     projectId: ProjectId.make("project-1"),
     botId: group ? null : BOT_ID,
     groupId: group ? GROUP_ID : null,
-    respondingBotId: null,
+    respondingBotId,
     title: "Voice thread",
     modelSelection: { instanceId: ProviderInstanceId.make("default"), model: "default-model" },
     runtimeMode: "full-access",
@@ -80,6 +86,7 @@ function makeThread(group = false): OrchestrationThread {
 function makeReadModel(options?: {
   readonly archived?: boolean;
   readonly group?: boolean;
+  readonly respondingBotId?: BotId | null;
 }): OrchestrationReadModel {
   return {
     ...createEmptyReadModel(NOW),
@@ -97,7 +104,7 @@ function makeReadModel(options?: {
           },
         ]
       : [],
-    threads: [makeThread(options?.group)],
+    threads: [makeThread(options?.group, options?.respondingBotId ?? null)],
   };
 }
 
@@ -111,7 +118,6 @@ const appendCommand = (overrides?: {
   messageId: MessageId.make("message-voice-1"),
   role: overrides?.role ?? ("assistant" as const),
   text: "I will start on that now.",
-  respondingBotId: BOT_ID,
   createdAt: NOW,
 });
 
@@ -161,39 +167,10 @@ it.layer(NodeServices.layer)("voice transcript decider", (it) => {
     }),
   );
 
-  it.effect("rejects user speech without a bot id, as the web client sends it", () =>
-    Effect.gen(function* () {
-      const { respondingBotId: _omitted, ...command } = appendCommand({ role: "user" });
-
-      const error = yield* decideOrchestrationCommand({
-        command,
-        readModel: makeReadModel({ archived: true }),
-      }).pipe(Effect.flip);
-
-      expect(String(error)).toContain("is archived");
-    }),
-  );
-
-  it.effect("rejects a different responder in a direct bot chat", () =>
-    Effect.gen(function* () {
-      const error = yield* decideOrchestrationCommand({
-        command: {
-          ...appendCommand({ role: "user" }),
-          respondingBotId: BotId.make("bot-other"),
-        },
-        readModel: makeReadModel({ archived: true }),
-      }).pipe(Effect.flip);
-
-      expect(String(error)).toContain("cannot address a different bot");
-    }),
-  );
-
   it.effect("rejects user speech in a group chat whose boss was archived", () =>
     Effect.gen(function* () {
-      const { respondingBotId: _omitted, ...command } = appendCommand({ role: "user" });
-
       const error = yield* decideOrchestrationCommand({
-        command,
+        command: appendCommand({ role: "user" }),
         readModel: makeReadModel({ archived: true, group: true }),
       }).pipe(Effect.flip);
 
@@ -201,12 +178,10 @@ it.layer(NodeServices.layer)("voice transcript decider", (it) => {
     }),
   );
 
-  it.effect("accepts user speech without a bot id for an active bot", () =>
+  it.effect("accepts user speech for an active bot", () =>
     Effect.gen(function* () {
-      const { respondingBotId: _omitted, ...command } = appendCommand({ role: "user" });
-
       const decided = yield* decideOrchestrationCommand({
-        command,
+        command: appendCommand({ role: "user" }),
         readModel: makeReadModel(),
       });
 
@@ -224,6 +199,49 @@ it.layer(NodeServices.layer)("voice transcript decider", (it) => {
 
       const events = Array.isArray(decided) ? decided : [decided];
       expect(events[0]?.type).toBe("thread.message-sent");
+    }),
+  );
+
+  it.effect("attributes reply speech to the responder the server already picked", () =>
+    Effect.gen(function* () {
+      const decided = yield* decideOrchestrationCommand({
+        command: appendCommand(),
+        readModel: makeReadModel({ respondingBotId: OTHER_BOT_ID }),
+      });
+
+      const events = Array.isArray(decided) ? decided : [decided];
+      expect(events[0]).toMatchObject({ payload: { respondingBotId: OTHER_BOT_ID } });
+    }),
+  );
+
+  it.effect("drops a responding bot id an older client still sends", () =>
+    Effect.gen(function* () {
+      const decoded = decodeVoiceTranscriptAppend({
+        ...appendCommand(),
+        respondingBotId: OTHER_BOT_ID,
+      });
+
+      expect("respondingBotId" in decoded).toBe(false);
+
+      const decided = yield* decideOrchestrationCommand({
+        command: decoded,
+        readModel: makeReadModel(),
+      });
+
+      const events = Array.isArray(decided) ? decided : [decided];
+      expect(events[0]).toMatchObject({ payload: { respondingBotId: BOT_ID } });
+    }),
+  );
+
+  it.effect("leaves group speech unattributed until a member answers", () =>
+    Effect.gen(function* () {
+      const decided = yield* decideOrchestrationCommand({
+        command: appendCommand(),
+        readModel: makeReadModel({ group: true }),
+      });
+
+      const events = Array.isArray(decided) ? decided : [decided];
+      expect(events[0]).toMatchObject({ payload: { respondingBotId: null } });
     }),
   );
 });

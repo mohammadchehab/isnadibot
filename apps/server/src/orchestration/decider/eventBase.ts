@@ -260,19 +260,29 @@ export function requireActiveResponder(input: {
 
 // The bot an assistant message is attributed to. A server-authored message may
 // name a bot explicitly: an active member of a group chat, or the chat's own bot
-// in a direct chat. Otherwise the thread's current responder answers.
+// in a direct chat. Otherwise the caller's fallback answers. A client-authored
+// voice transcript names no bot: it is speech by whoever this chat talks to.
 export const resolveAssistantMessageBot = Effect.fn("resolveAssistantMessageBot")(
   function* (input: {
     readonly readModel: OrchestrationReadModel;
     readonly command: Extract<
       OrchestrationCommand,
-      { type: "thread.message.assistant.delta" | "thread.message.assistant.complete" }
+      {
+        type:
+          | "thread.message.assistant.delta"
+          | "thread.message.assistant.complete"
+          | "thread.voice-transcript.append";
+      }
     >;
     readonly thread: OrchestrationReadModel["threads"][number];
+    readonly fallback: BotId | null;
   }) {
-    const botId = input.command.respondingBotId;
+    const botId =
+      input.command.type === "thread.voice-transcript.append"
+        ? undefined
+        : input.command.respondingBotId;
 
-    if (botId === undefined) return input.thread.respondingBotId ?? null;
+    if (botId === undefined) return input.fallback;
 
     if (input.thread.groupId === null && input.thread.botId !== botId) {
       return yield* new OrchestrationCommandInvariantError({

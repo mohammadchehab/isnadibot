@@ -301,7 +301,6 @@ export const ThreadVoiceTranscriptAppendCommand = Schema.Struct({
   messageId: MessageId,
   role: Schema.Literals(["user", "assistant"]),
   text: TrimmedNonEmptyString,
-  respondingBotId: Schema.optional(BotId),
   createdAt: IsoDateTime,
 });
 
