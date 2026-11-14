@@ -90,7 +90,10 @@ export default defineConfig({
   },
   staged: {
     // Formatter only for now — no lint or typecheck on commit.
-    "*": "vp fmt",
+    // A stage the formatter has nothing to do with (a `*.snap` on its own, say)
+    // is not a failure: the formatter excludes those files by default, so an
+    // empty target list here means "nothing to format", not "bad pattern".
+    "*": "vp fmt --no-error-on-unmatched-pattern",
   },
   fmt: {
     ignorePatterns: [
