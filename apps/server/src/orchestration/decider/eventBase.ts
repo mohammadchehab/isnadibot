@@ -242,6 +242,35 @@ export function activeGroupBotIds(
   );
 }
 
+/**
+ * Why a group cannot lose this bot, or `null` when it can. Two rules stand: a
+ * group keeps its boss, and it keeps at least two active bots. `group.member.unassign`,
+ * `bot.update` and `group.member.assign` all take a bot out of a group and all
+ * answer to the same rules, so the rule lives here once and each command words
+ * its own refusal.
+ *
+ * A bot that is not a listed member leaves the group unchanged, so neither rule
+ * applies to it.
+ */
+export function groupDepartureRefusal(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly group: OrchestrationReadModel["groups"][number];
+  readonly botId: BotId;
+}): "is-boss" | "too-few-members" | null {
+  const membership = input.group.members
+    .filter(isGroupBotMember)
+    .find((member) => member.botId === input.botId);
+
+  if (membership?.role === "boss" || input.group.bossBotId === input.botId) return "is-boss";
+
+  if (membership === undefined) return null;
+
+  const remainingBotIds = activeGroupBotIds(input.readModel, input.group);
+  remainingBotIds.delete(input.botId);
+
+  return remainingBotIds.size < 2 ? "too-few-members" : null;
+}
+
 // Checks that the bot a chat would answer with is still active: any bot for a
 // direct chat, an active member for a group chat. A chat with no bot passes.
 export function requireActiveResponder(input: {

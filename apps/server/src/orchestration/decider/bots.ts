@@ -31,6 +31,7 @@ import {
   type PlannedOrchestrationEvent,
   withEventBase,
   activeGroupBotIds,
+  groupDepartureRefusal,
   nowIso,
   TERMINAL_DELEGATION_PHASES,
   delegationChildThreadId,
@@ -205,18 +206,17 @@ export const decideBots = Effect.fn("decideBots")(function* ({
         .filter(isGroupBotMember)
         .find((member) => member.botId === bot.id);
 
-      if (sourceGroup && (sourceMembership?.role === "boss" || sourceGroup.bossBotId === bot.id)) {
-        return yield* new OrchestrationCommandInvariantError({
-          commandType: command.type,
-          detail: `Bot '${bot.id}' is the boss of group '${sourceGroup.id}'. Replace it with 'group.boss.set' before changing its group.`,
-        });
-      }
+      if (sourceGroup !== undefined) {
+        const refusal = groupDepartureRefusal({ readModel, group: sourceGroup, botId: bot.id });
 
-      if (sourceGroup && sourceMembership) {
-        const remainingBotIds = activeGroupBotIds(readModel, sourceGroup);
-        remainingBotIds.delete(bot.id);
+        if (refusal === "is-boss") {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `Bot '${bot.id}' is the boss of group '${sourceGroup.id}'. Replace it with 'group.boss.set' before changing its group.`,
+          });
+        }
 
-        if (remainingBotIds.size < 2) {
+        if (refusal === "too-few-members") {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
             detail: `Group '${sourceGroup.id}' requires at least two active bots.`,
