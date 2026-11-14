@@ -39,3 +39,4 @@ native/**/target/
 .alchemy/
 .env*
 !.env.example
+e2e/desktop/artifacts/
