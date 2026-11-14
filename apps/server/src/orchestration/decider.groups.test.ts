@@ -220,6 +220,9 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("at least two active bots");
+      // The client picks its copy from the code, never from the sentence, so a
+      // copyedit must not be the only thing this test covers.
+      expect(error.refusal).toBe("group-would-be-undersized");
     }),
   );
 
@@ -258,6 +261,58 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("at least two active bots");
+      // The legacy move path takes the same code as the archive and delete
+      // paths, so a client has one thing to switch on wherever a space would
+      // fall below its floor.
+      expect(error.refusal).toBe("group-would-be-undersized");
+    }),
+  );
+
+  it.effect("moves a bot out of a group that can spare it", () =>
+    Effect.gen(function* () {
+      // The other half of the check above: the floor must not fire on a group
+      // that keeps two bots, or every move out of a full group would be refused.
+      const targetGroupId = GroupId.make("group-target");
+      const targetBossId = BotId.make("bot-target-boss");
+
+      const result = yield* decideOrchestrationCommand({
+        command: {
+          type: "bot.update",
+          commandId: CommandId.make("cmd-move-group-spare-specialist"),
+          botId: SPECIALIST_ID,
+          groupId: targetGroupId,
+        },
+        readModel: makeReadModel({
+          bots: [
+            makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
+            makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
+            makeBot({ id: OTHER_SPECIALIST_ID, groupId: GROUP_ID }),
+            makeBot({ id: targetBossId, groupId: targetGroupId }),
+          ],
+          groups: [
+            makeGroup({
+              members: [
+                { kind: "bot", botId: BOSS_ID, role: "boss" },
+                { kind: "bot", botId: SPECIALIST_ID, role: "specialist" },
+                { kind: "bot", botId: OTHER_SPECIALIST_ID, role: "specialist" },
+              ],
+            }),
+            makeGroup({
+              id: targetGroupId,
+              bossBotId: targetBossId,
+              members: [{ kind: "bot", botId: targetBossId, role: "boss" }],
+            }),
+          ],
+        }),
+      });
+
+      const events = Array.isArray(result) ? result : [result];
+
+      expect(events.map((event) => event.type)).toEqual([
+        "group.member-unassigned",
+        "group.member-assigned",
+        "bot.updated",
+      ]);
     }),
   );
 
