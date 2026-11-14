@@ -5,12 +5,12 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   EventId,
+  GroupId,
   ProjectId,
   ProviderInstanceId,
   ThreadId,
   TurnId,
   WorkItemId,
-  type GroupId,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationGroup,
@@ -80,8 +80,8 @@ export const workItem = (input: {
   readonly id: string;
   readonly state?: WorkItem["state"];
   readonly ownerBotId?: BotId;
-  readonly createdAt?: string;
   readonly groupId?: GroupId;
+  readonly createdAt?: string;
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
   groupId: input.groupId ?? GROUP_ID,
@@ -93,6 +93,43 @@ export const workItem = (input: {
   createdAt: input.createdAt ?? NOW,
   updatedAt: NOW,
 });
+
+/** A bot that has left `GROUP_ID` for another one, and the chat its dispatcher turn ran in. */
+export const MOVED_GROUP = GroupId.make("group-moved");
+
+export const MOVED_BOT = makeBot({ id: "bot-moved" as BotId, groupId: MOVED_GROUP });
+
+export const MOVED_THREAD = ThreadId.make("thread-bot-moved");
+
+/** A chat whose latest turn is a dispatcher turn for `workItemId`, in the given state. */
+const dispatcherTurnThread = (
+  threadId: ThreadId,
+  workItemId: string,
+  botId: BotId,
+  state: "running" | "completed",
+): OrchestrationThread => ({
+  ...botThread(botId, threadId),
+  latestTurn: {
+    turnId: TurnId.make(`turn-${workItemId}`),
+    state,
+    requestedAt: NOW,
+    startedAt: NOW,
+    completedAt: state === "running" ? null : LATER,
+    assistantMessageId: null,
+    trigger: { kind: "dispatcher", workItemId: WorkItemId.make(workItemId) },
+  },
+});
+
+/**
+ * A chat whose latest turn is a dispatcher turn for `workItemId` and is still running: the state a
+ * released work item has to survive before the dispatcher may hand it out again.
+ */
+export const runningDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) =>
+  dispatcherTurnThread(threadId, workItemId, botId, "running");
+
+/** The same chat once that turn reports terminal, which is what releases the item. */
+export const settledDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) =>
+  dispatcherTurnThread(threadId, workItemId, botId, "completed");
 
 export const keepBusyGroup = (
   input: {
@@ -234,6 +271,19 @@ export type OnCommand = (
   command: OrchestrationCommand,
   outcome: "accepted" | "rejected",
 ) => Effect.Effect<void>;
+
+/**
+ * The release a group move or a human unassign emits: the item is queued and unowned again. Both
+ * arrive here as the same event, so the dispatcher cannot tell them apart — and does not need to.
+ */
+export const workItemAssigned = (sequence: number, item: WorkItem) =>
+  ({
+    ...base(sequence, "work-item.assigned"),
+    aggregateKind: "group" as const,
+    aggregateId: GROUP_ID,
+    type: "work-item.assigned",
+    payload: { workItem: item },
+  }) satisfies OrchestrationEvent;
 
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];
