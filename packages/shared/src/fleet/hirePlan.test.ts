@@ -102,12 +102,6 @@ describe("planFleetHire", () => {
     expect(scout?.skills.every((skill) => skill.enabled)).toBe(true);
   });
 
-  it("plans a space that keeps its idle members busy", () => {
-    const plan = planFleetHire({ template, providers: [provider()] });
-
-    expect(plan.keepBusy).toBe(true);
-  });
-
   it("blocks the hire when no provider can run a role", () => {
     const plan = planFleetHire({ template, providers: [] });
 

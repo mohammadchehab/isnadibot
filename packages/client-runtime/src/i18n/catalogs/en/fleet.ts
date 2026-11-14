@@ -26,6 +26,7 @@ export const fleetCatalog = {
     "The provider or model this bot picked is no longer connected.",
   "Every bot needs a name.": "Every bot needs a name.",
   "Could not create the space": "Could not create the space",
+  "Checking what happened…": "Checking what happened…",
 
   // Templates
   Recruiting: "Recruiting",

@@ -10,13 +10,12 @@ import {
 import {
   createHireDraft,
   draftBlockers,
-  recordHireFailure,
+  draftLocked,
   setBoss,
   setHopBudget,
   setMemberModel,
   setMemberReasoning,
   type HireDraft,
-  type HireFleetError,
 } from "@isnadi/client-runtime/fleet/hire";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -83,6 +82,8 @@ export function useHireDraft(template: FleetTemplate) {
   return {
     draft,
     blockers: draftBlockers(draft),
+    /** A send whose outcome is unknown owns the draft: nothing may edit it until it answers. */
+    locked: draftLocked(draft),
     instanceEntries,
     modelOptionsByInstance,
     pickBoss: (roleId: FleetRoleId) => {
@@ -98,12 +99,13 @@ export function useHireDraft(template: FleetTemplate) {
       edit((current) => setMemberReasoning(current, roleId, options));
     },
     /**
-     * Keeps the draft a failed Create hands back. The hire remembers which
-     * member's create already went out, so the next Create mints a fresh
-     * command id for a member whose engine was edited after that attempt.
+     * Adopts the draft a Create handed back. It arrives already marked with how
+     * its send went, so the next Create knows whether it may resend the same
+     * command id or needs a fresh one. The draft counts as edited from here on,
+     * so the reseed above cannot replace a draft whose send already went out.
      */
-    recordFailure: (failure: HireFleetError) => {
-      edit((current) => recordHireFailure(current, failure));
+    recordFailure: (failed: HireDraft) => {
+      edit(() => failed);
     },
   };
 }

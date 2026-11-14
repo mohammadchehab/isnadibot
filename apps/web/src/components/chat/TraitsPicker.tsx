@@ -23,8 +23,9 @@ export const TraitsPicker = memo(function TraitsPicker({
   allowPromptInjectedEffort = true,
   triggerVariant,
   triggerFit,
+  disabled = false,
   ...persistence
-}: TraitsMenuContentProps & TraitsPersistence) {
+}: TraitsMenuContentProps & TraitsPersistence & { readonly disabled?: boolean }) {
   const { t } = useI18n();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -85,6 +86,7 @@ export const TraitsPicker = memo(function TraitsPicker({
         render={
           <ComposerControl
             variant={triggerVariant ?? "ghost"}
+            disabled={disabled}
             presentation={
               triggerFit === "settings-row" ? "composer-control-settings-row" : undefined
             }

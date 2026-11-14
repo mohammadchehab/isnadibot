@@ -1,6 +1,5 @@
 import { ProviderInstanceId, type ProviderOptionSelection } from "@isnadi/contracts";
-import type { HireMember } from "@isnadi/client-runtime/fleet/hire";
-import type { SquadSeedNotice } from "@isnadi/client-runtime/fleet/squad-seed";
+import type { HireMember, HireMemberNotice } from "@isnadi/client-runtime/fleet/hire";
 
 import { useI18n } from "../../i18n";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -11,7 +10,7 @@ import type { ModelEsque } from "../chat/providerIconUtils";
 import { Badge } from "../ui/badge";
 
 /** Why a member does not start on what its role asked for, said where it shows. */
-function noticeCopy(notice: SquadSeedNotice): string {
+function noticeCopy(notice: HireMemberNotice): string {
   switch (notice) {
     case "no-provider":
       return "No provider can run this bot yet.";
@@ -35,12 +34,15 @@ export function HireMemberRow({
   modelOptionsByInstance,
   onModelChange,
   onReasoningChange,
+  disabled = false,
 }: {
   readonly member: HireMember;
   readonly instanceEntries: ReadonlyArray<ProviderInstanceEntry>;
   readonly modelOptionsByInstance: ReadonlyMap<ProviderInstanceId, ReadonlyArray<ModelEsque>>;
   readonly onModelChange: (instanceId: ProviderInstanceId, model: string) => void;
   readonly onReasoningChange: (options: ReadonlyArray<ProviderOptionSelection>) => void;
+  /** True while the screen is sending or waiting on a send, so the row's pickers cannot change the draft. */
+  readonly disabled?: boolean;
 }) {
   const { t } = useI18n();
   const engine = member.engine;
@@ -80,6 +82,7 @@ export function HireMemberRow({
               model={engine.model}
               instanceEntries={instanceEntries}
               modelOptionsByInstance={modelOptionsByInstance}
+              disabled={disabled}
               onChange={onModelChange}
             />
             {activeEntry ? (
@@ -93,6 +96,7 @@ export function HireMemberRow({
                 modelOptions={engine.options}
                 allowPromptInjectedEffort={false}
                 triggerFit="settings-row"
+                disabled={disabled}
                 onModelOptionsChange={(options) => onReasoningChange(options ?? [])}
               />
             ) : null}

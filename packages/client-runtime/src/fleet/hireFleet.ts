@@ -1,67 +1,91 @@
 import {
-  BotId,
   CommandId,
+  FLEET_TEMPLATES,
   FleetRoleId,
   GROUP_HOP_BUDGET_DEFAULT,
   GroupHopBudget,
-  GroupId,
   fleetRole,
-  type BotEngine,
-  type BotEngineChoice,
+  type BotAvatar,
+  type FleetHireBlocker,
+  type FleetHireCommand,
+  type FleetHireMember,
   type FleetTemplate,
   type FleetTemplateId,
+  type FleetTemplateIndex,
   type ProviderInstanceId,
   type ProviderOptionSelection,
   type ServerProvider,
 } from "@isnadi/contracts";
+import {
+  planFleetHire,
+  reasoningOptions,
+  seedSquadMember,
+  type SquadSeedNotice,
+} from "@isnadi/shared/fleet";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-import * as Schema from "effect/Schema";
 
-import { createBot, createGroup } from "../operations/commands.ts";
-import { planBlockers, planFleetHire, type FleetHireMember } from "./hirePlan.ts";
-import { reasoningOptionsFor } from "./squadSeed.ts";
+import { dispatch } from "../operations/commands/dispatch.ts";
+import { isRpcClientError } from "../rpc/client.ts";
 
 /**
- * The squad screen's working copy of a hire: every id and command id minted
- * once, so pressing Create twice finishes the same squad instead of starting a
- * second one, and so a failed hire can be retried where it stopped.
+ * The squad screen's working copy of a hire. Everything on it is local: the
+ * hire reaches the server as one `fleet.hire` command carrying the engines the
+ * screen picked, and the server mints the ids, so nothing here survives the
+ * screen except the squad it created.
  */
 
-/** One member as squad setup holds it, before anything exists on the server. */
+/** Why a member does not start on what its role asked for. Mostly the seed's word, plus the screen's own. */
+export type HireMemberNotice = SquadSeedNotice | "model-unavailable";
+
+/** One member as squad setup holds it: the plan's member plus what the row draws. */
 export interface HireMember extends FleetHireMember {
-  readonly botId: BotId;
-  readonly createCommandId: CommandId;
-  /**
-   * The engine `createCommandId` was last sent with, or null while the member's
-   * create has never gone out. The server replays the stored receipt for a
-   * command id it already accepted, so a retry after an edited engine needs a
-   * fresh id: the same one would report success for an engine it never stored.
-   */
-  readonly sentEngine: BotEngine | null;
+  /** The role's own avatar, which the contract member no longer carries. */
+  readonly avatar: BotAvatar;
+  readonly notice: HireMemberNotice | null;
 }
+
+/**
+ * Where the draft's one command stands.
+ *
+ * `draft` has never gone out. `failed` means the server answered a failure: a
+ * retry may resend the same command id, and a draft edited since needs a fresh
+ * one, since the same id would answer for content the user changed. `unknown`
+ * means the send may or may not have landed: the id is kept and the draft turns
+ * read-only until a resend of that id answers what happened.
+ */
+export type HireSendState =
+  | { readonly status: "draft" }
+  | { readonly status: "failed"; readonly edited: boolean }
+  | { readonly status: "unknown" };
+
+/** Whether a failed send is one we can account for, which decides what a retry may do. */
+export type HireSendOutcome = "failed" | "unknown";
 
 export interface HireDraft {
   readonly templateId: FleetTemplateId;
+  readonly templateIndex: FleetTemplateIndex;
   /** The group's name, which the template names. */
   readonly name: string;
   readonly bossRoleId: FleetRoleId;
   readonly hopBudget: GroupHopBudget;
-  /** Whether the space keeps its idle members busy; the plan decides it. */
-  readonly keepBusy: boolean;
   readonly members: ReadonlyArray<HireMember>;
-  readonly groupId: GroupId;
-  readonly groupCommandId: CommandId;
-  /** Fixed for the draft's life, so a retry sends the same command it sent before. */
+  /** The one command this draft sends. Minted once, so pressing Create twice finishes the same squad. */
+  readonly commandId: CommandId;
   readonly createdAt: string;
+  readonly send: HireSendState;
 }
 
-/** Mints the ids a draft needs. The web passes `crypto.randomUUID`. */
+/** Mints the id a retry needs after a failed send on an edited draft. The web passes `crypto.randomUUID`. */
 export type MakeId = () => string;
 
+/** The level the member currently saves, for the re-check a model change needs. */
 const REASONING_OPTION_IDS = new Set(["reasoningEffort", "effort"]);
 
-/** The level the member currently saves, for the re-check a model change needs. */
 function reasoningLevelOf(member: HireMember, roleId: FleetRoleId): string {
   const saved = member.engine?.options?.find((candidate) =>
     REASONING_OPTION_IDS.has(candidate.id),
@@ -71,9 +95,34 @@ function reasoningLevelOf(member: HireMember, roleId: FleetRoleId): string {
 }
 
 /**
+ * The template's index, the only way a client names a template to the server.
+ * A template outside `FLEET_TEMPLATES` cannot be hired, so this is a caller bug.
+ */
+function templateIndexOf(templateId: FleetTemplateId): FleetTemplateIndex {
+  const index = FLEET_TEMPLATES.findIndex((candidate) => candidate.id === templateId);
+
+  if (index < 0) {
+    throw new Error(`No fleet template '${templateId}' to hire.`);
+  }
+
+  return index;
+}
+
+/** A plan member with the role's avatar and the seed's notice, which the contract member does not carry. */
+function withRole(member: FleetHireMember, providers: ReadonlyArray<ServerProvider>): HireMember {
+  const role = fleetRole(member.roleId);
+
+  if (role === undefined) {
+    throw new Error(`Role '${member.roleId}' is not in the fleet catalogue.`);
+  }
+
+  return { ...member, avatar: role.avatar, notice: seedSquadMember(role, providers).notice };
+}
+
+/**
  * The draft squad setup opens with: the plan's members, each seeded to the
- * engine the role asks for, with ids already minted so the screen only has to
- * hand back the draft it edited.
+ * engine the role asks for and already carrying the one command id a hire or a
+ * retry sends.
  */
 export function createHireDraft({
   template,
@@ -88,26 +137,38 @@ export function createHireDraft({
 }): HireDraft {
   const plan = planFleetHire({ template, providers });
 
-  const members = plan.members.map(
-    (member): HireMember => ({
-      ...member,
-      botId: BotId.make(`bot-${makeId()}`),
-      createCommandId: CommandId.make(makeId()),
-      sentEngine: null,
-    }),
-  );
-
   return {
     templateId: template.id,
+    templateIndex: templateIndexOf(template.id),
     name: template.name,
     bossRoleId: template.bossRoleId,
     hopBudget: GroupHopBudget.make(GROUP_HOP_BUDGET_DEFAULT),
-    keepBusy: plan.keepBusy,
-    members,
-    groupId: GroupId.make(`group-${makeId()}`),
-    groupCommandId: CommandId.make(makeId()),
+    members: plan.members.map((member) => withRole(member, providers)),
+    commandId: CommandId.make(makeId()),
     createdAt,
+    send: { status: "draft" },
   };
+}
+
+/** Whether a send whose outcome is unknown still owns the draft, so nothing may edit it. */
+export function draftLocked(draft: HireDraft): boolean {
+  return draft.send.status === "unknown";
+}
+
+/**
+ * The draft after an edit. A draft whose send outcome is unknown is read-only
+ * until that outcome is known, and a draft whose send failed remembers that it
+ * changed, so the next send mints the fresh command id it needs.
+ */
+function afterEdit(draft: HireDraft): HireDraft {
+  switch (draft.send.status) {
+    case "draft":
+      return draft;
+    case "failed":
+      return { ...draft, send: { status: "failed", edited: true } };
+    case "unknown":
+      return draft;
+  }
 }
 
 /** The draft with one member replaced, keeping everything else as it was. */
@@ -116,10 +177,13 @@ function replaceMember(
   roleId: FleetRoleId,
   change: (member: HireMember) => HireMember,
 ): HireDraft {
-  return {
-    ...draft,
-    members: draft.members.map((member) => (member.roleId === roleId ? change(member) : member)),
-  };
+  if (draftLocked(draft)) return draft;
+
+  const members = draft.members.map((member) =>
+    member.roleId === roleId ? change(member) : member,
+  );
+
+  return afterEdit({ ...draft, members });
 }
 
 /**
@@ -130,8 +194,8 @@ function replaceMember(
  *
  * A pick whose provider or model is no longer on the server keeps the member's
  * choice on screen and marks it "model-unavailable": the picker stays usable, so
- * the user can pick again, and the blocker stops Create from making a bot that
- * has nowhere to run.
+ * the user can pick again, and `draftBlockers` stops Create from making a bot
+ * that has nowhere to run.
  */
 export function setMemberModel(
   draft: HireDraft,
@@ -156,7 +220,7 @@ export function setMemberModel(
       };
     }
 
-    const { options, adjusted } = reasoningOptionsFor(model, reasoningLevelOf(member, roleId));
+    const { options, adjusted } = reasoningOptions(model, reasoningLevelOf(member, roleId));
 
     return {
       ...member,
@@ -197,6 +261,8 @@ export function setMemberReasoning(
  * screen 2 shows.
  */
 export function setBoss(draft: HireDraft, roleId: FleetRoleId): HireDraft {
+  if (draftLocked(draft)) return draft;
+
   const members = draft.members.map((member) => ({
     ...member,
     isBoss: member.roleId === roleId,
@@ -206,184 +272,161 @@ export function setBoss(draft: HireDraft, roleId: FleetRoleId): HireDraft {
 
   if (boss === undefined) return draft;
 
-  return {
+  return afterEdit({
     ...draft,
     bossRoleId: roleId,
     members: [boss, ...members.filter((member) => member !== boss)],
-  };
+  });
 }
 
 /** The reply budget every new chat in this space starts with. */
 export function setHopBudget(draft: HireDraft, hopBudget: GroupHopBudget): HireDraft {
-  return { ...draft, hopBudget };
-}
-
-/** What still stops Create, asked of the members as they stand on screen. */
-export function draftBlockers(draft: HireDraft) {
-  return planBlockers(draft.members);
+  return draftLocked(draft) ? draft : afterEdit({ ...draft, hopBudget });
 }
 
 /**
- * Why a hire stopped. `step` says how far it got: nothing sent ("blocked"), a
- * member's `bot.create`, or the `group.create` that closes the hire. The draft
- * keeps its command ids, so handing the same draft back finishes the squad.
+ * What still stops Create, asked of the members as they stand on screen. The
+ * rules are the plan's, which the server runs again on the hire, plus the one
+ * only the screen knows: a member pinned to a model the server no longer offers
+ * has an engine it cannot run on.
  */
-export class HireFleetError extends Schema.TaggedErrorClass<HireFleetError>()("HireFleetError", {
-  step: Schema.Literals(["blocked", "member", "group"]),
-  /** The member the step belongs to; absent when a duplicate name blocks the hire. */
-  roleId: Schema.optional(FleetRoleId),
-  cause: Schema.optional(Schema.Defect()),
-}) {
-  override get message(): string {
-    return this.step === "blocked"
-      ? `The hire is blocked${this.roleId === undefined ? "" : ` at ${this.roleId}`}.`
-      : `The hire failed at the ${this.step} step${this.roleId === undefined ? "" : ` for ${this.roleId}`}.`;
-  }
+export function draftBlockers(draft: HireDraft): ReadonlyArray<FleetHireBlocker> {
+  const template = FLEET_TEMPLATES.find((candidate) => candidate.id === draft.templateId);
+
+  if (template === undefined) return [];
+
+  const plan = planFleetHire({
+    template: { ...template, bossRoleId: draft.bossRoleId },
+    // The members already carry their engines, so the plan seeds nothing here;
+    // a member without one is exactly the `no-provider` blocker.
+    providers: [],
+    picks: draft.members.flatMap((member) =>
+      member.engine === null ? [] : [{ roleId: member.roleId, engine: member.engine }],
+    ),
+    names: new Map(draft.members.map((member) => [member.roleId, member.name])),
+  });
+
+  const stale: ReadonlyArray<FleetHireBlocker> = draft.members.flatMap((member) =>
+    member.notice === "model-unavailable"
+      ? [{ kind: "no-provider" as const, roleId: member.roleId }]
+      : [],
+  );
+
+  return [...plan.blockers, ...stale];
 }
 
-export interface HireFleetResult {
-  readonly groupId: GroupId;
-  readonly botIds: ReadonlyArray<BotId>;
+/**
+ * Whether a failed send may still have landed. A dropped socket or an
+ * interruption can lose the answer after the server applied the command; a
+ * refused command or an environment that was never connected cannot.
+ */
+function isSocketLoss(cause: unknown): boolean {
+  if (!isRpcClientError(cause)) return false;
+
+  return Match.value(cause.reason).pipe(
+    Match.tags({
+      SocketReadError: () => true,
+      SocketWriteError: () => true,
+      SocketCloseError: () => true,
+    }),
+    Match.orElse(() => false),
+  );
 }
+
+function sendOutcome(cause: Cause.Cause<unknown>): HireSendOutcome {
+  if (Cause.hasInterruptsOnly(cause)) return "unknown";
+
+  const failure = Cause.findErrorOption(cause);
+
+  return Option.isSome(failure) && isSocketLoss(failure.value) ? "unknown" : "failed";
+}
+
+/**
+ * What one Create did. A blocked draft sent nothing; a failed send hands back
+ * the draft to keep, already marked with how it failed.
+ */
+export type HireFleetResult =
+  | { readonly status: "sent"; readonly sequence: number }
+  | { readonly status: "blocked"; readonly blockers: ReadonlyArray<FleetHireBlocker> }
+  | { readonly status: "failed"; readonly outcome: HireSendOutcome; readonly draft: HireDraft };
 
 /** How the hire reaches the server as a command: the draft the screen finished. */
 export interface HireFleetInput {
   readonly draft: HireDraft;
-  /** Mints the fresh command ids an edited member needs; the web passes `crypto.randomUUID`. */
   readonly makeId: MakeId;
 }
 
-function sameOption(
-  left: ProviderOptionSelection,
-  right: ProviderOptionSelection | undefined,
-): boolean {
-  return right !== undefined && left.id === right.id && left.value === right.value;
-}
-
-function sameChoice(left: BotEngineChoice, right: BotEngineChoice): boolean {
-  const leftOptions = left.options ?? [];
-  const rightOptions = right.options ?? [];
-
-  return (
-    left.provider === right.provider &&
-    left.model === right.model &&
-    leftOptions.length === rightOptions.length &&
-    leftOptions.every((option, index) => sameOption(option, rightOptions[index]))
-  );
-}
-
-/** Whether two engines would store the same bot, so the same command id still describes them. */
-function sameEngine(left: BotEngine | null, right: BotEngine | null): boolean {
-  if (left === null || right === null) return left === right;
-
-  return (
-    sameChoice(left, right) &&
-    left.fallbacks.length === right.fallbacks.length &&
-    left.fallbacks.every((fallback, index) => {
-      const other = right.fallbacks[index];
-
-      return other !== undefined && sameChoice(fallback, other);
-    })
-  );
-}
-
 /**
- * The draft to send: a member whose engine changed after its create went out
- * gets a fresh command id, so the server runs the command again and stores the
- * engine the user picked instead of replaying a receipt for the old one.
+ * The draft to send. Its command id stands for what it sends, so only a draft
+ * whose send failed and was edited since needs a fresh one: resending the old
+ * id would replay a receipt for the engines the user has already changed.
  */
-function withFreshCommandIds(draft: HireDraft, makeId: MakeId): HireDraft {
-  const members = draft.members.map((member) =>
-    member.sentEngine !== null && !sameEngine(member.sentEngine, member.engine)
-      ? { ...member, createCommandId: CommandId.make(makeId()) }
-      : member,
-  );
+function prepareSend(draft: HireDraft, makeId: MakeId): HireDraft {
+  if (draft.send.status !== "failed" || !draft.send.edited) return draft;
 
-  return members.every((member, index) => member === draft.members[index])
-    ? draft
-    : { ...draft, members };
+  return { ...draft, commandId: CommandId.make(makeId()), send: { status: "draft" } };
 }
 
-/**
- * The draft after a hire stopped: every member the attempt reached remembers
- * the engine its create command carried. `withFreshCommandIds` reads that on
- * the next Create, so an engine edited after the failure is not dropped.
- * A blocked hire sent nothing, so every command id still describes its member.
- */
-export function recordHireFailure(draft: HireDraft, error: HireFleetError): HireDraft {
-  if (error.step === "blocked") return draft;
+/** The command one hire sends: the template by index, the engines picked for its roles. */
+function hireCommand(draft: HireDraft): FleetHireCommand {
+  const picks = draft.members.flatMap((member) =>
+    member.engine === null ? [] : [{ roleId: member.roleId, engine: member.engine }],
+  );
 
-  const reached =
-    error.step === "group"
-      ? draft.members.length
-      : draft.members.findIndex((member) => member.roleId === error.roleId) + 1;
+  const [firstPick, ...otherPicks] = picks;
 
-  if (reached === 0) return draft;
+  if (firstPick === undefined) {
+    throw new Error("A hire needs at least one member.");
+  }
+
+  const overridesTemplateBoss =
+    draft.bossRoleId !== FLEET_TEMPLATES[draft.templateIndex]?.bossRoleId;
 
   return {
-    ...draft,
-    members: draft.members.map((member, index) =>
-      index < reached ? { ...member, sentEngine: member.engine } : member,
-    ),
+    type: "fleet.hire",
+    commandId: draft.commandId,
+    templateIndex: draft.templateIndex,
+    picks: [firstPick, ...otherPicks],
+    ...(overridesTemplateBoss ? { bossRoleId: draft.bossRoleId } : {}),
+    hopBudget: draft.hopBudget,
+    createdAt: draft.createdAt,
   };
 }
 
 /**
- * Creates the squad: one bot per member in screen order, then the group that
- * holds them under the template. Every command carries the draft's own command
- * id, so a retry after a failure replays what already landed instead of
- * creating a second bot, and a blocked draft never creates a partial squad. A
- * member edited between attempts is the exception: its create gets a fresh id,
- * because a replayed receipt would silently keep the engine the user changed.
+ * Hires the squad: one `fleet.hire` command that the server decides into every
+ * bot and the group, under the draft's own command id. A retry after a failure
+ * resends that id, so the server replays the hire it already stored instead of
+ * making a second squad, and the draft only mints a new id when a failed send
+ * was followed by an edit the stored hire does not describe.
  */
 export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (input: HireFleetInput) {
-  const draft = withFreshCommandIds(input.draft, input.makeId);
-  const blocked = draftBlockers(draft)[0];
+  // A locked draft is unedited, so `prepareSend` hands it back with its id
+  // intact: the resend answers what the first attempt did. It cannot have
+  // gained a blocker either, since every mutator refuses while locked.
+  const draft = prepareSend(input.draft, input.makeId);
+  const blockers = draftBlockers(draft);
 
-  if (blocked !== undefined) {
-    return yield* new HireFleetError({
-      step: "blocked",
-      ...(blocked.kind === "duplicate-name" ? {} : { roleId: blocked.roleId }),
-    });
-  }
+  if (blockers.length > 0) return { status: "blocked", blockers } satisfies HireFleetResult;
 
-  for (const member of draft.members) {
-    yield* createBot({
-      commandId: member.createCommandId,
-      botId: member.botId,
-      name: member.name,
-      title: member.title,
-      description: member.description,
-      avatar: member.avatar,
-      engine: member.engine,
-      skills: member.skills,
-      skillRegistryAccess: false,
-      sandbox: null,
-      groupId: null,
-      createdAt: draft.createdAt,
-    }).pipe(
-      Effect.mapError(
-        (cause) => new HireFleetError({ step: "member", roleId: member.roleId, cause }),
-      ),
-    );
-  }
+  return replayResult(draft, yield* dispatch(hireCommand(draft)).pipe(Effect.exit));
+});
 
-  yield* createGroup({
-    commandId: draft.groupCommandId,
-    groupId: draft.groupId,
-    name: draft.name,
-    bossBotId: draft.members.find((member) => member.roleId === draft.bossRoleId)?.botId,
-    specialistBotIds: draft.members
-      .filter((member) => member.roleId !== draft.bossRoleId)
-      .map((member) => member.botId),
-    hopBudget: draft.hopBudget,
-    keepBusy: draft.keepBusy,
-    fleetTemplateId: draft.templateId,
-    createdAt: draft.createdAt,
-  }).pipe(Effect.mapError((cause) => new HireFleetError({ step: "group", cause })));
+/** What a finished send did, with the draft a failure hands back to the screen. */
+function replayResult(
+  draft: HireDraft,
+  exit: Exit.Exit<{ readonly sequence: number }, unknown>,
+): HireFleetResult {
+  if (Exit.isSuccess(exit)) return { status: "sent", sequence: exit.value.sequence };
+
+  const outcome = sendOutcome(exit.cause);
 
   return {
-    groupId: draft.groupId,
-    botIds: draft.members.map((member) => member.botId),
-  } satisfies HireFleetResult;
-});
+    status: "failed",
+    outcome,
+    draft: {
+      ...draft,
+      send: outcome === "unknown" ? { status: "unknown" } : { status: "failed", edited: false },
+    },
+  };
+}

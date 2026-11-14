@@ -1,4 +1,9 @@
-import { FLEET_TEMPLATES, type FleetTemplate, type FleetTemplateId } from "@isnadi/contracts";
+import {
+  FLEET_TEMPLATES,
+  fleetRole,
+  type FleetTemplate,
+  type FleetTemplateId,
+} from "@isnadi/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { planFleetHire, type FleetHirePlan } from "@isnadi/client-runtime/fleet/hire-plan";
 import { useNavigate } from "@tanstack/react-router";
@@ -141,10 +146,16 @@ function TemplateCard({
   const { t } = useI18n();
   const Icon = TEMPLATE_ICONS[template.icon];
 
+  // The plan carries contract members, so the role catalogue draws the avatar.
+  // A role the catalogue does not know cannot be drawn, so the card skips it.
+  const catalogued = plan.members.flatMap((member) => {
+    const role = fleetRole(member.roleId);
+
+    return role === undefined ? [] : [{ member, avatar: role.avatar }];
+  });
+
   const members =
-    plan.members.length > CARD_MEMBER_SLOTS
-      ? plan.members.slice(0, CARD_MEMBER_SLOTS - 1)
-      : plan.members;
+    catalogued.length > CARD_MEMBER_SLOTS ? catalogued.slice(0, CARD_MEMBER_SLOTS - 1) : catalogued;
 
   const overflow = plan.members.length - members.length;
 
@@ -170,9 +181,9 @@ function TemplateCard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        {members.map((member) => (
+        {members.map(({ member, avatar }) => (
           <span key={member.roleId} className="flex min-w-0 items-center gap-1.5">
-            <BotAvatarView avatar={member.avatar} name={member.name} className="size-5" />
+            <BotAvatarView avatar={avatar} name={member.name} className="size-5" />
             <span className="max-w-24 truncate text-xs text-muted-foreground">
               {t(member.name)}
             </span>

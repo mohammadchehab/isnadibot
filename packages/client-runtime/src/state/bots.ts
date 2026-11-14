@@ -96,10 +96,13 @@ export function createBotEnvironmentAtoms<R, E>(
       JSON.stringify([environmentId, "group", input.groupId]),
   };
 
+  // One `fleet.hire` command creates the whole squad, so a retry replays the id
+  // the draft minted rather than topping up a half-made group. The key is the
+  // draft's command id: one draft sends serially, two drafts may not collide.
   const hireConcurrency = {
     mode: "serial" as const,
     key: ({ environmentId, input }: { environmentId: string; input: HireFleetInput }) =>
-      JSON.stringify([environmentId, "hire", input.draft.groupId]),
+      JSON.stringify([environmentId, "hire", input.draft.commandId]),
   };
 
   return {
@@ -133,9 +136,8 @@ export function createBotEnvironmentAtoms<R, E>(
       scheduler,
       concurrency: botConcurrency,
     }),
-    // Not atomic: the hire sends one bot.create per member, then group.create. A
-    // failure partway leaves the bots already created, and re-running the same
-    // draft finishes them off because every command carries the draft's own id.
+    // One `fleet.hire` commands the whole squad at once, so nothing here is left
+    // half-created: a retry carries the draft's own id and replays what landed.
     hire: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:group:hire",
       execute: (input: HireFleetInput) => hireFleet(input),
