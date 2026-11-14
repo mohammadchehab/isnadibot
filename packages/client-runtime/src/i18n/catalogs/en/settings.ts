@@ -33,7 +33,7 @@ export const settingsCatalog = {
   "Prompt font": "Prompt font",
   Provider: "Provider",
   "Provider default": "Provider default",
-  "Provider sign-in expired": "Provider sign-in expired",
+  "Provider sign-in expired or revoked": "Provider sign-in expired or revoked",
   "Provider update checks": "Provider update checks",
   Providers: "Providers",
   "Save chat settings": "Save chat settings",
@@ -214,7 +214,7 @@ export const settingsCatalog = {
     "Install {provider} from Settings > Providers, or pick another model for this bot.",
   "Install the provider from Settings > Providers, or pick another model for this bot.":
     "Install the provider from Settings > Providers, or pick another model for this bot.",
-  "{provider} sign-in expired": "{provider} sign-in expired",
+  "{provider} sign-in expired or revoked": "{provider} sign-in expired or revoked",
   "{model} is not available on {provider}": "{model} is not available on {provider}",
   "{model} is not available on the provider": "{model} is not available on the provider",
   "This model is not available on {provider}": "This model is not available on {provider}",

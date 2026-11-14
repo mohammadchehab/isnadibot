@@ -20,6 +20,7 @@ import {
   providerTurnKey,
 } from "./EventFields.ts";
 import { runtimeEventToActivities } from "./ActivityMapping.ts";
+import { providerUnavailabilityFromDetail } from "../../../provider/providerSnapshot.ts";
 import type { createAdmission } from "./Admission.ts";
 import type { createMessages } from "./Messages.ts";
 import type { createDependencies } from "./Dependencies.ts";
@@ -444,6 +445,13 @@ export function createEvents({
       if (event.type === "runtime.error") {
         const runtimeErrorMessage = event.payload.message;
 
+        // Only a provider error carries a category the client can act on; a
+        // transport or validation failure stays uncategorized.
+        const unavailability =
+          event.payload.class === "provider_error"
+            ? providerUnavailabilityFromDetail(event.provider, runtimeErrorMessage)
+            : undefined;
+
         const shouldApplyRuntimeError = !STRICT_PROVIDER_LIFECYCLE_GUARD
           ? true
           : activeTurnId === null || eventTurnId === undefined || sameId(activeTurnId, eventTurnId);
@@ -460,6 +468,7 @@ export function createEvents({
               ...(event.providerInstanceId !== undefined
                 ? { providerInstanceId: event.providerInstanceId }
                 : {}),
+              ...(unavailability !== undefined ? { unavailability } : {}),
               runtimeMode: thread.session?.runtimeMode ?? "full-access",
               mcpServerIds: thread.session?.mcpServerIds ?? [],
               activeTurnId: eventTurnId ?? null,

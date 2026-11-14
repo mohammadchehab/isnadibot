@@ -57,6 +57,18 @@ describe("providerUnavailabilityFromDetail", () => {
     ["opencode", "OpenCode API rate limit exceeded", "limit-reached"],
     ["opencode", "OpenCode usage cap exceeded", "usage-cap"],
     ["codex", "socket closed", "temporary-failure"],
+    // A revoked sign-in is the same state as an expired one, whichever driver said it.
+    ["codex", "OAuth access token has been revoked.", "expired-login"],
+    ["claudeAgent", "OAuth access token has been revoked.", "expired-login"],
+    ["grok", "Credentials revoked: invalid_grant", "expired-login"],
+    ["kimi", "Your login has been revoked; sign in again", "expired-login"],
+    ["opencodeGo", "invalid_grant: the refresh token was revoked", "expired-login"],
+    ["opencode", "Session revoked by the provider", "expired-login"],
+    // Revocation wording that is not about the provider sign-in stays an ordinary failure.
+    ["claudeAgent", "MCP server credential revoked by the user", "temporary-failure"],
+    ["claudeAgent", "The computer grant was revoked; re-authorize it", "temporary-failure"],
+    ["codex", "Thread was revoked", "temporary-failure"],
+    ["grok", "connection reset", "temporary-failure"],
   ])("maps %s provider detail", (driver, detail, category) => {
     expect(providerUnavailabilityFromDetail(driver, detail)).toBe(category);
   });

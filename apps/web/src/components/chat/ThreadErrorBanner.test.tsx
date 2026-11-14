@@ -127,6 +127,34 @@ describe("ThreadErrorBanner", () => {
     expect(markup).toContain(">Resume<");
   });
 
+  it("does not offer Resume for a failure only signing in again can fix", () => {
+    const markup = renderToStaticMarkup(
+      <ThreadErrorBanner
+        error="OAuth access token has been revoked."
+        threadKey="env:thread-revoked"
+        context={{ providerName: "Claude" }}
+        onResume={() => {}}
+      />,
+    );
+
+    expect(markup).toContain("Claude sign-in expired or revoked");
+    expect(markup).not.toContain(">Resume<");
+    expect(markup).toContain(">Open Providers<");
+  });
+
+  it("keeps Resume for a failure that retrying can fix", () => {
+    const markup = renderToStaticMarkup(
+      <ThreadErrorBanner
+        error="WebSocket disconnected"
+        threadKey="env:thread-temporary"
+        context={{ unavailability: "temporary-failure" }}
+        onResume={() => {}}
+      />,
+    );
+
+    expect(markup).toContain(">Resume<");
+  });
+
   it("turns a disabled provider exception into an actionable message", () => {
     const error =
       "ProviderValidationError: Provider validation failed in AgentController.inspectEngine: Provider instance 'codex' is disabled in IsnadiBot settings. at DisabledProviderError (file:///home/leo/app.ts:1:2)";
@@ -171,7 +199,7 @@ describe("ThreadErrorBanner", () => {
       />,
     );
 
-    expect(markup).toContain("Claude sign-in expired");
+    expect(markup).toContain("Claude sign-in expired or revoked");
     expect(markup).toContain("Reconnect Claude in Settings &gt; Providers");
     expect(markup).toContain(">Open Providers<");
     expect(markup).not.toContain("Send feedback");

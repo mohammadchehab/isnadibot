@@ -119,6 +119,25 @@ describe("presentThreadError", () => {
     });
   });
 
+  it("reads a revoked sign-in as a sign-in problem without a server category", () => {
+    expect(
+      presentThreadError("OAuth access token has been revoked.", { providerName: "Claude" }),
+    ).toMatchObject({
+      title: "Claude sign-in expired or revoked",
+      description: "Reconnect Claude in Settings > Providers, then send your message again.",
+      technicalDetails: "OAuth access token has been revoked.",
+      action: "providers",
+    });
+    expect(
+      presentThreadError("OAuth access token has been revoked.", { providerName: "Claude" }),
+    ).toEqual(
+      presentThreadError("OAuth access token has been revoked.", {
+        providerName: "Claude",
+        unavailability: "expired-login",
+      }),
+    );
+  });
+
   it("uses the server's failure category when it has one", () => {
     expect(
       presentThreadError("OAuth token expired", {
@@ -126,7 +145,7 @@ describe("presentThreadError", () => {
         providerName: "Claude",
       }),
     ).toMatchObject({
-      title: "Claude sign-in expired",
+      title: "Claude sign-in expired or revoked",
       technicalDetails: "OAuth token expired",
       action: "providers",
     });

@@ -142,7 +142,7 @@ describe("presentProviderUnavailability", () => {
     expect(
       presentProviderUnavailability({ reason: "expired-login", providerName: "Codex" }),
     ).toMatchObject({
-      title: "Codex sign-in expired",
+      title: "Codex sign-in expired or revoked",
       description: "Reconnect Codex in Settings > Providers, then send your message again.",
       action: "providers",
     });
@@ -173,7 +173,7 @@ describe("presentProviderUnavailability", () => {
     expect(
       presentProviderUnavailability({ reason: "expired-login", providerName: "Codex" }, zh),
     ).toMatchObject({
-      title: "Codex 登录已过期",
+      title: "Codex 登录已过期或被撤销",
       description: "请在“设置 > 提供商”中重新连接 Codex，然后重新发送消息。",
     });
     expect(presentProviderUnavailability({ reason: "missing-login" }, zh)).toMatchObject({

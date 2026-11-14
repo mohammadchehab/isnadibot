@@ -7,6 +7,7 @@ import {
   type ProviderRuntimeEvent,
 } from "@isnadi/contracts";
 import { projectActivityPayload } from "../../ActivityPayloadProjection.ts";
+import { providerUnavailabilityFromDetail } from "../../../provider/providerSnapshot.ts";
 import {
   requestKindFromCanonicalRequestType,
   boundedApprovalArgs,
@@ -123,6 +124,14 @@ export function runtimeEventToActivities(
     }
 
     case "runtime.error": {
+      // Classified from the untruncated message, so a long provider detail still
+      // resolves: the client reads `unavailability` instead of guessing from the
+      // truncated text it is shown.
+      const unavailability =
+        event.payload.class === "provider_error"
+          ? providerUnavailabilityFromDetail(event.provider, event.payload.message)
+          : undefined;
+
       return [
         {
           id: event.eventId,
@@ -133,6 +142,8 @@ export function runtimeEventToActivities(
           payload: {
             message: truncateDetail(event.payload.message),
             ...(event.payload.class ? { class: event.payload.class } : {}),
+            ...(unavailability !== undefined ? { unavailability } : {}),
+            ...(event.providerInstanceId ? { providerInstanceId: event.providerInstanceId } : {}),
           },
           turnId: toTurnId(event.turnId) ?? null,
           ...maybeSequence,

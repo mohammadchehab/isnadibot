@@ -53,7 +53,7 @@ export function botInboxKindLabel(kind: BotInboxItem["kind"]): MessageKey {
     case "routine-failure":
       return "Routine failed";
     case "oauth-expired":
-      return "Provider sign-in expired";
+      return "Provider sign-in expired or revoked";
     case "connector-failure":
       return "Provider connection failed";
     case "browser-dead":
