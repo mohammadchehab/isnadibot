@@ -444,7 +444,7 @@ export const rosterCatalog = {
   "Could not load these cards": "تعذّر تحميل هذه البطاقات",
   "Showing the {count} most recent.": "تُعرض أحدث {count}.",
   "{name} assigns cards. They move when a bot finishes a step.":
-    "‏{name} يوزّع البطاقات. تتحرك عند إنجاز بوت لخطوة.",
+    "{name} يوزّع البطاقات. تتحرك عند إنجاز بوت لخطوة.",
   "Cards move when a bot finishes a step.": "تتحرك البطاقات عند إنجاز بوت لخطوة.",
   "Add item": "إضافة عنصر",
   "Card actions": "إجراءات البطاقة",
