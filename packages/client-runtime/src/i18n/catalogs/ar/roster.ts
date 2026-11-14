@@ -123,6 +123,11 @@ export const rosterCatalog = {
   "This group still holds open work": "لا تزال هذه المجموعة تحتوي على عمل مفتوح",
   "Its work changed while you were deleting it. Delete again to see how many items would be discarded.":
     "تغيّر عملها أثناء الحذف. أعد الحذف لترى عدد العناصر التي ستُتجاهل.",
+  "Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.":
+    "حذف {name}؟ {name} هو قائد {space}. اختر قائدا جديدا للمساحة أولا، أو احذف المساحة.",
+  "Boss of {space}": "قائد {space}",
+  "Pick a new boss, or delete the space.": "اختر قائدا جديدا، أو احذف المساحة.",
+  "Pick a new boss": "اختر قائدا جديدا",
   Group: "المجموعة",
   "{name} group sidebar": "الشريط الجانبي لمجموعة {name}",
   "Collapse {name} group sidebar": "طي الشريط الجانبي لمجموعة {name}",

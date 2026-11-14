@@ -13,14 +13,14 @@ import {
 import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { driverSupportsDelegation } from "@isnadi/shared/delegationProviders";
 import { Brain02Icon, Link02Icon } from "@hugeicons/core-free-icons";
-import { useBlocker } from "@tanstack/react-router";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 
 import { requestConfirmDialog } from "../../confirmDialog";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useI18n } from "../../i18n";
 import { openSettings } from "../../settingsDialogStore";
-import { botEnvironment } from "../../state/bots";
+import { botEnvironment, environmentGroupsAtom } from "../../state/bots";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { environmentMcpServersAtom } from "../../state/mcpServers";
 import { useEnvironmentQuery } from "../../state/query";
@@ -41,6 +41,12 @@ import { BotMemorySheet } from "./BotMemorySheet";
 import { BotPersonalityToneField } from "./BotPersonalityToneField";
 import { BotSkillsSheet } from "./BotSkillsSheet";
 import { BotToolsSection } from "./BotToolsSection";
+import {
+  bossGroupOf,
+  botDeleteConfirmMessage,
+  botDeleteFailureToast,
+  classifyBotDeleteFailure,
+} from "./botDelete.logic";
 import { botSkillsEnabledCount } from "./botSkills";
 import { BOT_SANDBOX_OPTIONS, botSandboxLabel } from "./botSandbox";
 import type { Bot } from "./types";
@@ -69,6 +75,8 @@ export function BotSettingsForm({
   const environmentId = usePrimaryEnvironmentId();
   const mcpServers = useAtomValue(environmentMcpServersAtom(environmentId ?? NO_ENVIRONMENT));
   const deleteBot = useAtomCommand(botEnvironment.delete, { reportFailure: false });
+  const groups = useAtomValue(environmentGroupsAtom(environmentId ?? NO_ENVIRONMENT));
+  const navigate = useNavigate();
 
   const imageSettings = useEnvironmentSettings(
     environmentId ?? NO_ENVIRONMENT,
@@ -131,10 +139,10 @@ export function BotSettingsForm({
   const onDeleteBot = useCallback(() => {
     if (!environmentId) return;
 
+    const bossSpace = bossGroupOf(groups, bot.id);
+
     const confirmation = requestConfirmDialog(
-      t("Delete {name}? Its chats stay in your history. This cannot be undone.", {
-        name: bot.name,
-      }),
+      botDeleteConfirmMessage({ botName: bot.name, bossSpaceName: bossSpace?.name ?? null }),
       { variant: "destructive" },
     );
 
@@ -156,10 +164,43 @@ export function BotSettingsForm({
 
       if (Predicate.isTagged(result, "Failure")) {
         const error = squashAtomCommandFailure(result);
+
+        const space = bossGroupOf(groups, bot.id);
+
+        const copy = botDeleteFailureToast({
+          refusal: classifyBotDeleteFailure(result),
+          message: error instanceof Error ? error.message : "",
+          botName: bot.name,
+          bossSpaceName: space?.name ?? null,
+        });
+
         toastManager.add({
           type: "error",
-          title: t("Could not delete {name}", { name: bot.name }),
-          description: error instanceof Error ? error.message : t("The command failed."),
+          title: copy.title,
+          description: copy.description,
+          // The action is the way out and goes to the space whose boss this
+          // bot became between the check and the dispatch. No space on screen
+          // means no destination, so no action.
+          data:
+            copy.actionLabel !== null && space !== null
+              ? {
+                  secondaryActionVariant: "link",
+                  additionalActions: [
+                    {
+                      id: "pick-new-boss",
+                      props: {
+                        children: copy.actionLabel,
+                        onClick: () => {
+                          void navigate({
+                            to: "/groups/$groupId",
+                            params: { groupId: space.id },
+                          });
+                        },
+                      },
+                    },
+                  ],
+                }
+              : undefined,
         });
 
         return;
@@ -168,7 +209,7 @@ export function BotSettingsForm({
       deletedRef.current = true;
       onDeleted();
     });
-  }, [bot, environmentId, deleteBot, onDeleted, t]);
+  }, [bot, environmentId, deleteBot, onDeleted, t, groups, navigate]);
 
   return (
     <>

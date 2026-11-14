@@ -443,6 +443,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Bot '${command.botId}' is the boss of group '${bossGroup.id}'. Set a new boss before deleting it.`,
+          refusal: "bot-is-group-boss",
         });
       }
 

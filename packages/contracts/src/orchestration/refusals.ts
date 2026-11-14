@@ -10,7 +10,11 @@ import * as Schema from "effect/Schema";
  * code it does not know must degrade to `message` rather than fail the decode.
  * This set is what a current client can switch on.
  */
-export const CommandRefusalCodes = ["open-work-items", "environment-rights"] as const;
+export const CommandRefusalCodes = [
+  "open-work-items",
+  "environment-rights",
+  "bot-is-group-boss",
+] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);
 

@@ -124,6 +124,11 @@ export const rosterCatalog = {
   "This group still holds open work": "This group still holds open work",
   "Its work changed while you were deleting it. Delete again to see how many items would be discarded.":
     "Its work changed while you were deleting it. Delete again to see how many items would be discarded.",
+  "Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.":
+    "Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.",
+  "Boss of {space}": "Boss of {space}",
+  "Pick a new boss, or delete the space.": "Pick a new boss, or delete the space.",
+  "Pick a new boss": "Pick a new boss",
   Group: "Group",
   "{name} group sidebar": "{name} group sidebar",
   "Collapse {name} group sidebar": "Collapse {name} group sidebar",
