@@ -1,5 +1,133 @@
 # isnadibot
 
+## 0.1.0
+
+### Minor Changes
+
+- [#100](https://github.com/mohammadchehab/isnadibot/pull/100) [`8b857f6`](https://github.com/mohammadchehab/isnadibot/commit/8b857f6e7ec4cfe3939cb3d7085e976de3e80fa8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Arabic (العربية) is now available on web and desktop. Choose it in Settings → Language: the interface mirrors right to left at once, messages follow their own text direction, and code and paths stay left to right.
+
+- [#121](https://github.com/mohammadchehab/isnadibot/pull/121) [`ba13240`](https://github.com/mohammadchehab/isnadibot/commit/ba1324027382325e4e0384d69426a658512973c2) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Bots can keep an ordered list of fallback models in their settings. The list is saved with the bot and shown on mobile as a count; turns do not use it yet.
+
+- [#184](https://github.com/mohammadchehab/isnadibot/pull/184) [`9383c87`](https://github.com/mohammadchehab/isnadibot/commit/9383c872009369695506c7ea28589ccd2adf8e4b) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Interrupt a working bot, steer it, or clear its context without leaving the roster. Each bot's row menu has Interrupt, Steer and Clear context, and the command palette has a Bots group that interrupts or clears every bot at once or opens one bot's chat with the caret ready in its composer.
+
+- [#136](https://github.com/mohammadchehab/isnadibot/pull/136) [`d17c968`](https://github.com/mohammadchehab/isnadibot/commit/d17c968c026e01273ca97ddf5a341f863c5a7c48) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Choose which skills each bot uses. Bot settings has a Skills panel with a switch per skill and a switch for registry skills, and mobile shows how many skills are on.
+
+- [#206](https://github.com/mohammadchehab/isnadibot/pull/206) [`ca3fdf4`](https://github.com/mohammadchehab/isnadibot/commit/ca3fdf4170c59616a1052f9d187dbe76fefb1212) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A bot whose provider needs signing in now says so on the roster. Instead of reading as busy or idle, it shows **Sign in** in the capacity view and the space standup, and the count of bots in each state gains that total.
+
+- [#148](https://github.com/mohammadchehab/isnadibot/pull/148) [`d82aa9e`](https://github.com/mohammadchehab/isnadibot/commit/d82aa9e20072082d7b1c6ac9542d49849ba8878e) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Bot usage can now report turns and tokens for a chosen period. The usage summary counts every turn since the requested time instead of stopping at the newest 200 ledger entries, so windows such as "this month" stay accurate for busy bots.
+
+- [#182](https://github.com/mohammadchehab/isnadibot/pull/182) [`e885d8b`](https://github.com/mohammadchehab/isnadibot/commit/e885d8b360d7c32cc98816a7b28d4a28b7220957) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A bot's status is now one of four states — asking, held, busy, idle — derived from the chats, work items and delegated children it already has: it is asking when an approval or question waits on you anywhere in its chat tree, held when it owns a blocked item or its turn waits on a child, busy when a turn is running, and idle otherwise. Archived chats no longer count, and a delegated sub-chat reports as its root bot.
+
+- [#202](https://github.com/mohammadchehab/isnadibot/pull/202) [`2383557`](https://github.com/mohammadchehab/isnadibot/commit/2383557f3fb2fa342dc91eb31c3f237be9cbb4c8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Squad setup hires a whole fleet in one step: `fleet.plan` previews the members and what still blocks them, and `fleet.hire` creates every bot and the group together under a single receipt, so a dropped connection can no longer leave a half-built squad.
+
+- [#70](https://github.com/mohammadchehab/isnadibot/pull/70) [`3b98dd3`](https://github.com/mohammadchehab/isnadibot/commit/3b98dd3663d53f7ce2ed0665340e1096ae12cb97) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Group chats on web, desktop and mobile now let you address bots: mention several, use `@everyone`, or reply to a bot's message on web and desktop. The chat shows who answers next with a Stop button, and a reply budget limits how long bots chain replies.
+
+- [#73](https://github.com/mohammadchehab/isnadibot/pull/73) [`b157946`](https://github.com/mohammadchehab/isnadibot/commit/b1579463b04e8baae349d539393c5c40ec3dd156) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Group chats now let a bot hand the conversation to another member by mentioning it in a reply. Each chat has its own reply budget, from 1 to 20 and 6 by default, that caps how many replies a chain of mentions adds for one message. Bots you name yourself always answer, even past the budget, and a chain the budget cuts short is recorded so clients can say so.
+
+- [#68](https://github.com/mohammadchehab/isnadibot/pull/68) [`ff570fe`](https://github.com/mohammadchehab/isnadibot/commit/ff570fe9d19abaf020b25d3f27bf02852fd55469) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Group chats can now address specific bots, a reply, or everyone in a message. The server runs the addressed bots one at a time, in order, and shows who is next. Stop ends the whole answer, including the bots still waiting, and a restart resumes a waiting queue.
+
+- [#75](https://github.com/mohammadchehab/isnadibot/pull/75) [`aff4aba`](https://github.com/mohammadchehab/isnadibot/commit/aff4abaf66a9022784475bafe876a6fd3b801397) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - On mobile you can now reply to one bot's message in a group chat: press and hold the message, choose Reply, and that bot answers.
+
+- [#152](https://github.com/mohammadchehab/isnadibot/pull/152) [`c1c6fcc`](https://github.com/mohammadchehab/isnadibot/commit/c1c6fcc39f5c40878a22517a633a089828e39931) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The phone can now open a bot's computer from the thread: watch the screen, take control, give it back, and return to a paused view after switching apps.
+
+- [#92](https://github.com/mohammadchehab/isnadibot/pull/92) [`0fa6098`](https://github.com/mohammadchehab/isnadibot/commit/0fa6098c078da18a5ff511bde66afdb633f99210) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Chat messages, the composer, and bot and chat names now take the direction of their own text, so Arabic, Hebrew, and other right-to-left text reads correctly in the English interface. Code, paths, and shortcut keys stay left to right.
+
+- [#192](https://github.com/mohammadchehab/isnadibot/pull/192) [`5064caf`](https://github.com/mohammadchehab/isnadibot/commit/5064caf1d22b29cb07065b380e184e9b2c3af8bf) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A space's Overview now opens with its standup: what each bot is on right now and how many are asking, held, busy or idle, the cards waiting in the queue oldest first, and the blocked cards with who has to move first.
+
+- [#187](https://github.com/mohammadchehab/isnadibot/pull/187) [`c8b7257`](https://github.com/mohammadchehab/isnadibot/commit/c8b7257db8c3dca2a664d455e23ca857122b7b61) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A space's Tasks tab now has a board: five columns — New, In progress, Draft, Closed and Done — each card showing its owner and, when blocked, what it waits on. Add an item from the board or edit one, set its owner, close it as done or dropped, and reopen it, in light and dark themes and in English, Arabic and Simplified Chinese.
+
+- [#183](https://github.com/mohammadchehab/isnadibot/pull/183) [`289755e`](https://github.com/mohammadchehab/isnadibot/commit/289755e5a98fc4ad83a2bdeec458995bdcdfafe8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A space now has a Tasks board. Add items, set an owner and a state, close an item as done or dropped, and reopen it, in light and dark themes.
+
+- [#147](https://github.com/mohammadchehab/isnadibot/pull/147) [`9a6e791`](https://github.com/mohammadchehab/isnadibot/commit/9a6e7910fb18da554477b81aa0dc33b8e449f887) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A space now opens with four tabs: Overview, Chat, Skills and Files, with the space name and tabs in one top bar. Overview shows the newest decision waiting on you, the space's active routines with the next run, this week's turns across its bots, and its recent chats with each chat's bot. Chat stays the default tab, so existing links are unchanged. The sidebar heading "Groups" is now "Spaces".
+
+- [#194](https://github.com/mohammadchehab/isnadibot/pull/194) [`5a33948`](https://github.com/mohammadchehab/isnadibot/commit/5a339483f0e14669f787fdde06ae3b650a59bd2c) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Bots record the fleet role they were hired into, and a work item's role is now a fleet role id.
+
+- [#105](https://github.com/mohammadchehab/isnadibot/pull/105) [`2bfbaa9`](https://github.com/mohammadchehab/isnadibot/commit/2bfbaa9a6bdff0c055a9882c4c995bc33cbc1746) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A new Decisions group at the top of the bot list shows every chat where a bot is waiting on you for an approval or a question. Select a row to jump to that chat; it clears when you answer.
+
+### Patch Changes
+
+- [#211](https://github.com/mohammadchehab/isnadibot/pull/211) [`e01783d`](https://github.com/mohammadchehab/isnadibot/commit/e01783d6452eaeda2755df33f93c2ff7f831d673) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Arabic confirmation dialogs now split into a title and a body the way English and Chinese ones already did. The split looked for an ASCII or fullwidth question mark, and Arabic, Persian and Urdu ask with U+061F, so the whole sentence was landing in the dialog title with a generic line underneath.
+
+- [#101](https://github.com/mohammadchehab/isnadibot/pull/101) [`e82b1b6`](https://github.com/mohammadchehab/isnadibot/commit/e82b1b6776bd3a187892b4ed6773244686d08eb5) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Arabic now mirrors the app layout: the sidebar, settings, chat and preview panels sit on the correct side, and back, next and expand arrows point the right way.
+
+- [#216](https://github.com/mohammadchehab/isnadibot/pull/216) [`f48562d`](https://github.com/mohammadchehab/isnadibot/commit/f48562d10bd1907fcb22684d27f015d1e781a1de) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Deleting a bot that leads a space now says so in plain words before the delete, and a refused delete no longer shows the server's internal wording or raw ids.
+
+- [#217](https://github.com/mohammadchehab/isnadibot/pull/217) [`aa205af`](https://github.com/mohammadchehab/isnadibot/commit/aa205af50d194da5bda444bedafdadf43c27ac93) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A channel failure from a newer server no longer arrives as a parse error. The failure category
+  crosses the wire as a plain string, so a build that predates a category still shows the server's
+  message instead of losing it.
+
+- [#104](https://github.com/mohammadchehab/isnadibot/pull/104) [`b51a0b0`](https://github.com/mohammadchehab/isnadibot/commit/b51a0b02762cfae3db343ad4c082ac8cab83353b) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The composer banner keeps its solid background in browsers without backdrop blur.
+
+- [#193](https://github.com/mohammadchehab/isnadibot/pull/193) [`7fbb68a`](https://github.com/mohammadchehab/isnadibot/commit/7fbb68a7a28d46d8150e08128aa6660ed248abb3) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A bot or group command now checks that the person issuing it may change that group, so someone outside a group can no longer rename bots, move them between groups, or reconfigure groups they do not belong to.
+
+- [#122](https://github.com/mohammadchehab/isnadibot/pull/122) [`f57671d`](https://github.com/mohammadchehab/isnadibot/commit/f57671d9076de2cf41a0d313c970ec6d9c251453) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A bot can now hand work to a teammate, check on it, message it or stop it by the teammate's name, not only its ID. A name that matches two teammates is refused with both listed, and a name outside the current group is never revealed.
+
+- [#204](https://github.com/mohammadchehab/isnadibot/pull/204) [`dd09a4a`](https://github.com/mohammadchehab/isnadibot/commit/dd09a4a679b82d540121a025ad744fac86c62f15) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A keep-busy group now hands its next queued item to the bot that has been idle longest, instead of always to the first one by name. A bot that has never finished a turn goes first, and a tie falls back to the bot's id.
+
+- [#200](https://github.com/mohammadchehab/isnadibot/pull/200) [`2a8b7bc`](https://github.com/mohammadchehab/isnadibot/commit/2a8b7bcdd179e3a5c7dd9e8e2b6def688433ac63) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Keep-busy groups no longer hand work to a bot that is already occupied. A bot waiting on your answer, holding an approval, or with a turn already in flight counts as busy, so a group's queue waits for it instead of interrupting it.
+
+- [#224](https://github.com/mohammadchehab/isnadibot/pull/224) [`7ca1378`](https://github.com/mohammadchehab/isnadibot/commit/7ca13782281e44de95a2134711cd5c001f726254) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A keep-busy team no longer stops when the bot it picks has no chat yet. The dispatcher passes over
+  that member, works the rest of the queue, and picks the group up again as soon as the chat exists.
+  A lost claim no longer strands the items behind it, and one pass spends each bot once, so a bot in
+  two groups is handed one item.
+
+- [#150](https://github.com/mohammadchehab/isnadibot/pull/150) [`1a82a0c`](https://github.com/mohammadchehab/isnadibot/commit/1a82a0cc619b1af2218156da6a21ca8ba22db03e) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The desktop's egress tunnel no longer buffers without limit: a destination that sends faster than the server reads is paused instead of filling desktop memory, and a lookup or connection that hangs is refused after ten seconds instead of holding the stream. When a profile leaves the desktop's egress binding, the tunnel reconnects from the store's current state.
+
+- [#188](https://github.com/mohammadchehab/isnadibot/pull/188) [`5b55c9b`](https://github.com/mohammadchehab/isnadibot/commit/5b55c9b700f84a323b3ac0baa9d33f9dd00e9e2d) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Hiring a fleet now works out the squad before anything is created: the boss comes first, each member starts on the model picked for its role, and squad setup can say what still stops Create.
+
+- [#198](https://github.com/mohammadchehab/isnadibot/pull/198) [`a2a5b14`](https://github.com/mohammadchehab/isnadibot/commit/a2a5b144defd50f7d955ad7357ff9d0848ceb894) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Deleting a group is now an administrator action, and it refuses to take open work down with it unless the caller asks for that explicitly. A plain member could previously delete any group they belonged to, which discarded every work item the group held — finished ones included — and detached its chats. Two refusals replace that: a person without `access:write` is turned away, and a group that still holds open work items fails with an error naming the count until `discardWorkItems` is passed.
+
+- [#205](https://github.com/mohammadchehab/isnadibot/pull/205) [`79d2aac`](https://github.com/mohammadchehab/isnadibot/commit/79d2aac4ed144d4edbc233de6b5ff2cd7cb0fb10) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Deleting a group from the roster now tells you what the delete costs before it happens. When the group still holds open work items, the confirmation dialog names the count, its button reads "Delete and discard", and the app sends `discardWorkItems` only because you saw that number and confirmed it. A group with no open work keeps the plain "Delete group" dialog and never sends the flag. The two refusals the server can return — open work that was not confirmed for discard, and a person without `access:write` — now arrive as specific messages instead of the generic "Something went wrong" toast.
+
+- [#123](https://github.com/mohammadchehab/isnadibot/pull/123) [`ea5ea6d`](https://github.com/mohammadchehab/isnadibot/commit/ea5ea6dcae58a526affc08ecf5dde1000a2c1cb8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Importing a bot no longer brings along fallback models on standard OpenCode, which cannot be a fallback.
+
+- [#174](https://github.com/mohammadchehab/isnadibot/pull/174) [`23e6b61`](https://github.com/mohammadchehab/isnadibot/commit/23e6b613b1e94ea98aac2193ea86214fdd8a36c0) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A link-check run now reports what it found — how many links it checked, how many were broken, and the pages and links that broke — in one place the bot can read back.
+
+- [#97](https://github.com/mohammadchehab/isnadibot/pull/97) [`a7b233e`](https://github.com/mohammadchehab/isnadibot/commit/a7b233ecac6c4efd4043209c4dfc2c7036731cba) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Relative times in the mobile chat list, archive, and image generation settings now follow the interface language instead of always showing English, and the usage and step meters format numbers, currency, percentages, and dates for it.
+
+- [#208](https://github.com/mohammadchehab/isnadibot/pull/208) [`5ea301d`](https://github.com/mohammadchehab/isnadibot/commit/5ea301dd84263e7b8ce5459f3c021388be2a3a9a) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Provider status no longer puts a full account email address on the wire. The signed-in account shows as a masked handle such as m\*\*\*@example.com, on every client and provider.
+
+- [#170](https://github.com/mohammadchehab/isnadibot/pull/170) [`0356f71`](https://github.com/mohammadchehab/isnadibot/commit/0356f71743d74b7f47ab6e5421c8899966544c52) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The server can project a thread for a member: their frames keep the conversation and the approval rows, and never carry the owner's commands, paths, tool output or approval arguments.
+
+- [#160](https://github.com/mohammadchehab/isnadibot/pull/160) [`f7bdd31`](https://github.com/mohammadchehab/isnadibot/commit/f7bdd31c8fc10a8664d00945e2319e31e5d75eb9) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Upgrading from a very old version no longer stores saved model options as a quoted string. The migration that converts legacy object-shaped options into the current array shape now writes a real array on SQLite 3.54 and newer, so older projects and chats keep loading their saved options correctly.
+
+- [#221](https://github.com/mohammadchehab/isnadibot/pull/221) [`42e85b0`](https://github.com/mohammadchehab/isnadibot/commit/42e85b0d9de7aa17f8c517b2ef4a4e494a1f898e) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - On mobile, a refused bot delete now explains itself in plain words instead of printing the server's internal sentence with raw ids.
+
+- [#78](https://github.com/mohammadchehab/isnadibot/pull/78) [`047fbe3`](https://github.com/mohammadchehab/isnadibot/commit/047fbe346c47e0a38c074e2f6c2610fc823bc5fd) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The iOS app prebuild works again: the widget logo now comes from the app icon instead of a deleted marketing file.
+
+- [#220](https://github.com/mohammadchehab/isnadibot/pull/220) [`fe42b24`](https://github.com/mohammadchehab/isnadibot/commit/fe42b2487cc0eee155f8edea792ae5eb1a19d4cc) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Moving a bot to another group now removes it from its old group. Before, the bot stayed on the first group's roster while its own record pointed at the new group, which could corrupt group deletion and dispatch, and the move skipped the boss and minimum-membership guards.
+
+- [#227](https://github.com/mohammadchehab/isnadibot/pull/227) [`64df7db`](https://github.com/mohammadchehab/isnadibot/commit/64df7db6d80077ac6fd0610024461c9b19c227ff) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A provider failure from a newer server no longer arrives as a parse error. The reason a provider
+  could not run now crosses the wire as a plain string, in the dispatch error, in a chat's session and
+  latest turn, and on a channel binding. A build that predates a reason still shows the server's own
+  message instead of losing it.
+
+- [#82](https://github.com/mohammadchehab/isnadibot/pull/82) [`a49bd81`](https://github.com/mohammadchehab/isnadibot/commit/a49bd81444d426754a83aa2eeddbffc01dc746da) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Pressing Stop on an OpenCode bot right after sending a message now stops the turn instead of letting it run to the end.
+
+- [#94](https://github.com/mohammadchehab/isnadibot/pull/94) [`22029b7`](https://github.com/mohammadchehab/isnadibot/commit/22029b75b715240a9c45051f33e80c73ddc2006d) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - The server log no longer shows a warning each time a group chat hand-off finds no new bot to start.
+
+- [#225](https://github.com/mohammadchehab/isnadibot/pull/225) [`0d5c90d`](https://github.com/mohammadchehab/isnadibot/commit/0d5c90d490353eb5c5647727b03e6d2044d2fc0d) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Moving a bot to another group no longer strands the work it owned in the group it left. The items it had picked up there go back into that group's queue, unowned and ready for someone else, at the moment the bot leaves.
+
+- [#145](https://github.com/mohammadchehab/isnadibot/pull/145) [`d767f3a`](https://github.com/mohammadchehab/isnadibot/commit/d767f3a506b9f7f6795c391f1f1e054e32318b2c) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Interrupting a chat now closes any open question cards instead of leaving them waiting for an answer.
+
+- [#207](https://github.com/mohammadchehab/isnadibot/pull/207) [`ae9cc1b`](https://github.com/mohammadchehab/isnadibot/commit/ae9cc1be5f8a674b713c4c6c5e1c97a417f79533) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A revoked provider sign-in now reads as a sign-in problem instead of an unknown failure. The chat names the provider and offers a control that opens its sign-in, Resume is no longer offered where only signing in again can fix it, and an expired sign-in is described as "expired or revoked" in every interface language.
+
+- [#106](https://github.com/mohammadchehab/isnadibot/pull/106) [`a171fe2`](https://github.com/mohammadchehab/isnadibot/commit/a171fe27689e05a25c076117c24ab9c45843a589) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A second server started on the same data directory now exits with a clear error naming the running server's pid and port, instead of running migrations against its database.
+
+- [#213](https://github.com/mohammadchehab/isnadibot/pull/213) [`919dcf6`](https://github.com/mohammadchehab/isnadibot/commit/919dcf6de5e04fba132972daf2830ba7e8e3e87e) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A bot whose provider sign-in was revoked keeps showing the sign-in problem after a reload, instead of looking healthy until the next attempt fails. Signing in again clears it.
+
+- [#215](https://github.com/mohammadchehab/isnadibot/pull/215) [`009ec83`](https://github.com/mohammadchehab/isnadibot/commit/009ec8384de58b897380a051636339c50eace5c3) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Deleting a group that still holds open work, or one you lack permission to change, now shows the message the interface was built for. The server sends a refusal code with the failure instead of leaving the client to read its wording, so a future copyedit no longer quietly downgrades that toast to the raw sentence.
+
+- [#223](https://github.com/mohammadchehab/isnadibot/pull/223) [`f042de8`](https://github.com/mohammadchehab/isnadibot/commit/f042de88c8d3169d42cf170aedbece04e0cddbae) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Deleting one of two bots in a space is refused in plain words now, in every language, instead of showing the server's sentence with a group id in it.
+
+- [#103](https://github.com/mohammadchehab/isnadibot/pull/103) [`b1b650f`](https://github.com/mohammadchehab/isnadibot/commit/b1b650f21525938d78f6fcb55ad7fd5a45fb88f8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Each paragraph of a message you send now reads in its own direction, so an Arabic paragraph followed by an English one no longer share a single direction.
+
+- [#214](https://github.com/mohammadchehab/isnadibot/pull/214) [`7df5510`](https://github.com/mohammadchehab/isnadibot/commit/7df551069e5eef7d6d05e2e291d9d409988bb877) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A voice transcript now takes its speaker from the chat instead of from the client. A transcript sent for a reply is attributed to the bot that chat is talking to, so a client can no longer name a bot the chat is not talking to.
+
+- [#186](https://github.com/mohammadchehab/isnadibot/pull/186) [`43f8dfe`](https://github.com/mohammadchehab/isnadibot/commit/43f8dfeafa6bd5ba75175630e247615160e45015) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - When the bot that owns a work item leaves its group, is archived, or is deleted, that item goes back in the queue for someone else to take.
+
+- [#87](https://github.com/mohammadchehab/isnadibot/pull/87) [`501761e`](https://github.com/mohammadchehab/isnadibot/commit/501761e5b46ea75da27e17ed6d9b718312298ab8) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A session revoked while its WebSocket was still connecting now closes that socket instead of staying open.
+
 ## 0.0.2
 
 ### Patch Changes
