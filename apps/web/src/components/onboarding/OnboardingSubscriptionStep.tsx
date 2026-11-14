@@ -28,19 +28,30 @@ import { SUBSCRIPTION_PROVIDERS } from "../settings/subscriptionProviders";
 import type { DesktopOnboardingDraft } from "./desktopOnboardingDraft";
 import { ONBOARDING_HEADING_CLASS } from "./onboardingStyles";
 import type { OnboardingTranslate } from "./onboardingTranslate";
+import { ErrorDetailsDisclosure, rawErrorMessage } from "../ui/error-details";
+
+/**
+ * A failed sign-in step shows one sentence in the interface language; the raw cause stays
+ * available behind a "Show details" disclosure so the user and support can still read it.
+ */
+interface StepError {
+  readonly message: string;
+  readonly details: string | null;
+}
 
 function commandError(
   result: Parameters<typeof squashAtomCommandFailure>[0],
   t: OnboardingTranslate,
-): string {
-  const error = squashAtomCommandFailure(result);
-
-  return error instanceof Error ? error.message : t("The request failed.");
+): StepError {
+  return {
+    message: t("The request failed."),
+    details: rawErrorMessage(squashAtomCommandFailure(result)),
+  };
 }
 
 interface ActiveLogin {
   readonly flow: SubscriptionAuthStartResult;
-  readonly error: string | null;
+  readonly error: StepError | null;
 }
 
 export function SubscriptionStep({
@@ -82,7 +93,7 @@ export function SubscriptionStep({
   const [code, setCode] = useState("");
   const [keyMode, setKeyMode] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<StepError | null>(null);
 
   const statusByProvider = useMemo(
     () => new Map(statusQuery.data?.providers.map((status) => [status.provider, status]) ?? []),
@@ -103,7 +114,9 @@ export function SubscriptionStep({
       }
 
       if (progress.status === "failed") {
-        setActiveLogin((current) => (current ? { ...current, error: progress.error } : current));
+        setActiveLogin((current) =>
+          current ? { ...current, error: { message: progress.error, details: null } } : current,
+        );
         setBusy(false);
       }
 
@@ -160,7 +173,7 @@ export function SubscriptionStep({
   const saveKey = async () => {
     if (busy) return;
     const validation = apiKeyValidationError(code, baseUrl);
-    setError(validation);
+    setError(validation === null ? null : { message: validation, details: null });
 
     if (validation) return;
     setBusy(true);
@@ -196,11 +209,13 @@ export function SubscriptionStep({
 
     if (Predicate.isTagged(result, "Failure")) setError(commandError(result, t));
     else if (Predicate.isTagged(result, "Success")) {
-      setError(
-        result.value.status === "failed"
-          ? result.value.error
-          : t("The key was not saved. Try again."),
-      );
+      setError({
+        message:
+          result.value.status === "failed"
+            ? result.value.error
+            : t("The key was not saved. Try again."),
+        details: null,
+      });
     }
 
     await cancelAuth({ environmentId, input: { loginId: started.value.loginId } });
@@ -296,7 +311,7 @@ export function SubscriptionStep({
           apiKey={code}
           baseUrl={baseUrl}
           busy={busy}
-          error={error}
+          error={error?.message ?? null}
           onKeyChange={setCode}
           onBaseUrlChange={setBaseUrl}
           onSave={() => void saveKey()}
@@ -351,7 +366,14 @@ export function SubscriptionStep({
             {t("Waiting for approval")}
           </div>
         )}
-        {activeLogin.error ? <p className="text-sm text-destructive">{activeLogin.error}</p> : null}
+        {activeLogin.error ? (
+          <div className="flex flex-col">
+            <p className="text-sm text-destructive">{activeLogin.error.message}</p>
+            {activeLogin.error.details ? (
+              <ErrorDetailsDisclosure message={activeLogin.error.details} />
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex gap-2">
           <Button
             className="flex-1"
@@ -423,9 +445,10 @@ export function SubscriptionStep({
         })}
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <div className="flex flex-col" role="alert">
+          <p className="text-sm text-destructive">{error.message}</p>
+          {error.details ? <ErrorDetailsDisclosure message={error.details} /> : null}
+        </div>
       ) : null}
       {!connected && selected.id !== "opencode-go" ? (
         <Button className="w-full" variant="outline" disabled={busy} onClick={openKey}>

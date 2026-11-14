@@ -4,6 +4,7 @@ import {
   runAppUpdateCheck,
   type AppUpdateCheckState,
 } from "./app-updates";
+import type { AppUpdateFailure } from "./app-update-types";
 import { makeUpdateClient } from "./app-updates.test-support";
 
 vi.mock("expo-updates", () => ({
@@ -49,17 +50,17 @@ describe("runAppUpdateCheck", () => {
       }),
     });
 
-    const failures: string[] = [];
+    const failures: AppUpdateFailure[] = [];
     const states: AppUpdateCheckState[] = [];
 
     await runAppUpdateCheck({
       client,
-      onFailure: (message) => failures.push(message),
+      onFailure: (failure) => failures.push(failure),
       onStateChange: (state) => states.push(state),
     });
 
     expect(client.fetchUpdateAsync).not.toHaveBeenCalled();
-    expect(failures).toEqual(["offline"]);
+    expect(failures).toEqual([{ message: "Could not check for updates", details: "offline" }]);
     expect(states).toEqual(["checking", "idle"]);
     reportError.mockRestore();
   });
@@ -76,12 +77,12 @@ describe("runAppUpdateCheck", () => {
         }),
       });
 
-      const failures: string[] = [];
+      const failures: AppUpdateFailure[] = [];
       const states: AppUpdateCheckState[] = [];
 
       await runAppUpdateCheck({
         client,
-        onFailure: (message) => failures.push(message),
+        onFailure: (failure) => failures.push(failure),
         onStateChange: (state) => states.push(state),
       });
 
@@ -150,14 +151,14 @@ describe("runAppUpdateCheck", () => {
     });
 
     const checkOnLaunch = createAppUpdateLaunchCheck(client);
-    const failures: string[] = [];
+    const failures: AppUpdateFailure[] = [];
     const manualStates: AppUpdateCheckState[] = [];
 
     const launchCheck = checkOnLaunch();
 
     const manualCheck = runAppUpdateCheck({
       client,
-      onFailure: (message) => failures.push(message),
+      onFailure: (failure) => failures.push(failure),
       onStateChange: (state) => manualStates.push(state),
     });
 
@@ -165,7 +166,7 @@ describe("runAppUpdateCheck", () => {
     await Promise.all([launchCheck, manualCheck]);
 
     expect(client.checkForUpdateAsync).toHaveBeenCalledOnce();
-    expect(failures).toEqual(["offline"]);
+    expect(failures).toEqual([{ message: "Could not check for updates", details: "offline" }]);
     expect(manualStates).toEqual(["checking", "idle"]);
     reportError.mockRestore();
   });

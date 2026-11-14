@@ -57,7 +57,10 @@ vi.mock("../../lib/i18n", async () => {
   const { createTranslator } = await import("@isnadi/client-runtime/i18n");
   const translator = createTranslator("en");
 
-  return { useMobileI18n: () => ({ ...translator, t: translator.translate }) };
+  return {
+    translateOutsideReact: (message: string) => translator.translate(message),
+    useMobileI18n: () => ({ ...translator, t: translator.translate }),
+  };
 });
 
 vi.mock("react-native", async () => {

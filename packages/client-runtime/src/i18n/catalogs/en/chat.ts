@@ -374,6 +374,8 @@ export const chatCatalog = {
   "Loading image": "Loading image",
   "Unable to open file": "Unable to open file",
   "Unable to open file in browser": "Unable to open file in browser",
+  "Unable to resize browser viewport": "Unable to resize browser viewport",
+  "Unable to update popped-out preview": "Unable to update popped-out preview",
   "Unable to reveal file": "Unable to reveal file",
   "Open in integrated browser": "Open in integrated browser",
   "File options for {label}": "File options for {label}",

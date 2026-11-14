@@ -415,6 +415,8 @@ export const chatCatalog = {
   "Loading image": "جارٍ تحميل الصورة",
   "Unable to open file": "تعذّر فتح الملف",
   "Unable to open file in browser": "تعذّر فتح الملف في المتصفح",
+  "Unable to resize browser viewport": "تعذر تغيير حجم نافذة المعاينة",
+  "Unable to update popped-out preview": "تعذر تحديث المعاينة المنبثقة",
   "Unable to reveal file": "تعذّر إظهار الملف",
   "Open in integrated browser": "افتح في المتصفح المدمج",
   "File options for {label}": "خيارات الملف لـ {label}",

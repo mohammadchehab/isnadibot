@@ -6,18 +6,20 @@ import {
   squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 
+import { useI18n } from "~/i18n";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { manualServerUpdateCommand } from "~/versionSkew";
 import { Button } from "./ui/button";
+import { RawErrorDetails, rawErrorMessage } from "./ui/error-details";
 import { toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 // The wire "installing" stage is a sub-second launcher handoff, so the UI
 // folds it into the download phase; everything after the handoff is the
 // restart the user is actually waiting through.
-const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
+const UPDATE_STAGE_MESSAGES: Record<ServerUpdateStage, "Downloading…" | "Restarting…"> = {
   downloading: "Downloading…",
   installing: "Downloading…",
   resuming: "Restarting…",
@@ -25,12 +27,19 @@ const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
 
 const pendingUpdateEnvironmentIds = new Set<EnvironmentId>();
 
-export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
-  return UPDATE_STAGE_LABELS[stage];
+type Translate = (message: string, params?: Record<string, string | number>) => string;
+
+/** The copy failed, so the command is still in the page: the cause sits behind the disclosure. */
+function copyFailureToast(message: string, t: Translate) {
+  return {
+    type: "error" as const,
+    title: t("Could not copy update command"),
+    data: { expandableContent: <RawErrorDetails message={message} /> },
+  };
 }
 
-function updateFailureMessage(cause: unknown): string {
-  return cause instanceof Error ? cause.message : "Server update failed.";
+export function serverUpdateStageLabel(stage: ServerUpdateStage, t: Translate): string {
+  return t(UPDATE_STAGE_MESSAGES[stage]);
 }
 
 /**
@@ -44,6 +53,8 @@ export function ServerUpdateProgress({
 }: {
   readonly state: Exclude<ServerUpdateState, { status: "idle" }>;
 }) {
+  const { t } = useI18n();
+
   if (state.status === "failed") {
     return (
       <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-destructive" role="alert">
@@ -64,7 +75,7 @@ export function ServerUpdateProgress({
         className="size-1.5 shrink-0 animate-status-pulse rounded-full bg-foreground"
         aria-hidden="true"
       />
-      <span>{serverUpdateStageLabel(state.stage)}</span>
+      <span>{serverUpdateStageLabel(state.stage, t)}</span>
     </div>
   );
 }
@@ -79,7 +90,7 @@ export function ServerUpdateAction({
   serverLabel,
   selfUpdate,
   targetVersion,
-  label = "Update",
+  label,
 }: {
   readonly environmentId: EnvironmentId;
   readonly serverLabel: string;
@@ -87,6 +98,8 @@ export function ServerUpdateAction({
   readonly targetVersion: string;
   readonly label?: string;
 }) {
+  const { t } = useI18n();
+
   const updateServer = useAtomCommand(serverEnvironment.updateServer, {
     reportFailure: false,
   });
@@ -96,16 +109,15 @@ export function ServerUpdateAction({
     onCopy: ({ command }) => {
       toastManager.add({
         type: "success",
-        title: "Update command copied",
-        description: `Run \`${command}\` on ${serverLabel} to update it.`,
+        title: t("Update command copied"),
+        description: t("Run `{command}` on {server} to update it.", {
+          command,
+          server: serverLabel,
+        }),
       });
     },
     onError: (error) => {
-      toastManager.add({
-        type: "error",
-        title: "Could not copy update command",
-        description: error.message,
-      });
+      toastManager.add(copyFailureToast(error.message, t));
     },
   });
 
@@ -127,10 +139,14 @@ export function ServerUpdateAction({
           return;
         }
 
+        const cause = squashAtomCommandFailure(result);
+
         toastManager.add({
           type: "error",
-          title: "Server update failed",
-          description: updateFailureMessage(squashAtomCommandFailure(result)),
+          title: t("Server update failed"),
+          data: {
+            expandableContent: <RawErrorDetails message={rawErrorMessage(cause)} />,
+          },
         });
 
         return;
@@ -138,8 +154,10 @@ export function ServerUpdateAction({
 
       toastManager.add({
         type: "success",
-        title: `${serverLabel} updated`,
-        description: `Reconnected on IsnadiBot ${result.value.targetVersion}.`,
+        title: t("{server} updated", { server: serverLabel }),
+        description: t("Reconnected on IsnadiBot {version}.", {
+          version: result.value.targetVersion,
+        }),
       });
     } finally {
       pendingUpdateEnvironmentIds.delete(environmentId);
@@ -149,7 +167,7 @@ export function ServerUpdateAction({
   if (selfUpdate === "desktop-managed") {
     return (
       <span className="text-muted-foreground text-xs">
-        Update the desktop app on that machine to update this server.
+        {t("Update the desktop app on that machine to update this server.")}
       </span>
     );
   }
@@ -159,14 +177,14 @@ export function ServerUpdateAction({
 
     return (
       <Button size="xs" variant="outline" onClick={() => copyToClipboard(command, { command })}>
-        Copy update command
+        {t("Copy update command")}
       </Button>
     );
   }
 
   return (
     <Button size="xs" variant="outline" onClick={() => void handleUpdate()}>
-      {label}
+      {label ?? t("Update")}
     </Button>
   );
 }

@@ -10,6 +10,7 @@ import { cn } from "../../lib/utils";
 import { readLocalApi } from "../../localApi";
 import { shouldOpenMarkdownFileLinkInEditor } from "../../markdown-links";
 import { CHAT_FILE_TAG_CHIP_CLASS_NAME, FileTagChipContent } from "../chat/FileTagChip";
+import { RawErrorDetails, rawErrorMessage } from "../ui/error-details";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
@@ -147,11 +148,13 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
           result.cause,
         );
         const error = squashAtomCommandFailure(result);
+
         toastManager.add(
           stackedThreadToast({
             type: "error",
             title: t("Unable to open file"),
-            description: error instanceof Error ? error.message : t("An error occurred."),
+            description: t("An error occurred."),
+            data: { expandableContent: <RawErrorDetails message={rawErrorMessage(error)} /> },
           }),
         );
       } catch (cause) {
@@ -163,7 +166,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
           stackedThreadToast({
             type: "error",
             title: t("Unable to open file"),
-            description: cause instanceof Error ? cause.message : t("An error occurred."),
+            description: t("An error occurred."),
+            data: { expandableContent: <RawErrorDetails message={rawErrorMessage(cause)} /> },
           }),
         );
       }
@@ -289,7 +293,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             stackedThreadToast({
               type: "error",
               title: failedTitle,
-              description: error instanceof Error ? error.message : t("An error occurred."),
+              description: t("An error occurred."),
+              data: { expandableContent: <RawErrorDetails message={rawErrorMessage(error)} /> },
             }),
           );
         },

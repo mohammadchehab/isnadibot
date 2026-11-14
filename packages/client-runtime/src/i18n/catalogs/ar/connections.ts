@@ -70,6 +70,7 @@ export const connectionsCatalog = {
   "Pairing token": "رمز الاقتران",
   "Pairing with this environment": "جارٍ الاقتران مع هذه البيئة",
   "Pairing…": "جارٍ الاقتران…",
+  "Enter a pairing token to continue.": "أدخل رمز الاقتران للمتابعة.",
   "Paste a one-time token or pairing secret": "الصق رمزًا لمرة واحدة أو سر الاقتران",
   "Saved on this device only. System default follows this device when English or Simplified Chinese is available.":
     "يُحفظ على هذا الجهاز فقط. يتبع الإعداد الافتراضي للنظام هذا الجهاز عند توفر الإنجليزية أو الصينية المبسطة.",

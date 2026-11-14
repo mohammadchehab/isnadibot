@@ -26,6 +26,15 @@ vi.mock("./ui/toast", () => ({
   toastManager: { add: testState.toast },
 }));
 
+// The real provider pulls the settings and connection graph in through
+// `useSettings`; these tests only need the English catalog behind `t`.
+vi.mock("~/i18n", async () => {
+  const { createTranslator } = await import("@isnadi/client-runtime/i18n");
+  const { translate } = createTranslator("en");
+
+  return { useI18n: () => ({ t: translate }) };
+});
+
 import { ServerUpdateAction, ServerUpdateProgress } from "./ServerUpdateAction";
 
 type ActionElement = ReactElement<{

@@ -19,6 +19,7 @@ import { ComputerViewerDialog } from "../components/computer/ComputerViewerDialo
 import { ProductFeedbackDialog } from "../components/productFeedback/ProductFeedbackDialog";
 import { PolicyNotice } from "../components/privacy/PolicyNotice";
 import { TranslatedRootRouteErrorView } from "./-RootRouteErrorView";
+import { RawErrorDetails, rawErrorMessage } from "../components/ui/error-details";
 import { useI18n } from "../i18n";
 import {
   AnchoredToastProvider,
@@ -294,12 +295,15 @@ function EventRouter() {
               }
 
               const error = squashAtomCommandFailure(result);
+
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
                   title: t("Unable to open keybindings file"),
-                  description:
-                    error instanceof Error ? error.message : t("Unknown error opening file."),
+                  description: t("Unknown error opening file."),
+                  data: {
+                    expandableContent: <RawErrorDetails message={rawErrorMessage(error)} />,
+                  },
                 }),
               );
             })();

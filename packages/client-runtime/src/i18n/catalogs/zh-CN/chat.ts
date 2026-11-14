@@ -366,6 +366,8 @@ export const chatCatalog = {
   "Loading image": "正在加载图片",
   "Unable to open file": "无法打开文件",
   "Unable to open file in browser": "无法在浏览器中打开文件",
+  "Unable to resize browser viewport": "无法调整浏览器视图大小",
+  "Unable to update popped-out preview": "无法更新弹出的预览",
   "Unable to reveal file": "无法在文件管理器中显示",
   "Open in integrated browser": "在内置浏览器中打开",
   "File options for {label}": "{label} 的文件选项",

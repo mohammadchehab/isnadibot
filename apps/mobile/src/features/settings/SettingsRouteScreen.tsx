@@ -1,5 +1,6 @@
 import { Match, Predicate } from "effect";
 import { useMobileI18n } from "../../lib/i18n";
+import { alertWithDetails } from "../../lib/alertWithDetails";
 import { useAtomValue } from "@effect/atom-react";
 import {
   MEMORY_SETTING_DISABLED_HINT,
@@ -15,7 +16,7 @@ import { useNavigation, type StaticScreenProps } from "@react-navigation/native"
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { SymbolView } from "../../components/AppSymbol";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
@@ -412,7 +413,8 @@ function AppSettingsSection() {
       // apply immediately instead of prompting.
       await runAppUpdateCheck({
         applyMode: "immediate",
-        onFailure: (message) => Alert.alert(t("Update failed"), message),
+        onFailure: (failure) =>
+          alertWithDetails(t("Update failed"), t(failure.message), failure.details ?? null),
         onStateChange: setUpdateState,
       });
     } finally {

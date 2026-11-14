@@ -1,9 +1,11 @@
 import { Predicate } from "effect";
 import { useMobileI18n } from "../../lib/i18n";
+import { alertWithDetails } from "../../lib/alertWithDetails";
+import { rawCauseMessage } from "../../lib/rawCauseMessage";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { StackActions, useNavigation, usePreventRemove } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 import {
   KeyboardController,
   KeyboardStickyView,
@@ -16,6 +18,7 @@ import { useFontFamily } from "../../lib/useFontFamily";
 import {
   commandFailureMessage,
   isAtomCommandInterrupted,
+  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { composerActionIsDictation } from "@isnadi/client-runtime/dictation";
@@ -419,10 +422,11 @@ export function NewTaskDraftScreen(props: {
 
       try {
         await enqueueThreadOutboxMessage(message);
-      } catch (error) {
-        Alert.alert(
+      } catch (cause) {
+        alertWithDetails(
           t("Could not queue chat"),
-          error instanceof Error ? error.message : t("The chat could not be saved to the outbox."),
+          t("The chat could not be saved to the outbox."),
+          rawCauseMessage(cause),
         );
 
         return;
@@ -471,9 +475,10 @@ export function NewTaskDraftScreen(props: {
 
     if (Predicate.isTagged(result, "Failure")) {
       if (!isAtomCommandInterrupted(result)) {
-        Alert.alert(
+        alertWithDetails(
           t("Could not start chat"),
           commandFailureMessage(result, { t, fallback: "The chat could not be started." }),
+          rawCauseMessage(squashAtomCommandFailure(result)),
         );
       }
 

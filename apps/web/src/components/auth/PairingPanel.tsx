@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from "react";
 
 import { AppIcon } from "../ui/app-icon";
+import { ErrorDetailsDisclosure } from "../ui/error-details";
 import { Spinner } from "../ui/spinner";
 import { useI18n } from "~/i18n";
 import { cn } from "~/lib/utils";
@@ -29,7 +30,7 @@ export type PairingPanelStatus =
   | { readonly kind: "submitting" }
   | { readonly kind: "rejected" }
   | { readonly kind: "incomplete" }
-  | { readonly kind: "failed"; readonly message: string }
+  | { readonly kind: "failed"; readonly message: string; readonly details?: string }
   | { readonly kind: "paired" };
 
 export interface PairingEnvironmentSummary {
@@ -195,6 +196,9 @@ export function PairingPanel({
           {status.kind === "checking" ? <Spinner className="size-3.5 shrink-0" /> : null}
           <span className="min-w-0 break-words">{description}</span>
         </p>
+        {status.kind === "failed" && status.details ? (
+          <ErrorDetailsDisclosure className="mt-1.5" message={status.details} />
+        ) : null}
       </AuthSurfaceSection>
 
       {hasEnvironment ? (

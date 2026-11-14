@@ -98,7 +98,7 @@ export function listenForPairingHash<T>(
 
 export type HostedPairingOutcome =
   | { readonly ok: true }
-  | { readonly ok: false; readonly message: string };
+  | { readonly ok: false; readonly message: string; readonly details?: string };
 
 /**
  * Hands a hosted link's host and token to `connect` once, and reports the page
@@ -114,5 +114,9 @@ export async function runHostedPairing(
   if (!request) return { kind: "incomplete" };
   const outcome = await connect({ host: request.host, pairingCode: request.token });
 
-  return outcome.ok ? { kind: "paired" } : { kind: "failed", message: outcome.message };
+  if (outcome.ok) return { kind: "paired" };
+
+  return outcome.details === undefined
+    ? { kind: "failed", message: outcome.message }
+    : { kind: "failed", message: outcome.message, details: outcome.details };
 }
