@@ -57,6 +57,12 @@ describe("isOpenWorkItem", () => {
   });
 });
 
+describe("WORK_ITEM_BOARD_COLUMNS", () => {
+  it("reads New, In progress, Draft, Closed, Done, as the E13 frames show", () => {
+    expect(WORK_ITEM_BOARD_COLUMNS).toEqual(["new", "in-progress", "draft", "closed", "done"]);
+  });
+});
+
 describe("workItemBoard", () => {
   it("gives every column a list, even when nothing lands in it", () => {
     const board = workItemBoard([]);
