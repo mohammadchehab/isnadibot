@@ -329,6 +329,19 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
           type: "group.member-unassigned",
           payload: { groupId: sourceGroup.id, botId: bot.id, updatedAt: occurredAt },
         });
+
+        // The bot leaves the source group, so the work it owned there goes back to that group's
+        // queue, exactly as `group.member.unassign` releases it. The item keeps its own groupId:
+        // it waits in the group it belongs to, it does not follow the bot.
+        events.push(
+          ...(yield* clearOwnedWorkItems({
+            readModel,
+            botId: bot.id,
+            occurredAt,
+            commandId: command.commandId,
+            groupId: sourceGroup.id,
+          })),
+        );
       }
 
       // The roster and `bot.groupId` have to agree, whichever group the bot came from.
