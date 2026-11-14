@@ -1,6 +1,7 @@
 import { Predicate } from "effect";
 import { VOICE_API_PROVIDERS, type EnvironmentId, type VoiceApiProvider } from "@isnadi/contracts";
 import {
+  commandFailureMessage,
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@isnadi/client-runtime/state/runtime";
@@ -25,9 +26,8 @@ import {
 
 export function commandError(result: AtomCommandResult<unknown, unknown>): string {
   if (!Predicate.isTagged(result, "Failure")) return "The request failed.";
-  const error = squashAtomCommandFailure(result);
 
-  return error instanceof Error ? error.message : "The request failed.";
+  return commandFailureMessage(result, { fallback: "The request failed." });
 }
 
 type ProviderMessage = { readonly tone: "error" | "ok"; readonly text: string };

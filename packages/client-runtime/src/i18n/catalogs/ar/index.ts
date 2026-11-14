@@ -5,6 +5,7 @@ import { settingsCatalog } from "./settings.ts";
 import { memoryCatalog } from "./memory.ts";
 import { commonCatalog } from "./common.ts";
 import { browserAuthCatalog } from "./browserAuth.ts";
+import { refusalsCatalog } from "./refusals.ts";
 
 export const arCatalog = {
   ...rosterCatalog,
@@ -14,4 +15,5 @@ export const arCatalog = {
   ...memoryCatalog,
   ...commonCatalog,
   ...browserAuthCatalog,
+  ...refusalsCatalog,
 } as const;

@@ -2,6 +2,7 @@ import { Match, Predicate } from "effect";
 import { DndContext } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
 import { useAtomValue } from "@effect/atom-react";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { ARCHIVED_BOT_RETENTION_DAYS, BotId, GroupId } from "@isnadi/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
@@ -65,11 +66,7 @@ import {
 import { BotRosterRow, GroupRosterRow, RosterRail } from "./RosterRows";
 import { DecisionsGroup } from "./DecisionsGroup";
 import { RosterPanelHeader, RosterRailCreateMenu, RosterSidebarHeader } from "./RosterHeaders";
-import {
-  commandFailureMessage,
-  focusTargetAfterRosterArchive,
-  runCreateBotOnce,
-} from "./rosterCommands.logic";
+import { focusTargetAfterRosterArchive, runCreateBotOnce } from "./rosterCommands.logic";
 
 export { focusTargetAfterRosterArchive, runCreateBotOnce } from "./rosterCommands.logic";
 
@@ -343,7 +340,7 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
       toastManager.add({
         type: "error",
         title: t("Could not archive {name}", { name: bot.name }),
-        description: commandFailureMessage(result, t),
+        description: commandFailureMessage(result, { t }),
       });
 
       return;

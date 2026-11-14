@@ -2,8 +2,8 @@ import { hasTag } from "~/lib/taggedUnion";
 import { scopedThreadKey } from "@isnadi/client-runtime/environment";
 import {
   type AtomCommandResult,
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
 import { pinOrderKeyBetween } from "@isnadi/client-runtime/state/thread-sort";
 import type { ScopedThreadRef } from "@isnadi/contracts";
@@ -103,11 +103,13 @@ export function useChatActions() {
       if (hasTag(result, "Success")) return true;
 
       if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
           title,
-          description: error instanceof Error ? error.message : t("An unexpected error occurred."),
+          description: commandFailureMessage(result, {
+            t,
+            fallback: "An unexpected error occurred.",
+          }),
         });
       }
 

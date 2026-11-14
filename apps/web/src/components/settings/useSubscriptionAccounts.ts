@@ -10,8 +10,8 @@ import type {
   SubscriptionProviderStatus,
 } from "@isnadi/contracts";
 import {
+  commandFailureMessage,
   isAtomCommandInterrupted,
-  squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@isnadi/client-runtime/state/runtime";
 import {
@@ -37,9 +37,8 @@ export interface ActiveLogin {
 
 function commandError(result: AtomCommandResult<unknown, unknown>, t: Translate): string {
   if (!Predicate.isTagged(result, "Failure")) return t("The request failed.");
-  const error = squashAtomCommandFailure(result);
 
-  return error instanceof Error ? error.message : t("The request failed.");
+  return commandFailureMessage(result, { t, fallback: "The request failed." });
 }
 
 /** Subscription and API key status for every account on one environment. */
