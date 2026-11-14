@@ -126,6 +126,8 @@ export const rosterCatalog = {
   "This group needs at least two bots": "تحتاج هذه المجموعة إلى بوتين على الأقل",
   "Deleting this bot would leave this space with fewer than two. Add another bot first.":
     "سيؤدي حذف هذا البوت إلى ترك هذه المساحة بأقل من بوتين. أضف بوتًا آخر أولا.",
+  "Archiving this bot would leave this space with fewer than two. Add another bot first.":
+    "سيؤدي أرشفة هذا البوت إلى ترك هذه المساحة بأقل من بوتين. أضف بوتًا آخر أولا.",
   "Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.":
     "حذف {name}؟ {name} هو قائد {space}. اختر قائدا جديدا للمساحة أولا، أو احذف المساحة.",
   "Boss of {space}": "قائد {space}",
