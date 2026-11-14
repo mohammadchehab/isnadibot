@@ -2,11 +2,13 @@ import {
   EnvironmentId,
   FLEET_TEMPLATES,
   FleetRoleId,
+  GROUP_HOP_BUDGET_DEFAULT,
   GroupHopBudget,
   ORCHESTRATION_WS_METHODS,
   ProviderDriverKind,
   ProviderInstanceId,
   type ClientOrchestrationCommand,
+  type FleetHireCommand,
   type FleetTemplate,
   type ServerProvider,
   type ServerProviderModel,
@@ -18,6 +20,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { RpcClientError } from "effect/unstable/rpc";
+import * as Socket from "effect/unstable/socket/Socket";
 
 import { testRpcClient } from "../test-support/services.ts";
 import {
@@ -29,23 +32,23 @@ import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import type * as RpcSession from "../rpc/session.ts";
 
 import {
-  HireFleetError,
   createHireDraft,
   draftBlockers,
+  draftLocked,
   hireFleet,
-  recordHireFailure,
   setBoss,
   setHopBudget,
   setMemberModel,
   setMemberReasoning,
   type HireDraft,
+  type HireFleetResult,
 } from "./hireFleet.ts";
 
 const template = FLEET_TEMPLATES.find(
   (candidate) => candidate.id === "recruiting",
 ) as FleetTemplate;
 
-/** The command builders ask for ids and remains from Crypto, so each hire effect provides one. */
+/** The draft's screens ask Crypto for remains, so each hire effect provides one. */
 const TEST_CRYPTO_LAYER = Layer.succeed(
   Crypto.Crypto,
   Crypto.make({
@@ -133,6 +136,27 @@ interface DispatchLog {
   readonly commands: ClientOrchestrationCommand[];
   /** The 1-based dispatch that fails, as a dropped socket would. */
   readonly failAt?: number;
+  /**
+   * How that dispatch fails. A refused command is `defect`, the default; a
+   * dropped socket is `socket`, whose outcome the client cannot know.
+   */
+  readonly failAs?: "defect" | "socket";
+}
+
+/** The failure a dispatch at `failAt` answers with, the way a real client would see it. */
+function dispatchFailure(failAs: DispatchLog["failAs"]): RpcClientError.RpcClientError {
+  if (failAs === "socket") {
+    return new RpcClientError.RpcClientError({
+      reason: new Socket.SocketCloseError({ code: 1006 }),
+    });
+  }
+
+  return new RpcClientError.RpcClientError({
+    reason: new RpcClientError.RpcClientDefect({
+      message: "socket closed",
+      cause: new Error("socket closed"),
+    }),
+  });
 }
 
 const makeSupervisor = Effect.fn("TestHireFleet.makeSupervisor")(function* (log: DispatchLog) {
@@ -142,12 +166,7 @@ const makeSupervisor = Effect.fn("TestHireFleet.makeSupervisor")(function* (log:
         log.commands.push(command);
 
         if (log.failAt === log.commands.length) {
-          return yield* new RpcClientError.RpcClientError({
-            reason: new RpcClientError.RpcClientDefect({
-              message: "socket closed",
-              cause: new Error("socket closed"),
-            }),
-          });
+          return yield* dispatchFailure(log.failAs);
         }
 
         return { sequence: log.commands.length };
@@ -174,7 +193,7 @@ const makeSupervisor = Effect.fn("TestHireFleet.makeSupervisor")(function* (log:
   } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
 });
 
-/** Mints ids in call order, so a test can name the command ids it expects. */
+/** Mints ids in call order, so a test can name the command id it expects. */
 function makeIdFactory(): () => string {
   let minted = 0;
 
@@ -194,52 +213,45 @@ function draft(providers: ReadonlyArray<ServerProvider> = PROVIDERS): HireDraft 
   });
 }
 
-const botCreateIds = (log: DispatchLog) =>
-  log.commands
-    .filter((command: ClientOrchestrationCommand) => command.type === "bot.create")
-    .map((command) => command.commandId);
+/** Just the hires a log holds: a squad is one command, never a create per member. */
+const hireCommands = (log: DispatchLog): ReadonlyArray<FleetHireCommand> =>
+  log.commands.filter((command): command is FleetHireCommand => command.type === "fleet.hire");
 
-/** Why a hire stopped, for the screen that keeps the draft and lets the user retry. */
-function hireFailure(hire: HireDraft, log: DispatchLog) {
-  return Effect.gen(function* () {
-    const supervisor = yield* makeSupervisor(log);
+/** The picks a draft sends, in the order its members stand. */
+const picksOf = (hire: HireDraft) =>
+  hire.members.flatMap((member) =>
+    member.engine === null ? [] : [{ roleId: member.roleId, engine: member.engine }],
+  );
 
-    return yield* Effect.flip(
-      hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
-        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-      ),
-    );
-  }).pipe(Effect.provide(TEST_CRYPTO_LAYER));
-}
+/** The draft a failed hire hands back, for the retry the next case drives. */
+function failedDraft(result: HireFleetResult): HireDraft {
+  if (result.status !== "failed") {
+    throw new Error(`Expected a failed hire, got '${result.status}'.`);
+  }
 
-/** The member at `index`; the recruiting template's squad is long enough for every test here. */
-function memberAt(hire: HireDraft, index: number) {
-  const member = hire.members[index];
-
-  expect(member).toBeDefined();
-
-  return member!;
+  return result.draft;
 }
 
 describe("createHireDraft", () => {
-  it("seeds every member boss first, each with its own ids", () => {
+  it("seeds every member boss first, under one command id for the whole hire", () => {
     const hire = draft();
 
     expect(hire.members.map((member) => member.roleId)).toEqual([
       template.bossRoleId,
       ...template.roleIds.filter((roleId) => roleId !== template.bossRoleId),
     ]);
-    expect(new Set(hire.members.map((member) => member.botId)).size).toBe(hire.members.length);
-    expect(new Set(hire.members.map((member) => member.createCommandId)).size).toBe(
-      hire.members.length,
-    );
     expect(hire.members.every((member) => member.engine !== null)).toBe(true);
-    expect(hire.keepBusy).toBe(true);
+    expect(hire.commandId).toBe("id-1");
+    expect(hire.hopBudget).toBe(GroupHopBudget.make(GROUP_HOP_BUDGET_DEFAULT));
+    expect(hire.send).toEqual({ status: "draft" });
+    expect(hire.templateIndex).toBe(
+      FLEET_TEMPLATES.findIndex((candidate) => candidate.id === template.id),
+    );
   });
 });
 
 describe("hireFleet", () => {
-  it.effect("creates one bot per member in screen order, then the group", () =>
+  it.effect("sends one command naming every member's picked engine", () =>
     Effect.gen(function* () {
       const hire = draft();
       const log: DispatchLog = { commands: [] };
@@ -252,83 +264,22 @@ describe("hireFleet", () => {
       );
 
       expect(log.commands.map((command: ClientOrchestrationCommand) => command.type)).toEqual([
-        "bot.create",
-        "bot.create",
-        "bot.create",
-        "bot.create",
-        "group.create",
+        "fleet.hire",
       ]);
-      expect(botCreateIds(log)).toEqual(hire.members.map((member) => member.createCommandId));
-      expect(result.botIds).toEqual(hire.members.map((member) => member.botId));
-      expect(log.commands.at(-1)).toMatchObject({
-        type: "group.create",
-        commandId: hire.groupCommandId,
-        groupId: hire.groupId,
-        name: template.name,
-        bossBotId: hire.members[0]?.botId,
-        specialistBotIds: hire.members.slice(1).map((member) => member.botId),
-        fleetTemplateId: template.id,
-        keepBusy: true,
-        hopBudget: GroupHopBudget.make(6),
+      expect(hireCommands(log)[0]).toMatchObject({
+        commandId: hire.commandId,
+        templateIndex: hire.templateIndex,
+        picks: picksOf(hire),
         createdAt: hire.createdAt,
       });
+      // The template's ids never cross the wire: the server derives them from the index.
+      expect(hireCommands(log)[0]).not.toHaveProperty("fleetTemplateId");
+      expect(hireCommands(log)[0]).not.toHaveProperty("groupId");
+      expect(result).toEqual({ status: "sent", sequence: 1 });
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
 
-  it.effect("resends the same command ids after a member fails, and creates one group", () =>
-    Effect.gen(function* () {
-      const hire = draft();
-      const failed: DispatchLog = { commands: [], failAt: 3 };
-
-      const exit = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
-        Effect.provideService(
-          EnvironmentSupervisor.EnvironmentSupervisor,
-          yield* makeSupervisor(failed),
-        ),
-        Effect.exit,
-      );
-
-      expect(exit._tag).toBe("Failure");
-
-      const retried: DispatchLog = { commands: [] };
-
-      yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
-        Effect.provideService(
-          EnvironmentSupervisor.EnvironmentSupervisor,
-          yield* makeSupervisor(retried),
-        ),
-      );
-
-      expect(botCreateIds(retried)).toEqual(hire.members.map((member) => member.createCommandId));
-      expect(botCreateIds(failed)).toEqual(botCreateIds(retried).slice(0, 3));
-      expect(
-        retried.commands.filter(
-          (command: ClientOrchestrationCommand) => command.type === "group.create",
-        ),
-      ).toHaveLength(1);
-    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
-  );
-
-  it.effect("creates nothing when a member has no provider", () =>
-    Effect.gen(function* () {
-      const hire = draft([]);
-      const log: DispatchLog = { commands: [] };
-
-      const error = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
-        Effect.provideService(
-          EnvironmentSupervisor.EnvironmentSupervisor,
-          yield* makeSupervisor(log),
-        ),
-        Effect.catchTag("HireFleetError", (failure) => Effect.succeed(failure)),
-      );
-
-      expect(error).toBeInstanceOf(HireFleetError);
-      expect(error).toMatchObject({ step: "blocked" });
-      expect(log.commands).toEqual([]);
-    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
-  );
-
-  it.effect("creates the boss chosen on screen with the budget stepped there", () =>
+  it.effect("sends the boss and reply budget picked on screen", () =>
     Effect.gen(function* () {
       const bossed = setHopBudget(
         setBoss(draft(), FleetRoleId.make("coach")),
@@ -344,78 +295,191 @@ describe("hireFleet", () => {
         ),
       );
 
-      expect(log.commands.at(-1)).toMatchObject({
-        bossBotId: bossed.members.find((member) => member.roleId === "coach")?.botId,
-        hopBudget: GroupHopBudget.make(3),
-      });
+      const command = hireCommands(log)[0];
+
+      expect(command).toMatchObject({ bossRoleId: "coach", hopBudget: 3 });
+      expect(command?.picks[0]?.roleId).toBe("coach");
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
-});
 
-describe("recordHireFailure", () => {
-  it.effect("resends a reached member whose engine was edited, so the edit is not dropped", () =>
+  it.effect("leaves the boss out of the command when it is the template's own", () =>
     Effect.gen(function* () {
-      const hire = draft();
-      // The third create fails, so the first two members are stored as they were sent.
-      const failure = yield* hireFailure(hire, { commands: [], failAt: 3 });
-      const reached = memberAt(hire, 0);
+      const log: DispatchLog = { commands: [] };
 
-      const edited = setMemberModel(
-        recordHireFailure(hire, failure),
-        reached.roleId,
-        { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-opus-5-5" },
-        PROVIDERS,
-      );
-
-      const retried: DispatchLog = { commands: [] };
-
-      yield* hireFleet({ draft: edited, makeId: () => "fresh-command-id" }).pipe(
+      yield* hireFleet({ draft: draft(), makeId: makeIdFactory() }).pipe(
         Effect.provideService(
           EnvironmentSupervisor.EnvironmentSupervisor,
-          yield* makeSupervisor(retried),
+          yield* makeSupervisor(log),
         ),
       );
 
-      expect(botCreateIds(retried)[0]).toBe("fresh-command-id");
-      expect(retried.commands[0]).toMatchObject({ engine: { model: "claude-opus-5-5" } });
+      expect(hireCommands(log)[0]).not.toHaveProperty("bossRoleId");
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
 
-  it.effect("keeps the command id of a member the failed attempt never reached", () =>
+  it.effect("sends nothing while a member has no engine", () =>
     Effect.gen(function* () {
-      const hire = draft();
-      const failure = yield* hireFailure(hire, { commands: [], failAt: 3 });
-      const unreached = memberAt(hire, hire.members.length - 1);
-
-      const edited = setMemberModel(
-        recordHireFailure(hire, failure),
-        unreached.roleId,
-        { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-opus-5-5" },
-        PROVIDERS,
-      );
-
-      const retried: DispatchLog = { commands: [] };
-
-      yield* hireFleet({ draft: edited, makeId: () => "fresh-command-id" }).pipe(
-        Effect.provideService(
-          EnvironmentSupervisor.EnvironmentSupervisor,
-          yield* makeSupervisor(retried),
-        ),
-      );
-
-      // Nothing was stored for this member, so its own id still describes its create.
-      expect(botCreateIds(retried).at(-1)).toBe(unreached.createCommandId);
-    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
-  );
-
-  it.effect("leaves the draft alone when the hire was blocked before sending anything", () =>
-    Effect.gen(function* () {
-      // No providers: the draft blocks, so no create ever reached the server.
       const hire = draft([]);
-      const failure = yield* hireFailure(hire, { commands: [] });
+      const log: DispatchLog = { commands: [] };
 
-      expect(failure.step).toBe("blocked");
-      expect(recordHireFailure(hire, failure)).toBe(hire);
+      const result = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(log),
+        ),
+      );
+
+      expect(result.status).toBe("blocked");
+      expect(log.commands).toEqual([]);
+      expect(draftBlockers(hire).every((blocker) => blocker.kind === "no-provider")).toBe(true);
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
+  it.effect("sends nothing while a member is pinned to a model the server dropped", () =>
+    Effect.gen(function* () {
+      const hire = setMemberModel(
+        draft(),
+        FleetRoleId.make("tailor"),
+        { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-retired" },
+        PROVIDERS,
+      );
+
+      expect(draftBlockers(hire)).toContainEqual({
+        kind: "no-provider",
+        roleId: FleetRoleId.make("tailor"),
+      });
+
+      const log: DispatchLog = { commands: [] };
+
+      const result = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(log),
+        ),
+      );
+
+      expect(result.status).toBe("blocked");
+      expect(log.commands).toEqual([]);
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
+  it.effect("resends the draft's own command id after a failed send", () =>
+    Effect.gen(function* () {
+      const hire = draft();
+      const first: DispatchLog = { commands: [], failAt: 1 };
+
+      const attempt = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(first),
+        ),
+      );
+
+      expect(attempt).toMatchObject({ status: "failed", outcome: "failed" });
+
+      const failed = failedDraft(attempt);
+
+      expect(failed.send).toEqual({ status: "failed", edited: false });
+
+      const retried: DispatchLog = { commands: [] };
+
+      yield* hireFleet({ draft: failed, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(retried),
+        ),
+      );
+
+      // The server keys the hire on the id, so the retry replays instead of hiring twice.
+      expect(hireCommands(first)[0]?.commandId).toBe(hire.commandId);
+      expect(hireCommands(retried)[0]?.commandId).toBe(hire.commandId);
+      expect(retried.commands).toHaveLength(1);
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
+  it.effect("mints a fresh command id when a failed send is followed by an edit", () =>
+    Effect.gen(function* () {
+      const hire = draft();
+      const first: DispatchLog = { commands: [], failAt: 1 };
+
+      const attempt = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(first),
+        ),
+      );
+
+      const edited = setMemberModel(
+        failedDraft(attempt),
+        FleetRoleId.make("tailor"),
+        { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-opus-5-5" },
+        PROVIDERS,
+      );
+
+      expect(edited.send).toEqual({ status: "failed", edited: true });
+
+      const retried: DispatchLog = { commands: [] };
+
+      yield* hireFleet({ draft: edited, makeId: () => "fresh-command-id" }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(retried),
+        ),
+      );
+
+      const command = hireCommands(retried)[0];
+
+      // The old id answered for the engines the user has since changed.
+      expect(command?.commandId).toBe("fresh-command-id");
+      expect(command?.picks.find((pick) => pick.roleId === "tailor")?.engine.model).toBe(
+        "claude-opus-5-5",
+      );
+    }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
+  );
+
+  it.effect("keeps the command id and locks the draft when the send may have landed", () =>
+    Effect.gen(function* () {
+      const hire = draft();
+      const first: DispatchLog = { commands: [], failAt: 1, failAs: "socket" };
+
+      const attempt = yield* hireFleet({ draft: hire, makeId: makeIdFactory() }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(first),
+        ),
+      );
+
+      expect(attempt).toMatchObject({ status: "failed", outcome: "unknown" });
+
+      const locked = failedDraft(attempt);
+
+      expect(locked.commandId).toBe(hire.commandId);
+      expect(draftLocked(locked)).toBe(true);
+
+      // Nothing may edit a draft whose hire the server may already hold.
+      expect(setBoss(locked, FleetRoleId.make("coach"))).toBe(locked);
+      expect(setHopBudget(locked, GroupHopBudget.make(2))).toBe(locked);
+      expect(
+        setMemberModel(
+          locked,
+          FleetRoleId.make("tailor"),
+          { instanceId: ProviderInstanceId.make("claude-1"), model: "claude-opus-5-5" },
+          PROVIDERS,
+        ),
+      ).toBe(locked);
+      expect(setMemberReasoning(locked, FleetRoleId.make("tailor"), [])).toBe(locked);
+
+      const retried: DispatchLog = { commands: [] };
+
+      yield* hireFleet({ draft: locked, makeId: () => "fresh-command-id" }).pipe(
+        Effect.provideService(
+          EnvironmentSupervisor.EnvironmentSupervisor,
+          yield* makeSupervisor(retried),
+        ),
+      );
+
+      // The resend asks what the first attempt did, so it carries the same id.
+      expect(hireCommands(retried)[0]?.commandId).toBe(hire.commandId);
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );
 });
@@ -530,20 +594,17 @@ describe("setMemberReasoning", () => {
   });
 });
 
-describe("a draft's ids", () => {
-  it("survive every edit, so a retry finishes the squad it started", () => {
+describe("a draft's one command id", () => {
+  it("survives every edit, so a retry finishes the hire it started", () => {
     const hire = draft();
 
-    const edited = setBoss(setHopBudget(hire, GroupHopBudget.make(2)), FleetRoleId.make("scout"));
+    const edited = setMemberReasoning(
+      setHopBudget(setBoss(hire, FleetRoleId.make("scout")), GroupHopBudget.make(2)),
+      FleetRoleId.make("scout"),
+      [{ id: "reasoningEffort", value: "high" }],
+    );
 
-    // The boss edit reorders the members so the boss leads, so ids are compared
-    // by role: each role keeps the bot and command ids it was minted with.
-    const idsByRole = (draft: HireDraft) =>
-      new Map(
-        draft.members.map((member) => [member.roleId, [member.botId, member.createCommandId]]),
-      );
-
-    expect(idsByRole(edited)).toEqual(idsByRole(hire));
-    expect(edited.groupCommandId).toBe(hire.groupCommandId);
+    expect(edited.commandId).toBe(hire.commandId);
+    expect(edited.send).toEqual({ status: "draft" });
   });
 });
