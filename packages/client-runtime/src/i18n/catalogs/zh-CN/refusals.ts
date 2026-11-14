@@ -7,5 +7,9 @@ export const refusalsCatalog = {
     "此机器人是某个空间的主管。请先选择新的主管，或删除该空间。",
   "This space needs at least two bots. Add another bot before you remove one.":
     "此空间至少需要两个机器人。请先添加一个机器人，再移除其中一个。",
+  "This bot already has as many delegations open as it can take. Wait for one to finish.":
+    "此机器人已开启尽可能多的委派。请等待其中一个完成。",
+  "This delegation would loop back on itself. Choose a different bot.":
+    "此委派会循环回自身。请选择其他机器人。",
   "The command failed.": "命令失败。",
 } as const;

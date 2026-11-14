@@ -33,6 +33,9 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "bot-is-group-boss": "This bot leads a space. Pick a new boss, or delete the space.",
   "group-would-be-undersized":
     "This space needs at least two bots. Add another bot before you remove one.",
+  "delegation-limit-reached":
+    "This bot already has as many delegations open as it can take. Wait for one to finish.",
+  "delegation-would-cycle": "This delegation would loop back on itself. Choose a different bot.",
 };
 
 /**
