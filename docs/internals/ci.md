@@ -25,6 +25,43 @@ directories so files hardlink. To rebuild it, create `/opt/pnpm-store` owned by 
 Never run `pnpm store prune` while runners are online. A prune deletes files that a running install still
 needs, and the install then fails with `ERR_PNPM_ENOENT`. Stop the runners first, or leave the store alone.
 
+### Hetzner Chrome for Testing
+
+The server job's browser tests drive a real Chromium. The three runners are one machine running
+one user, so a single install under `/opt/chrome-for-testing` serves every runner and every job of
+a pull request run. The `Provide Chromium` step runs
+[the installer](../../scripts/ci/install-chromium.sh) on self-hosted runners only, then exports the
+resolved binary as `ISNADI_CHROMIUM_PATH`. Tests read it through
+`apps/server/src/browser/chromiumBinary.ts` and skip when it is unset, so a pull request from a fork
+runs on GitHub-hosted `ubuntu-24.04` without the step and stays green.
+
+The version is pinned in `CHROME_VERSION` at the top of the installer, currently `157.0.8103.78`,
+and is the Chrome for Testing `chrome-linux64` build, not the headless shell, so the same install
+can drive the web e2e suite later. `scripts/ci-workflow-policy.test.ts` fails when this page and
+the installer disagree, so bump both together.
+
+To provision a new box, or to repair an install, create the directory once and run the installer as
+`runner`:
+
+```bash
+sudo mkdir -p /opt/chrome-for-testing
+sudo chown runner:runner /opt/chrome-for-testing
+scripts/ci/install-chromium.sh /opt/chrome-for-testing
+```
+
+The installer is idempotent: an existing install of the pinned version prints its path and exits,
+so the CI step costs one `--version` call after the first run. It downloads, unpacks beside the
+final path and renames into place, so a job killed mid-download never leaves a partial install that
+a later run would take for a working browser. A missing install is not repaired automatically
+unless a job runs as a user that can write `/opt/chrome-for-testing`; the step fails the job instead
+of silently skipping the browser tests.
+
+Chromium's sandbox cannot run on the box: Ubuntu 24.04 restricts unprivileged user namespaces with
+AppArmor and the browser aborts with `No usable sandbox`. Launch options therefore pass
+`--no-sandbox`, plus `--disable-dev-shm-usage`. That is safe here because the binary only ever
+loads pages a test serves on `127.0.0.1`; do not reuse these options for a browser that visits
+untrusted pages.
+
 ### Hetzner runner cap
 
 The box has 16 cores and also hosts other work. A heavy job runs vitest with one worker per core, so each runner
