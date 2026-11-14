@@ -310,6 +310,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
 
   switch (command.type) {
     case "work-item.claim": {
+      // A released item whose turn is still running is held by the dispatcher, not here: this
+      // decider's read model is replayed through the legacy projector, which drops the turn's
+      // trigger, so it cannot tell a live dispatcher turn from a settled one. The dispatcher reads
+      // the DB-backed model and is the only producer of this command today — a second producer
+      // would reopen the two-bots-on-one-item window this guard closes.
       if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
 
       if (item.ownerBotId !== undefined || item.state !== "queued") {
