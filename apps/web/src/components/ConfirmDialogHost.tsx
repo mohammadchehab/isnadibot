@@ -24,6 +24,15 @@ type ConfirmationCopy = {
   readonly description: string | null;
 };
 
+/**
+ * A question does not have to end in an ASCII question mark. Chinese uses the
+ * fullwidth form, and Arabic, Persian and Urdu all use U+061F. Splitting on the
+ * ASCII mark alone leaves the whole sentence in the dialog title.
+ */
+const QUESTION_MARK = /[?？؟]/;
+
+const QUESTION_MARK_AT_END = /[?？؟]$/;
+
 export function resolveConfirmDialogCopy(
   message: string,
   fallback: ConfirmationCopy = {
@@ -34,7 +43,7 @@ export function resolveConfirmDialogCopy(
   const normalizedMessage = message.trim();
   const lines = normalizedMessage.split("\n");
   // Chinese copy ends questions with a fullwidth question mark.
-  const questionLineIndex = lines.findIndex((line) => /[?？]$/.test(line.trim()));
+  const questionLineIndex = lines.findIndex((line) => QUESTION_MARK_AT_END.test(line.trim()));
 
   if (questionLineIndex >= 0) {
     const title = lines[questionLineIndex]!.trim();
@@ -47,7 +56,7 @@ export function resolveConfirmDialogCopy(
     return { title, description: description || null };
   }
 
-  const questionMarkIndex = normalizedMessage.search(/[?？]/);
+  const questionMarkIndex = normalizedMessage.search(QUESTION_MARK);
 
   if (questionMarkIndex >= 0) {
     return {
