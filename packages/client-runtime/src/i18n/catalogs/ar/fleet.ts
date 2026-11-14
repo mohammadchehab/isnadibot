@@ -5,6 +5,7 @@ export const fleetCatalog = {
   "Pick the team you need. You can adjust it before it starts.":
     "اختر الفريق الذي تحتاجه. يمكنك تعديله قبل أن يبدأ.",
   "Hire fleet": "تعيين الفريق",
+  "Pick a fleet to continue.": "اختر فريقا للمتابعة.",
   "Start empty": "ابدأ فارغا",
   "{count} more": "{count} أخرى",
   "This fleet is no longer available.": "هذا الفريق لم يعد متاحا.",

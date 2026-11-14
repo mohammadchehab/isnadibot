@@ -3,6 +3,7 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import * as Struct from "effect/Struct";
 import {
   CheckpointRef,
+  GroupId,
   IsoDateTime,
   MessageId,
   NonNegativeInt,
@@ -92,6 +93,12 @@ export type ProjectionPendingApprovalDecision = typeof ProjectionPendingApproval
 
 export const DispatchResult = Schema.Struct({
   sequence: NonNegativeInt,
+  /**
+   * The squad a `fleet.hire` minted. The server mints every id, so the hire's
+   * answer is the one place the client learns which group its command created.
+   * Only `fleet.hire` sets it, and only once its events are saved.
+   */
+  createdGroupId: Schema.optionalKey(GroupId),
 });
 
 export type DispatchResult = typeof DispatchResult.Type;
