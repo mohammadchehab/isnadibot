@@ -4,6 +4,7 @@ import {
   type GroupId,
   ThreadId,
   TurnId,
+  type OrchestrationCommand,
   type OrchestrationReadModel,
   type OrchestrationThread,
   type WorkItem,
@@ -13,7 +14,10 @@ import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import { describe, expect } from "vite-plus/test";
 
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandIdConflictError,
+  OrchestrationCommandInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationRuntimeReceipt } from "../Services/RuntimeReceiptBus.ts";
 import {
   BOSS_ID,
@@ -212,6 +216,182 @@ describe("FleetDispatcherReactor", () => {
           );
           expect(yield* receipts).toMatchObject([
             { type: "fleet.dispatch.decided", kind: "skipped", reason: "claim-lost" },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("gives the item back when the turn never starts, and says so instead of assigned", () =>
+    Effect.gen(function* () {
+      // TASK-241: the claim is committed before the turn starts, so a refused start used to leave
+      // the item assigned to a bot that runs nothing — and `deriveBotStatus` read that bot busy for
+      // good. A start that did not happen is not an assignment.
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "thread.turn.start",
+        error: new OrchestrationCommandInvariantError({
+          commandType: "thread.turn.start",
+          detail: "Bot 'bot-specialist' is archived and takes no new turns.",
+        }),
+      });
+      yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // The refused start is not recorded as dispatched; the release and the chat's row are.
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "work-item.assign",
+            "thread.activity.append",
+          ]);
+
+          // The release is the branch every other release uses: no owner, so the item is queued.
+          expect(h.dispatched[1]).toMatchObject({ workItemId: "item-1", ownerBotId: null });
+
+          // The chat's work log says why it came back, on the bot's own chat, with a deterministic
+          // id so a retried pass cannot post the row twice.
+          expect(h.dispatched[2]).toMatchObject({
+            threadId: BOT_THREAD,
+            activity: {
+              id: "work-item-start-failed:item-1",
+              tone: "error",
+              kind: "work-item.start-failed",
+              summary: '"Item item-1" could not start, so it is back in the queue.',
+              payload: { itemId: "item-1", botId: SPECIALIST_ID },
+              turnId: null,
+            },
+          });
+
+          // Exactly one receipt, and it is not an `assigned`.
+          expect(yield* receipts).toMatchObject([
+            {
+              type: "fleet.dispatch.decided",
+              kind: "skipped",
+              reason: "turn-start-failed",
+              itemId: "item-1",
+              botId: SPECIALIST_ID,
+            },
+          ]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("treats a dispatch crash like a refused start, never as an assignment", () =>
+    Effect.gen(function* () {
+      // The engine can fail for reasons that are not refusals at all. None of them started a turn.
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "thread.turn.start",
+        error: new OrchestrationCommandIdConflictError({
+          commandId: "server:dispatcher-turn:1",
+          receiptAggregateKind: "thread",
+          receiptAggregateId: BOT_THREAD,
+          commandAggregateKind: "thread",
+          commandAggregateId: BOT_THREAD,
+        }),
+      });
+      yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "work-item.assign",
+            "thread.activity.append",
+          ]);
+          expect(yield* receipts).toMatchObject([{ kind: "skipped", reason: "turn-start-failed" }]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("posts the same activity id on a second failed pass, so the chat keeps one row", () =>
+    Effect.gen(function* () {
+      // The reactor cannot know whether its first report landed, so a retried pass dispatches the
+      // row again. The id is derived from the item, and the projector collapses rows by id, so the
+      // chat still shows one line.
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "thread.turn.start",
+        error: new OrchestrationCommandInvariantError({
+          commandType: "thread.turn.start",
+          detail: "The chat is not ready for a turn yet.",
+        }),
+      });
+      yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
+
+      const activityIds = (commands: ReadonlyArray<OrchestrationCommand>) =>
+        commands.flatMap((command) =>
+          command.type === "thread.activity.append" ? [command.activity.id] : [],
+        );
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          const firstPass = activityIds(h.dispatched);
+
+          expect(firstPass).toEqual(["work-item-start-failed:item-1"]);
+
+          // The group looks idle again, so the dispatcher tries the same item once more and fails
+          // the same way.
+          h.dispatched.length = 0;
+          yield* PubSub.publish(h.events, sessionSet(3, BOT_THREAD, "running"));
+          yield* PubSub.publish(h.events, sessionSet(4, BOT_THREAD, "ready"));
+          yield* reactor.drainThrough(4);
+
+          const secondPass = activityIds(h.dispatched);
+
+          expect(secondPass).toEqual(firstPass);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("hands the released item out again on the next pass", () =>
+    Effect.gen(function* () {
+      // The release is what keeps the item alive: it waits in the queue, so the next pass that
+      // finds the group idle hands it out again instead of leaving it stuck to the failed bot.
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "thread.turn.start",
+        error: new OrchestrationCommandInvariantError({
+          commandType: "thread.turn.start",
+          detail: "The chat is not ready for a turn yet.",
+        }),
+      });
+      yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "work-item.assign",
+            "thread.activity.append",
+          ]);
+
+          // The reason it failed is gone, and the item is still the group's oldest waiting one.
+          yield* Ref.set(h.rejection, undefined);
+          h.dispatched.length = 0;
+          yield* PubSub.publish(h.events, sessionSet(3, BOT_THREAD, "running"));
+          yield* PubSub.publish(h.events, sessionSet(4, BOT_THREAD, "ready"));
+          yield* reactor.drainThrough(4);
+
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.claim",
+            "thread.turn.start",
           ]);
         }),
       );

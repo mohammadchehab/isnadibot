@@ -1,13 +1,13 @@
 import {
   BotId,
   CommandId,
+  EventId,
   GroupId,
   MessageId,
   WorkItemId,
   isGroupBotMember,
   type IsoDateTime,
   type OrchestrationBot,
-  type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationGroup,
   type OrchestrationReadModel,
@@ -35,7 +35,7 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 
 import { forkParked } from "../../serverActivation.ts";
-import { COMMAND_PRODUCED_NO_EVENTS, OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError } from "../Errors.ts";
 import {
   FleetDispatcherReactor,
   type FleetDispatcherReactorShape,
@@ -45,7 +45,7 @@ import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts"
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 
 /** Why a group was left exactly as it was. */
-type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost";
+type SkipReason = "queue-empty" | "no-idle-member" | "no-chat" | "claim-lost" | "turn-start-failed";
 
 /**
  * Runs a keep-busy group: when one of its members stops running a turn, or a queued item
@@ -98,42 +98,6 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  const dispatchCommand = (
-    what: string,
-    build: (input: {
-      readonly commandId: CommandId;
-      readonly createdAt: string;
-    }) => OrchestrationCommand,
-  ) =>
-    crypto.randomUUIDv4.pipe(
-      Effect.flatMap((uuid) =>
-        DateTime.now.pipe(
-          Effect.flatMap((now) =>
-            orchestrationEngine.dispatch(
-              build({
-                commandId: CommandId.make(`server:${what}:${uuid}`),
-                createdAt: DateTime.formatIso(now),
-              }),
-            ),
-          ),
-        ),
-      ),
-      Effect.asVoid,
-      // A decider that finds nothing to do is a normal outcome, not a failure.
-      Effect.catchIf(
-        (error) => isInvariantError(error) && error.detail === COMMAND_PRODUCED_NO_EVENTS,
-        () => Effect.logDebug("fleet dispatcher command had nothing to do", { what }),
-      ),
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.logWarning("fleet dispatcher command failed", {
-              what,
-              cause: Cause.pretty(cause),
-            }),
-      ),
-    );
-
   // The claim is the only authority on who owns the item: it rejects when another group took the
   // item first, and that rejection is exactly the race this guard exists for.
   const claim = (botId: BotId, itemId: WorkItemId) =>
@@ -167,26 +131,116 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  // Reports how the start went: it started, or why it did not. A refused start is not an
+  // `assigned`: the caller releases the claim and tells the chat why, so no bot is left holding an
+  // item nobody runs.
   const startTurn = (thread: OrchestrationThread, item: WorkItem) =>
     crypto.randomUUIDv4.pipe(
       Effect.flatMap((uuid) =>
-        dispatchCommand("dispatcher-turn", ({ commandId, createdAt }) => ({
-          type: "thread.turn.start",
-          commandId,
-          threadId: thread.id,
-          message: {
-            messageId: MessageId.make(`dispatcher:${uuid}`),
-            role: "user",
-            text: dispatchBrief(item),
-            attachments: [],
-          },
-          // AC6: the chat's own runtime mode, never a raised one.
-          runtimeMode: thread.runtimeMode,
-          interactionMode: "default",
-          // AC6: the chat shows this brief as the dispatcher's, not the user's.
-          trigger: { kind: "dispatcher", workItemId: item.id },
-          createdAt,
-        })),
+        DateTime.now.pipe(
+          Effect.flatMap((now) =>
+            orchestrationEngine.dispatch({
+              type: "thread.turn.start",
+              commandId: CommandId.make(`server:dispatcher-turn:${uuid}`),
+              threadId: thread.id,
+              message: {
+                messageId: MessageId.make(`dispatcher:${uuid}`),
+                role: "user",
+                text: dispatchBrief(item),
+                attachments: [],
+              },
+              // AC6: the chat's own runtime mode, never a raised one.
+              runtimeMode: thread.runtimeMode,
+              interactionMode: "default",
+              // AC6: the chat shows this brief as the dispatcher's, not the user's.
+              trigger: { kind: "dispatcher", workItemId: item.id },
+              createdAt: DateTime.formatIso(now),
+            }),
+          ),
+        ),
+      ),
+      Effect.as({ started: true as const }),
+      // Every refusal — an archived bot, a vanished chat, a decider with nothing to do — is the
+      // same fact: no turn started. Its message is what the chat is told.
+      Effect.catchIf(
+        (error) => isInvariantError(error),
+        (error) => Effect.succeed({ started: false as const, detail: error.detail }),
+      ),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not start a turn", {
+              threadId: thread.id,
+              itemId: item.id,
+              cause: Cause.pretty(cause),
+            }).pipe(Effect.as({ started: false as const, detail: Cause.pretty(cause) })),
+      ),
+    );
+
+  // The claim is the only thing holding the item, so releasing it is the way back: the existing
+  // null-owner branch of `work-item.assign` returns the item to its group's queue, unowned.
+  const releaseClaim = (item: WorkItem) =>
+    crypto.randomUUIDv4.pipe(
+      Effect.flatMap((uuid) =>
+        orchestrationEngine.dispatch({
+          type: "work-item.assign",
+          commandId: CommandId.make(`server:work-item.assign:${uuid}`),
+          workItemId: item.id,
+          ownerBotId: null,
+        }),
+      ),
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not release a claim", {
+              itemId: item.id,
+              cause: Cause.pretty(cause),
+            }),
+      ),
+    );
+
+  // The chat's work log says why the item came back, in the tone the other reactors use for their
+  // own failures. The id is deterministic, so a retried pass cannot post the row twice.
+  const reportStartFailed = (
+    thread: OrchestrationThread,
+    item: WorkItem,
+    botId: BotId,
+    detail: string,
+  ) =>
+    crypto.randomUUIDv4.pipe(
+      Effect.flatMap((uuid) =>
+        DateTime.now.pipe(
+          Effect.flatMap((now) => {
+            const createdAt = DateTime.formatIso(now);
+
+            return orchestrationEngine.dispatch({
+              type: "thread.activity.append",
+              commandId: CommandId.make(`server:work-item.start-failed:${uuid}`),
+              threadId: thread.id,
+              activity: {
+                id: EventId.make(`work-item-start-failed:${item.id}`),
+                tone: "error",
+                kind: "work-item.start-failed",
+                summary: `"${item.title}" could not start, so it is back in the queue.`,
+                payload: { itemId: item.id, botId, detail },
+                turnId: null,
+                createdAt,
+              },
+              createdAt,
+            });
+          }),
+        ),
+      ),
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not report a failed start", {
+              threadId: thread.id,
+              itemId: item.id,
+              cause: Cause.pretty(cause),
+            }),
       ),
     );
 
@@ -236,7 +290,24 @@ const make = Effect.gen(function* () {
           return;
         }
 
-        yield* startTurn(chat, item);
+        const start = yield* startTurn(chat, item);
+
+        if (!start.started) {
+          // Nothing is running, so nothing is assigned: give the item back and say why in the
+          // chat, rather than publishing an `assigned` no bot is doing.
+          yield* releaseClaim(item);
+          yield* reportStartFailed(chat, item, bot.id, start.detail);
+          yield* publishDecision(group.id, "skipped", {
+            itemId: item.id,
+            botId: bot.id,
+            reason: "turn-start-failed",
+          });
+
+          // The item is back in the queue and this member was not spent, so the rest of the
+          // queue still gets its turn.
+          continue;
+        }
+
         yield* publishDecision(group.id, "assigned", { itemId: item.id, botId: bot.id });
         busied.add(bot.id);
       }
