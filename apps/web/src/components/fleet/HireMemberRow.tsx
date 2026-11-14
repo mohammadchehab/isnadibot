@@ -1,5 +1,6 @@
 import { ProviderInstanceId, type ProviderOptionSelection } from "@isnadi/contracts";
 import type { HireMember, HireMemberNotice } from "@isnadi/client-runtime/fleet/hire";
+import { SparklesIcon } from "lucide-react";
 
 import { useI18n } from "../../i18n";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -22,6 +23,22 @@ function noticeCopy(notice: HireMemberNotice): string {
       return "The provider or model this bot picked is no longer connected.";
   }
 }
+
+/**
+ * The one column track the header and every row share, so a label sits over its
+ * own control by construction: Bot takes what is left, then Model, Reasoning and
+ * Skills at the widths frame 2088:370 draws (x 16, 642, 834, 966 — 96 for
+ * Skills). Both sides of the list build from these two exports and nothing else,
+ * so the columns cannot drift apart.
+ */
+export const SQUAD_COLUMNS = "flex min-w-0 items-center gap-3";
+
+export const SQUAD_CELL = {
+  bot: "min-w-0 flex-1",
+  model: "w-48 shrink-0",
+  reasoning: "w-32 shrink-0",
+  skills: "w-24 shrink-0",
+} as const;
 
 /**
  * One planned member on squad setup: what it is, the model and reasoning level
@@ -54,26 +71,25 @@ export function HireMemberRow({
 
   return (
     <li className="px-4 py-3" data-role-id={member.roleId}>
-      <div className="flex min-w-0 items-center gap-3">
-        <BotAvatarView avatar={member.avatar} name={member.name} className="size-8" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium">{t(member.name)}</p>
-            {member.isBoss ? (
-              <Badge variant="secondary" size="sm">
-                {t("Boss")}
-              </Badge>
-            ) : null}
+      <div className={SQUAD_COLUMNS}>
+        <div className={`${SQUAD_CELL.bot} flex items-center gap-3`}>
+          <BotAvatarView avatar={member.avatar} name={member.name} className="size-8" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium">{t(member.name)}</p>
+              {member.isBoss ? (
+                <Badge variant="secondary" size="sm">
+                  {t("Boss")}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="truncate text-xs text-muted-foreground">{t(member.title)}</p>
           </div>
-          <p className="truncate text-xs text-muted-foreground">{t(member.title)}</p>
         </div>
-        <span className="w-12 shrink-0 text-right text-sm" data-testid="hire-member-skill-count">
-          {member.skills.length === 0 ? "—" : member.skills.length}
-        </span>
-        {engine === null ? (
-          <span className="text-sm text-muted-foreground">{t("No model yet")}</span>
-        ) : (
-          <span className="flex items-center gap-2">
+        <div className={SQUAD_CELL.model}>
+          {engine === null ? (
+            <span className="text-sm text-muted-foreground">{t("No model yet")}</span>
+          ) : (
             <BotModelPicker
               activeInstanceId={ProviderInstanceId.make(engine.provider)}
               model={engine.model}
@@ -82,23 +98,38 @@ export function HireMemberRow({
               disabled={disabled}
               onChange={onModelChange}
             />
-            {activeEntry ? (
-              <TraitsPicker
-                provider={activeEntry.driverKind}
-                instanceId={activeEntry.instanceId}
-                models={activeEntry.models}
-                model={engine.model}
-                prompt=""
-                onPromptChange={() => {}}
-                modelOptions={engine.options}
-                allowPromptInjectedEffort={false}
-                triggerFit="settings-row"
-                disabled={disabled}
-                onModelOptionsChange={(options) => onReasoningChange(options ?? [])}
-              />
-            ) : null}
-          </span>
-        )}
+          )}
+        </div>
+        <div className={SQUAD_CELL.reasoning}>
+          {engine !== null && activeEntry ? (
+            <TraitsPicker
+              provider={activeEntry.driverKind}
+              instanceId={activeEntry.instanceId}
+              models={activeEntry.models}
+              model={engine.model}
+              prompt=""
+              onPromptChange={() => {}}
+              modelOptions={engine.options}
+              allowPromptInjectedEffort={false}
+              triggerFit="settings-row"
+              disabled={disabled}
+              onModelOptionsChange={(options) => onReasoningChange(options ?? [])}
+            />
+          ) : null}
+        </div>
+        <span
+          className={`${SQUAD_CELL.skills} flex items-center gap-1.5 text-sm`}
+          data-testid="hire-member-skill-count"
+        >
+          {member.skills.length === 0 ? (
+            "—"
+          ) : (
+            <>
+              <SparklesIcon aria-hidden className="size-4 shrink-0" />
+              {t("{count} on demand", { count: member.skills.length })}
+            </>
+          )}
+        </span>
       </div>
       {member.notice === null ? null : (
         <p className="mt-1 pl-11 text-xs text-muted-foreground">{t(noticeCopy(member.notice))}</p>
