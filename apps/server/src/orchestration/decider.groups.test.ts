@@ -198,6 +198,9 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("Set a new boss before archiving it");
+      // The client picks its copy from the code, never from the sentence, so a
+      // copyedit must not be the only thing this test covers.
+      expect(error.refusal).toBe("bot-is-group-boss");
     }),
   );
 
