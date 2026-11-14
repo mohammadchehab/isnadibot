@@ -1,6 +1,7 @@
 import type { SubscriptionAccountState } from "./accountState.ts";
 import { codexPlanFromToken } from "./providers/openaiCodex.ts";
 import type { BotId, ProviderInstanceId } from "@isnadi/contracts";
+import { maskAccountHandle } from "@isnadi/shared/maskAccountHandle";
 import * as DateTime from "effect/DateTime";
 import * as Predicate from "effect/Predicate";
 import type { CredentialStoreState } from "./credentialStore.ts";
@@ -76,6 +77,8 @@ export function statusForKey(
             ? "healthy"
             : "detected";
 
+  // An email handle is personal data and every client that reads this
+  // environment receives this status, so it is masked here, at the producer.
   const accountLabel =
     credential?.type === "oauth"
       ? [credential.email, credential.accountId].find(
@@ -94,7 +97,7 @@ export function statusForKey(
     ...(plan ? { plan } : {}),
     ...(instanceId ? { instanceId } : {}),
     connected: credential !== undefined,
-    ...(accountLabel ? { accountLabel } : {}),
+    ...(accountLabel ? { accountLabel: maskAccountHandle(accountLabel) } : {}),
     ...(credential ? { authMode: credential.type } : {}),
     ...(credential?.type === "api-key" && credential.baseUrl
       ? { baseUrl: credential.baseUrl }
