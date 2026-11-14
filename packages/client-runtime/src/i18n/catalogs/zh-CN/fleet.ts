@@ -5,6 +5,7 @@ export const fleetCatalog = {
   "Pick the team you need. You can adjust it before it starts.":
     "选择你需要的团队。开始前可以调整。",
   "Hire fleet": "聘用团队",
+  "Pick a fleet to continue.": "选择一个团队以继续。",
   "Start empty": "从空白开始",
   "{count} more": "另外 {count} 个",
   "This fleet is no longer available.": "该团队已不可用。",

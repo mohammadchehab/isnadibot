@@ -10,6 +10,7 @@ export const fleetCatalog = {
   "Pick the team you need. You can adjust it before it starts.":
     "Pick the team you need. You can adjust it before it starts.",
   "Hire fleet": "Hire fleet",
+  "Pick a fleet to continue.": "Pick a fleet to continue.",
   "Start empty": "Start empty",
   "{count} more": "{count} more",
   "This fleet is no longer available.": "This fleet is no longer available.",

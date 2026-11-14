@@ -12,6 +12,7 @@ import {
   type FleetTemplate,
   type FleetTemplateId,
   type FleetTemplateIndex,
+  type GroupId,
   type ProviderInstanceId,
   type ProviderOptionSelection,
   type ServerProvider,
@@ -346,7 +347,16 @@ function sendOutcome(cause: Cause.Cause<unknown>): HireSendOutcome {
  * the draft to keep, already marked with how it failed.
  */
 export type HireFleetResult =
-  | { readonly status: "sent"; readonly sequence: number }
+  | {
+      readonly status: "sent";
+      readonly sequence: number;
+      /**
+       * The squad the hire created. The server mints it, so this is the only
+       * way the screen learns which group to land on. Absent only when the
+       * answering environment predates the id in the answer.
+       */
+      readonly groupId?: GroupId;
+    }
   | { readonly status: "blocked"; readonly blockers: ReadonlyArray<FleetHireBlocker> }
   | { readonly status: "failed"; readonly outcome: HireSendOutcome; readonly draft: HireDraft };
 
@@ -415,9 +425,17 @@ export const hireFleet = Effect.fn("Fleet.hireFleet")(function* (input: HireFlee
 /** What a finished send did, with the draft a failure hands back to the screen. */
 function replayResult(
   draft: HireDraft,
-  exit: Exit.Exit<{ readonly sequence: number }, unknown>,
+  exit: Exit.Exit<{ readonly sequence: number; readonly createdGroupId?: GroupId }, unknown>,
 ): HireFleetResult {
-  if (Exit.isSuccess(exit)) return { status: "sent", sequence: exit.value.sequence };
+  if (Exit.isSuccess(exit)) {
+    const { sequence, createdGroupId } = exit.value;
+
+    return {
+      status: "sent",
+      sequence,
+      ...(createdGroupId === undefined ? {} : { groupId: createdGroupId }),
+    };
+  }
 
   const outcome = sendOutcome(exit.cause);
 

@@ -1,9 +1,10 @@
 import type {
+  DispatchResult,
   OrchestrationClientOrigin,
   OrchestrationEvent,
   OrchestrationReadModel,
 } from "@isnadi/contracts";
-import { OrchestrationCommand } from "@isnadi/contracts";
+import { GroupId, OrchestrationCommand } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Crypto from "effect/Crypto";
@@ -31,6 +32,7 @@ import { toPersistenceSqlError } from "../../persistence/Errors.ts";
 import { tryAdmitTurnStart, type TurnStartAdmission } from "../../remote/updateGate.ts";
 import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 import { OrchestrationCommandReceiptRepository } from "../../persistence/Services/OrchestrationCommandReceipts.ts";
+import type { OrchestrationCommandReceipt } from "../../persistence/Services/OrchestrationCommandReceipts.ts";
 import {
   OrchestrationCommandIdConflictError,
   COMMAND_PRODUCED_NO_EVENTS,
@@ -61,7 +63,7 @@ interface CommandEnvelope {
   command: OrchestrationCommand;
   actor: OrchestrationDispatchActor | undefined;
   origin: OrchestrationClientOrigin | undefined;
-  result: Deferred.Deferred<{ sequence: number }, OrchestrationDispatchError>;
+  result: Deferred.Deferred<DispatchResult, OrchestrationDispatchError>;
   startedAtMs: number;
   /** Turn-start admission owned by this envelope, released once the worker finishes it. */
   admission: TurnStartAdmission | undefined;
@@ -183,6 +185,38 @@ function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateR
   }
 }
 
+/** A receipt's aggregate id is stored as text; only a real group id is one. */
+const isGroupId = Schema.is(GroupId);
+
+/**
+ * The squad a replayed `fleet.hire` minted. Its receipt records the aggregate
+ * of the event it appended, and the hire is the one command whose aggregate the
+ * client never names: the server mints the group during decide, so the receipt
+ * is the only surviving record of the id a retry has to be told again.
+ */
+function replayedHireGroupId(
+  command: OrchestrationCommand,
+  receipt: OrchestrationCommandReceipt,
+): GroupId | undefined {
+  if (command.type !== "fleet.hire" || receipt.aggregateKind !== "group") return undefined;
+
+  return isGroupId(receipt.aggregateId) ? receipt.aggregateId : undefined;
+}
+
+/**
+ * The squad a fresh `fleet.hire` minted, read off the event it committed for it.
+ */
+function committedHireGroupId(
+  command: OrchestrationCommand,
+  events: ReadonlyArray<OrchestrationEvent>,
+): GroupId | undefined {
+  if (command.type !== "fleet.hire") return undefined;
+
+  const created = events.find((event) => event.type === "group.created");
+
+  return created?.type === "group.created" ? created.payload.groupId : undefined;
+}
+
 const makeOrchestrationEngine = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* OrchestrationEventStore;
@@ -276,8 +310,11 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           }
 
           if (existingReceipt.value.status === "accepted") {
+            const createdGroupId = replayedHireGroupId(envelope.command, existingReceipt.value);
+
             return {
               sequence: existingReceipt.value.resultSequence,
+              ...(createdGroupId === undefined ? {} : { createdGroupId }),
             };
           }
 
@@ -421,7 +458,15 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           }
         }
 
-        return { sequence: committedCommand.lastSequence };
+        const createdGroupId = committedHireGroupId(
+          envelope.command,
+          committedCommand.committedEvents,
+        );
+
+        return {
+          sequence: committedCommand.lastSequence,
+          ...(createdGroupId === undefined ? {} : { createdGroupId }),
+        };
       }).pipe(Effect.withSpan(`orchestration.command.${envelope.command.type}`)),
     ).pipe(
       Effect.flatMap((exit) =>
@@ -599,7 +644,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           });
         }
 
-        const result = yield* Deferred.make<{ sequence: number }, OrchestrationDispatchError>();
+        const result = yield* Deferred.make<DispatchResult, OrchestrationDispatchError>();
 
         const offered = yield* Queue.offer(commandQueue, {
           command,
