@@ -173,6 +173,7 @@ export {
   type IsnadiCopyDirection,
   type IsnadiToolDefinition,
   ISNADI_TOOL_CATALOG,
+  ISNADI_TOOL_IDS,
 } from "./isnadiTools/catalog.ts";
 
 export {
