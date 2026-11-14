@@ -108,7 +108,13 @@ describe("spaceStandup", () => {
     });
 
     expect(standup.capacity.rows.map((row) => row.name)).toEqual(["Boss", "Engineer"]);
-    expect(standup.capacity.counts).toEqual({ asking: 1, held: 0, busy: 0, idle: 1 });
+    expect(standup.capacity.counts).toEqual({
+      asking: 1,
+      "sign-in-required": 0,
+      held: 0,
+      busy: 0,
+      idle: 1,
+    });
     expect(standup.queue.map((entry) => entry.id)).toEqual(["w-mine"]);
     expect(standup.queueTotal).toBe(1);
   });

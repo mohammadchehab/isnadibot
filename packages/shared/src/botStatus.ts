@@ -7,12 +7,18 @@ import {
   type WorkItemSummary,
 } from "@isnadi/contracts";
 
+import {
+  providerReasonNeedsSignIn,
+  type ProviderAvailabilityReason,
+} from "./fleet/providerAvailability.ts";
+
 /**
  * What a bot is doing, as the space view shows it. The order of this list is
  * the precedence {@link deriveBotStatus} applies: a bot waiting on its user is
- * not reported as busy just because a turn is still technically running.
+ * not reported as busy just because a turn is still technically running, and a
+ * bot that cannot sign in is not reported as busy either.
  */
-export const BOT_STATUSES = ["asking", "held", "busy", "idle"] as const;
+export const BOT_STATUSES = ["asking", "sign-in-required", "held", "busy", "idle"] as const;
 
 export type BotStatus = (typeof BOT_STATUSES)[number];
 
@@ -83,10 +89,34 @@ function rootOf(chat: BotStatusChat, byId: ReadonlyMap<string, BotStatusChat>): 
 }
 
 /**
- * The four states, in precedence order asking, held, busy, idle:
+ * Why a chat's last contact with its provider left the bot unable to run, or
+ * undefined when it did run. A turn that died says so on the turn; a session
+ * that never got a turn off the ground says so on the session. Nothing else
+ * counts: a turn that resumed drops these on purpose, so this never rebuilds a
+ * stale reason out of history.
+ */
+function unavailability(chat: BotStatusChat): ProviderAvailabilityReason | undefined {
+  if (chat.latestTurn?.state === "error") {
+    return chat.latestTurn.unavailability ?? chat.session?.unavailability;
+  }
+
+  return chat.session?.status === "error" ? chat.session.unavailability : undefined;
+}
+
+/** Whether signing in is the one fix for a chat, rather than a transient failure. */
+function needsSignIn(chat: BotStatusChat): boolean {
+  return providerReasonNeedsSignIn(unavailability(chat));
+}
+
+/**
+ * The five states, in precedence order asking, sign-in-required, held, busy,
+ * idle:
  *
  * - asking: a pending approval or question anywhere in the bot's chat tree, so
  *   the same rule `selectDecisions` shows the user applies here.
+ * - sign-in-required: the bot is not running anything and one of its chats
+ *   cannot start because its provider needs signing in. Only the user can clear
+ *   it, so it is worth their attention the way `asking` is.
  * - held: the bot owns an item in state `blocked`, or its running turn is
  *   waiting on a delegated child that has not finished. It is not free to take
  *   more work, and it is not working either.
@@ -113,6 +143,9 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
     return "asking";
 
   const running = chats.filter((chat) => chat.latestTurn?.state === "running");
+
+  // A bot with a turn in flight is working, not stuck at a login screen.
+  if (running.length === 0 && chats.some(needsSignIn)) return "sign-in-required";
 
   const blockedItem = input.workItems.some(
     (item) => item.ownerBotId === input.botId && item.state === "blocked",
@@ -144,7 +177,13 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
 export function countBotStatuses(
   statuses: ReadonlyArray<BotStatus>,
 ): Readonly<Record<BotStatus, number>> {
-  const counts: Record<BotStatus, number> = { asking: 0, held: 0, busy: 0, idle: 0 };
+  const counts: Record<BotStatus, number> = {
+    asking: 0,
+    "sign-in-required": 0,
+    held: 0,
+    busy: 0,
+    idle: 0,
+  };
 
   for (const status of statuses) counts[status] += 1;
 

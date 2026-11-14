@@ -111,7 +111,13 @@ describe("buildCapacity", () => {
     });
 
     expect(capacity.rows.map((row) => row.status)).toEqual(["asking", "held", "idle"]);
-    expect(capacity.counts).toEqual({ asking: 1, held: 1, busy: 0, idle: 1 });
+    expect(capacity.counts).toEqual({
+      asking: 1,
+      "sign-in-required": 0,
+      held: 1,
+      busy: 0,
+      idle: 1,
+    });
   });
 
   it("ignores an archived chat when it decides what a bot is doing", () => {

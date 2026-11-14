@@ -36,6 +36,7 @@ const row = (overrides: Partial<CapacityRow> & Pick<CapacityRow, "name">): Capac
 
 const counts = (rows: ReadonlyArray<CapacityRow>) => ({
   asking: rows.filter((entry) => entry.status === "asking").length,
+  "sign-in-required": rows.filter((entry) => entry.status === "sign-in-required").length,
   held: rows.filter((entry) => entry.status === "held").length,
   busy: rows.filter((entry) => entry.status === "busy").length,
   idle: rows.filter((entry) => entry.status === "idle").length,
@@ -88,7 +89,7 @@ describe("SpaceStandup", () => {
             }),
             row({ name: "Grace", status: "idle" }),
           ],
-          counts: { asking: 0, held: 0, busy: 1, idle: 1 },
+          counts: { asking: 0, "sign-in-required": 0, held: 0, busy: 1, idle: 1 },
         },
         isQuiet: false,
       }),
@@ -107,7 +108,7 @@ describe("SpaceStandup", () => {
       report({
         capacity: {
           rows: [row({ name: "Ada", status: "asking" })],
-          counts: { asking: 1, held: 0, busy: 0, idle: 0 },
+          counts: { asking: 1, "sign-in-required": 0, held: 0, busy: 0, idle: 0 },
         },
       }),
     );
@@ -125,7 +126,7 @@ describe("SpaceStandup", () => {
           rows: [
             row({ name: "Ada", status: "busy", item: { id: "w0", title: "Current", extra: 0 } }),
           ],
-          counts: { asking: 0, held: 0, busy: 1, idle: 0 },
+          counts: { asking: 0, "sign-in-required": 0, held: 0, busy: 1, idle: 0 },
         },
       }),
     );
@@ -173,7 +174,7 @@ describe("SpaceStandup", () => {
           rows: [
             row({ name: "Ada", status: "busy", item: { id: "w1", title: "Current", extra: 0 } }),
           ],
-          counts: { asking: 0, held: 0, busy: 1, idle: 0 },
+          counts: { asking: 0, "sign-in-required": 0, held: 0, busy: 1, idle: 0 },
         },
       }),
     );
