@@ -466,6 +466,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Group '${undersizedGroup.id}' requires at least two active bots.`,
+          refusal: "group-would-be-undersized",
         });
       }
 

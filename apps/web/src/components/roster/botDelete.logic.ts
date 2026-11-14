@@ -104,6 +104,16 @@ export function botDeleteFailureToast(
     };
   }
 
+  if (input.refusal === "group-would-be-undersized") {
+    return {
+      title: t("This group needs at least two bots"),
+      description: t(
+        "Deleting this bot would leave this space with fewer than two. Add another bot first.",
+      ),
+      actionLabel: null,
+    };
+  }
+
   return {
     title: t("Could not delete {name}", { name: input.botName }),
     description: input.message.trim() || t("The command failed."),

@@ -58,6 +58,12 @@ describe("classifyGroupDeleteFailure", () => {
     );
   });
 
+  it("reads the undersized-group refusal code", () => {
+    expect(classifyGroupDeleteFailure(failed({ refusal: "group-would-be-undersized" }))).toBe(
+      "group-would-be-undersized",
+    );
+  });
+
   it("leaves anything else to the server's own wording", () => {
     // A code a newer server added, and a failure with no code at all: both fall
     // back so the caller shows the prose the server sent.

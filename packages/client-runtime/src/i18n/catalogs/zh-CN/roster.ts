@@ -119,6 +119,9 @@ export const rosterCatalog = {
   "This group still holds open work": "此群组仍有未完成的工作",
   "Its work changed while you were deleting it. Delete again to see how many items would be discarded.":
     "删除时其工作发生了变化。请再次删除，以查看将丢弃多少个工作项。",
+  "This group needs at least two bots": "此群组至少需要两个机器人",
+  "Deleting this bot would leave this space with fewer than two. Add another bot first.":
+    "删除此机器人会使该空间少于两个机器人。请先添加另一个机器人。",
   "Delete {name}? {name} is the boss of {space}. Pick a new boss in the space first, or delete the space.":
     "删除 {name}？{name} 是 {space} 的负责人。请先在空间中选择新的负责人，或删除该空间。",
   "Boss of {space}": "{space} 的负责人",
