@@ -48,6 +48,7 @@ export {
   type UnassignGroupPersonInput,
   type LeaveGroupInput,
   type SetGroupBossInput,
+  type SetGroupKeepBusyInput,
   createGroup,
   renameGroup,
   deleteGroup,
@@ -57,6 +58,7 @@ export {
   unassignGroupPerson,
   leaveGroup,
   setGroupBoss,
+  setGroupKeepBusy,
 } from "./commands/group.ts";
 
 export {

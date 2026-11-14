@@ -70,6 +70,11 @@ export interface Group {
   id: string;
   name: string;
   bossBotId: string | null;
+  /**
+   * Whether the fleet here picks up new work as it arrives. Optional because
+   * the server omits it for a group that has never turned it on; absent means off.
+   */
+  keepBusy?: boolean | undefined;
   members: ReadonlyArray<GroupMembership>;
   /**
    * The fleet template this group was hired from; null for a group the user put

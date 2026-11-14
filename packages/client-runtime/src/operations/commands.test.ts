@@ -43,6 +43,7 @@ import {
   setThreadMessageReaction,
   settleThread,
   setGroupBoss,
+  setGroupKeepBusy,
   startThreadTurn,
   stopThreadSession,
   unassignGroupMember,
@@ -194,11 +195,17 @@ describe("environment commands", () => {
         bossBotId: botId,
         unassignPreviousBoss: true,
       }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
+      yield* setGroupKeepBusy({
+        commandId: CommandId.make("set-keep-busy"),
+        groupId,
+        keepBusy: true,
+      }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
 
       expect(dispatched.map((command) => command.type)).toEqual([
         "group.member.assign",
         "group.member.unassign",
         "group.boss.set",
+        "group.keep-busy.set",
       ]);
     }).pipe(Effect.provide(TEST_CRYPTO_LAYER)),
   );

@@ -447,4 +447,8 @@ export const rosterCatalog = {
   Bug: "Bug",
   Owner: "Owner",
   Tasks: "Tasks",
+  "Keep this group busy": "Keep this group busy",
+  "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.":
+    "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.",
+  "Could not change keep-busy for this group": "Could not change keep-busy for this group",
 } as const;

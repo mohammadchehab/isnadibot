@@ -471,4 +471,8 @@ export const rosterCatalog = {
   Bug: "علّة",
   Owner: "المالك",
   Tasks: "المهام",
+  "Keep this group busy": "أبقِ هذه المجموعة منشغلة",
+  "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.":
+    "البوتات هنا تلتقط العمل الجديد فور وصوله. عند الإيقاف تتوقف عن أخذ عناصر جديدة، ويكتمل العمل الجاري بالفعل.",
+  "Could not change keep-busy for this group": "تعذر تغيير إبقاء هذه المجموعة منشغلة",
 } as const;

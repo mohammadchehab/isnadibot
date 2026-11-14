@@ -14,9 +14,11 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { GroupMemberStack } from "./GroupMemberStack";
 import { GroupPeopleSection } from "./GroupPeopleSection";
+import { groupKeepBusyCopy, groupKeepsBusy } from "./groupKeepBusy.logic";
 import { groupBotMembers, groupContainsBot } from "./roster.logic";
 import type { Bot, Group } from "./types";
 import { classifyGroupDeleteFailure, openWorkItemCountForGroup } from "./groupDelete.logic";
@@ -60,6 +62,10 @@ export function GroupEditor({
     reportFailure: false,
   });
 
+  const setKeepBusy = useAtomCommand(botEnvironment.groups.setKeepBusy, {
+    reportFailure: false,
+  });
+
   const [name, setName] = useState(group.name);
   const [newMemberId, setNewMemberId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,6 +74,7 @@ export function GroupEditor({
   const availableBots = activeBots.filter((bot) => !groupContainsBot(group, bot.id));
   const removalHintId = useId();
   const addHintId = useId();
+  const keepBusyCopy = groupKeepBusyCopy(t);
 
   const removalHint = groupMemberRemovalHint(
     {
@@ -195,6 +202,33 @@ export function GroupEditor({
               ))}
             </SelectPopup>
           </Select>
+        </label>
+        <label className="flex items-center justify-between gap-3 text-sm font-medium">
+          <span>
+            {keepBusyCopy.label}
+            <span className="block text-xs font-normal text-muted-foreground">
+              {keepBusyCopy.hint}
+            </span>
+          </span>
+          <Switch
+            aria-label={keepBusyCopy.label}
+            aria-busy={busy}
+            checked={groupKeepsBusy(group)}
+            disabled={busy}
+            onCheckedChange={(checked) =>
+              void run(
+                () =>
+                  setKeepBusy({
+                    environmentId,
+                    input: {
+                      groupId: GroupId.make(group.id),
+                      keepBusy: checked,
+                    },
+                  }),
+                keepBusyCopy.failureTitle,
+              )
+            }
+          />
         </label>
         <section className="space-y-2" aria-labelledby="group-bots-heading">
           <h3 id="group-bots-heading" className="text-sm font-medium">

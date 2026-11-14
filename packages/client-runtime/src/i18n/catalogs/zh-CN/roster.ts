@@ -430,4 +430,8 @@ export const rosterCatalog = {
   Bug: "缺陷",
   Owner: "负责人",
   Tasks: "任务",
+  "Keep this group busy": "让此分组保持忙碌",
+  "Bots here pick up new work as it arrives. Turn this off and they stop taking new items; work already in progress finishes.":
+    "这里的机器人会在新工作到达时接手。关闭后它们不再接收新事项；已在进行中的工作会继续完成。",
+  "Could not change keep-busy for this group": "无法更改此分组的保持忙碌设置",
 } as const;
