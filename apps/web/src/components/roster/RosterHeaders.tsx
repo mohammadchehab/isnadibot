@@ -65,7 +65,7 @@ export const RosterSidebarHeader = memo(function RosterSidebarHeader({
               </MenuItem>
               <MenuItem onClick={onNewGroup}>
                 <UsersIcon />
-                {t("New group")}
+                {t("New space")}
               </MenuItem>
             </MenuPopup>
           </Menu>
@@ -138,7 +138,7 @@ export function RosterPanelHeader({
           </MenuItem>
           <MenuItem onClick={onNewGroup}>
             <UsersIcon />
-            {t("New group")}
+            {t("New space")}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -177,7 +177,7 @@ export function RosterRailCreateMenu({
           </MenuItem>
           <MenuItem onClick={onNewGroup}>
             <UsersIcon />
-            {t("New group")}
+            {t("New space")}
           </MenuItem>
         </MenuPopup>
       </Menu>

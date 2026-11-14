@@ -1,0 +1,106 @@
+export const fleetCatalog = {
+  // Screens
+  "New space": "مساحة جديدة",
+  "Start from a fleet": "ابدأ من فريق",
+  "Pick the team you need. You can adjust it before it starts.":
+    "اختر الفريق الذي تحتاجه. يمكنك تعديله قبل أن يبدأ.",
+  "Hire fleet": "تعيين الفريق",
+  "Pick a fleet to continue.": "اختر فريقا للمتابعة.",
+  "Start empty": "ابدأ فارغا",
+  "{count} more": "{count} أخرى",
+  "This fleet is no longer available.": "هذا الفريق لم يعد متاحا.",
+  "The bot that hands work out and answers for this space.":
+    "البوت الذي يوزع العمل ويجيب عن هذه المساحة.",
+  "Bot replies one message can chain before the space stops.":
+    "عدد ردود البوتات التي يمكن أن تتسلسل من رسالة واحدة قبل أن تتوقف المساحة.",
+  "No provider can run this bot yet.": "لا يوجد مزود يمكنه تشغيل هذا البوت بعد.",
+  "Runs on another provider because the role's own is not set up.":
+    "يعمل على مزود آخر لأن مزود الدور نفسه غير مهيأ.",
+  "The model has no such reasoning level, so it starts on the model's default.":
+    "لا يوفر هذا النموذج مستوى التفكير المطلوب، لذا يبدأ على الوضع الافتراضي للنموذج.",
+  "The provider or model this bot picked is no longer connected.":
+    "لم يعد مزود الخدمة أو النموذج الذي اختاره هذا البوت متصلًا.",
+  "Every bot needs a name.": "يحتاج كل بوت إلى اسم.",
+  "Could not create the space": "تعذّر إنشاء المساحة",
+  "Checking what happened…": "جارٍ التحقق مما حدث…",
+  "Set up your recruiting squad": "جهّز فريق التوظيف",
+  "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.":
+    "اختر القائد. يجيب القائد عن كل رسالة افتراضيًا ويوزّع العمل على بقية البوتات عبر الإشارات @mentions.",
+  "{count} on demand": "{count} عند الطلب",
+  "{name} was the boss. It stays in the squad as a member.":
+    "كان {name} هو القائد. سيبقى في الفريق كعضو.",
+
+  // Templates
+  Recruiting: "التوظيف",
+  "Sources candidates, writes outreach, and tracks every opening.":
+    "يستقطب المرشحين ويكتب رسائل التواصل ويتابع كل وظيفة.",
+  "Video editing": "مونتاج الفيديو",
+  "Turns raw footage into cut, captioned, publish-ready videos.":
+    "يحوّل المشاهد الخام إلى فيديوهات مونتاج ومترجمة وجاهزة للنشر.",
+  "Software engineering": "هندسة البرمجيات",
+  "Plans, builds, reviews, and ships changes in your repository.":
+    "يخطط وينفذ ويراجع ويشحن التغييرات في مستودعك.",
+  "Health research": "البحث الصحي",
+  "Searches public health data, screens evidence, and summarises what holds up.":
+    "يبحث في بيانات الصحة العامة ويفرز الأدلة ويلخص ما يصمد منها.",
+  "Customer support": "دعم العملاء",
+  "Triages the inbox, answers what it can, and escalates the rest.":
+    "يفرز الوارد ويجيب عما يستطيع ويصعّد الباقي.",
+  "Bookkeeping & procurement": "المحاسبة والمشتريات",
+  "Records spend, matches invoices, and runs purchase requests.":
+    "يسجل الإنفاق ويطابق الفواتير ويدير طلبات الشراء.",
+
+  // Roles
+  Scout: "المستقطب",
+  "Sources candidates": "يستقطب المرشحين",
+  Tailor: "كاتب الوظائف",
+  "Job posts and outreach": "إعلانات الوظائف والتواصل",
+  Tracker: "المتتبِّع",
+  "Pipeline and follow-ups": "مسار المرشحين والمتابعات",
+  Coach: "المدرِّب",
+  "Interview kits": "حزم المقابلات",
+  Producer: "المنتج",
+  "Plans the cut and the schedule": "يخطط المونتاج والجدول",
+  Editor: "المحرِّر",
+  "Cuts footage into a story": "يحوّل المشاهد إلى قصة",
+  Captioner: "كاتب التعليقات",
+  "Captions and subtitles": "التعليقات والترجمات",
+  Designer: "المصمِّم",
+  "Thumbnails and title cards": "الصور المصغرة وبطاقات العناوين",
+  Planner: "المخطِّط",
+  "Plans the work and assigns it": "يخطط العمل ويوزعه",
+  Engineer: "المهندس",
+  "Builds and tests changes": "ينفذ التغييرات ويختبرها",
+  Reviewer: "المراجع",
+  "Reviews and merges pull requests": "يراجع طلبات الدمج ويدمجها",
+  Architect: "المعماري",
+  "Designs and finds root causes": "يصمم ويتقصى الأسباب الجذرية",
+  "UI designer": "مصمم الواجهات",
+  "Screens and design specs": "الشاشات ومواصفات التصميم",
+  "Security reviewer": "مراجع الأمان",
+  "Reviews security-relevant changes": "يراجع التغييرات المتعلقة بالأمان",
+  "Lead researcher": "الباحث الرئيسي",
+  "Frames questions and signs off findings": "يصوغ الأسئلة ويعتمد النتائج",
+  "Literature scout": "مستطلع الأدبيات",
+  "Finds and screens papers": "يجد الدراسات ويفرزها",
+  "Trials analyst": "محلل التجارب",
+  "Reads trial registries": "يقرأ سجلات التجارب",
+  "Data analyst": "محلل البيانات",
+  "Runs the numbers on public data": "يحلل الأرقام في البيانات العامة",
+  Triage: "الفرز",
+  "Sorts the inbox and routes it": "يفرز الوارد ويوجهه",
+  Responder: "المجيب",
+  "Drafts replies": "يصوغ الردود",
+  Escalations: "التصعيدات",
+  "Handles the hard cases": "يتولى الحالات الصعبة",
+  Knowledge: "المعرفة",
+  "Keeps help articles current": "يبقي مقالات المساعدة محدثة",
+  Controller: "المراقب المالي",
+  "Approves spend and closes the books": "يعتمد الإنفاق ويقفل الحسابات",
+  Bookkeeper: "أمين الحسابات",
+  "Records spend and matches invoices": "يسجل الإنفاق ويطابق الفواتير",
+  Buyer: "المشتري",
+  "Runs purchase requests": "يدير طلبات الشراء",
+  Auditor: "المدقق",
+  "Checks entries for mistakes": "يدقق القيود بحثا عن الأخطاء",
+} as const;
