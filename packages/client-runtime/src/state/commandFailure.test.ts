@@ -25,6 +25,21 @@ const membershipRefusal = {
   refusal: "actor-not-a-group-member",
 };
 
+/** The refusal the decider throws when the roster offers a bot the space dropped. */
+const staleMemberRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Bot 'bot-4c81' is not a member of group 'group-91b2'.",
+  refusal: "bot-not-a-group-member",
+};
+
+/** The refusal the decider throws when another bot already leads the space. */
+const bossTakenRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message:
+    "Group 'group-91b2' already has boss bot 'bot-4c81'. Use 'group.boss.set' to replace it.",
+  refusal: "group-already-has-boss",
+};
+
 describe("classifyCommandFailure", () => {
   // The server attaches the code at the throw site, so these cases assert the
   // discriminant and never the sentence.
@@ -41,6 +56,12 @@ describe("classifyCommandFailure", () => {
     );
     expect(classifyCommandFailure(failed({ refusal: "actor-not-a-group-member" }))).toBe(
       "actor-not-a-group-member",
+    );
+    expect(classifyCommandFailure(failed({ refusal: "bot-not-a-group-member" }))).toBe(
+      "bot-not-a-group-member",
+    );
+    expect(classifyCommandFailure(failed({ refusal: "group-already-has-boss" }))).toBe(
+      "group-already-has-boss",
     );
   });
 
@@ -93,6 +114,50 @@ describe("commandFailureMessage", () => {
 
     // A catalog that forgot the sentence would fall back to English and collide.
     expect(new Set(sentences).size).toBe(3);
+  });
+
+  it("replaces a stale-member refusal with copy that names no bot or group", () => {
+    const message = commandFailureMessage(failed(staleMemberRefusal));
+
+    expect(message).toBe("That bot is no longer in this space. Refresh to see the current team.");
+    expect(message).not.toContain("Bot '");
+    expect(message).not.toContain("Group '");
+    expect(message).not.toContain("bot-4c81");
+    expect(message).not.toContain("group-91b2");
+  });
+
+  it("replaces a taken-boss refusal with copy that names no bot or group", () => {
+    const message = commandFailureMessage(failed(bossTakenRefusal));
+
+    expect(message).toBe(
+      "This space already has a boss. Replace the boss before making this bot the boss.",
+    );
+    expect(message).not.toContain("Bot '");
+    expect(message).not.toContain("Group '");
+    expect(message).not.toContain("bot-4c81");
+    expect(message).not.toContain("group-91b2");
+  });
+
+  it("renders both roster refusals in every locale without an internal id", () => {
+    const translators = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ];
+
+    for (const refusal of [staleMemberRefusal, bossTakenRefusal]) {
+      const sentences = translators.map((t) => commandFailureMessage(failed(refusal), { t }));
+
+      for (const sentence of sentences) {
+        expect(sentence).not.toContain("Bot '");
+        expect(sentence).not.toContain("Group '");
+        expect(sentence).not.toContain("bot-4c81");
+        expect(sentence).not.toContain("group-91b2");
+      }
+
+      // A catalog that forgot the sentence would fall back to English and collide.
+      expect(new Set(sentences).size).toBe(3);
+    }
   });
 
   it("keeps the server sentence for a code it does not know", () => {

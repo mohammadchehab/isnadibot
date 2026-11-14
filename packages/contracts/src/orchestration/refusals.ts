@@ -25,6 +25,20 @@ export const CommandRefusalCodes = [
    * refusals above.
    */
   "actor-not-a-group-member",
+  /**
+   * A stale click, not a permissions problem: the bot the client offered is no
+   * longer in the group, so the roster it drew came from a view the server has
+   * already left behind. Its remedy is a refresh, which is why it cannot share
+   * `actor-not-a-group-member` above — that one is about the person, this one
+   * about the bot they picked.
+   */
+  "bot-not-a-group-member",
+  /**
+   * The bot being assigned is not the boss; another bot is. `bot-is-group-boss`
+   * would tell the user something false about the bot they picked, so the two
+   * stay separate even though both end in the same remedy.
+   */
+  "group-already-has-boss",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);

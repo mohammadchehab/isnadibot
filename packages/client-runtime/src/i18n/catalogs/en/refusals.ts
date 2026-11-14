@@ -13,5 +13,9 @@ export const refusalsCatalog = {
     "This delegation would loop back on itself. Choose a different bot.",
   "You are not a member of this space. Ask the person who runs it for access.":
     "You are not a member of this space. Ask the person who runs it for access.",
+  "That bot is no longer in this space. Refresh to see the current team.":
+    "That bot is no longer in this space. Refresh to see the current team.",
+  "This space already has a boss. Replace the boss before making this bot the boss.":
+    "This space already has a boss. Replace the boss before making this bot the boss.",
   "The command failed.": "The command failed.",
 } as const;
