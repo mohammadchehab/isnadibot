@@ -92,7 +92,9 @@ export function StartSpaceScreen() {
                     template={template}
                     plan={plan}
                     selected={template.id === selectedId}
-                    onSelect={() => setSelectedId(template.id)}
+                    onSelect={() =>
+                      setSelectedId((current) => (current === template.id ? null : template.id))
+                    }
                   />
                 </li>
               ))}
