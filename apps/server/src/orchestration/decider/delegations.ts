@@ -14,7 +14,11 @@ import * as NodeUtil from "node:util";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  noShippedSurfaceInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireBotNotArchived,
@@ -336,13 +340,13 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         !Predicate.isTagged(original.phase, "Failed") &&
         !Predicate.isTagged(original.phase, "Canceled")
       ) {
-        return yield* internalInvariantError({
+        return yield* noShippedSurfaceInvariantError({
           commandType: command.type,
           detail: "Only failed or canceled bot work can be retried.",
           // The asymmetry with the already-retried guard below is why one of the
           // pair is an exclusion and the other a code, so it is stated here.
           reason:
-            "This guard checks only its own record: the retry button is offered only when that record's own phase is Failed or Canceled (delegationActions), and every terminal phase is terminal, so a phase the client saw as terminal cannot have moved. The next guard checks the rest of the delegations collection instead, which another device can add to, and that is why it carries stale-view while this one carries no code. If a surface ever offers retry off a non-terminal phase, this must be coded before that ships.",
+            "DelegationRetryCommand is client-dispatchable and carries only the delegation id, so a client can send a retry for a non-terminal phase; no shipped surface does, because the retry button is offered only when the record's own phase is Failed or Canceled (delegationActions). This exclusion ends the moment a surface offers retry off a non-terminal phase, which must code it first. The next guard checks the rest of the delegations collection instead, which another device can add to, and that is why it carries stale-view while this one carries no code.",
         });
       }
 

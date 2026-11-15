@@ -1,8 +1,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { CommandId, DelegationId } from "@isnadi/contracts";
+import { ClientOrchestrationCommand, CommandId, DelegationId } from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import { decideOrchestrationCommand } from "./decider.ts";
 import { projectEvent } from "./projector.ts";
 import {
@@ -14,6 +15,9 @@ import {
   makeReadModel,
   PARENT_THREAD_ID,
 } from "./test-support/DelegationDeciderFixtures.ts";
+
+/** Whether a payload survives the contract a client dispatch is decoded against. */
+const clientCanDispatch = Schema.is(ClientOrchestrationCommand);
 
 it.layer(NodeServices.layer)("delegation decider", (it) => {
   it.effect("requests a retry of failed or canceled work without touching the original", () =>
@@ -152,14 +156,21 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
         },
       });
 
+      const openRetry = {
+        type: "delegation.retry" as const,
+        commandId: CommandId.make("command-retry-own-phase"),
+        delegationId: running.delegationId,
+        createdAt: LATER,
+      };
+
+      // A client CAN send this: the command is client-dispatchable and carries
+      // only the id. The exclusion is that no shipped surface offers the button,
+      // which is a different claim from "a client cannot dispatch it".
+      expect(clientCanDispatch(openRetry)).toBe(true);
+
       const openError = yield* decideOrchestrationCommand({
         readModel: makeReadModel([running]),
-        command: {
-          type: "delegation.retry",
-          commandId: CommandId.make("command-retry-own-phase"),
-          delegationId: running.delegationId,
-          createdAt: LATER,
-        },
+        command: openRetry,
       }).pipe(Effect.flip);
 
       if (!Predicate.isTagged(openError, "OrchestrationCommandInvariantError")) {
@@ -168,7 +179,7 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
 
       // Own phase: terminal once a client can see it, so no surface reaches it.
       expect(openError.refusal).toBeUndefined();
-      expect(openError.internalReason).toContain("only its own record");
+      expect(openError.exclusion?.kind).toBe("no-shipped-surface");
 
       const canceled = makeDelegation({
         delegationId: DelegationId.make("delegation-canceled-asymmetry"),
@@ -203,7 +214,7 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
 
       // Rest of the collection: another device added a sibling, so refresh.
       expect(supersededError.refusal).toBe("stale-view");
-      expect(supersededError.internalReason).toBeUndefined();
+      expect(supersededError.exclusion).toBeUndefined();
 
       const active = [1, 2, 3].map((index) =>
         makeDelegation({ delegationId: DelegationId.make(`delegation-busy-${index}`) }),

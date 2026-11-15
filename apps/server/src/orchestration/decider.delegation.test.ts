@@ -1,8 +1,15 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { BotId, CommandId, DelegationId, type IsnadiDelegationRecord } from "@isnadi/contracts";
+import {
+  BotId,
+  ClientOrchestrationCommand,
+  CommandId,
+  DelegationId,
+  type IsnadiDelegationRecord,
+} from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import { decideOrchestrationCommand } from "./decider.ts";
 import {
   makeDelegation,
@@ -19,6 +26,9 @@ import {
   OTHER_BOT_ID,
   PARENT_THREAD_ID,
 } from "./test-support/DelegationDeciderFixtures.ts";
+
+/** Whether a payload survives the contract a client dispatch is decoded against. */
+const clientCanDispatch = Schema.is(ClientOrchestrationCommand);
 
 it.layer(NodeServices.layer)("delegation decider", (it) => {
   it.effect("creates and projects the full delegation record", () =>
@@ -355,19 +365,24 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
   );
 
   // delegation.create and delegation.state.set are in InternalOrchestrationCommand,
-  // so a client cannot dispatch either one. The exclusion has to say that at the
-  // throw, because there is no code for a client to switch on and there never will be.
-  it.effect("an internal refusal carries its reason instead of a code", () =>
+  // so a client cannot dispatch either one. That is the claim the throw makes, so
+  // the test proves the dispatchability rather than only reading the label back:
+  // decoding the same payload as a client command must fail.
+  it.effect("files a throw a client cannot dispatch as internal-command", () =>
     Effect.gen(function* () {
       const mismatchedBill = makeDelegation({ billedBotId: OTHER_BOT_ID });
 
+      const createCommand = {
+        type: "delegation.create" as const,
+        commandId: CommandId.make("command-internal-billing"),
+        delegation: mismatchedBill,
+      };
+
+      expect(clientCanDispatch(createCommand)).toBe(false);
+
       const createError = yield* decideOrchestrationCommand({
         readModel: makeReadModel(),
-        command: {
-          type: "delegation.create",
-          commandId: CommandId.make("command-internal-billing"),
-          delegation: mismatchedBill,
-        },
+        command: createCommand,
       }).pipe(Effect.flip);
 
       if (!Predicate.isTagged(createError, "OrchestrationCommandInvariantError")) {
@@ -375,7 +390,7 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
       }
 
       expect(createError.refusal).toBeUndefined();
-      expect(createError.internalReason).toContain("InternalOrchestrationCommand");
+      expect(createError.exclusion?.kind).toBe("internal-command");
 
       const queued = makeDelegation();
 
@@ -396,13 +411,17 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
         updatedAt: LATER,
       });
 
+      const transitionCommand = {
+        type: "delegation.state.set" as const,
+        commandId: CommandId.make("command-internal-transition"),
+        delegation: completed,
+      };
+
+      expect(clientCanDispatch(transitionCommand)).toBe(false);
+
       const transitionError = yield* decideOrchestrationCommand({
         readModel: makeReadModel([queued]),
-        command: {
-          type: "delegation.state.set",
-          commandId: CommandId.make("command-internal-transition"),
-          delegation: completed,
-        },
+        command: transitionCommand,
       }).pipe(Effect.flip);
 
       if (!Predicate.isTagged(transitionError, "OrchestrationCommandInvariantError")) {
@@ -411,7 +430,7 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
 
       // The phase table is server-owned, so no client-chosen pair reaches this.
       expect(transitionError.refusal).toBeUndefined();
-      expect(transitionError.internalReason).toContain("server-owned");
+      expect(transitionError.exclusion?.kind).toBe("internal-command");
     }),
   );
 
