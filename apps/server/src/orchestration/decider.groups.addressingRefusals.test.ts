@@ -42,7 +42,7 @@ const OUTSIDER_ID = AuthSessionId.make("person-outsider");
 const readModel = (
   input: {
     readonly bossBotId?: BotId | null;
-    readonly members?: Parameters<typeof makeGroup>[0]["members"];
+    readonly members?: NonNullable<Parameters<typeof makeGroup>[0]>["members"];
   } = {},
 ): OrchestrationReadModel =>
   makeReadModel({

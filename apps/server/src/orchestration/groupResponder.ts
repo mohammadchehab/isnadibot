@@ -108,6 +108,9 @@ export function resolveGroupAddressing(input: {
     case "bots": {
       const named = [...new Set(input.addressing.botIds)];
 
+      // `GroupAddressing` types `botIds` as non-empty, so this cannot arrive from a decoded
+      // command. It stays because an empty list reaching the fallback below would resolve to
+      // "send to nobody" instead of a refusal.
       if (named.length === 0) return needBoss();
 
       const stranger = named.find((botId) => !memberBotIds.includes(botId));

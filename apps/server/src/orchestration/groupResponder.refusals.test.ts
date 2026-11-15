@@ -94,15 +94,6 @@ describe("resolveGroupAddressing refusals", () => {
     expect(detail).toContain("has no boss bot that can respond");
   });
 
-  it("codes a bots send that names nobody, which falls back to the boss", () => {
-    const { refusal, detail } = refusalOf(
-      resolve({ addressing: { kind: "bots", botIds: [] }, bossBotId: null }),
-    );
-
-    expect(refusal).toBe("group-has-no-responder");
-    expect(detail).toContain("has no boss bot that can respond");
-  });
-
   // ---------------------------------------------------------- stale-view (3)
 
   it("codes a mention of a bot the space no longer holds", () => {
