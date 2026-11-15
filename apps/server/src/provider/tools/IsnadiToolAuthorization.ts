@@ -1,5 +1,6 @@
 import * as NodeFS from "node:fs";
-import * as NodePath from "node:path";
+import * as Effect from "effect/Effect";
+import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import {
   type IsnadiDelegationAccessGrant,
@@ -27,6 +28,8 @@ export function requiredString<Value>(value: Value, key: string): string {
 
   return candidate;
 }
+
+const path = Effect.runSync(Path.Path.pipe(Effect.provide(Path.layer)));
 
 export function canonicalInput<Value>(value: Value): string {
   if (Array.isArray(value)) return `[${value.map(canonicalInput).join(",")}]`;
@@ -65,9 +68,9 @@ export function scopeShellCwd<Input>(
 
   if (isAbsolute) {
     if (toolId !== "ExternalShell" || userRoot === undefined) throw outside();
-    const relative = NodePath.relative(userRoot, NodePath.resolve(cwd));
+    const relative = path.relative(userRoot, path.resolve(cwd));
 
-    if (relative.startsWith("..") || NodePath.isAbsolute(relative)) {
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
       throw new Error(
         `Tool 'ExternalShell' cwd '${cwd}' is outside the user's workspace '${userRoot}'.`,
       );
@@ -113,16 +116,16 @@ export const approvalUnavailableRefusal = (toolName: string) =>
  */
 export function realLocation(target: string): string {
   const missing: string[] = [];
-  let current = NodePath.resolve(target);
+  let current = path.resolve(target);
 
   for (;;) {
     try {
-      return NodePath.join(NodeFS.realpathSync(current), ...missing.toReversed());
+      return path.join(NodeFS.realpathSync(current), ...missing.toReversed());
     } catch {
-      const parent = NodePath.dirname(current);
+      const parent = path.dirname(current);
 
-      if (parent === current) return NodePath.resolve(target);
-      missing.push(NodePath.basename(current));
+      if (parent === current) return path.resolve(target);
+      missing.push(path.basename(current));
       current = parent;
     }
   }
@@ -134,9 +137,9 @@ export function realLocation(target: string): string {
  * has not been resolved would read as inside.
  */
 export const isInsideRoot = (root: string, target: string) => {
-  const relative = NodePath.relative(root, target);
+  const relative = path.relative(root, target);
 
-  return relative === "" || (!relative.startsWith("..") && !NodePath.isAbsolute(relative));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 };
 
 /**
@@ -194,7 +197,7 @@ export function delegatedReadVerdict(input: {
   }
 
   const root = realLocation(input.readRoot);
-  const target = realLocation(NodePath.resolve(input.readRoot, requested));
+  const target = realLocation(path.resolve(input.readRoot, requested));
 
   if (isInsideRoot(root, target)) return { kind: "approve" };
 
