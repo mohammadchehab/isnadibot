@@ -5,6 +5,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as PlatformError from "effect/PlatformError";
@@ -59,9 +60,55 @@ const withStore = <A, E, R extends FileSystem.FileSystem | Path.Path | Crypto.Cr
 
 const INSTANCE = "primary";
 
+/**
+ * A handle the store can write, sync and rename, over nothing. `persist` does that round trip on
+ * every change, and under a saturated pool it is the wait that outlasts the test budget.
+ */
+const noopFile: FileSystem.File = {
+  [FileSystem.FileTypeId]: FileSystem.FileTypeId,
+  stat: Effect.die("a policy test never stats the grants file"),
+  seek: () => Effect.void,
+  sync: Effect.void,
+  read: () => Effect.die("a policy test never reads the grants file"),
+  readAlloc: () => Effect.succeed(Option.none()),
+  truncate: () => Effect.void,
+  write: () => Effect.die("the store writes with writeAll"),
+  writeAll: () => Effect.void,
+};
+
+const noopFileSystem = FileSystem.makeNoop({
+  makeDirectory: () => Effect.void,
+  open: () => Effect.succeed(noopFile),
+  rename: () => Effect.void,
+});
+
+const POLICY_GRANTS_PATH = "/egress-grants/egress-grants.json";
+
+/**
+ * A store for the tests whose assertions read only the in-memory snapshot. They never read the
+ * grants file back, so they must not wait for a temporary directory to be created or for an
+ * fsync to land: on a loaded runner that wait alone reds the test at vitest's 5s default. The
+ * change path still runs in full - encode, open, write, sync, rename, remove - it just reaches
+ * no disk. Durability has its own tests below, on the real file system.
+ */
+const withPolicyStore = <
+  A,
+  E,
+  R extends FileSystem.FileSystem | Path.Path | Crypto.Crypto | Scope.Scope,
+>(
+  body: (store: EgressGrantStore.DesktopEgressGrants["Service"]) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const store = yield* EgressGrantStore.make(POLICY_GRANTS_PATH).pipe(
+      Effect.provideService(FileSystem.FileSystem, noopFileSystem),
+    );
+
+    return yield* body(store);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
+
 describe("DesktopEgressGrants", () => {
   it.effect("denies everything by default", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         assert.strictEqual(yield* store.status, "ready");
         assert.isFalse(store.policyFor(INSTANCE).allows("p", "example.com"));
@@ -70,7 +117,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a granted host is allowed only for a profile in the binding", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", exact("Example.com."));
         yield* store.setBinding(INSTANCE, ["p"]);
@@ -87,7 +134,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a profile outside the binding is refused even when it holds a grant", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", exact("example.com"));
         yield* store.setBinding(INSTANCE, ["someone-else"]);
@@ -98,7 +145,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a wildcard matches the apex and subdomains on a label boundary only", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", suffix("example.com"));
         yield* store.setBinding(INSTANCE, ["p"]);
@@ -117,7 +164,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a wildcard never matches an IP literal", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", suffix("example.com"));
         yield* store.setBinding(INSTANCE, ["p"]);
@@ -128,7 +175,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("refuses public suffixes, single labels and IP-shaped wildcards", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         for (const domain of ["com", "co.uk", "localhost", "127.0.0.1", "1234", "::1"]) {
           const error = yield* Effect.flip(store.grant("p", suffix(domain)));
@@ -142,7 +189,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("refuses a wildcard on a private suffix but still accepts the exact host", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         // One wildcard on `github.io` would cover every unrelated site hosted there.
         for (const domain of ["github.io", "blogspot.com"]) {
@@ -369,7 +416,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a revoke removes the grant and publishes the revocation", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.setBinding(INSTANCE, ["p"]);
         yield* store.grant("p", exact("example.com"));
@@ -399,7 +446,7 @@ describe("DesktopEgressGrants", () => {
   );
 
   it.effect("a revocation published before anything watches is still delivered", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.setBinding(INSTANCE, ["p"]);
 
@@ -460,7 +507,7 @@ describe("the dialer with the grant store", () => {
   };
 
   it.effect("a profile outside the binding is refused before any DNS or TCP", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", exact("example.com"));
         yield* store.setBinding(INSTANCE, ["someone-else"]);
@@ -474,7 +521,7 @@ describe("the dialer with the grant store", () => {
   );
 
   it.effect("a wildcard-granted subdomain that resolves to a private address is blocked", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", suffix("example.com"));
         yield* store.setBinding(INSTANCE, ["p"]);
@@ -488,7 +535,7 @@ describe("the dialer with the grant store", () => {
   );
 
   it.effect("a granted host that resolves to a public address connects once", () =>
-    withStore(({ store }) =>
+    withPolicyStore((store) =>
       Effect.gen(function* () {
         yield* store.grant("p", suffix("example.com"));
         yield* store.setBinding(INSTANCE, ["p"]);
