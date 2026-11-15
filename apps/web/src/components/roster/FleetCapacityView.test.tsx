@@ -1,6 +1,7 @@
 import {
   EnvironmentId,
   EventId,
+  type OrchestrationLatestTurnState,
   type OrchestrationThreadActivity,
   TurnId,
 } from "@isnadi/contracts";
@@ -23,7 +24,7 @@ type FixtureChat = {
   parentThreadId: string | null;
   archivedAt: string | null;
   updatedAt: string;
-  latestTurn: { state: string } | null;
+  latestTurn: { state: OrchestrationLatestTurnState } | null;
   session: { status: string } | null;
   hasPendingApprovals: boolean;
   hasPendingUserInput: boolean;
@@ -199,7 +200,7 @@ describe("fleet capacity view", () => {
     expect(rowStates(render())[ENGINEER]).toBe("busy");
 
     installSnapshot({
-      chats: [chat({ id: "chat-engineer", botId: ENGINEER, latestTurn: { state: "finished" } })],
+      chats: [chat({ id: "chat-engineer", botId: ENGINEER, latestTurn: { state: "completed" } })],
     });
 
     const settled = rowStates(render());

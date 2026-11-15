@@ -44,5 +44,7 @@ export const refusalsCatalog = {
     "This template is not available in this version. Update the app, then try again.",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "Bot mentions only work in a space chat. Remove the mention and send again.",
+  "This turn stopped responding, so it was closed. Try again.":
+    "This turn stopped responding, so it was closed. Try again.",
   "The command failed.": "The command failed.",
 } as const;

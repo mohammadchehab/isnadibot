@@ -7,6 +7,7 @@ import {
   PROVIDER_DISPLAY_NAMES,
   THREAD_SILENT_RUN_ACTIVITY_KIND,
   THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND,
+  TURN_WENT_SILENT_REFUSAL,
   type ProviderDriverKind,
   type ThreadSilentRunActivityPayload,
 } from "@isnadi/contracts";
@@ -16,18 +17,23 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { makeDrainableWorker } from "@isnadi/shared/DrainableWorker";
+import { livenessWindowMsFor } from "../../../provider/LivenessWindow.ts";
 import { startSilenceWatchdog, type SilenceWatchdogHandle } from "../../SilenceWatchdog.ts";
 import { resolveControllerBotId } from "../ProviderCommandReactor.ts";
 import { providerTurnKey } from "./EventFields.ts";
 import type { createDependencies } from "./Dependencies.ts";
 
 /**
- * The typed reason for a turn whose silence outlived the provider liveness window. Nothing else
+ * The typed reason for a turn whose silence outlived the provider's liveness window. Nothing else
  * will ever end that turn: the mark only ever clears on output, so without this a turn the provider
  * abandoned stays open forever and its chat reads as work that will never finish.
+ *
+ * Distinct from `ORPHANED_PROVIDER_TURN_ERROR`, which is the session-gone case: there the provider
+ * died with its session, here the session is alive and the provider simply stopped. The remedy is
+ * the same (try again), the diagnosis is not — collapsing them would destroy the only signal that
+ * tells a server restart apart from a provider going quiet.
  */
-export const SILENT_TURN_EXPIRED_ERROR =
-  "This chat's turn went silent and did not resume. Send a new message to continue.";
+export const TURN_WENT_SILENT_ERROR = "This turn stopped responding, so it was closed. Try again.";
 
 export const createWatchdogs = Effect.fn("makeRuntimeWatchdogs")(function* ({
   botInbox,
@@ -136,6 +142,8 @@ export const createWatchdogs = Effect.fn("makeRuntimeWatchdogs")(function* ({
         );
 
       const handle = yield* startSilenceWatchdog({
+        // How long this provider can legitimately say nothing is its own fact, not a server one.
+        livenessWindowMs: livenessWindowMsFor(provider),
         callbacks: {
           onSilent: (lastActivityAtMs) =>
             silenceReportWorker.enqueue(
@@ -192,48 +200,63 @@ export const createWatchdogs = Effect.fn("makeRuntimeWatchdogs")(function* ({
               yield* Effect.sync(() => botInbox.resolve(incidentKey));
             }),
           ),
-          // The mark expired, so the turn is settled the way a provider error settles it: the
-          // session leaving "running" is what makes the turn terminal. A turn that already ended,
-          // or a newer turn that took over, is left alone.
-          onExpired: silenceReportWorker.enqueue(
-            Effect.gen(function* () {
-              const shell = yield* projectionSnapshotQuery
-                .getThreadShellById(thread.id)
-                .pipe(Effect.map(Option.getOrUndefined));
+          // The mark expired, so the watchdog settles the turn itself: the session leaving
+          // "running" is the final-terminal event, and it is what the checkpoint, the dispatcher
+          // and every busy predicate already read. Nothing upstream will end this turn — the
+          // provider is not talking and its session is still alive. A turn that already ended, or
+          // a newer turn that took over, is left alone.
+          onExpired: (expired) =>
+            silenceReportWorker.enqueue(
+              Effect.gen(function* () {
+                const shell = yield* projectionSnapshotQuery
+                  .getThreadShellById(thread.id)
+                  .pipe(Effect.map(Option.getOrUndefined));
 
-              const session = shell?.session;
+                const session = shell?.session;
 
-              if (session == null || session.activeTurnId !== turnId) return;
+                if (session == null || session.activeTurnId !== turnId) return;
 
-              const expiredAt = DateTime.formatIso(yield* DateTime.now);
-
-              yield* orchestrationEngine.dispatch({
-                type: "thread.session.set",
-                commandId: CommandId.make(
-                  `silence-watchdog:expired:${thread.id}:${turnId}:${expiredAt}`,
-                ),
-                threadId: thread.id,
-                session: {
-                  ...session,
-                  status: "error",
-                  activeTurnId: null,
-                  lastError: SILENT_TURN_EXPIRED_ERROR,
-                  updatedAt: expiredAt,
-                },
-                createdAt: expiredAt,
-              });
-
-              yield* Effect.sync(() => botInbox.resolve(incidentKey));
-            }).pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning("failed to settle an expired silent turn", {
+                // The diagnosis, for the log: which provider went quiet and for how long. The
+                // user gets the typed reason, which says what to do instead of who to blame.
+                yield* Effect.logWarning("a silent turn outlived its provider's liveness window", {
                   threadId: thread.id,
                   turnId,
-                  cause: Cause.pretty(cause),
-                }),
+                  provider,
+                  livenessWindowMs: livenessWindowMsFor(provider),
+                  silentForMs: expired.silentForMs,
+                  lastActivityAt: DateTime.formatIso(DateTime.makeUnsafe(expired.lastActivityAtMs)),
+                });
+
+                const expiredAt = DateTime.formatIso(yield* DateTime.now);
+
+                yield* orchestrationEngine.dispatch({
+                  type: "thread.session.set",
+                  commandId: CommandId.make(
+                    `silence-watchdog:expired:${thread.id}:${turnId}:${expiredAt}`,
+                  ),
+                  threadId: thread.id,
+                  session: {
+                    ...session,
+                    status: "error",
+                    activeTurnId: null,
+                    lastError: TURN_WENT_SILENT_ERROR,
+                    lastErrorCode: TURN_WENT_SILENT_REFUSAL,
+                    updatedAt: expiredAt,
+                  },
+                  createdAt: expiredAt,
+                });
+
+                yield* Effect.sync(() => botInbox.resolve(incidentKey));
+              }).pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("failed to settle an expired silent turn", {
+                    threadId: thread.id,
+                    turnId,
+                    cause: Cause.pretty(cause),
+                  }),
+                ),
               ),
             ),
-          ),
         },
       });
 

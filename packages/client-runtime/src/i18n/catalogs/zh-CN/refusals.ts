@@ -42,5 +42,7 @@ export const refusalsCatalog = {
     "此版本中没有该模板。请更新应用后重试。",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "机器人提及仅在空间聊天中有效。请移除提及后重新发送。",
+  "This turn stopped responding, so it was closed. Try again.":
+    "此轮已停止响应，因此已关闭。请重试。",
   "The command failed.": "命令失败。",
 } as const;

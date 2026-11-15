@@ -23,13 +23,13 @@ Silent and cleared reports run on a drainable worker inside ingestion, so the in
 
 A silent turn is not work in progress. The provider stopped answering, and nothing says it will start again, so every surface that asks "is this chat working?" must read it as no.
 
-`turn.silent` is projected onto the turn row as `silentAt` (migration `085_ProjectionTurnSilentAt`), so the answer travels with the turn instead of needing the activity stream. Both projectors carry it: the SQL projection in `Layers/projection/Turns.ts` and the in-memory one in `projector/ThreadHistory.ts`, which is the decider's read model. The `threadTurns` projector subscribes to `thread.activity-appended` for exactly this, and its `eventTypes` allowlist in `ProjectionPipeline.ts` is a second place the set is enumerated — a new turn-ending activity needs the entry there too.
+`turn.silent` is projected onto the turn row as `silentAt` (migration `085_ProjectionTurnSilentAt`), so the answer travels with the turn instead of needing the activity stream. Both projectors carry it: the SQL projection in `Layers/projection/Turns.ts` and the in-memory one in `projector/ThreadHistory.ts`, which is the decider's read model. The `threadTurns` projector subscribes to `thread.activity-appended` for exactly this, and its `eventTypes` allowlist in `ProjectionPipeline.ts` is a second place the set is enumerated — a new turn-ending activity needs the entry there too. That duplication is a known defect and is being removed by deriving the allowlist from the projectors' own handled sets, with a meta-test that keeps the two equal.
 
 The predicate lives in one named place, `packages/contracts/src/orchestration/turnState.ts`:
 
 - `TERMINAL_TURN_STATES` — `completed`, `interrupted`, `error`.
 - `TURN_ENDING_ACTIVITY_KINDS` — the activities that end a turn with no provider reply. `turn.silent` is the first.
-- `isOpenTurn` — a turn is open iff it is not terminal and not silent. Every caller asks this: bot status, the responder queue, and the provider turn start.
+- `isOpenTurn` — a turn is open iff its state is not terminal and it carries no silent mark. Every caller asks this: bot status, the responder queue, and the provider turn start. It is written as a denylist over the terminal states on purpose: a state this build does not know reads as open, because a wrong "idle" hides work that is still happening, while a wrong "working" only shows a spinner that the next update corrects.
 
 Three behaviors follow:
 
@@ -41,9 +41,27 @@ Silence is a **reversible mark on a running turn**, not a terminal state. `turn.
 
 ## The mark expires
 
-A mark that can be withdrawn can also be forgotten, and a turn nothing ends stays open forever. So the mark is provisional in both directions: it never ends the turn by itself, and it does not stand indefinitely. The watchdog waits `SILENT_TURN_LIVENESS_MS` (30 minutes, measured from the last provider activity, so it runs from the moment the notice appears) for output. If none arrives, `onExpired` settles the turn the way a provider error does: a `thread.session.set` with status `error`, `activeTurnId` null, and the typed reason `SILENT_TURN_EXPIRED_ERROR`. The session leaving `running` is what makes the turn terminal, and the silence inbox item resolves with it. A turn already ended, or a newer turn that took over, is left alone.
+A mark that can be withdrawn can also be forgotten, and a turn nothing ends stays open forever. So the mark is provisional in both directions: it never ends the turn by itself, and it does not stand indefinitely. The watchdog waits the provider's **liveness window**, measured from the last provider event of any kind, for output. If none arrives, `onExpired` settles the turn the way a provider error does: the watchdog itself emits a `thread.session-set` with status `error`, `activeTurnId` null, `lastErrorCode` `turn-went-silent` and the sentence "This turn stopped responding, so it was closed. Try again." The session leaving `running` is what makes the turn terminal, and the silence inbox item resolves with it. A turn already ended, or a newer turn that took over, is left alone.
 
-The window is deliberately far longer than the 90-second silent one. A single long tool call emits no provider events, and ending a turn that is merely quiet would be a lie about work still in progress. 30 minutes matches the inactivity window the provider session reaper already trusts for a session with no sign of life; once the turn is settled and `activeTurnId` is null, that reaper can also stop the session.
+The trigger is **no event**, not the silent mark. Every runtime event on the turn proves the provider is alive and restarts the window, and `turn.silent.cleared` is only one of them: a turn visibly producing tool activity never reaches the expiry, because the activity resets it. A watchdog keyed on the silent mark alone would fire on exactly the turns that are working, which is the false positive that makes people switch watchdogs off.
+
+### The window is per provider
+
+The window is declared in `apps/server/src/provider/LivenessWindow.ts`, one ceiling per `ProviderDriverKind`, each with the sentence that justifies it. The question it answers is not "how long does a turn take" but "what is the longest period this provider can emit nothing while it is still alive":
+
+- The stated ceiling is multiplied by `LIVENESS_SAFETY_FACTOR` (2), because a turn sitting exactly on the ceiling is still alive.
+- `MIN_LIVENESS_WINDOW_MS` (5 minutes) is a floor, so a chatty provider cannot be given a window so short that a slow tool call trips it.
+- A provider with no stated ceiling gets `CONSERVATIVE_LIVENESS_WINDOW_MS` (30 minutes) until someone measures it. Ending a turn that is merely quiet is a lie about work still happening, so an unmeasured provider errs towards leaving the turn open.
+
+Only Claude has a measured ceiling today: 10 minutes, from the per-shell-call cap in Claude Code, doubled to a 20-minute window. The other providers take the conservative default; their entries belong in the same table, next to their basis, once measured.
+
+The table lives in the provider package rather than on `ProviderAdapterCapabilities` because `ProviderAdapterShape` only exists for the adapter-backed drivers. Codex, Claude, Kimi For Coding and OpenCode Go run through the Mastra controller with no adapter, and the watchdog only knows a `ProviderDriverKind`, so one per-kind table is the only source that reaches every provider.
+
+The window is deliberately far longer than the 90-second silent one. A single long tool call emits no provider events, and ending a turn that is merely quiet would be a lie about work still in progress.
+
+The reason is distinct from `ORPHANED_PROVIDER_TURN_ERROR` on purpose: session-gone means the provider died with its session, while outliving the window means the session is alive and the provider simply stopped. The remedy is the same (try again), but the diagnosis differs, and collapsing them would destroy the only signal that tells a server restart apart from a provider going quiet.
+
+`CheckpointReactor` settles the checkpoint when it sees that session-set, with status `error` rather than `ready`: a `ready` checkpoint's own `thread.turn-diff-completed` would rewrite the turn row to `completed`, which is not what happened. The session is persisted with `last_error_code` (migration `086_ProjectionThreadSessionLastErrorCode`), so the reason survives a reload and a client renders it from the shared code map instead of falling back to prose.
 
 The watchdog only covers turns this process started. A mark that outlived a restart has no watchdog, and is settled by startup reconciliation below.
 

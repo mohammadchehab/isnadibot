@@ -1,13 +1,21 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";
-import { SILENCE_WATCHDOG_SILENT_MS, startSilenceWatchdog } from "./SilenceWatchdog.ts";
+import {
+  SILENCE_WATCHDOG_SILENT_MS,
+  startSilenceWatchdog,
+  type SilenceWatchdogCallbacks,
+} from "./SilenceWatchdog.ts";
 
 /**
  * How long a silent mark stands before the watchdog settles the turn, pinned here on purpose: the
  * window is part of the contract this file proves, so moving it has to be a visible change.
  */
 const LIVENESS_WINDOW_MS = 30 * 60 * 1_000;
+
+/** Starts the watchdog on the pinned window; the tests vary only what it reports. */
+const startWatchdog = (callbacks: SilenceWatchdogCallbacks) =>
+  startSilenceWatchdog({ livenessWindowMs: LIVENESS_WINDOW_MS, callbacks });
 
 const recorder = () => {
   const events: string[] = [];
@@ -18,7 +26,7 @@ const recorder = () => {
       onSilent: (lastActivityAtMs: number) =>
         Effect.sync(() => events.push(`silent@${lastActivityAtMs}`)),
       onResumed: Effect.sync(() => events.push("resumed")),
-      onExpired: Effect.sync(() => events.push("expired")),
+      onExpired: () => Effect.sync(() => events.push("expired")),
     },
   };
 };
@@ -28,7 +36,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS - 1);
         expect(events).toEqual([]);
         yield* TestClock.adjust(1);
@@ -44,7 +52,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS);
         yield* handle.touch;
         yield* TestClock.adjust(1);
@@ -60,7 +68,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS - 1_000);
         yield* handle.touch;
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS - 1_000);
@@ -76,7 +84,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* handle.suspend;
         yield* TestClock.adjust("5 minutes");
         expect(events).toEqual([]);
@@ -93,7 +101,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* handle.stop;
         yield* handle.stop;
         yield* TestClock.adjust("5 minutes");
@@ -106,7 +114,7 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS);
         yield* handle.stop;
         yield* handle.touch;
@@ -120,10 +128,12 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        yield* startSilenceWatchdog({ callbacks });
+        yield* startSilenceWatchdog({ livenessWindowMs: LIVENESS_WINDOW_MS, callbacks });
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS);
         expect(events).toEqual(["silent@0"]);
-        yield* TestClock.adjust(LIVENESS_WINDOW_MS - 1);
+        // The window runs from the last provider event, so the silent mark has already used up
+        // part of it: the expiry lands one full window after the turn last spoke.
+        yield* TestClock.adjust(LIVENESS_WINDOW_MS - SILENCE_WATCHDOG_SILENT_MS - 1);
         expect(events).toEqual(["silent@0"]);
         yield* TestClock.adjust(1);
         expect(events).toEqual(["silent@0", "expired"]);
@@ -138,9 +148,9 @@ describe("silence watchdog", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { events, callbacks } = recorder();
-        const handle = yield* startSilenceWatchdog({ callbacks });
+        const handle = yield* startWatchdog(callbacks);
         yield* TestClock.adjust(SILENCE_WATCHDOG_SILENT_MS);
-        yield* TestClock.adjust(LIVENESS_WINDOW_MS - 1);
+        yield* TestClock.adjust(LIVENESS_WINDOW_MS - SILENCE_WATCHDOG_SILENT_MS - 1);
         yield* handle.touch;
         yield* TestClock.adjust(1);
         expect(events).toEqual(["silent@0", "resumed"]);

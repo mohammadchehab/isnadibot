@@ -348,6 +348,7 @@ export function createThreadRows({ sql }: Pick<ProjectionSnapshotDependencies, "
           sessions.mcp_server_ids_json AS "mcpServerIds",
           sessions.active_turn_id AS "activeTurnId",
           sessions.last_error AS "lastError",
+          sessions.last_error_code AS "lastErrorCode",
           sessions.unavailability,
           sessions.updated_at AS "updatedAt"
         FROM projection_threads AS threads
@@ -380,6 +381,7 @@ export function createThreadRows({ sql }: Pick<ProjectionSnapshotDependencies, "
                     mcpServerIds: row.mcpServerIds,
                     activeTurnId: row.activeTurnId,
                     lastError: row.lastError,
+                    lastErrorCode: row.lastErrorCode,
                     unavailability: row.unavailability,
                     updatedAt: row.updatedAt,
                   },
@@ -434,6 +436,7 @@ export function createThreadRows({ sql }: Pick<ProjectionSnapshotDependencies, "
           mcp_server_ids_json AS "mcpServerIds",
           active_turn_id AS "activeTurnId",
           last_error AS "lastError",
+          last_error_code AS "lastErrorCode",
           unavailability,
           updated_at AS "updatedAt"
         FROM projection_thread_sessions

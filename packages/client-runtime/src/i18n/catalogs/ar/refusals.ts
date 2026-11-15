@@ -43,5 +43,7 @@ export const refusalsCatalog = {
     "هذا القالب غير متاح في هذا الإصدار. حدّث التطبيق ثم حاول مجددًا.",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "إشارات البوت تعمل فقط في محادثة المساحة. أزل الإشارة ثم أرسل مجددًا.",
+  "This turn stopped responding, so it was closed. Try again.":
+    "توقف هذا الدور عن الاستجابة، لذا تم إغلاقه. حاول مرة أخرى.",
   "The command failed.": "فشل الأمر.",
 } as const;

@@ -4,6 +4,7 @@ import {
   type ProjectId,
   ThreadId,
   TurnId,
+  type OrchestrationCheckpointStatus,
   type OrchestrationEvent,
   type ProviderRuntimeEvent,
 } from "@isnadi/contracts";
@@ -239,15 +240,23 @@ export function createCapture({
   });
 
   // Capture the files left by a completed or interrupted turn.
-  const captureCheckpointFromTurnCompletion = Effect.fn("captureCheckpointFromTurnCompletion")(
-    function* (event: Extract<ProviderRuntimeEvent, { type: "turn.completed" | "turn.aborted" }>) {
-      const turnId = toTurnId(event.turnId);
+  /**
+   * Captures the checkpoint for a turn that has reached a final-terminal state, whatever ended it.
+   *
+   * The caller names the turn and how it ended; a provider that reported its own ending and a turn
+   * the silence watchdog had to settle both land here, so the checkpoint of a turn the provider
+   * abandoned is captured exactly like one it finished.
+   */
+  const captureCheckpointForSettledTurn = Effect.fn("captureCheckpointForSettledTurn")(
+    function* (input: {
+      readonly threadId: ThreadId;
+      readonly turnId: TurnId;
+      readonly status: OrchestrationCheckpointStatus;
+      readonly createdAt: string;
+    }) {
+      const turnId = input.turnId;
 
-      if (!turnId) {
-        return;
-      }
-
-      const thread = yield* resolveThreadCheckpointState(event.threadId);
+      const thread = yield* resolveThreadCheckpointState(input.threadId);
 
       if (!thread) {
         return;
@@ -302,11 +311,29 @@ export function createCapture({
         turnId,
         cwd: checkpointCwd,
         turnCount: nextTurnCount,
+        status: input.status,
+        assistantMessageId: existingPlaceholder?.assistantMessageId ?? undefined,
+        createdAt: input.createdAt,
+      });
+    },
+  );
+
+  /** The provider reported its own ending: completed with a status, or aborted. */
+  const captureCheckpointFromTurnCompletion = Effect.fn("captureCheckpointFromTurnCompletion")(
+    function* (event: Extract<ProviderRuntimeEvent, { type: "turn.completed" | "turn.aborted" }>) {
+      const turnId = toTurnId(event.turnId);
+
+      if (!turnId) {
+        return;
+      }
+
+      yield* captureCheckpointForSettledTurn({
+        threadId: event.threadId,
+        turnId,
         status:
           event.type === "turn.aborted"
             ? "ready"
             : checkpointStatusFromRuntime(event.payload.state),
-        assistantMessageId: existingPlaceholder?.assistantMessageId ?? undefined,
         createdAt: event.createdAt,
       });
     },
@@ -442,6 +469,7 @@ export function createCapture({
     resolveTurnAssistantMessageId,
     resolveCheckpointCwd,
     captureAndDispatchCheckpoint,
+    captureCheckpointForSettledTurn,
     captureCheckpointFromTurnCompletion,
     ensurePreTurnBaselineFromTurnStart,
     ensurePreTurnBaselineFromDomainTurnStart,

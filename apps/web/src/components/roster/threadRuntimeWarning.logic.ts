@@ -3,8 +3,12 @@ import {
   knownUnavailability,
   latestTurnFailure,
 } from "@isnadi/client-runtime/provider-availability";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
-import { commandFailureMessage, type Translate } from "@isnadi/client-runtime/state/runtime";
+import {
+  commandFailureMessage,
+  sessionRefusalMessage,
+  squashAtomCommandFailure,
+  type Translate,
+} from "@isnadi/client-runtime/state/runtime";
 import type {
   OrchestrationLatestTurn,
   OrchestrationSession,
@@ -138,16 +142,25 @@ export function localFailure(message: string): BotThreadFailure {
 export function latestBotThreadFailure(input: {
   readonly activities: ReadonlyArray<OrchestrationThreadActivity>;
   readonly latestTurn: OrchestrationLatestTurn | null;
-  readonly session: Pick<OrchestrationSession, "status" | "lastError" | "unavailability"> | null;
+  readonly session: Pick<
+    OrchestrationSession,
+    "status" | "lastError" | "lastErrorCode" | "unavailability"
+  > | null;
   readonly lastUserMessageAt: string | null;
 }): BotThreadFailure | null {
   const { activities, latestTurn, session, lastUserMessageAt } = input;
+
+  // A session the server closed for a typed reason — the silence watchdog ending a turn its
+  // provider abandoned — renders from the shared map rather than from the prose next to it, so the
+  // sentence is translated and a newer server's reason still falls back to that prose.
+  const codedMessage = sessionRefusalMessage(session?.lastErrorCode);
 
   if (
     latestTurn?.state === "error" &&
     (lastUserMessageAt === null || latestTurn.requestedAt >= lastUserMessageAt)
   ) {
     const message =
+      codedMessage ??
       latestThreadRuntimeError(activities, latestTurn) ??
       latestTurn.errorMessage ??
       session?.lastError ??
@@ -174,7 +187,7 @@ export function latestBotThreadFailure(input: {
 
   if (!unanswered || session?.status !== "error") return null;
   const failure = latestTurnFailure(activities, lastUserMessageAt);
-  const message = failure?.detail ?? session.lastError;
+  const message = codedMessage ?? failure?.detail ?? session.lastError;
 
   if (!message) return null;
 

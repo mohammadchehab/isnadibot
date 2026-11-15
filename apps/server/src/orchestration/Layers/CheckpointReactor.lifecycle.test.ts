@@ -167,6 +167,78 @@ describe("CheckpointReactor", () => {
     ).toBe(true);
   });
 
+  // A provider that goes quiet never reports its own ending, so the silence watchdog settles the
+  // turn by taking the session out of "running" itself. That settlement has to capture the
+  // checkpoint too, or the work an abandoned turn did is never recoverable.
+  it("captures a checkpoint when the silence watchdog settles the turn", async () => {
+    const harness = await createHarness({ seedFilesystemCheckpoints: false });
+    const threadId = ThreadId.make("thread-1");
+    const turnId = asTurnId("turn-went-silent-1");
+    const createdAt = "2026-01-01T00:00:00.000Z";
+
+    await harness.run(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-set-silent-running"),
+        threadId,
+        session: {
+          threadId,
+          status: "running",
+          providerName: "claudeAgent",
+          runtimeMode: "approval-required",
+          activeTurnId: turnId,
+          lastError: null,
+          updatedAt: createdAt,
+        },
+        createdAt,
+      }),
+    );
+
+    harness.provider.emit({
+      type: "turn.started",
+      eventId: EventId.make("evt-turn-started-silent"),
+      provider: ProviderDriverKind.make("claudeAgent"),
+      createdAt,
+      threadId,
+      turnId,
+    });
+    await waitForGitRefExists(harness, harness.cwd, checkpointRefForThreadTurn(threadId, 0));
+
+    // The work the provider did before it stopped answering.
+    NodeFS.writeFileSync(NodePath.join(harness.cwd, "README.md"), "v2\n", "utf8");
+
+    await harness.run(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-set-went-silent"),
+        threadId,
+        session: {
+          threadId,
+          status: "error",
+          providerName: "claudeAgent",
+          runtimeMode: "approval-required",
+          activeTurnId: null,
+          lastError: "This turn stopped responding, so it was closed. Try again.",
+          lastErrorCode: "turn-went-silent",
+          updatedAt: "2026-01-01T00:20:00.000Z",
+        },
+        createdAt: "2026-01-01T00:20:00.000Z",
+      }),
+    );
+
+    const thread = await waitForThread(
+      harness,
+      (entry) => entry.latestTurn?.turnId === turnId && entry.checkpoints.length === 1,
+    );
+
+    expect(thread.latestTurn?.state).toBe("error");
+    expect(thread.checkpoints[0]?.checkpointTurnCount).toBe(1);
+    expect(gitRefExists(harness.cwd, checkpointRefForThreadTurn(threadId, 1))).toBe(true);
+    expect(
+      gitShowFileAtRef(harness.cwd, checkpointRefForThreadTurn(threadId, 1), "README.md"),
+    ).toBe("v2\n");
+  });
+
   effectIt.effect.each(["turn.completed", "turn.aborted"] as const)(
     "captures every edit after a mid-turn diff update on %s",
     (terminalEventType) =>

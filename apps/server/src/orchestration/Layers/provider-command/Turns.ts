@@ -13,7 +13,7 @@ import {
   turnRequestKeyForEvent,
   resolveControllerBotId,
   isProviderDriverKind,
-  withoutUnavailability,
+  withoutStaleFailure,
   MANUAL_RECOVERY_INPUT,
   DEFAULT_RUNTIME_MODE,
 } from "./Fields.ts";
@@ -418,7 +418,7 @@ export function createTurns({
         yield* setThreadSession({
           threadId: event.payload.threadId,
           session: {
-            ...withoutUnavailability(stoppedSession),
+            ...withoutStaleFailure(stoppedSession),
             status: "stopped",
             activeTurnId: null,
             lastError: detail,

@@ -60,9 +60,11 @@ export type ProviderIntentEvent = Extract<
 
 export // A failure category describes the failure that set it. Session updates for
 // any other reason start from a copy without it so a stale category never
-// outlives its failure.
-function withoutUnavailability(session: OrchestrationSession): OrchestrationSession {
-  const { unavailability: _unavailability, ...rest } = session;
+// outlives its failure. `lastErrorCode` names the same failure in the shared
+// vocabulary, so it goes with it; `lastError`'s prose is left alone, exactly as
+// before, and the surface falls back to it when there is no code.
+function withoutStaleFailure(session: OrchestrationSession): OrchestrationSession {
+  const { unavailability: _unavailability, lastErrorCode: _lastErrorCode, ...rest } = session;
 
   return rest;
 }

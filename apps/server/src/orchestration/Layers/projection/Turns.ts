@@ -37,6 +37,7 @@ export function createTurns({
         ...existing.value,
         status: "starting",
         lastError: null,
+        lastErrorCode: null,
         updatedAt: event.payload.createdAt,
       });
 
@@ -56,6 +57,9 @@ export function createTurns({
       mcpServerIds: [...(event.payload.session.mcpServerIds ?? [])],
       activeTurnId: event.payload.session.activeTurnId,
       lastError: event.payload.session.lastError,
+      // Like `lastError`, a session-set that names no code clears it, so a reason never outlives the
+      // failure that set it.
+      lastErrorCode: event.payload.session.lastErrorCode ?? null,
       // A session-set with no category clears it, so a recovered sign-in stops reading as a problem.
       unavailability: event.payload.session.unavailability ?? null,
       updatedAt: event.payload.session.updatedAt,

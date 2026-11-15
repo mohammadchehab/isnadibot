@@ -122,6 +122,13 @@ export const OrchestrationSession = Schema.Struct({
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(TrimmedNonEmptyString),
   /**
+   * Why the last turn ended in error, as a code a client renders from the shared map rather than
+   * from `lastError`'s prose. A plain string on the wire for the same reason as `unavailability`:
+   * a code an older client has never heard of must arrive as a value it can ignore rather than
+   * fail the decode of the whole snapshot.
+   */
+  lastErrorCode: Schema.optional(TrimmedNonEmptyString),
+  /**
    * Why the provider could not start a turn. A plain string on the wire: a session is decoded
    * inside the shell snapshot, so a category an older client has never heard of must arrive as a
    * value it can ignore rather than fail the decode of the whole snapshot.

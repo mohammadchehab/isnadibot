@@ -66,7 +66,12 @@ export function projectThreadHistory(
           const thread = findProjectedThread(nextBase.threads, payload.threadId);
 
           if (!thread?.session) return nextBase;
-          const { unavailability: _staleUnavailability, ...session } = thread.session;
+
+          const {
+            unavailability: _staleUnavailability,
+            lastErrorCode: _staleLastErrorCode,
+            ...session
+          } = thread.session;
 
           return {
             ...nextBase,

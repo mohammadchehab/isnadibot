@@ -4,7 +4,7 @@ import {
   type ProviderIntentEvent,
   stalePendingRequestDetail,
   isUnknownPendingApprovalRequestError,
-  withoutUnavailability,
+  withoutStaleFailure,
   isRetryableUserInputResponseError,
   isUnknownPendingUserInputRequestError,
 } from "./Fields.ts";
@@ -95,7 +95,7 @@ export function createRequests({
             yield* setThreadSession({
               threadId: event.payload.threadId,
               session: {
-                ...withoutUnavailability(session),
+                ...withoutStaleFailure(session),
                 status: "error",
                 activeTurnId: null,
                 lastError: detail,
@@ -185,7 +185,7 @@ export function createRequests({
                 yield* setThreadSession({
                   threadId: event.payload.threadId,
                   session: {
-                    ...withoutUnavailability(thread.session),
+                    ...withoutStaleFailure(thread.session),
                     status: "error",
                     activeTurnId: null,
                     lastError: providerFailed ? failureDetail : detail,

@@ -10,7 +10,7 @@ While the notice is up, the bot shows as idle rather than busy. Nothing is runni
 - If the provider starts responding again, the notice goes away, the turn carries on, and the inbox item resolves on its own.
 - If the same turn goes quiet more than once, the same inbox item comes back instead of a new one.
 - When the turn finishes or you stop it, the inbox item resolves.
-- **If nothing comes back for 30 minutes**, the quiet turn is ended for you and the chat says the turn went silent and did not resume. Send a new message to carry on. The 30 minutes start after the notice appears, so a long build or test run has room to finish first.
+- **If nothing comes back**, the quiet turn is ended for you and the chat says the turn stopped responding and was closed. Send a new message to carry on. How long the bot waits is different for each provider: it is how long that provider can reasonably stay quiet, so a long build or test run has room to finish first.
 
 Time the bot spends waiting for your approval or your answer to a question does not count as silence.
 
