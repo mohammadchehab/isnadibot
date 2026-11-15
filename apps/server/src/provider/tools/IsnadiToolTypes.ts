@@ -35,9 +35,11 @@ export interface IsnadiToolSession {
    * Whether a bot-to-bot handoff's target (`SendToAgent` or `MessageAgent`)
    * shares the calling bot's home group, which makes the handoff an internal
    * move inside the space the user hired rather than a send across their trust
-   * boundary. Async because it reads the orchestration snapshot, and supplied
-   * only where the session has an environment to read. Absent means crossing,
-   * so the approval stays.
+   * boundary. The argument is the tool's `botId` text — a bot ID or an exact
+   * name — so the implementation resolves it exactly as the delegation itself
+   * will. Async because it reads the orchestration snapshot, and supplied only
+   * where the session has an environment to read. Absent means crossing, so the
+   * approval stays.
    */
   readonly sameSpaceTarget?: (targetBotId: BotId) => Promise<boolean>;
   readonly billedBotId?: BotId;

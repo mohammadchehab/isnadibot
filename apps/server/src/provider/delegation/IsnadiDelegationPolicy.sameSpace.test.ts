@@ -6,7 +6,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationReadModel,
 } from "@isnadi/contracts";
-import { expect, it } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import { isSameSpaceHandoff, isSameSpaceHandoffInSnapshot } from "./IsnadiDelegationPolicy.ts";
@@ -150,6 +150,91 @@ it.layer(NodeServices.layer)("same-space handoff", (it) => {
         targetBotId: TARGET,
       }),
     ).toBe(false);
+  });
+
+  /**
+   * A bot addresses a squad mate by name, not by ID: `TargetBotId` is "bot id
+   * or exact name". The cases below pin that the space is decided on the bot
+   * the name resolves to, so the natural way to address a mate takes the same
+   * path as an ID would — and that every way resolution can fail keeps the
+   * approval instead of quietly dropping it.
+   */
+  describe("a target addressed by name", () => {
+    const NAMED_TARGET = BotId.make("Squad Mate");
+
+    /**
+     * The thread's group names every bot in the model, so each is reachable by
+     * name: what separates these cases is the home, not the roster.
+     */
+    const readModel = (input: {
+      readonly targetHome: GroupId | null;
+      readonly extraBots?: ReadonlyArray<OrchestrationReadModel["bots"][number]>;
+    }) => {
+      const bots = [
+        { ...makeBot({ id: ACTING, groupId: HOME }), name: "Planner" },
+        { ...makeBot({ id: TARGET, groupId: input.targetHome }), name: "Squad Mate" },
+        ...(input.extraBots ?? []),
+      ];
+
+      return makeReadModel({
+        bots,
+        groups: [
+          makeGroup({
+            members: bots.map((bot) => ({
+              kind: "bot" as const,
+              botId: bot.id,
+              role: bot.id === ACTING ? ("boss" as const) : ("specialist" as const),
+            })),
+          }),
+        ],
+        threads: [makeGroupThread()],
+      });
+    };
+
+    it("reads a named squad mate in the same space as an internal move", () => {
+      expect(
+        isSameSpaceHandoffInSnapshot(readModel({ targetHome: HOME }), {
+          threadId: ThreadId.make("thread-group"),
+          actingBotId: ACTING,
+          targetBotId: NAMED_TARGET,
+        }),
+      ).toBe(true);
+    });
+
+    it("keeps the approval for a named target hired into another space", () => {
+      expect(
+        isSameSpaceHandoffInSnapshot(readModel({ targetHome: OTHER_HOME }), {
+          threadId: ThreadId.make("thread-group"),
+          actingBotId: ACTING,
+          targetBotId: NAMED_TARGET,
+        }),
+      ).toBe(false);
+    });
+
+    it("keeps the approval when the name matches more than one bot", () => {
+      const twin = {
+        ...makeBot({ id: BotId.make("bot-twin"), groupId: HOME }),
+        name: "Squad Mate",
+      };
+
+      expect(
+        isSameSpaceHandoffInSnapshot(readModel({ targetHome: HOME, extraBots: [twin] }), {
+          threadId: ThreadId.make("thread-group"),
+          actingBotId: ACTING,
+          targetBotId: NAMED_TARGET,
+        }),
+      ).toBe(false);
+    });
+
+    it("keeps the approval when the name matches no bot", () => {
+      expect(
+        isSameSpaceHandoffInSnapshot(readModel({ targetHome: HOME }), {
+          threadId: ThreadId.make("thread-group"),
+          actingBotId: ACTING,
+          targetBotId: BotId.make("Nobody Here"),
+        }),
+      ).toBe(false);
+    });
   });
 });
 
