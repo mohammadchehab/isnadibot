@@ -48,6 +48,8 @@ export interface IsnadiToolSession {
   readonly timezone?: string;
   readonly workspace?: Workspace;
   readonly userComputerWorkspace?: Workspace;
+  /** The folder on the user computer this session may read: its working directory. */
+  readonly userComputerRoot?: string;
   readonly memoryHandlers?: Record<IsnadiMemoryToolId, IsnadiMemoryToolHandler>;
   readonly delegation?: {
     readonly depth: number;

@@ -121,8 +121,14 @@
             // POSIX X_OK access checks, and statfs. File.stat and ino/dev are available.
             // The vault file store opens synchronously at startup, before any Effect runtime,
             // and needs realpath plus an atomic mode-0600 rename.
+            // Tool authorization resolves a read path with symlinks followed inside a synchronous
+            // gate shared by the runtime and the controller. FileSystem.realPath exists but is
+            // effectful and cannot express realLocation's nearest-existing-ancestor walk, so this
+            // file needs a synchronous realpath. This override is file-granular: no other node
+            // builtin goes in this file without its own justification.
             "include": [
               "**/apps/server/src/vault/vaultFile.ts",
+              "**/apps/server/src/provider/tools/IsnadiToolAuthorization.ts",
               "**/apps/server/src/bootstrap.ts",
               "**/apps/server/src/http.ts",
               "**/apps/server/src/orchestration/workflowScriptQuery.ts",

@@ -496,6 +496,7 @@ export function createSessionLifecycle(deps: SessionLifecycleDependencies) {
       workspaceType,
       ...(workspace ? { workspace } : {}),
       ...(userComputerWorkspace ? { userComputerWorkspace } : {}),
+      ...(userComputerWorkspace && input.cwd ? { userComputerRoot: input.cwd } : {}),
       ...(registeredMemoryHandlers ? { memoryHandlers: registeredMemoryHandlers } : {}),
       ...(input.botId && deps.wired().botStateRuntime
         ? { botState: deps.wired().botStateRuntime }

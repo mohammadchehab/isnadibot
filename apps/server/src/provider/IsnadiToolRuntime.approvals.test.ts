@@ -360,4 +360,79 @@ describe("IsnadiToolRuntime", () => {
     await expect(runtime.execute(execution)).resolves.toMatchObject({ status: "applied" });
     expect(reactToMessage).toHaveBeenCalledWith(execution.input, execution.toolCallId);
   });
+
+  it("lets a read-only delegation read the user's files, and names the grant it lacks", async () => {
+    const runtime = createIsnadiToolRuntime();
+
+    const register = (threadId: string, hasUserComputer: boolean) =>
+      runtime.registerSession(threadId, {
+        runtimeMode: "approval-required",
+        workspaceType: "local",
+        userComputerWorkspace: workspace(threadId),
+        userComputerRoot: process.cwd(),
+        catalogHandlers: { ExternalRead: async () => ({ text: "# Notes" }) },
+        delegation: {
+          depth: 0,
+          activeDelegations: 0,
+          access: {
+            allowedToolIds: ["ExternalRead"],
+            memoryScopes: [],
+            sandbox: "local",
+            runtimeMode: "approval-required",
+            hasUserComputer,
+            enabledMcpServerIds: [],
+            disabledMcpServerIds: [],
+            approvalCeiling: "none",
+          },
+          send: vi.fn(),
+        },
+      });
+
+    const input = { path: "docs/README.md" };
+
+    register("thread-read-granted", true);
+    await expect(
+      runtime.requiresApproval("thread-read-granted", "ExternalRead", input),
+    ).resolves.toBe(false);
+    await expect(
+      runtime.execute({
+        threadId: "thread-read-granted",
+        toolId: "ExternalRead",
+        toolCallId: "tool-read-granted",
+        input,
+        approvalMode: "require-grant",
+      }),
+    ).resolves.toEqual({ text: "# Notes" });
+
+    // A session that can still ask its user keeps the card.
+    runtime.registerSession("thread-read-askable", {
+      runtimeMode: "approval-required",
+      workspaceType: "local",
+      userComputerWorkspace: workspace("thread-read-askable"),
+      catalogHandlers: { ExternalRead: async () => ({ text: "# Notes" }) },
+      delegation: {
+        depth: 0,
+        activeDelegations: 0,
+        access: {
+          allowedToolIds: ["ExternalRead"],
+          memoryScopes: [],
+          sandbox: "local",
+          runtimeMode: "approval-required",
+          hasUserComputer: true,
+          enabledMcpServerIds: [],
+          disabledMcpServerIds: [],
+          approvalCeiling: "user-computer",
+        },
+        send: vi.fn(),
+      },
+    });
+    await expect(
+      runtime.requiresApproval("thread-read-askable", "ExternalRead", input),
+    ).resolves.toBe(true);
+
+    register("thread-read-missing", false);
+    await expect(
+      runtime.requiresApproval("thread-read-missing", "ExternalRead", input),
+    ).rejects.toThrow("not granted user-computer access");
+  });
 });
