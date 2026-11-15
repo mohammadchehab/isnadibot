@@ -47,6 +47,20 @@ describe("botDeleteRefusalCopy", () => {
     expect(`${copy.title} ${copy.description}`).not.toMatch(/bot-\d|group-\d/);
   });
 
+  it("explains the two-bot floor in plain words with no id in either line", () => {
+    const copy = botDeleteRefusalCopy(
+      { failure: botDeleteFailure("group-would-be-undersized"), botName },
+      englishTranslate,
+    );
+
+    expect(copy).toEqual({
+      title: "This group needs at least two bots",
+      description:
+        "Deleting this bot would leave this space with fewer than two. Add another bot first.",
+    });
+    expect(`${copy.title} ${copy.description}`).not.toMatch(/bot-\d|group-\d/);
+  });
+
   it("keeps the server's sentence for a refusal the client cannot name", () => {
     const failure: DeleteBotFailure = {
       refusal: "unknown",
@@ -72,6 +86,16 @@ describe("botDeleteRefusalCopy", () => {
     expect(botDeleteRefusalCopy({ failure: bossRefusal, botName }, markingTranslate)).toEqual({
       title: "xx:Could not delete {name}",
       description: "xx:Pick a new boss, or delete the space.",
+    });
+    expect(
+      botDeleteRefusalCopy(
+        { failure: botDeleteFailure("group-would-be-undersized"), botName },
+        markingTranslate,
+      ),
+    ).toEqual({
+      title: "xx:This group needs at least two bots",
+      description:
+        "xx:Deleting this bot would leave this space with fewer than two. Add another bot first.",
     });
   });
 });
