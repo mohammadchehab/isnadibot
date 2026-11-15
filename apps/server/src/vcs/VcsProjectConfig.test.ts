@@ -28,7 +28,7 @@ describe("VcsProjectConfig", () => {
     assert.equal(error.cwd, "/repo/packages/app");
     assert.equal(error.configPath, "/repo/.t3code/vcs.json");
     assert.strictEqual(error.cause, cause);
-    assert.equal(error.message, "Failed to read VCS project config at /repo/.t3code/vcs.json.");
+    assert.equal(error.message, "Failed to read VCS project config.");
   });
 
   it.layer(TestLayer)("uses an explicit requested VCS kind before config", (it) => {
@@ -104,10 +104,7 @@ describe("VcsProjectConfig", () => {
         const failedCandidate = path.join(cwd, ".t3code", "vcs.json");
         const [error] = messages[0] as ReadonlyArray<unknown>;
         assert.instanceOf(error, VcsProjectConfig.VcsProjectConfigError);
-        assert.equal(
-          error.message,
-          "Failed to inspect VCS project config at " + failedCandidate + ".",
-        );
+        assert.equal(error.message, "Failed to inspect VCS project config.");
         assert.deepInclude(error, {
           operation: "inspect",
           cwd,
@@ -161,10 +158,7 @@ describe("VcsProjectConfig", () => {
         assert.equal(kind, "auto");
         const [error] = messages[0] as ReadonlyArray<unknown>;
         assert.instanceOf(error, VcsProjectConfig.VcsProjectConfigError);
-        assert.equal(
-          error.message,
-          "Failed to decode VCS project config at " + path.join(configDir, "vcs.json") + ".",
-        );
+        assert.equal(error.message, "Failed to decode VCS project config.");
         assert.deepInclude(error.cause, { _tag: "SchemaError" });
         assert.deepInclude(error, {
           operation: "decode",
@@ -201,7 +195,8 @@ describe("VcsProjectConfig", () => {
         assert.equal(kind, "auto");
         const [error] = messages[0] as ReadonlyArray<unknown>;
         assert.instanceOf(error, VcsProjectConfig.VcsProjectConfigError);
-        assert.equal(error.message, "Failed to read VCS project config at " + configPath + ".");
+        assert.equal(error.message, "Failed to read VCS project config.");
+        assert.notInclude(error.message, configPath);
         assert.deepInclude(error.cause, { _tag: "PlatformError" });
         assert.deepInclude(error, {
           operation: "read",

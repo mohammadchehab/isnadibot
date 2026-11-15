@@ -1,4 +1,5 @@
 import { accountScope } from "./subscription-auth/service.ts";
+import { subscriptionAuthFailure } from "./subscription-auth/failure.ts";
 import type * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
@@ -8,7 +9,6 @@ import {
   type AuthAccessStreamEvent,
   McpServerAuthenticationError,
   ImageGenerationError,
-  SubscriptionAuthError,
   WS_METHODS,
   WsRpcGroup,
 } from "@isnadi/contracts";
@@ -142,7 +142,7 @@ export const createWsAuthHandlers = ({
                 ? cause
                 : new McpServerAuthenticationError({
                     mcpServerId,
-                    reason: cause instanceof Error ? cause.message : String(cause),
+                    reason: "The MCP server could not be reached.",
                   }),
             ),
             Effect.catchTag("McpServerAuthenticationError", (error) => Queue.fail(queue, error)),
@@ -159,13 +159,9 @@ export const createWsAuthHandlers = ({
         Effect.gen(function* () {
           yield* validateAccountInstance(provider, options.instanceId);
 
-          return yield* Effect.tryPromise({
-            try: () => subscriptionAuth.startLogin(provider, options),
-            catch: (cause) =>
-              new SubscriptionAuthError({
-                reason: cause instanceof Error ? cause.message : String(cause),
-              }),
-          });
+          return yield* Effect.tryPromise(() =>
+            subscriptionAuth.startLogin(provider, options),
+          ).pipe(subscriptionAuthFailure("Could not start the sign-in."));
         }),
         { "rpc.aggregate": "server" },
       ),
@@ -173,26 +169,22 @@ export const createWsAuthHandlers = ({
     [WS_METHODS.subscriptionAuthPoll]: ({ loginId }) =>
       observeRpcEffect(
         WS_METHODS.subscriptionAuthPoll,
-        Effect.tryPromise({
-          try: () => subscriptionAuth.pollLogin(loginId),
-          catch: (cause) =>
-            new SubscriptionAuthError({
-              reason: cause instanceof Error ? cause.message : String(cause),
-            }),
-        }).pipe(refreshChangedSubscriptionProviders, resetChangedApiKeySessions),
+        Effect.tryPromise(() => subscriptionAuth.pollLogin(loginId)).pipe(
+          subscriptionAuthFailure("Could not check the sign-in."),
+          refreshChangedSubscriptionProviders,
+          resetChangedApiKeySessions,
+        ),
         { "rpc.aggregate": "server" },
       ),
 
     [WS_METHODS.subscriptionAuthComplete]: ({ loginId, code }) =>
       observeRpcEffect(
         WS_METHODS.subscriptionAuthComplete,
-        Effect.tryPromise({
-          try: () => subscriptionAuth.completeLogin(loginId, code),
-          catch: (cause) =>
-            new SubscriptionAuthError({
-              reason: cause instanceof Error ? cause.message : String(cause),
-            }),
-        }).pipe(refreshChangedSubscriptionProviders, resetChangedApiKeySessions),
+        Effect.tryPromise(() => subscriptionAuth.completeLogin(loginId, code)).pipe(
+          subscriptionAuthFailure("Could not finish the sign-in."),
+          refreshChangedSubscriptionProviders,
+          resetChangedApiKeySessions,
+        ),
         { "rpc.aggregate": "server" },
       ),
 
@@ -210,14 +202,10 @@ export const createWsAuthHandlers = ({
     [WS_METHODS.subscriptionAuthLogout]: ({ provider, instanceId, accountId }) =>
       observeRpcEffect(
         WS_METHODS.subscriptionAuthLogout,
-        Effect.tryPromise({
-          try: () =>
-            subscriptionAuth.logout(provider, accountId ? accountScope(accountId) : instanceId),
-          catch: (cause) =>
-            new SubscriptionAuthError({
-              reason: cause instanceof Error ? cause.message : String(cause),
-            }),
-        }).pipe(
+        Effect.tryPromise(() =>
+          subscriptionAuth.logout(provider, accountId ? accountScope(accountId) : instanceId),
+        ).pipe(
+          subscriptionAuthFailure("Could not sign out."),
           refreshChangedSubscriptionProviders,
           resetChangedApiKeySessions,
           Effect.andThen(getAccessHealthSnapshot()),
@@ -228,27 +216,22 @@ export const createWsAuthHandlers = ({
     [WS_METHODS.subscriptionAuthHealthTest]: ({ provider, instanceId, accountId }) =>
       observeRpcEffect(
         WS_METHODS.subscriptionAuthHealthTest,
-        Effect.tryPromise({
-          try: () =>
-            subscriptionAuth.testHealth(provider, accountId ? accountScope(accountId) : instanceId),
-          catch: (cause) =>
-            new SubscriptionAuthError({
-              reason: cause instanceof Error ? cause.message : String(cause),
-            }),
-        }).pipe(Effect.andThen(getAccessHealthSnapshot())),
+        Effect.tryPromise(() =>
+          subscriptionAuth.testHealth(provider, accountId ? accountScope(accountId) : instanceId),
+        ).pipe(
+          subscriptionAuthFailure("Could not test the connection."),
+          Effect.andThen(getAccessHealthSnapshot()),
+        ),
         { "rpc.aggregate": "server" },
       ),
 
     [WS_METHODS.subscriptionAuthSetAccountOrder]: ({ provider, accountIds }) =>
       observeRpcEffect(
         WS_METHODS.subscriptionAuthSetAccountOrder,
-        Effect.tryPromise({
-          try: () => subscriptionAuth.setAccountOrder(provider, accountIds),
-          catch: (cause) =>
-            new SubscriptionAuthError({
-              reason: cause instanceof Error ? cause.message : String(cause),
-            }),
-        }).pipe(Effect.andThen(getAccessHealthSnapshot())),
+        Effect.tryPromise(() => subscriptionAuth.setAccountOrder(provider, accountIds)).pipe(
+          subscriptionAuthFailure("Could not save the account order."),
+          Effect.andThen(getAccessHealthSnapshot()),
+        ),
         { "rpc.aggregate": "server" },
       ),
 

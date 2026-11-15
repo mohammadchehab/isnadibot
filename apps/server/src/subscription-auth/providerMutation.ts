@@ -1,4 +1,5 @@
-import { ProviderInstanceId, SubscriptionAuthError } from "@isnadi/contracts";
+import { ProviderInstanceId } from "@isnadi/contracts";
+import { subscriptionAuthFailure } from "./failure.ts";
 import * as Effect from "effect/Effect";
 
 import { deriveProviderInstanceConfigMap } from "../provider/Layers/ProviderInstanceRegistryHydration.ts";
@@ -28,7 +29,7 @@ export function subscriptionProviderMutation(
     Environment,
   >(operation: Effect.Effect<Value, Error, Environment>) {
     const beforeSettings = yield* settings.getSettings.pipe(
-      Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message })),
+      subscriptionAuthFailure("Could not read the server settings."),
     );
 
     const bindings = Object.entries(deriveProviderInstanceConfigMap(beforeSettings)).flatMap(
@@ -64,7 +65,7 @@ export function subscriptionProviderMutation(
     if (changed.length === 0) return result;
 
     const currentSettings = yield* settings.getSettings.pipe(
-      Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message })),
+      subscriptionAuthFailure("Could not read the server settings."),
     );
 
     const patch = subscriptionProviderSettingsPatch(currentSettings, auth.statuses());
@@ -72,7 +73,7 @@ export function subscriptionProviderMutation(
     const nextSettings = patch
       ? yield* settings
           .updateSettings(patch)
-          .pipe(Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message })))
+          .pipe(subscriptionAuthFailure("Could not save the server settings."))
       : currentSettings;
 
     yield* mutator.reconcile(deriveProviderInstanceConfigMap(nextSettings));

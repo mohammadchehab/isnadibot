@@ -58,11 +58,35 @@ export const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
 export const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
 
-export const portabilityError = (operation: "export" | "preview" | "apply", cause: unknown) =>
-  new PortabilityArchiveError({
-    operation,
-    message: cause instanceof Error ? cause.message : String(cause),
-  });
+/**
+ * The sentence a portability failure shows. `detail` is written copy the user
+ * can act on; a raw cause sentence never goes here, because it carries paths
+ * and internal wording. A caller with nothing better than "it failed" omits
+ * `detail` and gets the operation's own sentence.
+ */
+const PORTABILITY_FAILURE_COPY = {
+  export: "The archive could not be exported.",
+  preview: "The archive could not be previewed.",
+  apply: "The archive could not be applied.",
+} as const;
+
+const isPortabilityArchiveError = Schema.is(PortabilityArchiveError);
+
+export const portabilityError = (
+  operation: "export" | "preview" | "apply",
+  detail: string = PORTABILITY_FAILURE_COPY[operation],
+) => new PortabilityArchiveError({ operation, message: detail });
+
+/**
+ * A failure raised while exporting, previewing or applying. A sentence a caller
+ * already wrote for the user survives untouched; any other cause becomes the
+ * operation's own sentence, so a filesystem or parser error never reaches a
+ * screen in its own words.
+ */
+export const portabilityFailure = (operation: "export" | "preview" | "apply", cause: unknown) =>
+  isPortabilityArchiveError(cause) && cause.operation === operation
+    ? cause
+    : portabilityError(operation);
 
 export const memoryOperationError = (operation: string, cause: unknown) =>
   new IsnadiMemoryOperationError({
@@ -107,7 +131,7 @@ export const validatePortabilityProjectFolders = Effect.fn("validatePortabilityP
       if (!path.isAbsolute(destination) || path.dirname(destination) === destination) {
         return yield* portabilityError(
           operation,
-          new Error(`Project '${projectId}' destination must be an absolute non-root path.`),
+          `Project '${projectId}' destination must be an absolute non-root path.`,
         );
       }
     }

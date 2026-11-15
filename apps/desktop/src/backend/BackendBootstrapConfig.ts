@@ -19,7 +19,7 @@ export class DesktopBackendObservabilitySettingsReadError extends Schema.TaggedE
   },
 ) {
   override get message(): string {
-    return `Failed to read persisted backend observability settings at ${this.settingsPath}.`;
+    return "Failed to read persisted backend observability settings.";
   }
 }
 

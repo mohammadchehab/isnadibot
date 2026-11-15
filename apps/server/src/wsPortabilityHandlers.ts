@@ -8,6 +8,7 @@ import * as Portability from "./portability.ts";
 import {
   nowIso,
   portabilityError,
+  portabilityFailure,
   availablePortabilityProviderIds,
   openCodePortabilityInstanceIds,
   validatePortabilityProjectFolders,
@@ -50,9 +51,9 @@ export const createWsPortabilityHandlers = ({
                 contents: Portability.serializePortabilityArchive(archive),
               };
             },
-            catch: (cause) => portabilityError("export", cause),
+            catch: (cause) => portabilityFailure("export", cause),
           });
-        }).pipe(Effect.mapError((cause) => portabilityError("export", cause))),
+        }).pipe(Effect.mapError((cause) => portabilityFailure("export", cause))),
         { "rpc.aggregate": "portability" },
       ),
 
@@ -62,7 +63,7 @@ export const createWsPortabilityHandlers = ({
         Effect.gen(function* () {
           const archive = yield* Effect.try({
             try: () => Portability.parsePortabilityArchive(contents),
-            catch: (cause) => portabilityError("preview", cause),
+            catch: (cause) => portabilityFailure("preview", cause),
           });
 
           const [snapshot, settings, providers] = yield* Effect.all([
@@ -85,7 +86,7 @@ export const createWsPortabilityHandlers = ({
             availablePortabilityProviderIds(providers),
             validatedProjectFolders,
           );
-        }).pipe(Effect.mapError((cause) => portabilityError("preview", cause))),
+        }).pipe(Effect.mapError((cause) => portabilityFailure("preview", cause))),
         { "rpc.aggregate": "portability" },
       ),
 
@@ -100,7 +101,7 @@ export const createWsPortabilityHandlers = ({
         Effect.gen(function* () {
           const archive = yield* Effect.try({
             try: () => Portability.parsePortabilityArchive(contents),
-            catch: (cause) => portabilityError("apply", cause),
+            catch: (cause) => portabilityFailure("apply", cause),
           });
 
           const [snapshot, settings, providers] = yield* Effect.all([
@@ -132,7 +133,7 @@ export const createWsPortabilityHandlers = ({
           ) {
             return yield* portabilityError(
               "apply",
-              new Error("IsnadiBot state changed after the preview. Review the archive again."),
+              "IsnadiBot state changed after the preview. Review the archive again.",
             );
           }
 
@@ -187,7 +188,7 @@ export const createWsPortabilityHandlers = ({
           }
 
           return Portability.summarizePortabilityApply(outcomes, plan.skipped);
-        }).pipe(Effect.mapError((cause) => portabilityError("apply", cause))),
+        }).pipe(Effect.mapError((cause) => portabilityFailure("apply", cause))),
         { "rpc.aggregate": "portability" },
       ),
   }) satisfies Pick<

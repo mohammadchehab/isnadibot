@@ -1,4 +1,5 @@
 import { subscriptionProviderMutation } from "./subscription-auth/providerMutation.ts";
+import { subscriptionAuthFailure } from "./subscription-auth/failure.ts";
 import { ProviderInstanceRegistryMutator } from "./provider/Services/ProviderInstanceRegistryMutator.ts";
 import { computerRegistry } from "./provider/computerRegistry.ts";
 import * as Cause from "effect/Cause";
@@ -312,7 +313,7 @@ export const createWsServices = (
       if (!instanceId) return;
 
       const settings = yield* serverSettings.getSettings.pipe(
-        Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message })),
+        subscriptionAuthFailure("Could not read the server settings."),
       );
 
       const instance = deriveProviderInstanceConfigMap(settings)[instanceId];
@@ -320,7 +321,7 @@ export const createWsServices = (
 
       if (instance?.driver !== driver) {
         return yield* new SubscriptionAuthError({
-          reason: `Provider instance '${instanceId}' does not belong to ${provider}.`,
+          reason: `The provider instance does not belong to ${provider}.`,
         });
       }
     });
@@ -402,14 +403,12 @@ export const createWsServices = (
 
       const [providers, bots, snapshot, settings] = yield* Effect.all([
         providerRegistry.getProviders,
-        projectionBots
-          .listAll()
-          .pipe(Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message }))),
+        projectionBots.listAll().pipe(subscriptionAuthFailure("Could not read the bots.")),
         projectionSnapshotQuery
           .getShellSnapshot()
-          .pipe(Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message }))),
+          .pipe(subscriptionAuthFailure("Could not read the app state.")),
         serverSettings.getSettings.pipe(
-          Effect.mapError((cause) => new SubscriptionAuthError({ reason: cause.message })),
+          subscriptionAuthFailure("Could not read the server settings."),
         ),
       ]);
 

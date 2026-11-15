@@ -199,7 +199,7 @@ export class ExternalLauncherBrowserSpawnError extends Schema.TaggedErrorClass<E
   },
 ) {
   override get message(): string {
-    return `Failed to launch browser target '${this.target}' with '${[this.command, ...this.args].join(" ")}'`;
+    return "Failed to launch the browser.";
   }
 }
 
@@ -212,7 +212,7 @@ export class ExternalLauncherEditorSpawnError extends Schema.TaggedErrorClass<Ex
   },
 ) {
   override get message(): string {
-    return `Failed to launch '${this.target}' in ${this.editor} with '${[this.command, ...this.args].join(" ")}'`;
+    return `Failed to launch ${this.editor}.`;
   }
 }
 
