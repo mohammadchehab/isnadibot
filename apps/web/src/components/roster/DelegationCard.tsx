@@ -25,10 +25,12 @@ import { orchestrationEnvironment } from "../../state/orchestration";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
+import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { BotAvatarView } from "./BotAvatarView";
 import { DelegationDetail, delegationStateLabel, formatDelegationAccess } from "./DelegationDetail";
 import { useDelegationClock } from "./delegationClock";
 import type { Bot } from "./types";
+import { useRosterPendingApproval } from "./useRosterPendingApproval";
 
 const STATE_DOT: Record<IsnadiDelegationState, string> = {
   queued: "bg-muted-foreground/50",
@@ -206,11 +208,18 @@ export function DelegationCard({
 
   const childThread = useThreadShell(childThreadRef);
   const childActivities = useThreadActivities(childThreadRef);
+  // The child's own chat is deliberately not reachable from the roster (child
+  // work only ever shows as a card in the parent chat), so the approval the
+  // child raised is answered here, on the card, or nowhere.
+  const childApproval = useRosterPendingApproval(childThreadRef);
   const activeChildBot = childBot?.archivedAt === null ? childBot : null;
   const state = presentation.state;
   const childName = activeChildBot?.name ?? t("Unknown bot");
   const parentName = parentBot?.name ?? t("Unknown bot");
   const usageTokens = childThread ? delegationUsageTokens(delegation, childActivities) : null;
+  // Nothing is left to answer once the work has finished, so a stale row never
+  // turns into a prompt the server would refuse.
+  const pendingChildApproval = presentation.terminal ? null : childApproval.pendingApproval;
 
   const outcome = presentation.outcome
     ? presentation.outcome.text ||
@@ -279,6 +288,19 @@ export function DelegationCard({
             : t("Result delivered to {name}", { name: parentName })}
         </p>
       ) : null}
+      {pendingChildApproval === null ? null : (
+        <div className="mt-2">
+          <BotApprovalPrompt
+            approval={pendingChildApproval}
+            pendingCount={childApproval.pendingCount}
+            responding={childApproval.responding}
+            error={childApproval.responseError}
+            onRespond={(decision) =>
+              childApproval.respond(pendingChildApproval.requestId, decision)
+            }
+          />
+        </div>
+      )}
       <details className="mt-1 text-xs text-muted-foreground" data-delegation-details>
         <summary className="min-h-11 w-fit content-center">{t("Details")}</summary>
         <dl className="flex flex-col gap-1 pb-1">
