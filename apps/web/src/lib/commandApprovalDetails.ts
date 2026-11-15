@@ -1,4 +1,5 @@
 import { type PendingApproval } from "@isnadi/client-runtime/pending-requests";
+import { isFileWriteRedirection, parseShellCommands, programOf } from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 import { storedField } from "./persistedSchema";
@@ -23,11 +24,21 @@ export interface CommandApprovalDetails {
 /** Longer than this and the collapsed row truncates, so the full text is worth expanding. */
 const TRUNCATING_COMMAND_LENGTH = 64;
 
-const SEGMENT_SEPARATOR = /\s*(?:&&|\|\||[;|\n])\s*/;
+/** Programs whose command position is the fact a reviewer needs, whatever their arguments. */
+const DELETES_FILES = new Set(["rm", "rmdir", "unlink", "trash"]);
 
-const ENVIRONMENT_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const REACHES_NETWORK = new Set(["curl", "wget", "ssh", "scp", "nc", "rsync"]);
 
-const COMMAND_PREFIXES = new Set(["sudo", "command", "exec", "nohup", "time", "env", "xargs"]);
+const CHANGES_PERMISSIONS = new Set(["chmod", "chown"]);
+
+/** The subcommand that publishes, per program: `git push`, `npm publish`, and their peers. */
+const PUBLISHES = new Map([
+  ["git", "push"],
+  ["npm", "publish"],
+  ["bun", "publish"],
+  ["pnpm", "publish"],
+  ["yarn", "publish"],
+]);
 
 function readString(
   args: CommandApprovalArguments | null,
@@ -42,30 +53,15 @@ function readString(
   return null;
 }
 
-/** First real program in a segment, past any env assignments and wrappers like "sudo". */
-function programOfSegment(segment: string): string | null {
-  for (const token of segment.split(/\s+/)) {
-    const bare = token.replace(/^['"]|['"]$/g, "");
-
-    if (bare.length === 0) continue;
-
-    if (ENVIRONMENT_ASSIGNMENT.test(bare)) continue;
-
-    if (bare.startsWith("-")) continue;
-
-    if (COMMAND_PREFIXES.has(bare)) continue;
-
-    return bare.split("/").at(-1) ?? bare;
-  }
-
-  return null;
-}
-
+/**
+ * The programs a command runs, in order, from the same shell parse the signals use. One
+ * parse means a quoted separator (`echo "a; b"`) cannot invent a second program.
+ */
 function programsOf(command: string): ReadonlyArray<string> {
   const seen: string[] = [];
 
-  for (const segment of command.split(SEGMENT_SEPARATOR)) {
-    const program = programOfSegment(segment.trim());
+  for (const segment of parseShellCommands(command)) {
+    const { program } = programOf(segment);
 
     if (program && !seen.includes(program)) seen.push(program);
   }
@@ -73,7 +69,19 @@ function programsOf(command: string): ReadonlyArray<string> {
   return seen;
 }
 
-/** Short labels for the operations a reviewer needs to see before approving. */
+/** The first argument that is not a flag: `git push` and `npm publish` read as publishes. */
+function subcommandOf(args: ReadonlyArray<string>): string | null {
+  return args.find((argument) => !argument.startsWith("-")) ?? null;
+}
+
+/**
+ * Short labels for the operations a reviewer needs to see before approving.
+ *
+ * Every label is a projection of the one shell parse: a program counts only where the
+ * shell would run it, and a write counts only when the redirection targets a real file.
+ * A second regex pass over the raw string cannot make either distinction — it reads the
+ * `git push` inside `grep "git push" log` as a push and `2>&1` as a file write.
+ */
 function signalsOf(command: string): ReadonlyArray<string> {
   const signals: string[] = [];
 
@@ -81,19 +89,40 @@ function signalsOf(command: string): ReadonlyArray<string> {
     if (!signals.includes(label)) signals.push(label);
   };
 
-  if (/(^|\s)sudo(\s|$)/.test(command)) add("Runs as root");
+  const segments = parseShellCommands(command);
+  const commands = segments.map((segment) => programOf(segment));
 
-  if (/(^|\s)rm\s+(-\S*\s+)*-?\S*[rf]/.test(command)) add("Deletes files");
+  if (commands.some(({ wrappers }) => wrappers.includes("sudo"))) add("Runs as root");
 
-  if (/(^|\s)(curl|wget|ssh|scp|nc|rsync)(\s|$)/.test(command)) add("Network access");
+  if (commands.some(({ program }) => program !== null && DELETES_FILES.has(program))) {
+    add("Deletes files");
+  }
 
-  if (/(^|\s)(git\s+push|npm\s+publish|bun\s+publish|pnpm\s+publish)(\s|$)/.test(command)) {
+  if (commands.some(({ program }) => program !== null && REACHES_NETWORK.has(program))) {
+    add("Network access");
+  }
+
+  if (
+    commands.some(({ program, args }) => {
+      const publishes = program === null ? undefined : PUBLISHES.get(program);
+
+      return publishes !== undefined && subcommandOf(args) === publishes;
+    })
+  ) {
     add("Publishes");
   }
 
-  if (/>>?\s*\S/.test(command) || /(^|\s|\|)\s*tee(\s|$)/.test(command)) add("Writes files");
+  const writes =
+    commands.some(({ program }) => program === "tee") ||
+    segments.some((segment) =>
+      segment.redirections.some((redirection) => isFileWriteRedirection(redirection)),
+    );
 
-  if (/(^|\s)(chmod|chown)(\s|$)/.test(command)) add("Changes permissions");
+  if (writes) add("Writes files");
+
+  if (commands.some(({ program }) => program !== null && CHANGES_PERMISSIONS.has(program))) {
+    add("Changes permissions");
+  }
 
   return signals;
 }
