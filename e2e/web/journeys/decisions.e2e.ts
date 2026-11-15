@@ -1,10 +1,11 @@
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
-import { chromium, type Browser, type Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { reportFailure, watchPage } from "../support/diagnostics.ts";
+import { launchBrowser } from "../support/journey.ts";
 import { startStack, type Stack } from "../support/stack.ts";
 import { STUB_APPROVAL_MARKER } from "../support/stubOpenAI.ts";
 
@@ -29,10 +30,7 @@ describe("decisions", () => {
 
   beforeAll(async () => {
     stack = await startStack();
-    browser = await chromium.launch({
-      channel: process.env.E2E_BROWSER_CHANNEL ?? "chrome",
-      headless: process.env.E2E_HEADED !== "1",
-    });
+    browser = await launchBrowser();
     page = await browser.newPage();
     seen = watchPage(page);
   });

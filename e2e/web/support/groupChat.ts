@@ -1,9 +1,10 @@
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
-import { chromium, type Browser, type Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
 import { expect } from "vite-plus/test";
 
+import { launchBrowser } from "./journey.ts";
 import { startStack, type Stack } from "./stack.ts";
 import { stubReplyFrom } from "./stubOpenAI.ts";
 
@@ -78,10 +79,7 @@ export interface Crew {
 export async function openCrew(): Promise<Crew> {
   const stack = await startStack();
 
-  const browser = await chromium.launch({
-    channel: process.env.E2E_BROWSER_CHANNEL ?? "chrome",
-    headless: process.env.E2E_HEADED !== "1",
-  });
+  const browser = await launchBrowser();
 
   const page = await browser.newPage();
 
