@@ -58,14 +58,21 @@ describe("critical action classification", () => {
   it("keeps a `<<` the shell never reads as an operator from hiding a shell command", () => {
     // The shell runs the `rm` in every one of these; only a scanner that reads
     // any `<<WORD` as an opener loses it.
-    for (const first of [
-      `echo "see <<EOF below"`,
-      "echo 'use <<EOF to end'",
-      "# example: <<EOF",
-      "grep -c '<<EOF' notes.md",
-      "cat <<< EOF",
-    ]) {
-      expect(criticalActionFromShellCommand(heredoc(first, "rm -rf /tmp/x", "EOF"))).toBe("delete");
+    for (const [first, closing] of [
+      [`echo "see <<EOF below"`, "EOF"],
+      ["echo 'use <<EOF to end'", "EOF"],
+      ["# example: <<EOF", "EOF"],
+      ["grep -c '<<EOF' notes.md", "EOF"],
+      ["cat <<< EOF", "EOF"],
+      // `<<` in an arithmetic region is a shift operator, not an opener.
+      ["echo $((1 << n))", "n"],
+      ["echo $((a << b))", "b"],
+      ["echo $[1<<k]", "k"],
+      ["(( total = 1 << bits ))", "bits"],
+    ] as const) {
+      expect(criticalActionFromShellCommand(heredoc(first, "rm -rf /tmp/x", closing))).toBe(
+        "delete",
+      );
     }
   });
 
@@ -73,14 +80,19 @@ describe("critical action classification", () => {
     // `rm` is a shell-only token, so the text classifier is proven here with a
     // word it actually knows. Both classifiers call the one scanner, and this
     // asserts the second one rather than trusting that the first implies it.
-    for (const first of [
-      `echo "see <<EOF below"`,
-      "echo 'use <<EOF to end'",
-      "# example: <<EOF",
-      "grep -c '<<EOF' notes.md",
-      "cat <<< EOF",
-    ]) {
-      expect(criticalActionFromText(heredoc(first, "deploy to production", "EOF"))).toBe(
+    for (const [first, closing] of [
+      [`echo "see <<EOF below"`, "EOF"],
+      ["echo 'use <<EOF to end'", "EOF"],
+      ["# example: <<EOF", "EOF"],
+      ["grep -c '<<EOF' notes.md", "EOF"],
+      ["cat <<< EOF", "EOF"],
+      // `<<` in an arithmetic region is a shift operator, not an opener.
+      ["echo $((1 << n))", "n"],
+      ["echo $((a << b))", "b"],
+      ["echo $[1<<k]", "k"],
+      ["(( total = 1 << bits ))", "bits"],
+    ] as const) {
+      expect(criticalActionFromText(heredoc(first, "deploy to production", closing))).toBe(
         "production",
       );
     }

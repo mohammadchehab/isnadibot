@@ -471,6 +471,11 @@ describe("Shell command intent", () => {
       ["cat <<< EOF", "rm -rf /tmp/x", "EOF", "delete"],
       ["echo 'use <<E to end'", "rm -rf /tmp/x", "E", "delete"],
       ["echo x # <<EOF", "git push origin main", "EOF", "production"],
+      // `<<` in an arithmetic region is a shift operator, not an opener.
+      ["echo $((1 << n))", "rm -rf /tmp/x", "n", "delete"],
+      ["echo $((a << b))", "rm -rf /tmp/x", "b", "delete"],
+      ["echo $[1<<k]", "rm -rf /tmp/x", "k", "delete"],
+      ["(( total = 1 << bits ))", "git push origin main", "bits", "production"],
     ] as const;
 
     for (const [openerLine, hiddenLine, closingLine, expected] of cases) {

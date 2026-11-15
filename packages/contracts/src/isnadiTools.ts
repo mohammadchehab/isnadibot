@@ -89,10 +89,40 @@ interface HeredocScan {
 }
 
 /**
+ * The index just past the `)` that closes the parenthesised group opening at
+ * `at`, so an arithmetic region is skipped as one unit. An unterminated group
+ * runs to the end of the line, which is where the shell stops reading it too.
+ */
+const skipArithmeticParens = (line: string, at: number): number => {
+  let depth = 0;
+
+  for (let cursor = at; cursor < line.length; cursor += 1) {
+    const char = line[cursor];
+
+    if (char === "(") depth += 1;
+    else if (char === ")") {
+      depth -= 1;
+
+      if (depth === 0) return cursor + 1;
+    }
+  }
+
+  return line.length;
+};
+
+/** The index just past the `]` that closes the `$[` arithmetic group at `at`. */
+const skipBracketArithmetic = (line: string, at: number): number => {
+  const close = line.indexOf("]", at);
+
+  return close === -1 ? line.length : close + 1;
+};
+
+/**
  * The heredoc opener on one line, if the shell would read one, plus the quote
  * state the line leaves open for the next line. A `<<` inside a quoted string,
- * inside a `#` comment, or opening a `<<<` herestring is not an operator, so it
- * opens nothing — the shell runs every line after it, and so must we.
+ * inside a `#` comment, opening a `<<<` herestring, or sitting in an arithmetic
+ * region (`$((…))`, `((…))`, `$[…]`) where it is a shift is not an operator, so
+ * it opens nothing — the shell runs every line after it, and so must we.
  */
 const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan => {
   let quote = startingQuote;
@@ -136,6 +166,30 @@ const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan
       return { opener: null, quote };
     }
 
+    // `<<` inside an arithmetic region is a shift operator, not a heredoc
+    // opener. Skip the whole region so its contents are never read as shell
+    // operators, in every form the shell accepts: `$((…))`, `((…))` and `$[…]`.
+    if (char === "$" && line[at + 1] === "(" && line[at + 2] === "(") {
+      at = skipArithmeticParens(line, at + 1) - 1;
+      atWordStart = false;
+
+      continue;
+    }
+
+    if (char === "(" && line[at + 1] === "(") {
+      at = skipArithmeticParens(line, at) - 1;
+      atWordStart = false;
+
+      continue;
+    }
+
+    if (char === "$" && line[at + 1] === "[") {
+      at = skipBracketArithmetic(line, at + 1) - 1;
+      atWordStart = false;
+
+      continue;
+    }
+
     if (char === "<" && line[at + 1] === "<") {
       if (line[at + 2] === "<") {
         // `<<<` is a herestring: the word after it is data, not a delimiter.
@@ -165,9 +219,10 @@ const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan
  * that says "delete a todo" is content, not a destructive command.
  *
  * Only a `<<` the shell reads as an operator opens a heredoc. A phantom opener
- * in a quoted string, a comment or a herestring would otherwise drop every line
- * up to a later line equal to its "delimiter" from classification, which is a
- * way to run a destructive command with no approval prompt at all.
+ * in a quoted string, a `#` comment, a herestring, or an arithmetic region
+ * (`$((…))`, `((…))`, `$[…]`) where `<<` is a shift would otherwise drop every
+ * line up to a later line equal to its "delimiter" from classification, which
+ * is a way to run a destructive command with no approval prompt at all.
  *
  * An unterminated heredoc is left whole on purpose. It swallows the rest of the
  * command, so stripping what follows a stray opener would hide a real
