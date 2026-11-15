@@ -63,7 +63,11 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
         {pendingTask.title}
       </Text>
       <Text className="mt-1 text-xs text-foreground-muted" numberOfLines={1}>
-        {failure ? t("Not sent") : t("Queued")}
+        {failure ? (
+          <Text className="text-danger-foreground">{t("Not sent")}</Text>
+        ) : (
+          <Text className="text-foreground-muted">{t("Queued")}</Text>
+        )}
         {projectTitle ? `  ·  ${projectTitle}` : ""}
         {branch ? (
           <Text className="text-xs text-foreground-muted" style={{ fontFamily: MONO_FONT }}>
@@ -116,8 +120,9 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
       </ControlPillMenu>
       {failure ? (
         <QueuedMessageFailureNotice
-          className={sidebarPane ? "px-3 pb-2" : "bg-screen px-5 pb-3"}
+          className={sidebarPane ? "mx-3 mb-2" : "mx-5 mb-3"}
           failure={failure}
+          messageText={pendingTask.message.text}
           onDiscard={() => onDeletePendingTask(pendingTask)}
           onRetry={() => {
             void retryQueuedMessage(pendingTask.message);

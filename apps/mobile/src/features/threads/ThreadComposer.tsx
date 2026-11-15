@@ -755,8 +755,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
           message.failure === undefined ? null : (
             <QueuedMessageFailureNotice
               key={message.messageId}
-              className="pt-2"
+              className="mt-2"
               failure={message.failure}
+              messageText={message.text}
               onRetry={() => {
                 void retryQueuedMessage(message);
               }}
