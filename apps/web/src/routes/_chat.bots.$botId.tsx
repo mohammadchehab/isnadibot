@@ -16,6 +16,7 @@ import {
   toRoutineSchedule,
   type RoutineAdapterDraft,
 } from "@isnadi/client-runtime/routines";
+import type { AtomCommandResult } from "@isnadi/client-runtime/state/runtime";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
@@ -23,6 +24,7 @@ import { BotThreadLanding } from "../components/roster/BotThreadLanding";
 import { BotDetailsPanel } from "../components/roster/BotDetailsPanel";
 import { routineDelegateOptions } from "../components/roster/botEngineSelection";
 import { useBotThreadRef } from "../components/roster/useBotThreadRef";
+import { routineFailureToast } from "../components/roster/routineFailure.logic";
 import { useThreadShell } from "../state/entities";
 import { resolveRoutedBot } from "../components/roster/rosterRouteSelection";
 import { useRosterStore } from "../components/roster/rosterStore";
@@ -99,10 +101,14 @@ function BotThreadRouteView() {
   const routinesView = useMemo(() => botRoutinesView(snapshot, botId), [botId, snapshot]);
   const routines = routinesView.kind === "ready" ? routinesView.routines : [];
 
-  const requireSuccess = (result: { readonly _tag: string }, message: string) => {
+  const requireSuccess = <A, E>(result: AtomCommandResult<A, E>, fallback: string) => {
     if (hasTag(result, "Success")) return;
-    toastManager.add({ type: "error", title: message });
-    throw new Error(message);
+
+    const toast = routineFailureToast(result, t, fallback);
+
+    toastManager.add({ type: "error", ...toast });
+
+    throw new Error(fallback);
   };
 
   const withBusy = async (routineId: string, action: () => Promise<void>) => {

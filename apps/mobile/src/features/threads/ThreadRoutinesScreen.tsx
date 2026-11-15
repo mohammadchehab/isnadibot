@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
 import { useMobileI18n } from "../../lib/i18n";
 import { routineEnvironment } from "../../state/routines";
+import { routineFailureMessage } from "./routineFailure.logic";
 import { useEnvironmentOperateAccess } from "../../state/session";
 import { environmentSnapshotAtom } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -226,8 +227,7 @@ export function ThreadRoutinesScreen() {
       const result = await action();
 
       if (Predicate.isTagged(result, "Failure")) {
-        // Server errors can be technical English, so the card shows only translated copy.
-        setFailure({ routineId, message: fallback });
+        setFailure({ routineId, message: routineFailureMessage(result, t, fallback) });
       }
     } finally {
       setBusyRoutineId(null);
