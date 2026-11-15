@@ -76,6 +76,24 @@ describe("critical action classification", () => {
     }
   });
 
+  it("keeps a `<<` inside a region the scanner does not read from hiding a shell command", () => {
+    // `${…}`, `$'…'`, backticks, `$(…)`, `$"…"`, a delimiter the shell expands
+    // and a continued line: in each one the shell never reads the `<<` as an
+    // operator, so the `rm` after it runs. The scanner refuses to guess in all
+    // of them rather than reading the `<<` as an opener and deleting the `rm`.
+    for (const [first] of [
+      ["echo ${x:-<<EOF}"],
+      ["$'a\\'b <<EOF'"],
+      ["echo `cat <<EOF`"],
+      ["echo $(cat <<EOF)"],
+      ['echo $"see <<EOF"'],
+      ["cat > f <<$DELIM"],
+      ["echo one \\"],
+    ] as const) {
+      expect(criticalActionFromShellCommand(heredoc(first, "rm -rf /tmp/x", "EOF"))).toBe("delete");
+    }
+  });
+
   it("keeps a `<<` the shell never reads as an operator from hiding a text action", () => {
     // `rm` is a shell-only token, so the text classifier is proven here with a
     // word it actually knows. Both classifiers call the one scanner, and this
@@ -91,6 +109,11 @@ describe("critical action classification", () => {
       ["echo $((a << b))", "b"],
       ["echo $[1<<k]", "k"],
       ["(( total = 1 << bits ))", "bits"],
+      // A region the scanner does not read is not an opener either.
+      ["echo ${x:-<<EOF}", "EOF"],
+      ["$'a\\'b <<EOF'", "EOF"],
+      ["echo `cat <<EOF`", "EOF"],
+      ["echo $(cat <<EOF)", "EOF"],
     ] as const) {
       expect(criticalActionFromText(heredoc(first, "deploy to production", closing))).toBe(
         "production",

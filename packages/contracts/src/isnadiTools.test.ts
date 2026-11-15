@@ -494,6 +494,96 @@ describe("Shell command intent", () => {
   });
 });
 
+/**
+ * Regions this scanner does not read. Each one hides a `<<` from the shell and
+ * shows it to a scanner that reads the line as plain shell text, so the body it
+ * "opens" is deleted before classification and the command inside runs with no
+ * prompt. The list cannot be finished — that is the point of the rule — so the
+ * scanner strips nothing at all when it meets one.
+ */
+describe("Shell command intent outside the modelled subset", () => {
+  const lines = (...parts: ReadonlyArray<string>) => parts.join("\n");
+
+  const shapes = [
+    // `${…}` parameter expansion: the `<<EOF` is part of the expansion's word.
+    ["parameter expansion ${x:-<<EOF}", "echo ${x:-<<EOF}"],
+    // `$'…'` ANSI-C quoting: `\'` is an escaped quote, so bash keeps the string
+    // open across the `<<` the scanner reads as an operator.
+    ["ANSI-C quoting $'a\\'b <<EOF'", "$'a\\'b <<EOF'"],
+    // Backticks are command substitution, a region the scanner never enters.
+    ["backtick substitution", "echo `cat <<EOF`"],
+    // `$(…)` command substitution is the same region in its other spelling.
+    ["command substitution $(…)", "echo $(cat <<EOF)"],
+    // `$"…"` is locale quoting, read like `"…"` by the shell.
+    ['locale quoting $"…"', 'echo $"see <<EOF"'],
+    // A `<<` whose delimiter is not a literal word has no terminator to find.
+    ["a delimiter the shell expands", "cat > f <<$DELIM"],
+    // A trailing backslash continues the line, so the next line is not a command.
+    ["a continued line", "echo one \\"],
+  ] as const;
+
+  it("strips nothing when it meets a construct it does not model", () => {
+    for (const [name, openerLine] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", "EOF");
+
+      expect(classifyIsnadiExternalCommand(command), name).toBe("delete");
+      // Nothing was stripped, so the destructive line is still there to be read.
+      expect(stripHeredocBodies(command), name).toBe(command);
+    }
+  });
+
+  it("makes the tool ask for approval, so the shell cannot run unapproved", () => {
+    // `localFullAccess` with a command present skips ExternalShell's own
+    // `user-computer` approval, which leaves the classifier as the only gate.
+    // Shell's own class is `none`, so on a cloud workspace it has no other gate
+    // either.
+    const externalShell = ISNADI_TOOL_CATALOG.find(
+      (candidate) => candidate.id === "ExternalShell",
+    )!;
+
+    const cloudShell = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === "Shell")!;
+
+    for (const [name, openerLine] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", "EOF");
+
+      expect(isnadiToolApprovalForInput(externalShell, { command }), name).toBe("delete");
+      expect(
+        isnadiToolRequiresApproval(externalShell, { localFullAccess: true }, { command }),
+        name,
+      ).toBe(true);
+
+      expect(isnadiToolApprovalForInput(cloudShell, { command }), name).toBe("delete");
+      expect(
+        isnadiToolRequiresApproval(cloudShell, { localFullAccess: false }, { command }),
+        name,
+      ).toBe(true);
+    }
+  });
+
+  it("strips nothing when a quote is still open at the end of the command", () => {
+    const command = lines("echo 'unterminated", "rm -rf /tmp/x");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("still strips a body that names the constructs it refuses to read as shell", () => {
+    // These regions are ordinary content in a heredoc body, and a body is never
+    // scanned: refusing to read them must not cost the feature its main case.
+    const command = lines(
+      "cat > f.ts <<'EOF'",
+      "const id = `${environment}:${id}`;",
+      "const out = $'a\\'b';",
+      "echo `cat <<EOF`",
+      "rm -rf /tmp/x",
+      "EOF",
+    );
+
+    expect(stripHeredocBodies(command)).toBe("cat > f.ts <<'EOF'");
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+});
+
 describe("Shell command intent inside an arithmetic region", () => {
   const lines = (...parts: ReadonlyArray<string>) => parts.join("\n");
 

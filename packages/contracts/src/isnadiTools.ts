@@ -158,12 +158,21 @@ const scanBracketArithmetic = (line: string, at: number, startingDepth: number):
  * operator, so it opens nothing — the shell runs every line after it, and so
  * must we. An arithmetic region may open on one line and close on a later one,
  * so the region a line ends inside is carried the way a quote is.
+ *
+ * `null` means the line leaves the subset this scanner models, and the caller
+ * must strip nothing at all: `${…}`, `$'…'`, `$"…"` and `$(…)` are regions whose
+ * text this scanner does not read, a backtick is command substitution it does
+ * not track, a line continued by a trailing backslash is not a whole line, and a
+ * `<<` whose delimiter is not a literal word has no terminator this scanner can
+ * find. In every one of those, a `<<` may or may not be an operator, and reading
+ * it as one deletes text the shell would run. Enumerating the regions instead
+ * loses this one construct per review round; refusing to guess does not.
  */
 const scanHeredocOpener = (
   line: string,
   startingQuote: QuoteState,
   startingArithmetic: ArithmeticRegion | null,
-): HeredocScan => {
+): HeredocScan | null => {
   let quote = startingQuote;
   let atWordStart = true;
   let at = 0;
@@ -198,6 +207,11 @@ const scanHeredocOpener = (
     }
 
     if (char === "\\") {
+      // A trailing backslash continues the command on the next line, so this
+      // line is not a line the shell reads on its own: the scan would look for a
+      // heredoc in the wrong place.
+      if (at + 1 >= line.length) return null;
+
       // A backslash escapes the next character inside double quotes as well as
       // outside them, which is enough to stop `\"` closing a string and `\<`
       // opening a heredoc.
@@ -224,6 +238,12 @@ const scanHeredocOpener = (
       // A `#` that starts a word comments out the rest of the line, so a `<<` in
       // it is text the shell never reads as an operator.
       return { opener: null, quote, arithmetic: null };
+    }
+
+    if (char === "`") {
+      // Backticks are command substitution, a region this scanner does not
+      // track, so it cannot say whether a `<<` inside one is an operator.
+      return null;
     }
 
     // `<<` inside an arithmetic region is a shift operator, not a heredoc
@@ -266,6 +286,17 @@ const scanHeredocOpener = (
       continue;
     }
 
+    if (char === "$") {
+      const next = line[at + 1] ?? "";
+
+      // `$((…))` and `$[…]` were read above, where arithmetic makes a `<<` a
+      // shift. Every other `$` that opens a region — `${…}` parameter
+      // expansion, `$'…'` ANSI-C quoting, `$"…"` locale quoting, `$(…)` command
+      // substitution — is text this scanner does not read, so a `<<` inside it
+      // cannot be placed. A bare `$` prefix such as `$HOME` opens nothing.
+      if (next === "{" || next === "'" || next === '"' || next === "(") return null;
+    }
+
     if (char === "<" && line[at + 1] === "<") {
       if (line[at + 2] === "<") {
         // `<<<` is a herestring: the word after it is data, not a delimiter.
@@ -278,13 +309,18 @@ const scanHeredocOpener = (
       const match = HEREDOC_DELIMITER.exec(line.slice(at));
       const delimiter = match?.[2] ?? match?.[3] ?? match?.[4] ?? match?.[5];
 
-      if (match && delimiter !== undefined) {
-        return {
-          opener: { stripLeadingTabs: match[1] === "-", delimiter },
-          quote,
-          arithmetic: null,
-        };
+      if (match === null || delimiter === undefined) {
+        // A `<<` whose delimiter is not a literal word — `<<$DELIM`, `<<` at the
+        // end of a line — opens a heredoc whose terminator this scanner cannot
+        // find, so it cannot tell body from command.
+        return null;
       }
+
+      return {
+        opener: { stripLeadingTabs: match[1] === "-", delimiter },
+        quote,
+        arithmetic: null,
+      };
     }
 
     atWordStart = WORD_BOUNDARY.test(char);
@@ -310,6 +346,15 @@ const scanHeredocOpener = (
  * command, so stripping what follows a stray opener would hide a real
  * destructive command behind it; keeping it means a false protection at worst,
  * never a missed one.
+ *
+ * The same rule decides the whole command, and it is the reason this function
+ * cannot lose a command to a construct nobody thought of: a body is stripped
+ * only when *every* line is in the subset `scanHeredocOpener` models and every
+ * opener it finds is terminated. Anything else — a region the scanner does not
+ * read, a quote or arithmetic region still open at the end, an opener with no
+ * terminator — returns the command untouched, so classification sees the text
+ * the shell would run. Over-classifying costs a prompt; under-classifying costs
+ * the approval.
  */
 export function stripHeredocBodies(command: string): string {
   const lines = command.split("\n");
@@ -322,6 +367,10 @@ export function stripHeredocBodies(command: string): string {
     kept.push(line);
 
     const scan = scanHeredocOpener(line, quote, arithmetic);
+
+    // A line the scanner cannot read leaves the whole command unstripped.
+    if (scan === null) return command;
+
     quote = scan.quote;
     arithmetic = scan.arithmetic;
 
@@ -346,12 +395,18 @@ export function stripHeredocBodies(command: string): string {
       }
     }
 
-    if (terminator === -1) continue;
+    // No terminator means every later line is body the shell never runs, but
+    // this scanner cannot prove where that body ends, so it strips nothing.
+    if (terminator === -1) return command;
 
     // The opener stays, the body and its terminator go, and scanning resumes
     // after the terminator so a command on the next line is still classified.
     at = terminator;
   }
+
+  // A quote or arithmetic region still open when the command ends is a command
+  // the shell reads past its last line, so no line was read in the right place.
+  if (quote !== null || arithmetic !== null) return command;
 
   return kept.join("\n");
 }
