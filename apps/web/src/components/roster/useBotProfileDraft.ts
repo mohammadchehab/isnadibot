@@ -60,6 +60,97 @@ function mcpServerIdsKey(ids: readonly McpServerId[]): string {
   return [...ids].sort().join(TOOL_ID_SEPARATOR);
 }
 
+/**
+ * The ten fields the draft compares, each already in the form it is compared
+ * in: trimmed text, canonical tone, and list fields folded into a key. Plain
+ * primitives make dirtiness one comparison, whichever side the baseline is.
+ */
+interface BotProfileFields {
+  readonly name: string;
+  readonly label: string | null;
+  readonly description: string | null;
+  readonly sandbox: BotSandboxChoice;
+  readonly personalityTone: number;
+  readonly voiceEnabled: boolean;
+  readonly imageProvider: ImageProviderId | null;
+  readonly mcpServerIds: string;
+  readonly skills: string;
+  readonly skillRegistryAccess: boolean;
+}
+
+const PROFILE_FIELDS = [
+  "name",
+  "label",
+  "description",
+  "sandbox",
+  "personalityTone",
+  "voiceEnabled",
+  "imageProvider",
+  "mcpServerIds",
+  "skills",
+  "skillRegistryAccess",
+] as const satisfies readonly (keyof BotProfileFields)[];
+
+function sameProfileFields(left: BotProfileFields, right: BotProfileFields): boolean {
+  return PROFILE_FIELDS.every((field) => Object.is(left[field], right[field]));
+}
+
+/** A bot's saved values in the same shape the draft compares. */
+function profileFieldsFromBot(bot: Bot): BotProfileFields {
+  return {
+    name: bot.name,
+    label: bot.label,
+    description: bot.description,
+    sandbox: botSandboxChoice(bot.sandbox),
+    personalityTone: canonicalizeBotPersonalityTone(bot.personalityTone),
+    voiceEnabled: bot.voiceEnabled,
+    imageProvider: bot.imageProvider ?? null,
+    mcpServerIds: mcpServerIdsKey(bot.disabledMcpServerIds),
+    skills: botSkillsKey(bot.skills ?? []),
+    skillRegistryAccess: bot.skillRegistryAccess ?? false,
+  };
+}
+
+/** Carries a baseline over a bot change field by field, keeping any field it had diverged on. */
+function rebaseProfileFields(
+  current: BotProfileFields,
+  previous: BotProfileFields,
+  next: BotProfileFields,
+): BotProfileFields {
+  return {
+    name: rebaseUneditedValue(current.name, previous.name, next.name),
+    label: rebaseUneditedValue(current.label, previous.label, next.label),
+    description: rebaseUneditedValue(current.description, previous.description, next.description),
+    sandbox: rebaseUneditedValue(current.sandbox, previous.sandbox, next.sandbox),
+    personalityTone: rebaseUneditedValue(
+      current.personalityTone,
+      previous.personalityTone,
+      next.personalityTone,
+    ),
+    voiceEnabled: rebaseUneditedValue(
+      current.voiceEnabled,
+      previous.voiceEnabled,
+      next.voiceEnabled,
+    ),
+    imageProvider: rebaseUneditedValue(
+      current.imageProvider,
+      previous.imageProvider,
+      next.imageProvider,
+    ),
+    mcpServerIds: rebaseUneditedValue(
+      current.mcpServerIds,
+      previous.mcpServerIds,
+      next.mcpServerIds,
+    ),
+    skills: rebaseUneditedValue(current.skills, previous.skills, next.skills),
+    skillRegistryAccess: rebaseUneditedValue(
+      current.skillRegistryAccess,
+      previous.skillRegistryAccess,
+      next.skillRegistryAccess,
+    ),
+  };
+}
+
 export interface BotProfileUpdate {
   readonly name: string;
   readonly label: string | null;
@@ -124,6 +215,10 @@ export function useBotProfileDraft(
   const [engineChanged, setEngineChanged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // What the last successful save put on the server. The bot prop still holds
+  // the pre-save values until the projection reaches this client, and comparing
+  // against those would call a profile that was just saved dirty.
+  const [savedFields, setSavedFields] = useState<BotProfileFields | null>(null);
   const previousBot = useRef(bot);
 
   const instanceEntries = useMemo(
@@ -212,7 +307,12 @@ export function useBotProfileDraft(
     const previous = previousBot.current;
     previousBot.current = bot;
 
-    if (previous.id !== bot.id) return;
+    if (previous.id !== bot.id) {
+      // A different bot: the saved baseline belongs to the one we left.
+      setSavedFields(null);
+
+      return;
+    }
 
     setName((current) => rebaseUneditedValue(current, previous.name, bot.name));
     setLabel((current) => rebaseUneditedValue(current, previous.label ?? "", bot.label ?? ""));
@@ -262,13 +362,17 @@ export function useBotProfileDraft(
         bot.skillRegistryAccess ?? false,
       ),
     );
+    setSavedFields((current) =>
+      current === null
+        ? null
+        : rebaseProfileFields(current, profileFieldsFromBot(previous), profileFieldsFromBot(bot)),
+    );
   }, [bot]);
 
   const markChanged = () => setSaved(false);
 
   const normalizedLabel = label.trim() || null;
   const normalizedDescription = description.trim() || null;
-  const savedTone = canonicalizeBotPersonalityTone(bot.personalityTone);
 
   const nextEngine: Bot["engine"] =
     engineChanged && model
@@ -287,26 +391,21 @@ export function useBotProfileDraft(
       allowPromptInjectedEffort: false,
     });
 
-  const toolOverridesDirty =
-    mcpServerIdsKey(disabledMcpServerIds) !== mcpServerIdsKey(bot.disabledMcpServerIds);
-
-  const skillsDirty =
-    botSkillsKey(skills) !== botSkillsKey(bot.skills ?? []) ||
-    skillRegistryAccess !== (bot.skillRegistryAccess ?? false);
-
-  const sandboxDirty = sandbox !== botSandboxChoice(bot.sandbox);
+  const draftFields: BotProfileFields = {
+    name: name.trim(),
+    label: normalizedLabel,
+    description: normalizedDescription,
+    sandbox,
+    personalityTone,
+    voiceEnabled,
+    imageProvider,
+    mcpServerIds: mcpServerIdsKey(disabledMcpServerIds),
+    skills: botSkillsKey(skills),
+    skillRegistryAccess,
+  };
 
   const dirty =
-    name.trim() !== bot.name ||
-    normalizedLabel !== bot.label ||
-    normalizedDescription !== bot.description ||
-    engineChanged ||
-    sandboxDirty ||
-    personalityTone !== savedTone ||
-    voiceEnabled !== bot.voiceEnabled ||
-    imageProvider !== (bot.imageProvider ?? null) ||
-    toolOverridesDirty ||
-    skillsDirty;
+    engineChanged || !sameProfileFields(draftFields, savedFields ?? profileFieldsFromBot(bot));
 
   const canSave = Boolean(onSave) && dirty && name.trim().length > 0;
 
@@ -426,7 +525,10 @@ export function useBotProfileDraft(
         setSaving(false);
         setSaved(success);
 
-        if (success) setEngineChanged(false);
+        if (success) {
+          setSavedFields(draftFields);
+          setEngineChanged(false);
+        }
       });
     },
   };

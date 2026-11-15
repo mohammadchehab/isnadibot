@@ -21,6 +21,7 @@ import type { Dispatch, SetStateAction } from "react";
  *   return {
  *     ...actual,
  *     useCallback: reactHookHarness.useCallback,
+ *     useEffect: reactHookHarness.useEffect,
  *     useMemo: reactHookHarness.useMemo,
  *     useRef: reactHookHarness.useRef,
  *     useState: reactHookHarness.useState,
@@ -32,12 +33,29 @@ import type { Dispatch, SetStateAction } from "react";
  * });
  * ```
  *
- * Call `beginRender()` before each component invocation and `reset()` in
- * `beforeEach` to drop persisted state between tests.
+ * Call `beginRender()` before each component invocation, `flushEffects()` after the render whose
+ * effects a test needs, and `reset()` in `beforeEach` to drop persisted state between tests.
  */
+interface EffectSlot {
+  readonly deps: readonly unknown[] | undefined;
+  cleanup: (() => void) | undefined;
+}
+
+function sameDeps(
+  previous: readonly unknown[] | undefined,
+  next: readonly unknown[] | undefined,
+): boolean {
+  if (previous === undefined || next === undefined) return false;
+
+  if (previous.length !== next.length) return false;
+
+  return previous.every((value, index) => Object.is(value, next[index]));
+}
+
 export function createReactHookHarness() {
   let cursor = 0;
   let slots: unknown[] = [];
+  let pendingEffects: Array<{ index: number; effect: () => void | (() => void) }> = [];
   const nextIndex = () => cursor++;
 
   return {
@@ -45,8 +63,42 @@ export function createReactHookHarness() {
       cursor = 0;
     },
     reset() {
+      for (const { index } of pendingEffects) {
+        (slots[index] as EffectSlot | undefined)?.cleanup?.();
+      }
+
+      pendingEffects = [];
       cursor = 0;
       slots = [];
+    },
+    /**
+     * Queues an effect whose dependencies changed during this render, the way React does, and
+     * leaves running it to `flushEffects`. A test that needs the effect's `setState` result calls
+     * the component again, which is the re-render React would schedule.
+     */
+    useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void {
+      const index = nextIndex();
+      const slot = slots[index] as EffectSlot | undefined;
+
+      if (slot !== undefined && deps !== undefined && sameDeps(slot.deps, deps)) return;
+
+      slots[index] = { deps, cleanup: slot?.cleanup };
+      pendingEffects.push({ index, effect });
+    },
+    /** Runs every queued effect once, in render order, after each cleanup the previous run left. */
+    flushEffects() {
+      const queue = pendingEffects;
+
+      pendingEffects = [];
+
+      for (const { index, effect } of queue) {
+        const slot = slots[index] as EffectSlot;
+
+        slot.cleanup?.();
+        const cleanup = effect();
+
+        slot.cleanup = Predicate.isFunction(cleanup) ? cleanup : undefined;
+      }
     },
     useCallback<T>(callback: T): T {
       nextIndex();
