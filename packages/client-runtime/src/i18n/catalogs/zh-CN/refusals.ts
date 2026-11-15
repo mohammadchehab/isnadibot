@@ -34,6 +34,8 @@ export const refusalsCatalog = {
     "此空间需要一位主管。请选择由哪个机器人担任。",
   "This bot already leads the space. Pick a different boss, or keep this one.":
     "此机器人已经是该空间的主管。请选择其他主管，或保留当前主管。",
+  "No bot in this space can answer right now. Set a boss, or add a bot.":
+    "此空间目前没有可以回答的机器人。请设置主管，或添加机器人。",
   "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
     "你只能以自己的身份退出空间。如需移除其他人，你需要管理该空间。",
   "This template is not available in this version. Update the app, then try again.":

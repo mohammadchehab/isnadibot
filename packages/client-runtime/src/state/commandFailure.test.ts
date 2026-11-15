@@ -94,6 +94,13 @@ const threadStateRefusals = [
   },
 ] as const;
 
+/** The refusal the decider throws when a send reaches a space with nobody to answer. */
+const noResponderRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Group 'group-91b2' has no boss bot that can respond.",
+  refusal: "group-has-no-responder",
+};
+
 /** The refusal the decider throws when a create names a bot with another live home. */
 const botInAnotherGroupRefusal = {
   _tag: "OrchestrationCommandInvariantError",
@@ -132,6 +139,9 @@ describe("classifyCommandFailure", () => {
     expect(classifyCommandFailure(failed({ refusal: "entity-archived" }))).toBe("entity-archived");
     expect(classifyCommandFailure(failed({ refusal: "workspace-root-in-use" }))).toBe(
       "workspace-root-in-use",
+    );
+    expect(classifyCommandFailure(failed({ refusal: "group-has-no-responder" }))).toBe(
+      "group-has-no-responder",
     );
   });
 
@@ -346,6 +356,33 @@ describe("commandFailureMessage", () => {
       expect(sentence).not.toContain("Group '");
       expect(sentence).not.toContain("bot-4c81");
       expect(sentence).not.toContain("group-91b2");
+    }
+
+    // A catalog that forgot the sentence would fall back to English and collide.
+    expect(new Set(sentences).size).toBe(3);
+  });
+
+  it("replaces a no-responder refusal with copy that names no group", () => {
+    const message = commandFailureMessage(failed(noResponderRefusal));
+
+    expect(message).toBe("No bot in this space can answer right now. Set a boss, or add a bot.");
+    expect(message).not.toContain("Group '");
+    expect(message).not.toContain("group-91b2");
+  });
+
+  it("renders the no-responder refusal in every locale without an internal id", () => {
+    const sentences = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ].map((t) => commandFailureMessage(failed(noResponderRefusal), { t }));
+
+    for (const sentence of sentences) {
+      expect(sentence).not.toContain("Group '");
+      expect(sentence).not.toContain("Bot '");
+      expect(sentence).not.toContain("Person '");
+      expect(sentence).not.toContain("group-91b2");
+      expect(sentence).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
     }
 
     // A catalog that forgot the sentence would fall back to English and collide.
