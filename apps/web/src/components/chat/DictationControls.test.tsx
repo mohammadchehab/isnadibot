@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 import { visitElements } from "../../test/reactElementTree";
+import { Button } from "../ui/button";
 import { DictationControls, type DictationControlsProps } from "./DictationControls";
+
+/**
+ * The dictation control is a `Button` in the send slot and a bare `button` in the
+ * labeled form; both carry the same handlers, so a test reads either.
+ */
+const isControl = (element: { type: unknown }) =>
+  element.type === Button || element.type === "button";
 
 const effects = vi.hoisted(() => ({
   cursor: 0,
@@ -50,6 +58,11 @@ interface PointerInput {
 
 interface TestButtonProps {
   type?: string;
+  className?: string;
+  /** The design-system look the control asks for, when it is a `Button`. */
+  variant?: string;
+  /** A string on the Button, a number on a bare input; the test only reads it. */
+  size?: string | number;
   "aria-label"?: string;
   "aria-disabled"?: boolean | "true" | "false";
   "aria-pressed"?: boolean | "true" | "false";
@@ -67,13 +80,15 @@ function render(props: DictationControlsProps) {
   hooks.beginRender();
   effects.cursor = 0;
   const tree = DictationControls(props);
-  const button = visitElements(tree, (element) => element.type === "button")!;
+  const button = visitElements(tree, isControl)!;
   const cancel = visitElements(tree, (element) => element.props.children === "Cancel dictation");
   const status = visitElements(tree, (element) => element.props.role === "status")!;
 
   return {
     button: button.props as TestButtonProps,
     cancel: cancel?.props as TestButtonProps | undefined,
+    /** The control's type and props, for the look it asks the design system for. */
+    control: { type: button.type, props: button.props as TestButtonProps },
     status: status.props,
   };
 }
@@ -191,6 +206,19 @@ describe("DictationControls", () => {
     expect(handlers.onRelease).toHaveBeenCalledTimes(1);
   });
 
+  // TASK-297 AC3: the send slot takes its solid circle and its disabled look from
+  // the Button's own variants, so no opacity utility is written at this call site.
+  it("asks the Button for the default look at the round icon size", () => {
+    const idle = render({ status: "idle", appearance: "send-slot", ...callbacks() });
+    expect(idle.control.type).toBe(Button);
+    expect(idle.control.props.variant).toBe("default");
+    expect(idle.control.props.size).toBe("icon-round");
+    expect(idle.control.props.className ?? "").not.toMatch(/opacity-/);
+
+    const recording = render({ status: "recording", appearance: "send-slot", ...callbacks() });
+    expect(recording.control.props.variant).toBe("destructive");
+  });
+
   it("renders a send-slot microphone without a labeled caption", () => {
     const view = render({ status: "idle", appearance: "send-slot", ...callbacks() });
     expect(view.button["aria-label"]).toBe("Start dictation");
@@ -251,8 +279,7 @@ describe("DictationControls", () => {
     effects.cursor = 0;
     const tree = DictationControls({ status: "failed", appearance: "send-slot", ...handlers });
 
-    const retry = visitElements(tree, (element) => element.type === "button")!
-      .props as TestButtonProps;
+    const retry = visitElements(tree, isControl)!.props as TestButtonProps;
 
     expect(retry["aria-label"]).toBe("Retry dictation");
     retry.onClick!(click(0));

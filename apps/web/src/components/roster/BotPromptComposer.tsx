@@ -618,10 +618,7 @@ export function BotPromptComposer({
                 )}
               </div>
               {showDictation ? (
-                <div
-                  className="pointer-events-auto size-9 shrink-0"
-                  data-bot-prompt-dictation="true"
-                >
+                <div className="pointer-events-auto shrink-0" data-bot-prompt-dictation="true">
                   <DictationControls
                     appearance="send-slot"
                     {...dictation}

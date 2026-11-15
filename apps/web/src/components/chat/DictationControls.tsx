@@ -1,7 +1,14 @@
 import { MicIcon, RotateCcwIcon, SquareIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { useI18n } from "~/i18n";
+import { Button } from "../ui/button";
 
 export interface DictationControlsProps {
   status: "idle" | "requesting" | "recording" | "transcribing" | "canceled" | "failed";
@@ -113,78 +120,84 @@ export function DictationControls({
     ? t("Dictation unavailable: {reason}", { reason: unavailableReason })
     : announcements[status];
 
-  const button = (
-    <button
-      type="button"
-      className={
-        appearance === "send-slot"
-          ? `flex size-full touch-none select-none items-center justify-center rounded-full transition-colors disabled:opacity-50 aria-disabled:opacity-50 ${
-              active ? "bg-destructive text-on-solid" : "bg-foreground text-background"
-            }`
-          : "min-h-11 touch-none select-none rounded-md border px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
-      }
-      disabled={disabled}
-      aria-disabled={explainsBlock || undefined}
-      aria-label={label}
-      aria-pressed={active}
-      aria-describedby={`${descriptionId} ${descriptionId}-status`}
-      onPointerDown={(event) => {
-        if (event.button !== 0 || !event.isPrimary || disabled || pointer.current !== null) return;
+  // The send slot is a Button, so its disabled look and its solid fill come from
+  // the variant rather than from utilities written here. The labeled form is
+  // still a bare button (TASK-301 owns its look), so both share these handlers.
+  const handlers = {
+    disabled,
+    "aria-disabled": explainsBlock || undefined,
+    "aria-label": label,
+    "aria-pressed": active,
+    "aria-describedby": `${descriptionId} ${descriptionId}-status`,
+    onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0 || !event.isPrimary || disabled || pointer.current !== null) return;
 
-        if (explainsBlock) return;
+      if (explainsBlock) return;
 
-        if (appearance === "send-slot" && status === "transcribing") return;
-        event.preventDefault();
-        suppressClick.current = true;
-        event.currentTarget.setPointerCapture(event.pointerId);
-        pointer.current = event.pointerId;
-        holdStartedAt.current = Date.now();
-        startedThisGesture.current = !active;
+      if (appearance === "send-slot" && status === "transcribing") return;
+      event.preventDefault();
+      suppressClick.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      pointer.current = event.pointerId;
+      holdStartedAt.current = Date.now();
+      startedThisGesture.current = !active;
 
-        if (!active) start();
-      }}
-      onPointerUp={(event) => {
-        if (pointer.current !== event.pointerId) return;
-        pointer.current = null;
-        const heldMs = Date.now() - holdStartedAt.current;
+      if (!active) start();
+    },
+    onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (pointer.current !== event.pointerId) return;
+      pointer.current = null;
+      const heldMs = Date.now() - holdStartedAt.current;
 
-        // A tap starts recording; only a real hold finishes on release.
-        if (appearance === "send-slot" && startedThisGesture.current && heldMs < 220) return;
-        onRelease();
-      }}
-      onPointerCancel={(event) => {
-        if (pointer.current === event.pointerId) cancel();
-      }}
-      onLostPointerCapture={(event) => {
-        if (pointer.current === event.pointerId) cancel();
-      }}
-      onClick={(event) => {
-        // Pointer release already finished the hold; keyboard and AT clicks have detail zero.
-        if (event.detail !== 0 && suppressClick.current) {
-          suppressClick.current = false;
-
-          return;
-        }
-
+      // A tap starts recording; only a real hold finishes on release.
+      if (appearance === "send-slot" && startedThisGesture.current && heldMs < 220) return;
+      onRelease();
+    },
+    onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (pointer.current === event.pointerId) cancel();
+    },
+    onLostPointerCapture: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (pointer.current === event.pointerId) cancel();
+    },
+    onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+      // Pointer release already finished the hold; keyboard and AT clicks have detail zero.
+      if (event.detail !== 0 && suppressClick.current) {
         suppressClick.current = false;
-        toggle();
-      }}
-    >
-      {appearance === "send-slot" ? (
-        status === "transcribing" ? (
+
+        return;
+      }
+
+      suppressClick.current = false;
+      toggle();
+    },
+  };
+
+  const button =
+    appearance === "send-slot" ? (
+      <Button
+        type="button"
+        variant={active ? "destructive" : "default"}
+        size="icon-round"
+        className="touch-none select-none"
+        {...handlers}
+      >
+        {status === "transcribing" ? (
           <SquareIcon className="size-3.5 fill-current" aria-hidden="true" />
         ) : retry ? (
           <RotateCcwIcon className="size-4.5" aria-hidden="true" />
         ) : (
           <MicIcon className="size-5" aria-hidden="true" />
-        )
-      ) : active ? (
-        t("Stop dictation")
-      ) : (
-        t("Dictate")
-      )}
-    </button>
-  );
+        )}
+      </Button>
+    ) : (
+      <button
+        type="button"
+        className="min-h-11 touch-none select-none rounded-md border px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+        {...handlers}
+      >
+        {active ? t("Stop dictation") : t("Dictate")}
+      </button>
+    );
 
   if (appearance === "send-slot") {
     return (
