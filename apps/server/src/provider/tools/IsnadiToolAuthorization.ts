@@ -89,7 +89,7 @@ export const approvalUnavailableRefusal = (toolName: string) =>
  * exist yet resolves through its nearest existing ancestor, so a `..` or a link
  * cannot hide behind a missing leaf.
  */
-function realLocation(target: string): string {
+export function realLocation(target: string): string {
   const missing: string[] = [];
   let current = NodePath.resolve(target);
 
@@ -106,7 +106,12 @@ function realLocation(target: string): string {
   }
 }
 
-const isInsideRoot = (root: string, target: string) => {
+/**
+ * Whether `target` sits at or below `root`. Expects both arguments canonicalised
+ * by {@link realLocation}: the check is string-based, so on raw input a `..` that
+ * has not been resolved would read as inside.
+ */
+export const isInsideRoot = (root: string, target: string) => {
   const relative = NodePath.relative(root, target);
 
   return relative === "" || (!relative.startsWith("..") && !NodePath.isAbsolute(relative));
