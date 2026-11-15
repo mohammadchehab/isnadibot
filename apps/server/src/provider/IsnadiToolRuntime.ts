@@ -234,19 +234,20 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
     decodeIsnadiRuntimeToolInput(toolId, input, { approvalGrant: true }).input;
 
   /**
-   * Whether a `SendToAgent` target shares the calling bot's space. A same-space
-   * handoff is an internal move whose audit trail is the delegation record, so
-   * it needs no approval; a target outside the space keeps the approval it had.
-   * Anything the session cannot resolve reads as "not the same space", which
-   * keeps the approval rather than quietly dropping it — including a session
-   * with no environment to read, where the relationship is simply unknown.
+   * Whether a bot-to-bot handoff's target shares the calling bot's space, for
+   * both `SendToAgent` and `MessageAgent`. A same-space handoff is an internal
+   * move whose audit trail is the delegation record, so it needs no approval; a
+   * target outside the space keeps the approval it had. Anything the session
+   * cannot resolve reads as "not the same space", which keeps the approval
+   * rather than quietly dropping it — including a session with no environment
+   * to read, where the relationship is simply unknown.
    */
   const sameSpaceTarget = async (
     session: IsnadiToolSession,
     toolId: IsnadiRuntimeToolId,
     input: IsnadiToolExecution["input"],
   ) => {
-    if (toolId !== "SendToAgent") return false;
+    if (toolId !== "SendToAgent" && toolId !== "MessageAgent") return false;
 
     const resolve = session.sameSpaceTarget;
 

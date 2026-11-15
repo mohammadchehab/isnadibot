@@ -73,6 +73,61 @@ describe("IsnadiToolRuntime", () => {
     expect(send).toHaveBeenCalledOnce();
   });
 
+  it("lets a same-space MessageAgent through and keeps the approval across spaces", async () => {
+    const send = vi.fn(async () => ({ delivered: true }));
+    const runtime = createIsnadiToolRuntime();
+
+    const register = (threadId: string, sameSpace: boolean) => {
+      runtime.registerSession(threadId, {
+        runtimeMode: "approval-required",
+        workspaceType: "local",
+        workspace: workspace(threadId),
+        sameSpaceTarget: async () => sameSpace,
+        delegation: {
+          depth: 0,
+          activeDelegations: 0,
+          access: {
+            allowedToolIds: ["MessageAgent"],
+            memoryScopes: [],
+            sandbox: "local",
+            runtimeMode: "approval-required",
+            hasUserComputer: false,
+            enabledMcpServerIds: [],
+            disabledMcpServerIds: [],
+            approvalCeiling: "send",
+          },
+          send,
+        },
+      });
+    };
+
+    register("thread-inside", true);
+    register("thread-outside", false);
+
+    const execution = (threadId: string) => ({
+      threadId,
+      toolId: "MessageAgent" as const,
+      toolCallId: `tool-${threadId}`,
+      input: {
+        botId: BotId.make("target-bot"),
+        task: "Review the change.",
+        expectedResult: "A review.",
+      },
+      approvalMode: "require-grant" as const,
+    });
+
+    // A target inside the space is recorded, not approved.
+    await expect(runtime.execute(execution("thread-inside"))).resolves.toEqual({ delivered: true });
+
+    // A target outside it still needs the one-shot grant.
+    const outside = execution("thread-outside");
+    await expect(runtime.execute(outside)).rejects.toThrow("requires approval");
+    runtime.grantApproval(outside);
+    await expect(runtime.execute(outside)).resolves.toEqual({ delivered: true });
+
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   describe("temporary workers", () => {
     const WORKER_TOOLS = ["Task", "CheckSubagent", "MessageSubagent", "StopSubagent"];
 

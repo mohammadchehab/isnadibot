@@ -283,6 +283,40 @@ describe("Isnadi tool contracts", () => {
     );
   });
 
+  it("records a bot-to-bot handoff inside one space and keeps the approval across spaces", () => {
+    // `SendToAgent` and `MessageAgent` are one handoff family: same `botId`
+    // input, same `session.delegation.send` dispatch. The boundary is the
+    // space, not the tool, so both are recorded inside one and approved across.
+    const handoffInput = {
+      botId: "target-bot",
+      task: "Review the change.",
+      expectedResult: "A review.",
+    };
+
+    for (const toolId of ["MessageAgent", "SendToAgent"] as const) {
+      const tool = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === toolId)!;
+
+      // Protected by default, so the same-space case below is a real exemption.
+      expect(tool.approval).toBe("send");
+      expect(
+        isnadiToolRequiresApproval(
+          tool,
+          { localFullAccess: false, sameSpaceTarget: true },
+          handoffInput,
+        ),
+      ).toBe(false);
+      expect(
+        isnadiToolRequiresApproval(
+          tool,
+          { localFullAccess: false, sameSpaceTarget: false },
+          handoffInput,
+        ),
+      ).toBe(true);
+      // A session that could not resolve the relationship keeps the approval.
+      expect(isnadiToolRequiresApproval(tool, { localFullAccess: false }, handoffInput)).toBe(true);
+    }
+  });
+
   it("decodes non-fatal typed receipts", () => {
     const decode = Schema.decodeUnknownSync(IsnadiToolReceipt);
     expect(
