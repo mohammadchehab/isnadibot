@@ -1,5 +1,5 @@
 import type { TestProps, TestValue } from "../test-support/reactTree";
-import { Predicate } from "effect";
+import { Match, Predicate } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -14,6 +14,7 @@ import {
   type IsnadiDelegationState,
   type OrchestrationThreadActivity,
   type OrchestrationThreadShell,
+  type ProviderApprovalDecision,
 } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Schema from "effect/Schema";
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   activities: [] as OrchestrationThreadActivity[],
   cancel: vi.fn(),
   retry: vi.fn(),
+  respond: vi.fn(),
   toast: vi.fn(),
   // The in-flight action a mounted card would hold after a click.
   pendingAction: null as string | null,
@@ -40,8 +42,17 @@ vi.mock("react", async (importOriginal) => {
   return {
     ...actual,
     useMemo: <T,>(factory: () => T) => factory(),
+    // The card is rendered to static markup, so no renderer installs a
+    // dispatcher; the hooks it calls through useRosterPendingApproval run as
+    // plain functions here.
+    useCallback: <T,>(callback: T) => callback,
+    useRef: <T,>(initial: T) => ({ current: initial }),
     useState: <T,>(initial: T) => [
-      initial === null ? (mocks.pendingAction as T) : initial,
+      initial === null
+        ? (mocks.pendingAction as T)
+        : Predicate.isFunction(initial)
+          ? (initial as () => T)()
+          : initial,
       mocks.setState,
     ],
     useSyncExternalStore: <T,>(
@@ -84,7 +95,16 @@ vi.mock("../../state/orchestration", () => ({
 }));
 
 vi.mock("../../state/use-atom-command", () => ({
-  useAtomCommand: (command: string) => (command === "retryDelegation" ? mocks.retry : mocks.cancel),
+  useAtomCommand: (command: string) =>
+    Match.value(command).pipe(
+      Match.when("retryDelegation", () => mocks.retry),
+      Match.when("respondToApproval", () => mocks.respond),
+      Match.orElse(() => mocks.cancel),
+    ),
+}));
+
+vi.mock("../../state/threads", () => ({
+  threadEnvironment: { respondToApproval: "respondToApproval" },
 }));
 
 vi.mock("../ui/toast", () => ({ toastManager: { add: mocks.toast } }));
@@ -93,6 +113,7 @@ vi.mock("./rosterStore", () => ({
   useRosterStore: { getState: () => ({ recordChatPath: mocks.recordChatPath }) },
 }));
 
+import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { DelegationCard, delegationUsageTokens } from "./DelegationCard";
 import { DelegationDetail } from "./DelegationDetail";
 import { delegationClockState } from "./delegationClock";
@@ -249,6 +270,22 @@ function usage(turnId: string, totalProcessedTokens: number): OrchestrationThrea
   };
 }
 
+/** The approval the delegated chat raises while it works. */
+const approvalRequested: OrchestrationThreadActivity = {
+  id: EventId.make("approval-shell-1"),
+  tone: "approval",
+  kind: "approval.requested",
+  summary: "Approval requested",
+  payload: {
+    requestId: "shell-1",
+    requestType: "dynamic_tool_call",
+    toolName: "Shell",
+    detail: "Allow Shell?",
+  },
+  turnId: TurnId.make("turn-child"),
+  createdAt: "2026-08-31T00:00:30.000Z",
+};
+
 function renderCard(
   state: IsnadiDelegationState,
   bot: Bot | null = childBot,
@@ -310,6 +347,7 @@ describe("DelegationCard", () => {
     mocks.thread = childThread;
     mocks.cancel.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
     mocks.retry.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
+    mocks.respond.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
     mocks.toast.mockReset();
     mocks.pendingAction = null;
     mocks.navigate.mockReset().mockResolvedValue(undefined);
@@ -701,6 +739,50 @@ describe("DelegationCard", () => {
     expect(markup).toContain("Let it finish");
     expect(markup).not.toContain("Cancel delegation to Mori");
     expect(markup).toContain('aria-label="View Mori&#x27;s work"');
+  });
+
+  it("shows the approval a delegated chat raised, on the card in the parent chat", () => {
+    mocks.activities = [approvalRequested];
+
+    const markup = renderCard("running");
+
+    // The child's own chat is deliberately unreachable from the roster, so this
+    // card is the only place the approval can be answered.
+    expect(markup).toContain('data-testid="bot-approval-prompt"');
+    expect(markup).toContain("Run this command?");
+  });
+
+  it("stops offering the approval once the delegated work has finished", () => {
+    mocks.activities = [approvalRequested];
+
+    const markup = renderCard("completed");
+
+    expect(markup).not.toContain('data-testid="bot-approval-prompt"');
+  });
+
+  it("answers the child chat, not the parent, when approved on the card", async () => {
+    mocks.activities = [approvalRequested];
+
+    const prompt = visitElements(
+      cardElement("running"),
+      (element) => element.type === BotApprovalPrompt,
+    );
+
+    const onRespond = prompt?.props.onRespond as
+      | ((decision: ProviderApprovalDecision) => Promise<boolean | void>)
+      | undefined;
+
+    await onRespond?.("accept");
+
+    // Answering the parent here would leave the child's turn blocked forever.
+    expect(mocks.respond).toHaveBeenCalledWith({
+      environmentId: EnvironmentId.make("environment-1"),
+      input: {
+        threadId: ThreadId.make("thread-child"),
+        requestId: "shell-1",
+        decision: "accept",
+      },
+    });
   });
 
   it("runs one shared timer for every live card and none for finished cards", () => {
