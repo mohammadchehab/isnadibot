@@ -60,6 +60,9 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "member.title)}</p>",
       "noticeCopy(member.notice))}</p>",
     ],
+    "apps/web/src/components/fleet/SquadSetupHeading.tsx": [
+      "templateName));",
+    ],
     "apps/web/src/components/fleet/SquadSetupScreen.tsx": [
       "boss.name) : null}</SelectValue>",
       "member.name)}",
@@ -462,6 +465,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/computer/ComputerViewerDialog.tsx",
     "apps/web/src/components/computer/ComputerViewerPanel.tsx",
     "apps/web/src/components/fleet/HireMemberRow.tsx",
+    "apps/web/src/components/fleet/SquadSetupHeading.tsx",
     "apps/web/src/components/fleet/SquadSetupScreen.tsx",
     "apps/web/src/components/fleet/StartSpaceScreen.tsx",
     "apps/web/src/components/fleet/useCreateSquad.ts",

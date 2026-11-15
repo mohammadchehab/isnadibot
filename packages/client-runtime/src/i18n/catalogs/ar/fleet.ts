@@ -23,7 +23,7 @@ export const fleetCatalog = {
   "Every bot needs a name.": "يحتاج كل بوت إلى اسم.",
   "Could not create the space": "تعذّر إنشاء المساحة",
   "Checking what happened…": "جارٍ التحقق مما حدث…",
-  "Set up your recruiting squad": "جهّز فريق التوظيف",
+  "Set up your {template} squad": "جهّز فريق {template}",
   "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.":
     "اختر القائد. يجيب القائد عن كل رسالة افتراضيًا ويوزّع العمل على بقية البوتات عبر الإشارات @mentions.",
   "{count} on demand": "{count} عند الطلب",
