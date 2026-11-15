@@ -431,7 +431,13 @@ describe("IsnadiToolRuntime", () => {
         approvalMode: "require-grant" as const,
       },
     ]) {
-      if (execution.toolId === "StopAgent") runtime.grantApproval(execution);
+      // Creating and stopping a bot sit behind the approval gate. The failure
+      // this test is about happens once the grant is spent and the control call
+      // itself fails, so each is approved before it runs.
+      if (execution.toolId === "CreateAgent" || execution.toolId === "StopAgent") {
+        runtime.grantApproval(execution);
+      }
+
       receipts.length = 0;
       await expect(runtime.execute(execution)).resolves.toMatchObject({
         receiptId: execution.toolCallId,
