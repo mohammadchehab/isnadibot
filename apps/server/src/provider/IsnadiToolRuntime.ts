@@ -32,6 +32,7 @@ import {
 import {
   ensureWorkspaceCwd,
   approvalCeilingRefusal,
+  delegationPreApprovesRead,
   canonicalInput,
   requiredString,
   field,
@@ -292,9 +293,20 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
       input,
       workspaceType: session.workspaceType,
       approvalCeiling: session.delegation?.access.approvalCeiling,
+      grant: session.delegation?.access,
     });
 
     if (refusal) throw new Error(refusal);
+
+    if (
+      delegationPreApprovesRead({
+        tool: isnadiTool,
+        input,
+        workspaceType: session.workspaceType,
+        grant: session.delegation?.access,
+      })
+    )
+      return false;
 
     return isnadiToolRequiresApproval(
       isnadiTool,

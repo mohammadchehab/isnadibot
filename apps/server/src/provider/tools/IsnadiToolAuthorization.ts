@@ -83,6 +83,46 @@ export const approvalUnavailableRefusal = (toolName: string) =>
   `Tool '${toolName}' needs approval, and this chat cannot ask anyone for it. Finish without it or report the blocker.`;
 
 /**
+ * Whether the delegation's own grant already approves this call. A boss that
+ * delegates `ExternalRead` with user-computer access has consented to reads of
+ * the user's computer, so an ordinary read needs no card, and a `none` ceiling
+ * (which nobody can answer) must not strand it. Only the plain `user-computer`
+ * class is covered: a protected path (secrets, production) keeps its approval.
+ */
+export function delegationPreApprovesRead(input: {
+  readonly tool: IsnadiToolDefinition | undefined;
+  readonly input: unknown;
+  readonly workspaceType: IsnadiToolWorkspaceType | undefined;
+  readonly grant?: IsnadiDelegationAccessGrant | undefined;
+}): boolean {
+  const { tool, grant } = input;
+
+  if (tool?.id !== "ExternalRead" || !grant) return false;
+
+  if (!grant.hasUserComputer || !grant.allowedToolIds.includes("ExternalRead")) return false;
+
+  return (
+    isnadiToolApprovalForInput(
+      tool,
+      input.input,
+      input.workspaceType === undefined ? {} : { workspaceType: input.workspaceType },
+    ) === "user-computer"
+  );
+}
+
+/**
+ * The refusal for a call whose approval nobody can give. It names the missing
+ * grant so the bot can tell its boss what to change.
+ */
+const approvalUnavailableForAction = (
+  tool: IsnadiToolDefinition,
+  action: IsnadiToolApprovalClass,
+) =>
+  tool.id === "ExternalRead" && action === "user-computer"
+    ? `Tool 'ExternalRead' reads the user's computer. This delegation was not granted user-computer access (it needs 'ExternalRead' in its tools and a user computer), and nobody here can approve it. Report that blocker to your boss so they re-delegate with that access.`
+    : `${approvalUnavailableRefusal(tool.id)} It is a '${action}' action, which this delegation's approval ceiling 'none' does not allow.`;
+
+/**
  * Why a call above its delegation's approval ceiling is refused, or null when
  * the call is within it. Two places ask, and they must never disagree: the
  * runtime refuses the call, and the controller refuses to show an approval card
@@ -94,12 +134,15 @@ export function approvalCeilingRefusal(input: {
   readonly input: unknown;
   readonly workspaceType: IsnadiToolWorkspaceType | undefined;
   readonly approvalCeiling: IsnadiToolApprovalClass | undefined;
+  readonly grant?: IsnadiDelegationAccessGrant | undefined;
 }): string | null {
   const { tool, approvalCeiling } = input;
 
   // No definition is a tool the ceiling does not classify: memory and MCP tools
   // never reach it, so they keep whatever gate they had.
   if (!tool || !approvalCeiling) return null;
+
+  if (delegationPreApprovesRead({ ...input, tool })) return null;
 
   const action = isnadiToolApprovalForInput(
     tool,
@@ -109,7 +152,7 @@ export function approvalCeilingRefusal(input: {
 
   if (APPROVAL_RANK.indexOf(action) <= APPROVAL_RANK.indexOf(approvalCeiling)) return null;
 
-  if (approvalCeiling === "none") return approvalUnavailableRefusal(tool.id);
+  if (approvalCeiling === "none") return approvalUnavailableForAction(tool, action);
 
   return `Tool '${tool.id}' is a '${action}' action, and this chat's approval ceiling is '${approvalCeiling}', so approving it here would not run it. Do the work another way, or ask your user to run it.`;
 }

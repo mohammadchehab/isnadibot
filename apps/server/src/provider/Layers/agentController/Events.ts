@@ -29,6 +29,7 @@ import { SubscriptionAuthService } from "../../../subscription-auth/service.ts";
 import { isnadiActionNeedsApproval, criticalIsnadiAction } from "../../IsnadiMastraHarness.ts";
 import {
   approvalCeilingRefusal,
+  delegationPreApprovesRead,
   approvalUnavailableRefusal,
 } from "../../tools/IsnadiToolAuthorization.ts";
 
@@ -408,6 +409,7 @@ export function createEvents(deps: {
           input: toolInput,
           workspaceType: active.toolSession.workspaceType,
           approvalCeiling: grant?.approvalCeiling,
+          grant,
         });
 
         if (ceilingRefusal) {
@@ -415,6 +417,23 @@ export function createEvents(deps: {
             toolCallId: event.toolCallId,
             decision: "decline",
             declineContext: { reason: "approval_ceiling", message: ceilingRefusal },
+          });
+
+          return;
+        }
+
+        // The delegation's grant already approves a plain read of the user's computer.
+        if (
+          delegationPreApprovesRead({
+            tool: ISNADI_TOOL_CATALOG.find((tool) => tool.id === event.toolName),
+            input: toolInput,
+            workspaceType: active.toolSession.workspaceType,
+            grant,
+          })
+        ) {
+          active.session.respondToToolApproval({
+            toolCallId: event.toolCallId,
+            decision: "approve",
           });
 
           return;
