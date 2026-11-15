@@ -1,6 +1,7 @@
 import {
   isGroupBotMember,
   type BotId,
+  type CommandRefusal,
   type GroupAddressing,
   type GroupMembership,
   type MessageId,
@@ -58,7 +59,7 @@ export const resolveGroupResponderBotId = <E, R>(input: {
 
 export type GroupAddressingResolution =
   | { readonly ok: true; readonly responders: ReadonlyArray<BotId> }
-  | { readonly ok: false; readonly detail: string };
+  | { readonly ok: false; readonly refusal: CommandRefusal; readonly detail: string };
 
 /**
  * Turns an addressing intent into the ordered bots that answer, first to last. Every bot must be
@@ -91,7 +92,11 @@ export function resolveGroupAddressing(input: {
   const needBoss = (): GroupAddressingResolution =>
     boss !== null && memberBotIds.includes(boss)
       ? { ok: true, responders: [boss] }
-      : { ok: false, detail: `Group '${input.group.id}' has no boss bot that can respond.` };
+      : {
+          ok: false,
+          refusal: "group-has-no-responder",
+          detail: `Group '${input.group.id}' has no boss bot that can respond.`,
+        };
 
   switch (input.addressing.kind) {
     case "auto":
@@ -111,6 +116,7 @@ export function resolveGroupAddressing(input: {
         ? { ok: true, responders: named }
         : {
             ok: false,
+            refusal: "stale-view",
             detail: `Bot '${stranger}' is not an active member of group '${input.group.id}'.`,
           };
     }
@@ -120,21 +126,33 @@ export function resolveGroupAddressing(input: {
       const target = input.messages.find((message) => message.id === messageId);
 
       if (target === undefined) {
-        return { ok: false, detail: `Message '${messageId}' does not exist in this chat.` };
+        return {
+          ok: false,
+          refusal: "stale-view",
+          detail: `Message '${messageId}' does not exist in this chat.`,
+        };
       }
 
       const author = target.respondingBotId ?? null;
 
       // Only a bot's own message can be replied to: a user message, or one saved without its
-      // bot, has no one to answer.
+      // bot, has no one to answer. The composer sends reply addressing only for a message its
+      // own model records a bot author for, so a fresh send does not land here; a model that
+      // went stale does — a history restore rewrites a message under the same id. That makes
+      // this the same fact as the other arms: the client's picture is behind the server's.
       if (target.role !== "assistant" || author === null) {
-        return { ok: false, detail: `Message '${messageId}' was not written by a bot.` };
+        return {
+          ok: false,
+          refusal: "stale-view",
+          detail: `Message '${messageId}' was not written by a bot.`,
+        };
       }
 
       return memberBotIds.includes(author)
         ? { ok: true, responders: [author] }
         : {
             ok: false,
+            refusal: "stale-view",
             detail: `Bot '${author}' is not an active member of group '${input.group.id}'.`,
           };
     }

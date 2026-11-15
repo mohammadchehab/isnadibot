@@ -35,6 +35,8 @@ export const refusalsCatalog = {
     "تحتاج هذه المساحة إلى قائد. اختر البوت الذي سيقودها.",
   "This bot already leads the space. Pick a different boss, or keep this one.":
     "هذا البوت يقود المساحة بالفعل. اختر قائدًا آخر أو أبقِ هذا القائد.",
+  "No bot in this space can answer right now. Set a boss, or add a bot.":
+    "لا يوجد بوت في هذه المساحة يمكنه الرد الآن. عيّن قائدًا، أو أضف بوتًا.",
   "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
     "يمكنك مغادرة المساحة بنفسك فقط. لإزالة شخص آخر، تحتاج إلى إدارة المساحة.",
   "This template is not available in this version. Update the app, then try again.":

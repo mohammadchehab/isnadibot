@@ -153,6 +153,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
           if (!resolution.ok) {
             return yield* new OrchestrationCommandInvariantError({
               commandType: command.type,
+              refusal: resolution.refusal,
               detail: resolution.detail,
             });
           }
@@ -171,6 +172,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         if (selectedBotId === null) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
+            refusal: "group-has-no-responder",
             detail: `Group '${group.id}' has no boss bot that can respond.`,
           });
         }
@@ -198,6 +200,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         if (!senderIsMember && command.senderCanManageGroups !== true) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
+            refusal: "actor-not-a-group-member",
             detail: `Person '${command.senderPersonId}' is not a member of group '${group.id}'.`,
           });
         }

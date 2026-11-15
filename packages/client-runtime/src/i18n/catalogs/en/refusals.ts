@@ -36,6 +36,8 @@ export const refusalsCatalog = {
     "This space needs a boss. Choose which bot leads it.",
   "This bot already leads the space. Pick a different boss, or keep this one.":
     "This bot already leads the space. Pick a different boss, or keep this one.",
+  "No bot in this space can answer right now. Set a boss, or add a bot.":
+    "No bot in this space can answer right now. Set a boss, or add a bot.",
   "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
     "You can only leave a space as yourself. To remove someone else, you need to manage the space.",
   "This template is not available in this version. Update the app, then try again.":

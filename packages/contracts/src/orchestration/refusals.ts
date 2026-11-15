@@ -72,6 +72,19 @@ export const CommandRefusalCodes = [
    */
   "boss-cannot-be-replaced-and-removed",
   /**
+   * A turn was sent to a space and no bot in it can answer: the space has no
+   * boss, or the boss is not an active member. One code for both sites, because
+   * they are one fact and one remedy — the roster has nobody to answer, and the
+   * fix is to set a boss or add a bot.
+   *
+   * It cannot share `bot-is-group-boss` (that one tells the user the bot they
+   * picked leads the space) or `group-would-be-undersized` (whose sentence
+   * sends them to add a bot *before removing one*, and which would be false
+   * here — the space may hold three bots and still have no active boss). It is
+   * not `thread-is-busy` either: the chat is fine, the roster is not.
+   */
+  "group-has-no-responder",
+  /**
    * The chat has live work — a running session, a turn the user just sent that
    * no turn has adopted yet, or an approval/user-input request blocking the
    * agent — so settling or snoozing it would hide work the user is waiting on.
