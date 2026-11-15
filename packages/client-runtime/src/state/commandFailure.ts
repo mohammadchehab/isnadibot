@@ -29,7 +29,7 @@ export type CommandFailureRefusal = CommandRefusal | "unknown";
 const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "environment-rights": "Changing this environment needs permission. Ask the person who runs it.",
   "open-work-items":
-    "This group still holds open work. Delete again to see how many items would be discarded.",
+    "This space still holds open work. Delete again to see how many items would be discarded.",
   "bot-is-group-boss": "This bot leads a space. Pick a new boss, or delete the space.",
   "group-would-be-undersized":
     "This space needs at least two bots. Add another bot before you remove one.",

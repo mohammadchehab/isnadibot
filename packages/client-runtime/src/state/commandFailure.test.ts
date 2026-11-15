@@ -101,6 +101,14 @@ const noResponderRefusal = {
   refusal: "group-has-no-responder",
 };
 
+/** The refusal the decider throws when deleting a group that still holds open work. */
+const openWorkItemsRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message:
+    "Group 'group-91b2' still holds 2 open work item(s). Pass discardWorkItems to delete it and discard them.",
+  refusal: "open-work-items",
+};
+
 /** The refusal the decider throws when a create names a bot with another live home. */
 const botInAnotherGroupRefusal = {
   _tag: "OrchestrationCommandInvariantError",
@@ -381,6 +389,48 @@ describe("commandFailureMessage", () => {
       expect(sentence).not.toContain("Group '");
       expect(sentence).not.toContain("Bot '");
       expect(sentence).not.toContain("Person '");
+      expect(sentence).not.toContain("group-91b2");
+      expect(sentence).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
+    }
+
+    // A catalog that forgot the sentence would fall back to English and collide.
+    expect(new Set(sentences).size).toBe(3);
+  });
+
+  // A space is the name the user knows (docs/internals/glossary.md); group is the
+  // internal word. This sentence was the one refusal that printed the internal one.
+  it("calls it a space, never a group, for an open-work-items refusal", () => {
+    const message = commandFailureMessage(failed(openWorkItemsRefusal));
+
+    expect(message).toBe(
+      "This space still holds open work. Delete again to see how many items would be discarded.",
+    );
+    expect(message).toContain("space");
+    expect(message).not.toContain("group");
+  });
+
+  it("renders the open-work-items refusal with the space word in every locale", () => {
+    const sentences = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ].map((t) => commandFailureMessage(failed(openWorkItemsRefusal), { t }));
+
+    const [en, ar, zhCN] = sentences;
+
+    expect(en).toContain("space");
+    expect(en).not.toContain("group");
+
+    // The space word, and never the group word the old values carried.
+    expect(ar).toContain("المساحة");
+    expect(ar).not.toContain("المجموعة");
+    expect(ar).not.toContain("الفريق");
+
+    expect(zhCN).toContain("空间");
+    expect(zhCN).not.toContain("分组");
+    expect(zhCN).not.toContain("群组");
+
+    for (const sentence of sentences) {
       expect(sentence).not.toContain("group-91b2");
       expect(sentence).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
     }
