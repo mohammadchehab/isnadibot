@@ -27,7 +27,7 @@ export function SettingsRow(props: {
     <View
       className={
         props.disabled
-          ? "flex-row items-center gap-4 p-4 opacity-[0.45]"
+          ? "flex-row items-center gap-4 p-4 opacity-45"
           : "flex-row items-center gap-4 p-4"
       }
     >

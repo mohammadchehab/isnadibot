@@ -246,8 +246,8 @@ function LocalExecution({ environmentId }: { readonly environmentId: Environment
               accessibilityState={{ selected: mode === option.value }}
               className={
                 mode === option.value
-                  ? "flex-1 rounded-[14px] bg-foreground px-4 py-3"
-                  : "flex-1 rounded-[14px] bg-subtle px-4 py-3"
+                  ? "flex-1 rounded-2xl bg-foreground px-4 py-3"
+                  : "flex-1 rounded-2xl bg-subtle px-4 py-3"
               }
               onPress={() => {
                 void updateSettings({

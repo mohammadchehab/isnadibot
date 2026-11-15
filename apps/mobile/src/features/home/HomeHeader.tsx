@@ -224,7 +224,7 @@ export function HomeHeader(props: {
                 accessibilityRole="button"
                 className="size-11 items-center justify-center rounded-full border border-border-subtle bg-subtle"
               >
-                <RNText className="text-[15px] font-t3-bold tracking-[0.5px] text-foreground-secondary">
+                <RNText className="text-base font-t3-bold tracking-wider text-foreground-secondary">
                   {initials}
                 </RNText>
                 {hasCustomListOptions ? (

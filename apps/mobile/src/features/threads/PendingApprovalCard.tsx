@@ -46,8 +46,8 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   // Opaque for the same reason as PendingUserInputCard: nothing blurs the feed
   // behind this card, so a translucent surface bleeds messages through it.
   return (
-    <View className="gap-2.5 rounded-[20px] border border-neutral-200 bg-neutral-100 p-4 dark:border-white/6 dark:bg-neutral-900">
-      <Text className="font-t3-bold text-2xs uppercase tracking-[1.1px] text-sky-700 dark:text-sky-300">
+    <View className="gap-2.5 rounded-3xl border border-neutral-200 bg-neutral-100 p-4 dark:border-white/6 dark:bg-neutral-900">
+      <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-sky-700 dark:text-sky-300">
         {t("Approval needed")}
       </Text>
       <Text className="font-t3-bold text-lg text-neutral-950 dark:text-neutral-50">
@@ -84,7 +84,7 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
         {options.map((option) => (
           <Pressable
             key={option.decision}
-            className={`items-center justify-center rounded-[14px] px-3.5 py-3 ${Match.value(
+            className={`items-center justify-center rounded-2xl px-3.5 py-3 ${Match.value(
               option.decision,
             ).pipe(
               Match.when("accept", () => "bg-blue-500"),

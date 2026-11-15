@@ -540,7 +540,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         <View className="flex-row items-center gap-2">
           <Text
             className={cn(
-              "shrink text-[17px] font-t3-bold leading-snug",
+              "shrink text-lg font-t3-bold leading-snug",
               selected ? "text-user-bubble-foreground" : "text-foreground",
             )}
             numberOfLines={1}
@@ -549,7 +549,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           </Text>
           {/* A title-derived identity already shows the title; skip the duplicate chip. */}
           {displayThreadTitle !== botName ? (
-            <View className="min-w-0 shrink-[2] rounded-lg bg-subtle px-2 py-0.75">
+            <View className="min-w-0 shrink-2 rounded-lg bg-subtle px-2 py-0.75">
               <Text className={cn("text-xs font-t3-medium", metaMutedClass)} numberOfLines={1}>
                 {displayThreadTitle}
               </Text>

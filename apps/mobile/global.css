@@ -223,6 +223,10 @@
   --font-medium: "DMSans-Medium";
   --font-bold: "DMSans-Bold";
 
+  /* Small-caps tracking for uppercase labels and brand wordmarks. */
+  --tracking-label: 0.065em;
+  --tracking-label-wide: 0.09em;
+
   /* Keep this scale aligned with src/lib/typography.ts for native style props. */
   --text-3xs: 11px;
   --text-3xs--line-height: 14px;
