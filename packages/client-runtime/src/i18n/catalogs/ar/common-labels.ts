@@ -95,6 +95,7 @@ export const commonLabelsCatalog = {
   "Reset to default": "إعادة الضبط إلى الافتراضي",
   "Stop generation": "أوقف التوليد",
   "Try again": "حاول مرة أخرى",
+  Discard: "تجاهل",
   General: "عام",
   English: "الإنجليزية",
   "System default": "افتراضي النظام",

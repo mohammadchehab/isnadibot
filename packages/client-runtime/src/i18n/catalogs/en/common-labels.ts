@@ -95,6 +95,7 @@ export const commonLabelsCatalog = {
   "Reset to default": "Reset to default",
   "Stop generation": "Stop generation",
   "Try again": "Try again",
+  Discard: "Discard",
   General: "General",
   English: "English",
   "System default": "System default",

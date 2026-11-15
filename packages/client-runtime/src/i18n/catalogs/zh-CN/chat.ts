@@ -39,6 +39,7 @@ export const chatCatalog = {
   "Plan mode (legacy)": "计划模式（旧版）",
   "Queue chat": "加入队列",
   Queued: "已排队",
+  "Not sent": "未发送",
   "Retry now": "立即重试",
   "Return to chat": "返回聊天",
   "Review changes": "查看更改",
