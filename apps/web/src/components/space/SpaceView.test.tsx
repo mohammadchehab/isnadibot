@@ -9,6 +9,10 @@ vi.mock("./SpaceOverview", () => ({ SpaceOverview: () => <p>overview-body</p> })
 
 vi.mock("./SpaceTasks", () => ({ SpaceTasks: () => <p>tasks-body</p> }));
 
+vi.mock("../roster/GroupMemberStack", () => ({
+  GroupMemberStack: () => <span data-testid="member-stack" />,
+}));
+
 import { SpaceView, type SpaceTab } from "./SpaceView";
 
 const group: Group = {
@@ -53,5 +57,17 @@ describe("SpaceView", () => {
 
   it("shows an empty state on Files", () => {
     expect(render("files")).toContain("Files you add to this space show here.");
+  });
+
+  it("draws the member stack only on Group chat, where the header owns it", () => {
+    expect(render("chat")).toContain("member-stack");
+
+    for (const tab of ["overview", "tasks", "skills", "files"] as const)
+      expect(render(tab)).not.toContain("member-stack");
+  });
+
+  it("keeps the space name in the top bar on every tab", () => {
+    for (const tab of ["overview", "tasks", "chat", "skills", "files"] as const)
+      expect(render(tab)).toContain("Launch");
   });
 });
