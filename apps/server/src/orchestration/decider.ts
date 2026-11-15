@@ -6,7 +6,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "./Errors.ts";
+import { type OrchestrationCommandInvariantError, internalInvariantError } from "./Errors.ts";
 import type { OrchestrationDispatchActor } from "./Services/OrchestrationEngine.ts";
 import { requireGroupOwnedThreadMutationAuthorized, requireThread } from "./commandInvariants.ts";
 import { projectEvent } from "./projector.ts";
@@ -285,9 +285,11 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     default: {
       command satisfies never;
 
-      return yield* new OrchestrationCommandInvariantError({
+      return yield* internalInvariantError({
         commandType: commandType,
         detail: `Unknown command type: ${commandType}`,
+        reason:
+          "The switch is exhaustive over `OrchestrationCommand`, so an unknown type means the command arrived without passing the contract's decode; no client can produce one.",
       });
     }
   }

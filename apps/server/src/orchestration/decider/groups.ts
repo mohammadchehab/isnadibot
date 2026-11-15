@@ -7,7 +7,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, refusedInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireBotNotArchived,
@@ -66,7 +66,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       const createdByBotId = command.createdByBotId ?? null;
 
       if (createdByBotId !== null && actor !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: "A bot origin is set by the server, never carried by a client command.",
           refusal: "bot-origin-forbidden",
@@ -81,7 +81,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         command.fleetTemplateId !== undefined &&
         !FLEET_TEMPLATES.some((template) => template.id === command.fleetTemplateId)
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "unknown-fleet-template",
           detail: `Unknown fleet template '${command.fleetTemplateId}'.`,
@@ -89,7 +89,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       }
 
       if (command.bossBotId === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "group-requires-boss",
           detail: "A group requires a boss bot.",
@@ -120,7 +120,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       );
 
       if (botInAnotherGroup !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "bot-in-another-group",
           detail: `Bot '${botInAnotherGroup.id}' already belongs to group '${botInAnotherGroup.groupId}'.`,
@@ -128,7 +128,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       }
 
       if (memberBotIds.length < 2) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "group-would-be-undersized",
           detail: `Group '${command.groupId}' requires at least two active bots.`,
@@ -219,7 +219,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       ).length;
 
       if (openWorkItemCount > 0 && command.discardWorkItems !== true) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Group '${command.groupId}' still holds ${openWorkItemCount} open work item(s). Pass discardWorkItems to delete it and discard them.`,
           refusal: "open-work-items",
@@ -320,7 +320,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       }
 
       if (command.role === "boss" && group.bossBotId !== null && group.bossBotId !== bot.id) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "group-already-has-boss",
           detail: `Group '${group.id}' already has boss bot '${group.bossBotId}'. Use 'group.boss.set' to replace it.`,
@@ -328,7 +328,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       }
 
       if (command.role === "specialist" && group.bossBotId === bot.id) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "bot-is-group-boss",
           detail: `Bot '${bot.id}' is the boss of group '${group.id}' and cannot be assigned as a specialist.`,
@@ -342,7 +342,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         const refusal = groupDepartureRefusal({ readModel, group: sourceGroup, botId: bot.id });
 
         if (refusal === "is-boss") {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             refusal: "bot-is-group-boss",
             detail: `Bot '${bot.id}' is the boss of group '${sourceGroup.id}'. Replace it with 'group.boss.set' before moving it to another group.`,
@@ -350,7 +350,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         }
 
         if (refusal === "too-few-members") {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             refusal: "group-would-be-undersized",
             detail: `Group '${sourceGroup.id}' requires at least two active bots.`,
@@ -426,7 +426,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         .find((entry) => entry.botId === command.botId);
 
       if (!member) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "bot-not-a-group-member",
           detail: `Bot '${command.botId}' is not a member of group '${group.id}'.`,
@@ -436,7 +436,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       const refusal = groupDepartureRefusal({ readModel, group, botId: command.botId });
 
       if (refusal === "is-boss") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "bot-is-group-boss",
           detail: `Bot '${command.botId}' is the last boss of group '${group.id}'. Set a new boss and unassign the previous boss with one 'group.boss.set' command.`,
@@ -444,7 +444,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       }
 
       if (refusal === "too-few-members") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "group-would-be-undersized",
           detail: `Group '${group.id}' requires at least two active bots.`,
@@ -510,7 +510,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         // Removing someone else needs environment manage rights.
         yield* requireEnvironmentManageRights({ command, actor });
       } else if (actor !== undefined && command.personId !== actor.personId) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "leave-only-as-yourself",
           detail: `Person '${actor.personId}' can only leave a group as themselves.`,
@@ -522,7 +522,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       );
 
       if (!person) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           // A person who left is usually still in the environment, so "no longer
           // in this space" would be false; the membership is the thing that is
@@ -562,7 +562,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       });
 
       if (group.bossBotId === nextBoss.id && command.unassignPreviousBoss === true) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "boss-cannot-be-replaced-and-removed",
           detail: `Bot '${nextBoss.id}' is already the boss and cannot replace and unassign itself.`,
@@ -576,7 +576,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         remainingBotIds.add(nextBoss.id);
 
         if (remainingBotIds.size < 2) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             refusal: "group-would-be-undersized",
             detail: `Group '${group.id}' requires at least two active bots.`,

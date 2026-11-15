@@ -6,6 +6,7 @@ import {
   MessageId,
   ProjectId,
   ProviderInstanceId,
+  OrchestrationDispatchCommandError,
   ThreadId,
   type OrchestrationCommand,
   type OrchestrationReadModel,
@@ -18,6 +19,12 @@ import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { applyAuthenticatedCommandActor } from "./AuthenticatedCommand.ts";
 import { decideOrchestrationCommand } from "./decider.ts";
+import { toDispatchCommandError } from "./dispatchCommandError.ts";
+import {
+  internalInvariantError,
+  pendingRefusalInvariantError,
+  refusedInvariantError,
+} from "./Errors.ts";
 import {
   BOSS_ID,
   GROUP_ID,
@@ -47,6 +54,9 @@ import {
  */
 
 const MESSAGE_ID = MessageId.make("message-1");
+
+/** What a client actually receives: the error encoded against its wire schema. */
+const encodeDispatchError = Schema.encodeEffect(OrchestrationDispatchCommandError);
 
 /** Whether a payload survives the contract a client dispatch is decoded against. */
 const clientCanDispatch = Schema.is(ClientOrchestrationCommand);
@@ -343,6 +353,75 @@ it.layer(NodeServices.layer)("invariant exclusions", (it) => {
         type: "thread.message-reaction-set",
         payload: { personId: CLIENT_ACTOR.personId },
       });
+    }),
+  );
+
+  /**
+   * The exclusions above are for the server's log and for a test. Only `refusal`
+   * crosses the wire, because only `refusal` has a sentence on a client. An
+   * exclusion's written reason names the command type and the field that keeps
+   * the guard open, and a pending refusal's ticket names internal work — neither
+   * is a sentence a user should read, and neither may reach a client.
+   */
+  it.effect("carries only the refusal code onto the wire", () =>
+    Effect.gen(function* () {
+      const detail = "Thread 'thread-1' is archived.";
+
+      // The positive control: a coded throw keeps its code, so the assertions
+      // below cannot pass by the translation dropping everything.
+      const refused = toDispatchCommandError(
+        refusedInvariantError({ commandType: "thread.update", detail, refusal: "stale-view" }),
+        "fallback",
+      );
+
+      expect(refused.refusal).toBe("stale-view");
+      expect(refused.message).toContain(detail);
+
+      const excluded = toDispatchCommandError(
+        internalInvariantError({
+          commandType: "thread.update",
+          detail,
+          reason: "ThreadUpdateCommand rejects this at decode.",
+        }),
+        "fallback",
+      );
+
+      // The sentence still reaches the client as the fallback it can print.
+      expect(excluded.message).toContain(detail);
+      expect(excluded.refusal).toBeUndefined();
+      expect(excluded).not.toHaveProperty("exclusion");
+      expect(excluded).not.toHaveProperty("failure");
+
+      // The written reason names the command type and the field that keeps the
+      // guard open, which is a fact for the server's log and not a sentence a
+      // user reads. It must not survive the encode either.
+      const excludedWire = yield* encodeDispatchError(excluded);
+
+      expect(JSON.stringify(excludedWire)).not.toContain("rejects this at decode");
+
+      const pending = toDispatchCommandError(
+        pendingRefusalInvariantError({
+          commandType: "thread.update",
+          detail,
+          reason: "The archived flag has no code of its own yet.",
+          ticket: "TASK-000",
+        }),
+        "fallback",
+      );
+
+      expect(pending.message).toContain(detail);
+      expect(pending.refusal).toBeUndefined();
+      expect(pending).not.toHaveProperty("failure");
+
+      // The ticket is internal work, not a user-facing code. The throw rides on
+      // the error as its `cause`, and a `Defect` encodes an `Error` as
+      // `{ name, message }` — so only the sentence reaches the wire while the
+      // ticket and the reason stay on the server. Assert the encoded form, not
+      // the in-process object, because the encoded form is what a client reads.
+      const pendingWire = yield* encodeDispatchError(pending);
+
+      expect(JSON.stringify(pendingWire)).not.toContain("TASK-000");
+      expect(JSON.stringify(pendingWire)).not.toContain("has no code of its own yet");
     }),
   );
 });

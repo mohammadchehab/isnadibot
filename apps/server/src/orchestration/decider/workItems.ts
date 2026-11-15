@@ -15,7 +15,11 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  internalInvariantError,
+  refusedInvariantError,
+  type OrchestrationCommandInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireGroup, requireGroupWorkItemMutationAuthorized } from "../commandInvariants.ts";
 import { type PlannedOrchestrationEvent, nowIso, withEventBase } from "./eventBase.ts";
@@ -53,17 +57,33 @@ const BLOCKABLE: ReadonlySet<WorkItem["state"]> = new Set(["assigned", "in-progr
  * into a sentence. The `detail` stays for the log and never becomes the toast.
  */
 const reject = (command: WorkItemCommand, detail: string, refusal: CommandRefusal) =>
-  new OrchestrationCommandInvariantError({ commandType: command.type, detail, refusal });
+  refusedInvariantError({ commandType: command.type, detail, refusal });
 
 /**
- * A refusal no person can produce, so there is no sentence to show. The four bot
- * guards sit behind the server-built `work-item.bot-act` wrapper, and the two
- * claim guards behind `work-item.claim`, which `ClientWorkItemCommand` does not
- * carry. Each call site states its own R/A/C/U reason. TASK-304 makes this a
- * required constructor argument so a new uncoded throw cannot compile.
+ * A refusal no person can produce, so there is no sentence to show. The reason
+ * is required and stays server-side: it names the contract fact that closes the
+ * guard, which is what stops a later reader from re-deriving the call.
  */
-const rejectInternal = (command: WorkItemCommand, detail: string) =>
-  new OrchestrationCommandInvariantError({ commandType: command.type, detail });
+const rejectInternal = (command: WorkItemCommand, detail: string, reason: string) =>
+  internalInvariantError({ commandType: command.type, detail, reason });
+
+/**
+ * The reason the four bot guards share. A bot actor arrives only through
+ * `BotWorkItemCommand`, which is internal and built by the server after
+ * resolving the bot from its own session; the person branch returns before
+ * these guards, so no shipped surface can reach them.
+ */
+const BOT_ACTOR_ONLY =
+  "A bot actor arrives only through the internal `BotWorkItemCommand`, which the server builds after resolving the bot from its own session; the person branch returns before these guards.";
+
+/**
+ * The reason the two claim guards share. `work-item.claim` is not in
+ * `ClientWorkItemCommand`, so the contract cannot carry it, and the fleet
+ * dispatcher is its only producer — it reads this invariant as `false` and
+ * renders no sentence.
+ */
+const CLAIM_DISPATCHER_ONLY =
+  "`work-item.claim` is absent from `ClientWorkItemCommand`, so the contract cannot carry it; the fleet dispatcher is its only producer and turns this invariant into `false` without rendering a sentence.";
 
 function requireItem(
   readModel: OrchestrationReadModel,
@@ -112,7 +132,11 @@ function requireActorAllowed(input: {
 
   if (!isGroupMemberBot(input.group, botId)) {
     return Effect.fail(
-      rejectInternal(input.command, `Bot '${botId}' is not in group '${input.group.id}'.`),
+      rejectInternal(
+        input.command,
+        `Bot '${botId}' is not in group '${input.group.id}'.`,
+        BOT_ACTOR_ONLY,
+      ),
     );
   }
 
@@ -127,12 +151,23 @@ function requireActorAllowed(input: {
       rejectInternal(
         input.command,
         `Only the boss of group '${input.group.id}' can run '${input.command.type}'.`,
+        BOT_ACTOR_ONLY,
       ),
     );
   }
 
+  // Dead arm with valid input. `work-item.update`, `.block` and `.unblock` all
+  // require `workItemId` in the contract, and `work-item.create` — the only
+  // command that reaches here with no item — is not in `MEMBER_BOT_COMMANDS`,
+  // so it returned at the guard above. Nothing shipped can send this.
   if (input.item === undefined) {
-    return Effect.fail(rejectInternal(input.command, `Bot '${botId}' has no work item to change.`));
+    return Effect.fail(
+      rejectInternal(
+        input.command,
+        `Bot '${botId}' has no work item to change.`,
+        "Every command that reaches this guard carries `workItemId` in the contract, and `work-item.create` — the only one that would not — returns at the member-command guard above, so no input can leave `item` undefined here.",
+      ),
+    );
   }
 
   if (input.item.ownerBotId !== botId) {
@@ -140,6 +175,7 @@ function requireActorAllowed(input: {
       rejectInternal(
         input.command,
         `Bot '${botId}' neither owns work item '${input.item.id}' nor is its boss.`,
+        BOT_ACTOR_ONLY,
       ),
     );
   }
@@ -344,18 +380,22 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       // trigger, so it cannot tell a live dispatcher turn from a settled one. The dispatcher reads
       // the DB-backed model and is the only producer of this command today — a second producer
       // would reopen the two-bots-on-one-item window this guard closes.
-      // Both guards below are internal: R, not U. `work-item.claim` is not in
-      // `ClientWorkItemCommand` at all, so the contract cannot carry it. The
-      // dispatcher is the only producer, and it swallows this invariant into a
-      // `false` (`FleetDispatcherReactor.ts:130-135`), so no sentence is ever
-      // rendered and there is nothing for the client to say.
+      // Both guards below are internal: R, not U. The dispatcher is the only
+      // producer, and it swallows this invariant into a `false`
+      // (`FleetDispatcherReactor.ts:130-135`), so no sentence is ever rendered
+      // and there is nothing for the client to say.
       if (!isOpen(item))
-        return yield* rejectInternal(command, "A finished item must be reopened first.");
+        return yield* rejectInternal(
+          command,
+          "A finished item must be reopened first.",
+          CLAIM_DISPATCHER_ONLY,
+        );
 
       if (item.ownerBotId !== undefined || item.state !== "queued") {
         return yield* rejectInternal(
           command,
           `Work item '${item.id}' is already ${item.ownerBotId === undefined ? item.state : `taken by '${item.ownerBotId}'`}.`,
+          CLAIM_DISPATCHER_ONLY,
         );
       }
 

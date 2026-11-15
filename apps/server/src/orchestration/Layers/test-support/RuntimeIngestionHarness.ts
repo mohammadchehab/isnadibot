@@ -68,7 +68,7 @@ import { OrchestrationProjectionSnapshotQueryLive } from "../ProjectionSnapshotQ
 import * as ThreadBackgroundLiveness from "../../ThreadBackgroundLiveness.ts";
 import * as ThreadPlanProgress from "../../ThreadPlanProgress.ts";
 import { ProviderRuntimeIngestionLive } from "../ProviderRuntimeIngestion.ts";
-import { OrchestrationCommandInvariantError } from "../../Errors.ts";
+import { internalInvariantError } from "../../Errors.ts";
 import { OrchestrationEngineService } from "../../Services/OrchestrationEngine.ts";
 import { ProviderRuntimeIngestionService } from "../../Services/ProviderRuntimeIngestion.ts";
 import { ProjectionSnapshotQuery } from "../../Services/ProjectionSnapshotQuery.ts";
@@ -261,9 +261,11 @@ export function createRuntimeIngestionHarness() {
         dispatch: (...args: Parameters<typeof real.dispatch>) =>
           options?.failDispatch?.(args[0])
             ? Effect.fail(
-                new OrchestrationCommandInvariantError({
+                internalInvariantError({
                   commandType: args[0].type,
                   detail: "injected dispatch failure",
+                  reason:
+                    "Test fixture: the harness injects this failure when a test asks for a failing dispatch, so no user situation produces it.",
                 }),
               )
             : real.dispatch(...args),

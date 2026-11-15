@@ -6,7 +6,11 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  refusedInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireBotNotArchived,
@@ -303,7 +307,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       // (rather than silently pinning) keeps a raced reorder-after-unpin
       // from resurrecting a pin the user just cleared.
       if (thread.pinnedAt == null) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `thread ${command.threadId} is not pinned and cannot be reordered`,
@@ -467,7 +471,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       });
 
       if (thread.groupId === null || thread.groupId === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `Thread '${command.threadId}' is not a group chat, so it has no hop budget.`,
@@ -504,7 +508,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       const message = thread.messages.find((entry) => entry.id === command.messageId);
 
       if (message && message.role !== "assistant") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "channel-delivery-unavailable",
           detail: `Channel delivery can only mark an assistant message in thread '${command.threadId}'.`,
@@ -679,7 +683,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       }
 
       if (events.length === 0) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `Thread '${command.threadId}' history already matches the restore command.`,

@@ -2,7 +2,11 @@ import { type OrchestrationCommand, type OrchestrationReadModel } from "@isnadi/
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  refusedInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireActiveGroupMember, requireGroup, requireThread } from "../commandInvariants.ts";
 import {
@@ -174,7 +178,7 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
       });
 
       if (!thread.messages.some((message) => message.id === command.messageId)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "stale-view",
           detail: `Message '${command.messageId}' is not visible in thread '${command.threadId}'.`,

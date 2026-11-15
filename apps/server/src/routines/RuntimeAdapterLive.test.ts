@@ -17,8 +17,8 @@ import * as Option from "effect/Option";
 
 import * as ServerConfig from "../config.ts";
 import {
-  OrchestrationCommandInvariantError,
   OrchestrationListenerCallbackError,
+  internalInvariantError,
 } from "../orchestration/Errors.ts";
 import { OrchestrationEngineService } from "../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../orchestration/Services/ProjectionSnapshotQuery.ts";
@@ -134,9 +134,11 @@ const makeLayer = (options: {
 
             return command.type === "routine.run.start" && options.runEnded
               ? Effect.fail(
-                  new OrchestrationCommandInvariantError({
+                  internalInvariantError({
                     commandType: command.type,
                     detail: `Routine run '${command.runId}' already ended with status 'canceled'.`,
+                    reason:
+                      "Test fixture: the fake engine refuses a run-lifecycle command to exercise the adapter's failure path, mirroring the decider's own internal filing for these server-only commands.",
                   }),
                 )
               : Effect.succeed({ sequence: options.commands.length });

@@ -16,6 +16,7 @@ import { resolveGroupAddressing, resolveGroupResponderBotId } from "../groupResp
 import {
   OrchestrationCommandInvariantError,
   internalInvariantError,
+  refusedInvariantError,
   noShippedSurfaceInvariantError,
 } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
@@ -77,7 +78,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       // Channel replies are sent only from the parent thread's turn, so a delegated child
       // thread must never carry an inbound channel message. See resolveCompletedChannelReply.
       if (targetThread.parentThreadId && command.message.channelOrigin !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "channel-delivery-unavailable",
           detail: `Delegated thread '${command.threadId}' cannot receive channel messages.`,
@@ -100,7 +101,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
           : null;
 
       if (sourceProposedPlan && !sourcePlan) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "stale-view",
           detail: `Proposed plan '${sourceProposedPlan.planId}' does not exist on thread '${sourceProposedPlan.threadId}'.`,
@@ -108,7 +109,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       }
 
       if (sourceThread && sourceThread.projectId !== targetThread.projectId) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "stale-view",
           detail: `Proposed plan '${sourceProposedPlan?.planId}' belongs to thread '${sourceThread.id}' in a different project.`,
@@ -159,7 +160,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
           });
 
           if (!resolution.ok) {
-            return yield* new OrchestrationCommandInvariantError({
+            return yield* refusedInvariantError({
               commandType: command.type,
               refusal: resolution.refusal,
               detail: resolution.detail,
@@ -178,7 +179,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         }
 
         if (selectedBotId === null) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             refusal: "group-has-no-responder",
             detail: `Group '${group.id}' has no boss bot that can respond.`,
@@ -208,7 +209,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         }
 
         if (!senderIsMember && command.senderCanManageGroups !== true) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             refusal: "actor-not-a-group-member",
             detail: `Person '${command.senderPersonId}' is not a member of group '${group.id}'.`,
@@ -239,7 +240,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
           };
         }
       } else if (command.respondingBotId !== undefined || command.addressing !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-does-not-take-mentions",
           detail: `Bot mentions can only route turns on a group-owned thread.`,
@@ -431,7 +432,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         (thread.latestTurn === null ||
           (thread.latestTurn.state !== "error" && thread.latestTurn.state !== "interrupted"))
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `Chat '${command.threadId}' does not have an interrupted request to resume.`,
@@ -444,7 +445,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         thread.session.status !== "interrupted" &&
         thread.session.status !== "stopped"
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `Chat '${command.threadId}' is already active.`,

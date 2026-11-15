@@ -14,10 +14,7 @@ import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import { describe, expect } from "vite-plus/test";
 
-import {
-  OrchestrationCommandIdConflictError,
-  OrchestrationCommandInvariantError,
-} from "../Errors.ts";
+import { OrchestrationCommandIdConflictError, internalInvariantError } from "../Errors.ts";
 import type { OrchestrationRuntimeReceipt } from "../Services/RuntimeReceiptBus.ts";
 import {
   BOSS_ID,
@@ -50,6 +47,18 @@ import {
 
 /** A second keep-busy group, so one pass can be seen deciding two. */
 const SECOND_GROUP_ID = GroupId.make("group-second");
+
+/**
+ * A rejection the test injects in place of the decider's own. The reactor treats
+ * every invariant rejection alike, so the arm only has to be a real one.
+ */
+const injectedRejection = (commandType: string, detail: string) =>
+  internalInvariantError({
+    commandType,
+    detail,
+    reason:
+      "Test fixture: the test injects this rejection to exercise the dispatcher's refusal path, so no user situation produces it.",
+  });
 
 /** An owner outside the group: the item was taken by someone else. */
 const OTHER_BOT_ID = BotId.make("bot-other");
@@ -237,10 +246,7 @@ describe("FleetDispatcherReactor", () => {
 
       yield* Ref.set(h.rejection, {
         type: "work-item.claim",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "work-item.claim",
-          detail: "Work item 'item-1' is no longer queued.",
-        }),
+        error: injectedRejection("work-item.claim", "Work item 'item-1' is no longer queued."),
       });
       yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
 
@@ -268,10 +274,10 @@ describe("FleetDispatcherReactor", () => {
 
       yield* Ref.set(h.rejection, {
         type: "thread.turn.start",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "thread.turn.start",
-          detail: "Bot 'bot-specialist' is archived and takes no new turns.",
-        }),
+        error: injectedRejection(
+          "thread.turn.start",
+          "Bot 'bot-specialist' is archived and takes no new turns.",
+        ),
       });
       yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
 
@@ -359,10 +365,7 @@ describe("FleetDispatcherReactor", () => {
 
       yield* Ref.set(h.rejection, {
         type: "thread.turn.start",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "thread.turn.start",
-          detail: "The chat is not ready for a turn yet.",
-        }),
+        error: injectedRejection("thread.turn.start", "The chat is not ready for a turn yet."),
       });
       yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
 
@@ -402,10 +405,7 @@ describe("FleetDispatcherReactor", () => {
 
       yield* Ref.set(h.rejection, {
         type: "thread.turn.start",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "thread.turn.start",
-          detail: "The chat is not ready for a turn yet.",
-        }),
+        error: injectedRejection("thread.turn.start", "The chat is not ready for a turn yet."),
       });
       yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));
 
@@ -716,10 +716,7 @@ describe("FleetDispatcherReactor", () => {
       yield* Ref.set(h.rejection, {
         type: "work-item.claim",
         workItemId: WorkItemId.make("item-taken"),
-        error: new OrchestrationCommandInvariantError({
-          commandType: "work-item.claim",
-          detail: "Work item 'item-taken' is no longer queued.",
-        }),
+        error: injectedRejection("work-item.claim", "Work item 'item-taken' is no longer queued."),
       });
       yield* Ref.set(h.onCommand, takeWorkItem(h));
       yield* Ref.set(
@@ -755,10 +752,7 @@ describe("FleetDispatcherReactor", () => {
 
       yield* Ref.set(h.rejection, {
         type: "work-item.claim",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "work-item.claim",
-          detail: "Work item is no longer queued.",
-        }),
+        error: injectedRejection("work-item.claim", "Work item is no longer queued."),
       });
       yield* Ref.set(h.onCommand, takeWorkItem(h));
       yield* Ref.set(
@@ -794,10 +788,7 @@ describe("FleetDispatcherReactor", () => {
       // The claim is refused once, as a stale pass is, and succeeds when the group re-reads.
       yield* Ref.set(h.rejection, {
         type: "work-item.claim",
-        error: new OrchestrationCommandInvariantError({
-          commandType: "work-item.claim",
-          detail: "Work item 'item-1' is no longer queued.",
-        }),
+        error: injectedRejection("work-item.claim", "Work item 'item-1' is no longer queued."),
         remaining: 1,
       });
       yield* Ref.set(h.model, idleTeamModel([workItem({ id: "item-1" })]));

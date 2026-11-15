@@ -3,7 +3,13 @@ import { type OrchestrationCommand, type OrchestrationReadModel } from "@isnadi/
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  type OrchestrationCommandInvariantError,
+  internalInvariantError,
+  noShippedSurfaceInvariantError,
+  pendingRefusalInvariantError,
+  refusedInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { nextScheduledFor } from "../../routines/schedule.ts";
 import { withEventBase, type DecideOrchestrationCommandResult } from "./eventBase.ts";
@@ -47,9 +53,11 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' already exists.`,
+          reason:
+            "`routine.create-approved` is a member of `InternalRoutineCommand` (packages/contracts/src/routines.ts), so no client can dispatch it.",
         });
       }
 
@@ -98,9 +106,12 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing?.lifecycle === "deleted") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* pendingRefusalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' is deleted.`,
+          reason:
+            "The routine record still exists with `lifecycle: deleted`, so `stale-view` would tell the user it is gone when it is present; no existing code names a deleted routine.",
+          ticket: "TASK-305",
         });
       }
 
@@ -109,9 +120,12 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         command.expectedProcedureVersion !== undefined &&
         command.expectedProcedureVersion !== existing.procedureVersion
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* pendingRefusalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' procedure version changed.`,
+          reason:
+            "The draft was written against a procedure version another device has since replaced; no existing code names a version conflict.",
+          ticket: "TASK-305",
         });
       }
 
@@ -166,9 +180,12 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         existing.lifecycle === "deleted" ||
         existing.procedureVersion !== command.procedureVersion
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* pendingRefusalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' cannot approve procedure version ${command.procedureVersion}.`,
+          reason:
+            "The approval names a procedure version the routine no longer holds; no existing code names a version conflict.",
+          ticket: "TASK-305",
         });
       }
 
@@ -202,9 +219,12 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         existing.lifecycle === "deleted" ||
         existing.approvalVersion !== existing.procedureVersion
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* pendingRefusalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' requires approval before enable.`,
+          reason:
+            "The routine's procedure has been edited since it was approved, so the user has to approve it again; no existing code names that remedy.",
+          ticket: "TASK-305",
         });
       }
 
@@ -239,9 +259,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing === undefined || existing.lifecycle === "deleted") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' does not exist.`,
+          refusal: "stale-view",
         });
       }
 
@@ -272,30 +293,37 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing === undefined || existing.lifecycle === "deleted") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' does not exist.`,
+          refusal: "stale-view",
         });
       }
 
       if (command.type === "routine.run.scheduled" && !existing.enabled) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' is not enabled.`,
+          reason:
+            "Only `routine.run.scheduled`, a member of `InternalRoutineCommand`, can reach this arm; the scheduler firing for a disabled routine is a server race, not a user action.",
         });
       }
 
       if (command.trigger !== "dry-run" && existing.approvalVersion !== existing.procedureVersion) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* pendingRefusalInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' procedure approval is stale.`,
+          reason:
+            "The routine still exists and is approved, but for an older procedure version, so `stale-view` would say it is gone; the remedy is to approve the current version, which no existing code names.",
+          ticket: "TASK-305",
         });
       }
 
       if ((readModel.routineRuns ?? []).some((run) => run.id === command.runId)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine run '${command.runId}' already exists.`,
+          refusal: "already-exists",
         });
       }
 
@@ -354,9 +382,11 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       const existingRun = (readModel.routineRuns ?? []).find((run) => run.id === command.runId);
 
       if (existing === undefined || existing.lifecycle === "deleted" || existingRun === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Routine run '${command.runId}' does not exist.`,
+          reason:
+            "`routine.run.start`, `.block`, `.fail`, `.complete` and `.cancel` are all members of `InternalRoutineCommand` (packages/contracts/src/routines.ts), so no client can dispatch them.",
         });
       }
 
@@ -368,9 +398,11 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         existingRun.status !== "waiting-for-approval" &&
         existingRun.status !== "running"
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Routine run '${command.runId}' already ended with status '${existingRun.status}'.`,
+          reason:
+            "The run lifecycle commands are members of `InternalRoutineCommand` (packages/contracts/src/routines.ts); a settled run being restarted is the server double-firing, not a user action.",
         });
       }
 
@@ -478,9 +510,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' does not exist.`,
+          refusal: "stale-view",
         });
       }
 
@@ -511,9 +544,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
           (assignment) => assignment.id === command.assignmentId,
         )
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Skill assignment '${command.assignmentId}' already exists.`,
+          refusal: "already-exists",
         });
       }
 
@@ -545,9 +579,11 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (assignment === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* noShippedSurfaceInvariantError({
           commandType: command.type,
           detail: `Skill assignment '${command.assignmentId}' does not exist.`,
+          reason:
+            "`routine.skill.unassign` is in the client command union but no shipped screen dispatches it: `assignSkill` is wired in `packages/client-runtime/src/state/routines.ts` and called from web, while unassign has no control on web, desktop or mobile today.",
         });
       }
 

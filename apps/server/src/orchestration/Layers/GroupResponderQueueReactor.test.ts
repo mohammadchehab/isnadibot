@@ -20,7 +20,11 @@ import * as Stream from "effect/Stream";
 import { describe, expect } from "vite-plus/test";
 
 import { ServerActivation } from "../../serverActivation.ts";
-import { COMMAND_PRODUCED_NO_EVENTS, OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  COMMAND_PRODUCED_NO_EVENTS,
+  type OrchestrationCommandInvariantError,
+  internalInvariantError,
+} from "../Errors.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { makeGroupThread, makeReadModel } from "../test-support/GroupDeciderFixtures.ts";
@@ -516,7 +520,12 @@ describe("GroupResponderQueueReactor", () => {
       const h = yield* harness;
       yield* Ref.set(
         h.failure,
-        new OrchestrationCommandInvariantError({ commandType: "thread.responder.advance", detail }),
+        internalInvariantError({
+          commandType: "thread.responder.advance",
+          detail,
+          reason:
+            "Test fixture: the test injects this failure to exercise the reactor's rejection path, so no user situation produces it.",
+        }),
       );
 
       yield* run(h, (reactor) =>

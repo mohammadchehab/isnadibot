@@ -9,7 +9,7 @@ import {
 } from "@isnadi/contracts";
 import { createIsnadiToolRuntime, type IsnadiToolSession } from "./IsnadiToolRuntime.ts";
 import { IsnadiWorkerError } from "./IsnadiWorkerRuntime.ts";
-import { OrchestrationCommandInvariantError } from "../orchestration/Errors.ts";
+import { refusedInvariantError } from "../orchestration/Errors.ts";
 import { makeIsnadiToolRuntimeTestSupport } from "./test-support/IsnadiToolRuntime.ts";
 
 const { directories, workspace } = makeIsnadiToolRuntimeTestSupport();
@@ -586,7 +586,7 @@ describe("IsnadiToolRuntime", () => {
           approvalCeiling: "send",
         },
         send: async () => {
-          throw new OrchestrationCommandInvariantError({
+          throw refusedInvariantError({
             commandType: "delegation.create",
             detail: "Bot 'bot-parent' already has 3 active delegations.",
             refusal: "delegation-limit-reached",
