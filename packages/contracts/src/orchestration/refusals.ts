@@ -26,6 +26,15 @@ export const CommandRefusalCodes = [
    */
   "actor-not-a-group-member",
   /**
+   * The command type is wrong for the actor's own account, not the actor's
+   * rights: `group.leave` acts on the caller, so naming anyone else is refused
+   * however much access they hold. It cannot share `environment-rights` above —
+   * telling someone with manage rights that they lack rights sends them to ask
+   * for something they already have. The remedy is a different command,
+   * `group.person.unassign`, which the sentence names.
+   */
+  "leave-only-as-yourself",
+  /**
    * A stale click, not a permissions problem: the bot the client offered is no
    * longer in the group, so the roster it drew came from a view the server has
    * already left behind. Its remedy is a refresh, which is why it cannot share
@@ -43,11 +52,25 @@ export const CommandRefusalCodes = [
    */
   "bot-in-another-group",
   /**
+   * A create arrived with no boss at all. `group-already-has-boss` below is the
+   * opposite situation and would tell the user something false about a space
+   * that has none, so this keeps its own literal; the remedy is the boss the
+   * command never named.
+   */
+  "group-requires-boss",
+  /**
    * The bot being assigned is not the boss; another bot is. `bot-is-group-boss`
    * would tell the user something false about the bot they picked, so the two
    * stay separate even though both end in the same remedy.
    */
   "group-already-has-boss",
+  /**
+   * `group.boss.set` named the current boss and asked to unassign the previous
+   * one in the same breath, so the command contradicts itself. It is not
+   * `group-already-has-boss` above — that one fires when the bot picked is not
+   * the boss — and the remedy is to drop the unassign or pick a different bot.
+   */
+  "boss-cannot-be-replaced-and-removed",
   /**
    * The chat has live work — a running session, a turn the user just sent that
    * no turn has adopted yet, or an approval/user-input request blocking the
@@ -113,6 +136,14 @@ export const CommandRefusalCodes = [
    * describes it, and the remedy — pick a different folder — is its own.
    */
   "workspace-root-in-use",
+  /**
+   * Client-server version skew, the only family whose remedy is to update
+   * rather than to refresh: the id names a fleet template this build does not
+   * ship, so nothing was deleted and no refresh can produce it. Advising a
+   * refresh here would be false in the same way it would be on a not-archived
+   * site.
+   */
+  "unknown-fleet-template",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);

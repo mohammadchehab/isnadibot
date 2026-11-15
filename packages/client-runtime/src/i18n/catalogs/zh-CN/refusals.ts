@@ -30,5 +30,13 @@ export const refusalsCatalog = {
   "It is archived. Restore it first, then try again.": "它已归档。请先恢复，然后重试。",
   "Another project already uses that folder. Choose a different one.":
     "另一个项目已使用该文件夹。请选择其他文件夹。",
+  "This space needs a boss. Choose which bot leads it.":
+    "此空间需要一位主管。请选择由哪个机器人担任。",
+  "This bot already leads the space. Pick a different boss, or keep this one.":
+    "此机器人已经是该空间的主管。请选择其他主管，或保留当前主管。",
+  "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
+    "你只能以自己的身份退出空间。如需移除其他人，你需要管理该空间。",
+  "This template is not available in this version. Update the app, then try again.":
+    "此版本中没有该模板。请更新应用后重试。",
   "The command failed.": "命令失败。",
 } as const;

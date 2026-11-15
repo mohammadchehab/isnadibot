@@ -31,5 +31,13 @@ export const refusalsCatalog = {
   "It is archived. Restore it first, then try again.": "إنه مؤرشف. استعده أولًا ثم حاول مرة أخرى.",
   "Another project already uses that folder. Choose a different one.":
     "مشروع آخر يستخدم هذا المجلد بالفعل. اختر مجلدًا مختلفًا.",
+  "This space needs a boss. Choose which bot leads it.":
+    "تحتاج هذه المساحة إلى قائد. اختر البوت الذي سيقودها.",
+  "This bot already leads the space. Pick a different boss, or keep this one.":
+    "هذا البوت يقود المساحة بالفعل. اختر قائدًا آخر أو أبقِ هذا القائد.",
+  "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
+    "يمكنك مغادرة المساحة بنفسك فقط. لإزالة شخص آخر، تحتاج إلى إدارة المساحة.",
+  "This template is not available in this version. Update the app, then try again.":
+    "هذا القالب غير متاح في هذا الإصدار. حدّث التطبيق ثم حاول مجددًا.",
   "The command failed.": "فشل الأمر.",
 } as const;

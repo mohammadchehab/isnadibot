@@ -33,11 +33,16 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "bot-is-group-boss": "This bot leads a space. Pick a new boss, or delete the space.",
   "group-would-be-undersized":
     "This space needs at least two bots. Add another bot before you remove one.",
+  "group-requires-boss": "This space needs a boss. Choose which bot leads it.",
+  "boss-cannot-be-replaced-and-removed":
+    "This bot already leads the space. Pick a different boss, or keep this one.",
   "delegation-limit-reached":
     "This bot already has as many delegations open as it can take. Wait for one to finish.",
   "delegation-would-cycle": "This delegation would loop back on itself. Choose a different bot.",
   "actor-not-a-group-member":
     "You are not a member of this space. Ask the person who runs it for access.",
+  "leave-only-as-yourself":
+    "You can only leave a space as yourself. To remove someone else, you need to manage the space.",
   "bot-not-a-group-member": "That bot is no longer in this space. Refresh to see the current team.",
   "bot-in-another-group":
     "This bot belongs to another space. Create this space without it, then add the bot.",
@@ -51,6 +56,8 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "already-exists": "It already exists. Refresh to see it.",
   "entity-archived": "It is archived. Restore it first, then try again.",
   "workspace-root-in-use": "Another project already uses that folder. Choose a different one.",
+  "unknown-fleet-template":
+    "This template is not available in this version. Update the app, then try again.",
 };
 
 /**

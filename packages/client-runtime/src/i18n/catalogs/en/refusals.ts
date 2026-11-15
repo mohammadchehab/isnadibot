@@ -32,5 +32,13 @@ export const refusalsCatalog = {
     "It is archived. Restore it first, then try again.",
   "Another project already uses that folder. Choose a different one.":
     "Another project already uses that folder. Choose a different one.",
+  "This space needs a boss. Choose which bot leads it.":
+    "This space needs a boss. Choose which bot leads it.",
+  "This bot already leads the space. Pick a different boss, or keep this one.":
+    "This bot already leads the space. Pick a different boss, or keep this one.",
+  "You can only leave a space as yourself. To remove someone else, you need to manage the space.":
+    "You can only leave a space as yourself. To remove someone else, you need to manage the space.",
+  "This template is not available in this version. Update the app, then try again.":
+    "This template is not available in this version. Update the app, then try again.",
   "The command failed.": "The command failed.",
 } as const;
