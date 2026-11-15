@@ -181,3 +181,13 @@ export {
   IsnadiToolFailureCode,
   IsnadiToolReceipt,
 } from "./isnadiTools/receipts.ts";
+
+export {
+  type ShellCommand,
+  type ShellProgram,
+  type ShellRedirection,
+  type ShellWord,
+  isFileWriteRedirection,
+  parseShellCommands,
+  programOf,
+} from "./isnadiTools/shellCommand.ts";
