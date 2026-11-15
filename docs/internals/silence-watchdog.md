@@ -1,6 +1,6 @@
 # Silence watchdog
 
-A running turn that stops producing output is reported as a typed silent-run state instead of a spinner that keeps claiming the bot is working. The watchdog never interrupts the turn. The user decides whether to wait or stop it.
+A running turn that stops producing output is reported as a typed silent-run state instead of a spinner that keeps claiming the bot is working. The watchdog never interrupts the turn while the user can still wait for it: the silent mark is a report, and the user decides whether to wait or stop. It does end the turn on its own if the provider stays quiet past its liveness window, because a turn nothing ends stays open forever.
 
 ## Where it runs
 

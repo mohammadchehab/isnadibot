@@ -2,7 +2,7 @@
 
 Sometimes a provider stops sending anything while a bot is still working. After 90 seconds with no output, the chat stops showing the working indicator and says "No response from" the provider, for example "No response from Claude". The timer next to it counts from the last time the provider sent something.
 
-The bot also gets one item in the inbox, labeled "Bot stopped responding". Isnadi does not stop the turn for you.
+The bot also gets one item in the inbox, labeled "Bot stopped responding". Isnadi does not stop the turn right away: it waits to see whether the provider comes back.
 
 While the notice is up, the bot shows as idle rather than busy. Nothing is running that will answer.
 
