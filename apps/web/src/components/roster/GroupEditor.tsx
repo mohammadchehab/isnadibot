@@ -3,6 +3,7 @@ import { Predicate } from "effect";
 import { useAtomValue } from "@effect/atom-react";
 import { BotId, GroupId, isGroupBotMember, type EnvironmentId } from "@isnadi/contracts";
 import {
+  classifyCommandFailure,
   commandFailureMessage,
   squashAtomCommandFailure,
   type AtomCommandResult,
@@ -108,11 +109,12 @@ export function GroupEditor({
     return true;
   };
 
-  // Adding and removing a member are the two editor actions whose every refusal
-  // the server codes, so their toast names the reason under the title. The other
-  // three stay on `run`'s title-only toast on purpose: their throws are still
-  // uncoded, and the helper would echo the server's own sentence, raw ids and
-  // all, exactly as it did before the codes existed.
+  // Adding and removing a member name the reason under the title, but only for a
+  // refusal the server codes. Not every throw on these two commands is coded yet:
+  // a group or bot deleted on another device still refuses in plain prose, and
+  // the helper would echo that sentence, raw ids and all, exactly as it did
+  // before the codes existed. So an uncoded failure keeps `run`'s title-only
+  // toast until the server codes the rest of the path.
   const runMemberChange = async (
     action: () => Promise<AtomCommandResult<unknown, unknown>>,
     title: string,
@@ -121,17 +123,21 @@ export function GroupEditor({
     const result = await action();
     setBusy(false);
 
-    if (Predicate.isTagged(result, "Failure")) {
-      toastManager.add({
-        type: "error",
-        title,
-        description: commandFailureMessage(result, { t }),
-      });
+    if (!Predicate.isTagged(result, "Failure")) return true;
+
+    if (classifyCommandFailure(result) === "unknown") {
+      toastManager.add({ type: "error", title });
 
       return false;
     }
 
-    return true;
+    toastManager.add({
+      type: "error",
+      title,
+      description: commandFailureMessage(result, { t }),
+    });
+
+    return false;
   };
 
   // Each refusal the server codes gets its own message rather than the generic
