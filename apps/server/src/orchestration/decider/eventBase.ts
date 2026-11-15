@@ -318,7 +318,7 @@ export const resolveAssistantMessageBot = Effect.fn("resolveAssistantMessageBot"
         commandType: input.command.type,
         detail: `Bot '${botId}' cannot post in thread '${input.thread.id}'.`,
         reason:
-          "Reached only from the three assistant message paths, where respondingBotId is the provider's own bot; a mismatch with the bot thread's botId means the provider reported the wrong bot, which is a server bug.",
+          "Reached only from thread.message.assistant.delta and thread.message.assistant.complete, both of which live in the server's InternalOrchestrationCommand union; the voice-transcript path returns above because it carries no respondingBotId. There respondingBotId is the provider's own bot, so a mismatch with the bot thread's botId means the provider reported the wrong bot — a server bug, not a client input.",
       });
     }
 

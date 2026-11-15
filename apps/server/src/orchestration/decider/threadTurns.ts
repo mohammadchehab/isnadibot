@@ -13,7 +13,11 @@ import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import { resolveGroupAddressing, resolveGroupResponderBotId } from "../groupResponder.ts";
 
-import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  noShippedSurfaceInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireActiveGroupMember,
@@ -138,11 +142,11 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         let selectedBotId: BotId | null;
 
         if (command.addressing !== undefined && command.respondingBotId !== undefined) {
-          return yield* internalInvariantError({
+          return yield* noShippedSurfaceInvariantError({
             commandType: command.type,
             detail: `Send either addressing or respondingBotId, not both.`,
             reason:
-              "No shipped client sends addressing and respondingBotId together: a composer picks one routing shape, so reaching both is a server bug in the dispatch, not a user situation.",
+              "ClientThreadTurnStartCommand carries both addressing and respondingBotId, so the contract allows both at once; no shipped composer sets both, because each picks one routing shape. This exclusion ends the moment a client offers a control that sends both.",
           });
         }
 
