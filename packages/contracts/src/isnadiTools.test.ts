@@ -7,11 +7,13 @@ import {
   ISNADI_TOOL_CATALOG,
   IsnadiToolInputSchemas,
   IsnadiToolReceipt,
+  classifyIsnadiExternalCommand,
   isnadiToolApprovalForInput,
   isnadiToolRequiresApproval,
   copyDirectionForTool,
   decodeIsnadiToolInput,
   filterIsnadiTools,
+  stripHeredocBodies,
 } from "./isnadiTools.ts";
 
 describe("Isnadi tool contracts", () => {
@@ -546,3 +548,286 @@ function walkObjectFields(
     walk(signature.type, `${prefix}[*]`);
   }
 }
+
+describe("Shell command intent", () => {
+  const heredoc = (...lines: ReadonlyArray<string>) => lines.join("\n");
+
+  it("reads a heredoc body as content, not as a destructive command", () => {
+    const command = heredoc(
+      "cd /project && cat > README.md <<EOF",
+      "# Todo",
+      "Delete a todo to remove it, or send it to the archive.",
+      "EOF",
+    );
+
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("reads a script body as content, so requiring node:crypto is not a send", () => {
+    const command = heredoc(
+      "cat > package.json <<EOF",
+      '{"scripts":{"send":"node store.js"}}',
+      "EOF",
+      "cat > store.js <<EOF",
+      'import { createHash } from "node:crypto";',
+      "EOF",
+    );
+
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("strips every quoted, tab-stripped and backslash heredoc form", () => {
+    for (const opener of ["<<'EOF'", '<<"EOF"', "<<-EOF", "<<\\EOF"]) {
+      const body = opener === "<<-EOF" ? "\trm -rf /" : "rm -rf /";
+      const terminator = opener === "<<-EOF" ? "\tEOF" : "EOF";
+
+      expect(
+        classifyIsnadiExternalCommand(heredoc(`cat > f.txt ${opener}`, body, terminator)),
+      ).toBeUndefined();
+    }
+  });
+
+  it("still classifies rm and curl outside a heredoc", () => {
+    expect(classifyIsnadiExternalCommand("rm -rf build")).toBe("delete");
+    expect(classifyIsnadiExternalCommand("curl -X POST https://example.com -d '{}'")).toBe("send");
+  });
+
+  it("keeps an unterminated heredoc whole so it cannot hide a destructive command", () => {
+    // The opener swallows the rest of the command; dropping what follows would
+    // protect a stray heredoc at the cost of missing the real `rm`.
+    expect(classifyIsnadiExternalCommand(heredoc("cat > f.txt <<EOF", "rm -rf /"))).toBe("delete");
+  });
+
+  it("keeps a destructive command that shares the terminator line", () => {
+    // `EOF; rm -rf /` is not a terminator in the shell, so the heredoc never
+    // closes and the line is body text — the same fail-closed case as above.
+    expect(classifyIsnadiExternalCommand(heredoc("cat <<EOF", "body", "EOF; rm -rf /"))).toBe(
+      "delete",
+    );
+  });
+
+  it("still classifies a command after a legitimate terminator", () => {
+    expect(classifyIsnadiExternalCommand(heredoc("cat <<EOF", "body", "EOF", "rm -rf /"))).toBe(
+      "delete",
+    );
+  });
+
+  it("keeps the opener line when it strips a body", () => {
+    expect(stripHeredocBodies(heredoc("cat > f.txt <<EOF", "hello", "EOF"))).toBe(
+      "cat > f.txt <<EOF",
+    );
+  });
+
+  it("keeps a `<<` the shell never reads as an operator from hiding a command", () => {
+    // The shell reads each of these `<<` as text and runs the line after it. A
+    // scanner that treats any `<<WORD` as an opener drops that line from the
+    // text it classifies, so the command runs with no approval prompt at all.
+    const cases = [
+      [`echo "see <<EOF below"`, "rm -rf /tmp/x", "EOF", "delete"],
+      ["echo 'use <<EOF to end'", "rm -rf /tmp/x", "EOF", "delete"],
+      ["# example: <<EOF", "rm -rf /tmp/x", "EOF", "delete"],
+      ["grep -c '<<EOF' notes.md", "rm -rf /tmp/x", "EOF", "delete"],
+      ["cat <<< EOF", "rm -rf /tmp/x", "EOF", "delete"],
+      ["echo 'use <<E to end'", "rm -rf /tmp/x", "E", "delete"],
+      ["echo x # <<EOF", "git push origin main", "EOF", "production"],
+      // `<<` in an arithmetic region is a shift operator, not an opener.
+      ["echo $((1 << n))", "rm -rf /tmp/x", "n", "delete"],
+      ["echo $((a << b))", "rm -rf /tmp/x", "b", "delete"],
+      ["echo $[1<<k]", "rm -rf /tmp/x", "k", "delete"],
+      ["(( total = 1 << bits ))", "git push origin main", "bits", "production"],
+    ] as const;
+
+    for (const [openerLine, hiddenLine, closingLine, expected] of cases) {
+      const command = heredoc(openerLine, hiddenLine, closingLine);
+
+      expect(classifyIsnadiExternalCommand(command)).toBe(expected);
+      expect(stripHeredocBodies(command)).toBe(command);
+    }
+  });
+
+  it("still strips a real heredoc that shares a line with quoted text", () => {
+    const command = heredoc("echo '<<EOF' > note.txt; cat > f <<MD", "rm -rf /", "MD");
+
+    expect(stripHeredocBodies(command)).toBe("echo '<<EOF' > note.txt; cat > f <<MD");
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+});
+
+/**
+ * Regions this scanner does not read. Each one hides a `<<` from the shell and
+ * shows it to a scanner that reads the line as plain shell text, so the body it
+ * "opens" is deleted before classification and the command inside runs with no
+ * prompt. The list cannot be finished — that is the point of the rule — so the
+ * scanner strips nothing at all when it meets one.
+ */
+describe("Shell command intent outside the modelled subset", () => {
+  const lines = (...parts: ReadonlyArray<string>) => parts.join("\n");
+
+  const shapes = [
+    // `${…}` parameter expansion: the `<<EOF` is part of the expansion's word.
+    ["parameter expansion ${x:-<<EOF}", "echo ${x:-<<EOF}"],
+    // `$'…'` ANSI-C quoting: `\'` is an escaped quote, so bash keeps the string
+    // open across the `<<` the scanner reads as an operator.
+    ["ANSI-C quoting $'a\\'b <<EOF'", "$'a\\'b <<EOF'"],
+    // Backticks are command substitution, a region the scanner never enters.
+    ["backtick substitution", "echo `cat <<EOF`"],
+    // `$(…)` command substitution is the same region in its other spelling.
+    ["command substitution $(…)", "echo $(cat <<EOF)"],
+    // `$"…"` is locale quoting, read like `"…"` by the shell.
+    ['locale quoting $"…"', 'echo $"see <<EOF"'],
+    // A `<<` whose delimiter is not a literal word has no terminator to find.
+    ["a delimiter the shell expands", "cat > f <<$DELIM"],
+    // A trailing backslash continues the line, so the next line is not a command.
+    ["a continued line", "echo one \\"],
+    // An array assignment: the shell rejects the `<<` inside `(…)` as a syntax
+    // error, keeps going, and runs the next line.
+    ["an array assignment a=(…)", "a=(<<EOF)"],
+    // An extglob pattern: `@(…)`, and `+(…)`, `!(…)`, `?(…)`, `*(…)` with it,
+    // are pattern lists where a `<<` is not an operator.
+    ["an extglob case pattern @(…)", "case x in @(<<EOF)) ;; esac"],
+    // An array subscript is an arithmetic context without the `$`: the shell
+    // expands `a[1<<B]` as a shift, reports `B: command not found`, and runs
+    // the next line. The delimiter is the shift's right operand, not `EOF`.
+    ["an array subscript a[1<<B]", "a[1<<B]=x", "B"],
+    ["an array subscript with a name", "a[i<<D]=x", "D"],
+    ["an array subscript with spaces", "a[1 << B]=x", "B"],
+    ["an array subscript append", "a[1<<B]+=x", "B"],
+    ["an integer array subscript", lines("declare -i a", "a[1<<B]=1"), "B"],
+  ] as const;
+
+  it("strips nothing when it meets a construct it does not model", () => {
+    for (const [name, openerLine, delimiter] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", delimiter ?? "EOF");
+
+      expect(classifyIsnadiExternalCommand(command), name).toBe("delete");
+      // Nothing was stripped, so the destructive line is still there to be read.
+      expect(stripHeredocBodies(command), name).toBe(command);
+    }
+  });
+
+  it("makes the tool ask for approval, so the shell cannot run unapproved", () => {
+    // `localFullAccess` with a command present skips ExternalShell's own
+    // `user-computer` approval, which leaves the classifier as the only gate.
+    // Shell's own class is `none`, so on a cloud workspace it has no other gate
+    // either.
+    const externalShell = ISNADI_TOOL_CATALOG.find(
+      (candidate) => candidate.id === "ExternalShell",
+    )!;
+
+    const cloudShell = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === "Shell")!;
+
+    for (const [name, openerLine, delimiter] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", delimiter ?? "EOF");
+
+      expect(isnadiToolApprovalForInput(externalShell, { command }), name).toBe("delete");
+      expect(
+        isnadiToolRequiresApproval(externalShell, { localFullAccess: true }, { command }),
+        name,
+      ).toBe(true);
+
+      expect(isnadiToolApprovalForInput(cloudShell, { command }), name).toBe("delete");
+      expect(
+        isnadiToolRequiresApproval(cloudShell, { localFullAccess: false }, { command }),
+        name,
+      ).toBe(true);
+    }
+  });
+
+  it("strips nothing when a quote is still open at the end of the command", () => {
+    const command = lines("echo 'unterminated", "rm -rf /tmp/x");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("still strips a body that names the constructs it refuses to read as shell", () => {
+    // These regions are ordinary content in a heredoc body, and a body is never
+    // scanned: refusing to read them must not cost the feature its main case.
+    const command = lines(
+      "cat > f.ts <<'EOF'",
+      "const id = `${environment}:${id}`;",
+      "const out = $'a\\'b';",
+      "echo `cat <<EOF`",
+      "rm -rf /tmp/x",
+      "EOF",
+    );
+
+    expect(stripHeredocBodies(command)).toBe("cat > f.ts <<'EOF'");
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+});
+
+describe("Shell command intent inside an arithmetic region", () => {
+  const lines = (...parts: ReadonlyArray<string>) => parts.join("\n");
+
+  /**
+   * Shapes where a `<<` the shell reads as a shift was read back as a heredoc
+   * opener, so the destructive line after it was stripped as body and nothing
+   * was classified. Two conditions make a shape bite, and both must hold: the
+   * misread delimiter has to be a word, because `HEREDOC_DELIMITER` starts with
+   * a letter, and a later line equal to it has to exist, or the heredoc is
+   * unterminated and `stripHeredocBodies` leaves everything alone.
+   */
+  const shapes = [
+    // The first `]` is `a[1]`'s, not the region's, so the region ended early and
+    // the `<< k` after it read as an opener.
+    ["nested subscript $[ a[1] << k ]", ["echo $[ a[1] << k ]"], "k"],
+    ["$[a[0]<<k]", ["echo $[a[0]<<k]"], "k"],
+    // The region opens on one line and closes on a later one, so a scanner that
+    // reads one line at a time never sees it as arithmetic at all.
+    ["$(( opened on its own line", ["echo $((", "1 << n", "))"], "n"],
+    ["(( opened on its own line", ["((", "1 << n", "))"], "n"],
+    ["$[ opened on its own line", ["echo $[", "1 << k", "]"], "k"],
+  ] as const;
+
+  it("keeps the destructive line after a shift, in every shape", () => {
+    for (const [name, prefix, delimiter] of shapes) {
+      const command = lines(...prefix, "rm -rf /tmp/x", delimiter);
+
+      expect(classifyIsnadiExternalCommand(command), name).toBe("delete");
+      // Nothing was stripped: the destructive line is still there to be read.
+      expect(stripHeredocBodies(command), name).toBe(command);
+    }
+  });
+
+  it("makes the tool ask for approval, so the shell cannot run unapproved", () => {
+    // `localFullAccess` with a command present skips ExternalShell's own
+    // `user-computer` approval, which leaves the classifier as the only gate.
+    // Returning no class there is the bypass: approval is then not required.
+    const tool = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === "ExternalShell")!;
+    const command = lines("echo $((", "1 << n", "))", "rm -rf /tmp/x", "n");
+
+    expect(isnadiToolApprovalForInput(tool, { command })).toBe("delete");
+    expect(isnadiToolRequiresApproval(tool, { localFullAccess: true }, { command })).toBe(true);
+  });
+
+  it("carries a paren region across lines so its second line never opens a heredoc", () => {
+    const command = lines("echo $((", "1 << n", "))", "rm -rf /tmp/x", "n");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("carries a bracket region's depth, so a subscript inside it does not close it", () => {
+    const command = lines("echo $[", "a[1] << k", "]", "rm -rf /tmp/x", "k");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("still strips a real heredoc opened after the carried region closes", () => {
+    const command = lines("echo $((", "1 << n", ")); cat > f.txt <<EOF", "rm -rf /tmp/x", "EOF");
+
+    expect(stripHeredocBodies(command)).toBe(lines("echo $((", "1 << n", ")); cat > f.txt <<EOF"));
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("keeps every later line inside a region that never closes", () => {
+    // An unterminated region is a shell syntax error, so the command cannot run
+    // anyway; keeping the text is the fail-closed side of the same choice an
+    // unterminated heredoc gets.
+    const command = lines("echo $((", "1 << n", "rm -rf /tmp/x");
+
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+});
