@@ -379,8 +379,8 @@ describe("DelegationCard", () => {
   });
 
   it("shows whether the parent bot has received a finished result", () => {
-    expect(renderCard("completed")).toContain("Result waiting for the next reply");
-    expect(renderCard("failed")).toContain("Result waiting for the next reply");
+    expect(renderCard("completed")).toContain("Bot is picking up the result");
+    expect(renderCard("failed")).toContain("Bot is picking up the result");
     expect(renderCard("running")).not.toContain("Result waiting");
     expect(renderCard("canceled")).not.toContain("Result");
 

@@ -224,7 +224,7 @@ export const commonLabelsCatalog = {
   "Could not approve procedure": "تعذّرت الموافقة على الإجراء",
   "Could not cancel delegation": "تعذّر إلغاء التفويض",
   "Could not load errors": "تعذّر تحميل الأخطاء",
-  "Result waiting for the next reply": "النتيجة بانتظار الرد التالي",
+  "Bot is picking up the result": "الروبوت يستلم النتيجة",
   Retried: "أُعيدت المحاولة",
   "Expected result": "النتيجة المتوقعة",
   "Dismiss error": "تجاهل الخطأ",

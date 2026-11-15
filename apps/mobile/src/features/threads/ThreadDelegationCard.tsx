@@ -159,7 +159,7 @@ export function ThreadDelegationCard(props: {
       {presentation.delivery ? (
         <Text className="text-xs text-foreground-muted">
           {presentation.delivery === "pending"
-            ? t("Result waiting for the next reply")
+            ? t("Bot is picking up the result")
             : t("Result delivered to {name}", { name: parentName })}
         </Text>
       ) : null}

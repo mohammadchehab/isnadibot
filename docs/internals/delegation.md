@@ -153,8 +153,13 @@ ways.
   (the result summary or failure message). Reading a finished, unacknowledged
   result acknowledges it, so the next turn does not repeat it.
 
-If the parent never takes another turn, the result stays pending and the card
-says it is waiting for the next reply. If the turn start fails before its
+`DelegationWakeReactor` starts that next turn. When a thread has pending
+results, no live session and no open child (`isThreadWaitingOnChildren`, so a
+Blocked child holds the wake), it dispatches a `thread.turn.start` with trigger
+`delegation-results`; the decider acknowledges the results at that turn start,
+so a result wakes the parent once. It also sweeps on startup for results that
+finished while the server was down. Until the turn starts, the card says the
+bot is picking up the result. If the turn start fails before its
 provider reads the results, `ProviderCommandReactor` releases their
 acknowledgement so the next parent turn receives them, retrying in the
 background when the release cannot land at once. It records the

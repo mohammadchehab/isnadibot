@@ -249,7 +249,8 @@ export type OrchestrationLatestTurnState = typeof OrchestrationLatestTurnState.T
 
 /**
  * Why a turn runs: the user message that addressed it, a bot's mention, or a
- * keep-busy dispatcher handing over one queued work item.
+ * keep-busy dispatcher handing over one queued work item, or the server waking a
+ * boss because every delegation of its turn has finished.
  */
 export const ResponderTrigger = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("user"), messageId: MessageId }),
@@ -259,6 +260,7 @@ export const ResponderTrigger = Schema.Union([
     sourceBotId: BotId,
   }),
   Schema.Struct({ kind: Schema.Literal("dispatcher"), workItemId: WorkItemId }),
+  Schema.Struct({ kind: Schema.Literal("delegation-results") }),
 ]);
 
 export type ResponderTrigger = typeof ResponderTrigger.Type;

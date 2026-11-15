@@ -169,9 +169,9 @@ show up in chat search.
 While work is still running, the chat shows **Waiting on delegated work**. When the work finishes,
 the card shows the result or what went wrong, and one of these lines:
 
-- **Result waiting for the next reply** means your bot has not seen the result yet. Send another
-  message and the bot uses the result in that reply. If you send nothing, the result stays on the
-  card.
+- **Bot is picking up the result** means your bot has not seen the result yet. When every
+  delegation from its turn has finished, the bot starts a new turn on its own and replies with the
+  results. You do not need to send a message.
 - **Result delivered to {name}** means your bot has received the result, with {name} naming your
   bot that received it. It does not receive it again.
 

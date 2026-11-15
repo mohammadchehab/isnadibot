@@ -226,7 +226,7 @@ export const commonLabelsCatalog = {
   "Could not approve procedure": "Could not approve procedure",
   "Could not cancel delegation": "Could not cancel delegation",
   "Could not load errors": "Could not load errors",
-  "Result waiting for the next reply": "Result waiting for the next reply",
+  "Bot is picking up the result": "Bot is picking up the result",
   Retried: "Retried",
   "Expected result": "Expected result",
   "Dismiss error": "Dismiss error",

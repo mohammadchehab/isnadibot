@@ -226,7 +226,7 @@ export const commonLabelsCatalog = {
   "Could not approve procedure": "无法批准任务内容",
   "Could not cancel delegation": "无法取消委派",
   "Could not load errors": "无法加载错误",
-  "Result waiting for the next reply": "结果等待下一次回复",
+  "Bot is picking up the result": "机器人正在处理结果",
   Retried: "已重试",
   "Expected result": "预期结果",
   "Dismiss error": "关闭错误",
