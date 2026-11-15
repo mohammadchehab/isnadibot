@@ -1,7 +1,7 @@
 import { Predicate } from "effect";
 import type { EnvironmentThreadShell } from "@isnadi/client-runtime/state/shell";
 import { canSnooze } from "@isnadi/client-runtime/state/thread-settled";
-import * as Cause from "effect/Cause";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { useCallback, useRef } from "react";
 import { Alert } from "react-native";
 import { useMobileI18n } from "../../lib/i18n";
@@ -114,12 +114,9 @@ export function useThreadListActions(): ThreadListActions {
         });
 
         if (Predicate.isTagged(result, "Failure")) {
-          const error = Cause.squash(result.cause);
           Alert.alert(
             t("Could not snooze chat"),
-            error instanceof Error && error.message.trim().length > 0
-              ? error.message
-              : t("The chat could not be snoozed."),
+            commandFailureMessage(result, { t, fallback: "The chat could not be snoozed." }),
           );
 
           return false;
@@ -163,12 +160,9 @@ export function useThreadListActions(): ThreadListActions {
         });
 
         if (Predicate.isTagged(result, "Failure")) {
-          const error = Cause.squash(result.cause);
           Alert.alert(
             t("Could not wake chat"),
-            error instanceof Error && error.message.trim().length > 0
-              ? error.message
-              : t("The chat could not be woken."),
+            commandFailureMessage(result, { t, fallback: "The chat could not be woken." }),
           );
 
           return false;
@@ -224,12 +218,9 @@ export function useThreadListActions(): ThreadListActions {
       });
 
       if (Predicate.isTagged(result, "Failure")) {
-        const error = Cause.squash(result.cause);
         Alert.alert(
           t("Could not pin chat"),
-          error instanceof Error && error.message.trim().length > 0
-            ? error.message
-            : t("The chat could not be pinned."),
+          commandFailureMessage(result, { t, fallback: "The chat could not be pinned." }),
         );
 
         return false;
@@ -261,12 +252,9 @@ export function useThreadListActions(): ThreadListActions {
       });
 
       if (Predicate.isTagged(result, "Failure")) {
-        const error = Cause.squash(result.cause);
         Alert.alert(
           t("Could not unpin chat"),
-          error instanceof Error && error.message.trim().length > 0
-            ? error.message
-            : t("The chat could not be unpinned."),
+          commandFailureMessage(result, { t, fallback: "The chat could not be unpinned." }),
         );
 
         return false;
@@ -309,12 +297,12 @@ export function useThreadListActions(): ThreadListActions {
         });
 
         if (Predicate.isTagged(result, "Failure")) {
-          const error = Cause.squash(result.cause);
           Alert.alert(
             t("Could not regenerate title"),
-            error instanceof Error && error.message.trim().length > 0
-              ? error.message
-              : t("The chat title could not be regenerated."),
+            commandFailureMessage(result, {
+              t,
+              fallback: "The chat title could not be regenerated.",
+            }),
           );
 
           return false;
@@ -403,12 +391,9 @@ export function useThreadListActions(): ThreadListActions {
           });
 
           if (Predicate.isTagged(result, "Failure")) {
-            const error = Cause.squash(result.cause);
             Alert.alert(
               t("Could not move chat"),
-              error instanceof Error && error.message.trim().length > 0
-                ? error.message
-                : t("The pinned chat could not be moved."),
+              commandFailureMessage(result, { t, fallback: "The pinned chat could not be moved." }),
             );
 
             // No rollback: keys already written are valid orderings on their

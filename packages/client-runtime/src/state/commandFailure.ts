@@ -41,6 +41,10 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "bot-not-a-group-member": "That bot is no longer in this space. Refresh to see the current team.",
   "group-already-has-boss":
     "This space already has a boss. Replace the boss before making this bot the boss.",
+  "thread-is-busy": "This chat has work in flight. Wait for it to finish, or respond to it.",
+  "thread-state-invalid":
+    "That action does not fit this chat's current state. Refresh and try again.",
+  "channel-delivery-unavailable": "Channel delivery is not available for this chat or message.",
 };
 
 /**

@@ -2,6 +2,7 @@ import { Predicate } from "effect";
 import { Match } from "effect";
 import type { EnvironmentThreadShell } from "@isnadi/client-runtime/state/shell";
 import { canSettle } from "@isnadi/client-runtime/state/thread-settled";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
 import * as Haptics from "expo-haptics";
 import { useCallback, useRef } from "react";
@@ -18,17 +19,8 @@ export type ThreadListAction = "archive" | "unarchive" | "delete" | "settle" | "
 
 type Translate = ReturnType<typeof useMobileI18n>["t"];
 
-function actionFailureMessage(
-  action: ThreadListAction,
-  cause: Cause.Cause<unknown>,
-  t: Translate,
-): string {
-  const error = Cause.squash(cause);
-
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
+/** The surface's own wording for a failure that carried neither a known refusal code nor a sentence. */
+function actionFailureFallback(action: ThreadListAction, t: Translate): string {
   if (action === "archive") return t("The chat could not be archived.");
 
   if (action === "unarchive") return t("The chat could not be unarchived.");
@@ -38,6 +30,19 @@ function actionFailureMessage(
   if (action === "unsettle") return t("The chat could not be un-settled.");
 
   return t("The chat could not be deleted.");
+}
+
+/**
+ * The sentence under the alert title. A refusal code the client knows gets
+ * localized copy, so a settle blocked by a live session no longer shows the
+ * server's invariant sentence with the thread id in it.
+ */
+function actionFailureMessage(
+  action: ThreadListAction,
+  failure: { readonly cause: Cause.Cause<unknown> },
+  t: Translate,
+): string {
+  return commandFailureMessage(failure, { t, fallback: actionFailureFallback(action, t) });
 }
 
 export function selectionHaptic(): void {
@@ -138,7 +143,7 @@ export function useThreadActionExecutor(
               });
 
         if (Predicate.isTagged(result, "Failure")) {
-          Alert.alert(actionFailureTitle(action, t), actionFailureMessage(action, result.cause, t));
+          Alert.alert(actionFailureTitle(action, t), actionFailureMessage(action, result, t));
 
           return false;
         }

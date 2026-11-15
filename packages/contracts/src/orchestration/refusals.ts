@@ -39,6 +39,37 @@ export const CommandRefusalCodes = [
    * stay separate even though both end in the same remedy.
    */
   "group-already-has-boss",
+  /**
+   * The chat has live work — a running session, a turn the user just sent that
+   * no turn has adopted yet, or an approval/user-input request blocking the
+   * agent — so settling or snoozing it would hide work the user is waiting on.
+   *
+   * One code, not three: the reason is the same (there is live work) and so is
+   * the remedy (wait for it, or answer it). The three states differ only in what
+   * the user does next, which the surface's own title already says.
+   */
+  "thread-is-busy",
+  /**
+   * The action does not fit the chat's current state: the pin order is stale
+   * because the chat was unpinned elsewhere, there is no interrupted request to
+   * resume, the turn is already running, the history is already restored, the
+   * chat is not a group chat, or the snooze wake time has already passed.
+   *
+   * One code because every member shares a remedy: the client's picture of the
+   * chat disagrees with the server's, and refreshing shows the real one. It
+   * stays separate from `thread-is-busy` because waiting is the wrong advice
+   * here — nothing is in flight to wait for.
+   */
+  "thread-state-invalid",
+  /**
+   * Channel delivery does not apply: the message being marked is not a bot
+   * reply, or the chat is a delegated child that runs under its parent's turn
+   * and so has no turn for an inbound channel message to land in.
+   *
+   * Separate from the two above because there is nothing for the user to do —
+   * the surface offered an action that cannot apply to this message or chat.
+   */
+  "channel-delivery-unavailable",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);

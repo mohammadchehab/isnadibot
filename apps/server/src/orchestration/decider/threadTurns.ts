@@ -75,6 +75,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       if (targetThread.parentThreadId && command.message.channelOrigin !== undefined) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "channel-delivery-unavailable",
           detail: `Delegated thread '${command.threadId}' cannot receive channel messages.`,
         });
       }
@@ -418,6 +419,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       ) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `Chat '${command.threadId}' does not have an interrupted request to resume.`,
         });
       }
@@ -430,6 +432,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       ) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `Chat '${command.threadId}' is already active.`,
         });
       }

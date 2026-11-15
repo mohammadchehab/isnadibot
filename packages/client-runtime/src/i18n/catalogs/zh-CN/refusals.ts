@@ -17,5 +17,10 @@ export const refusalsCatalog = {
     "该机器人已不在此空间中。请刷新以查看当前团队。",
   "This space already has a boss. Replace the boss before making this bot the boss.":
     "此空间已有主管。请先更换主管，再将该机器人设为主管。",
+  "This chat has work in flight. Wait for it to finish, or respond to it.":
+    "此对话有正在进行的工作。请等待其完成或先作回应。",
+  "That action does not fit this chat's current state. Refresh and try again.":
+    "该操作不符合此对话的当前状态。请刷新后重试。",
+  "Channel delivery is not available for this chat or message.": "此对话或此消息不支持频道投递。",
   "The command failed.": "命令失败。",
 } as const;

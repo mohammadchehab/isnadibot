@@ -40,6 +40,29 @@ const bossTakenRefusal = {
   refusal: "group-already-has-boss",
 };
 
+/**
+ * The three thread-state codes, each with the English sentence it shows and the
+ * invariant prose the server sends alongside it. Every server sentence here
+ * carries a thread or message id, which is exactly what the copy must not leak.
+ */
+const threadStateRefusals = [
+  {
+    refusal: "thread-is-busy",
+    sentence: "This chat has work in flight. Wait for it to finish, or respond to it.",
+    serverMessage: "thread thread-7f3a has an active session and cannot be settled",
+  },
+  {
+    refusal: "thread-state-invalid",
+    sentence: "That action does not fit this chat's current state. Refresh and try again.",
+    serverMessage: "Thread 'thread-7f3a' is not a group chat, so it has no hop budget.",
+  },
+  {
+    refusal: "channel-delivery-unavailable",
+    sentence: "Channel delivery is not available for this chat or message.",
+    serverMessage: "Channel delivery can only mark an assistant message in thread 'thread-7f3a'.",
+  },
+] as const;
+
 describe("classifyCommandFailure", () => {
   // The server attaches the code at the throw site, so these cases assert the
   // discriminant and never the sentence.
@@ -67,6 +90,12 @@ describe("classifyCommandFailure", () => {
 
   it("keeps a code a newer server added out of the known set", () => {
     expect(classifyCommandFailure(failed({ refusal: "quota-exceeded" }))).toBe("unknown");
+  });
+
+  it("reads each thread-state code rather than falling back to unknown", () => {
+    for (const { refusal } of threadStateRefusals) {
+      expect(classifyCommandFailure(failed({ refusal }))).toBe(refusal);
+    }
   });
 
   it("is unknown for a failure that carries no code", () => {
@@ -160,10 +189,59 @@ describe("commandFailureMessage", () => {
     }
   });
 
+  it("replaces every thread-state refusal with copy that names no chat or message", () => {
+    for (const { refusal, sentence, serverMessage } of threadStateRefusals) {
+      const message = commandFailureMessage(failed({ refusal, message: serverMessage }));
+
+      expect(message).toBe(sentence);
+      expect(message).not.toContain("thread-7f3a");
+      expect(message).not.toContain("Person '");
+      expect(message).not.toContain("Bot '");
+      expect(message).not.toContain("Group '");
+    }
+  });
+
+  it("renders every thread-state refusal in each locale, all three distinct", () => {
+    const translators = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ];
+
+    for (const { refusal, serverMessage } of threadStateRefusals) {
+      const sentences = translators.map((t) =>
+        commandFailureMessage(failed({ refusal, message: serverMessage }), { t }),
+      );
+
+      for (const sentence of sentences) {
+        expect(sentence).not.toContain("thread-7f3a");
+        expect(sentence).not.toContain("Person '");
+        expect(sentence).not.toContain("Bot '");
+        expect(sentence).not.toContain("Group '");
+        // A catalog that forgot the sentence would fall back to English and
+        // collide with the others.
+        expect(sentence).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
+      }
+
+      expect(new Set(sentences).size).toBe(3);
+    }
+  });
+
   it("keeps the server sentence for a code it does not know", () => {
     expect(
       commandFailureMessage(failed({ refusal: "quota-exceeded", message: "Quota reached." })),
     ).toBe("Quota reached.");
+
+    // A thread-state code this client predates must still say something true
+    // rather than guess at copy: the sentence survives verbatim.
+    expect(
+      commandFailureMessage(
+        failed({
+          refusal: "thread-state-unheard-of",
+          message: "Thread 'thread-7f3a' is not a group chat, so it has no hop budget.",
+        }),
+      ),
+    ).toBe("Thread 'thread-7f3a' is not a group chat, so it has no hop budget.");
   });
 
   it("falls back to the surface's own sentence when the server sent none", () => {
