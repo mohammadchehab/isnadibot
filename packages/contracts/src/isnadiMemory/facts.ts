@@ -118,10 +118,114 @@ export const IsnadiMemoryFactsListResult = Schema.Struct({
 
 export type IsnadiMemoryFactsListResult = typeof IsnadiMemoryFactsListResult.Type;
 
+/**
+ * The memory operations a failure can name. Every producer on the memory RPCs
+ * reports one of these, so the copy below can be exhaustive: a new operation is
+ * a compile error rather than a silent fall through to a vague sentence.
+ */
+export const IsnadiMemoryOperation = Schema.Literals([
+  "archive.applyImport",
+  "archive.export",
+  "archive.previewImport",
+  "document.replace",
+  "documents.export",
+  "documents.importApply",
+  "documents.importPreview",
+  "documents.inspect",
+  "facts.list",
+  "facts.mutate",
+  "observations.clear",
+]);
+
+export type IsnadiMemoryOperation = typeof IsnadiMemoryOperation.Type;
+
+/**
+ * The sentence a memory failure shows the user, per operation. `detail` is the
+ * raw cause and can carry a filesystem path or an internal id, so it stays a
+ * log field and never becomes copy. No value here names a path, an id, a raw
+ * operation or a cause.
+ *
+ * Operations that are the same user situation share a sentence rather than each
+ * minting one, the way the settings failures do.
+ */
+export const ISNADI_MEMORY_FAILURE_COPY: Record<IsnadiMemoryOperation, string> = {
+  "archive.applyImport": "The memory could not be imported.",
+  "archive.export": "The memory could not be exported.",
+  "archive.previewImport": "The memory import could not be previewed.",
+  "document.replace": "The memory could not be saved.",
+  "documents.export": "The memory could not be exported.",
+  "documents.importApply": "The memory could not be imported.",
+  "documents.importPreview": "The memory import could not be previewed.",
+  "documents.inspect": "The memory could not be read.",
+  "facts.list": "The memory could not be read.",
+  "facts.mutate": "The memory could not be saved.",
+  "observations.clear": "The chat summary could not be cleared.",
+};
+
+/**
+ * The authored conditions a memory failure can name. Unlike `operation`, which
+ * says what the user was doing, a reason says what was wrong, and each of these
+ * five has its own remedy — reopen memory, turn memory on, or ask whoever runs
+ * the environment to restore approvals. That closed set is why they are literals
+ * here instead of a message the producer fills in.
+ */
+export const IsnadiMemoryFailureReason = Schema.Literals([
+  "memory-changed",
+  "bot-changed",
+  "memory-off",
+  "memory-unavailable",
+  "approvals-unavailable",
+]);
+
+export type IsnadiMemoryFailureReason = typeof IsnadiMemoryFailureReason.Type;
+
+/**
+ * The sentence each authored condition shows. These are the sentences the
+ * server already wrote for these five conditions, kept verbatim so a reason
+ * changes where the copy lives and not what the user reads.
+ */
+const ISNADI_MEMORY_REASON_COPY: Record<IsnadiMemoryFailureReason, string> = {
+  "memory-changed": "Memory changed since you opened it. Reopen memory before saving.",
+  "bot-changed": "The active bot changed. Reopen memory before saving.",
+  "memory-off": "Memory is turned off.",
+  "memory-unavailable": "Memory is unavailable.",
+  "approvals-unavailable": "Memory approvals are unavailable.",
+};
+
+/**
+ * A memory request that failed, carrying the sentence the user reads.
+ *
+ * The message picks between two cause shapes, and which one applies is a
+ * property of the cause set, not a preference:
+ *
+ * - `reason` is a closed union of authored conditions, so it is a literal union
+ *   and its copy is exhaustive — a new condition is a compile error.
+ * - `operation` is the eleven memory operations, likewise closed, and its copy
+ *   is exhaustive for the same reason.
+ *
+ * When a producer's cause set is instead open — a portability archive failure
+ * can say anything — the message travels as a plain `message` field the producer
+ * fills, the way `PortabilityArchiveError` does. A declared field that the
+ * server is merely trusted to fill correctly is not a guarantee, so it is only
+ * used where no closed set exists.
+ *
+ * `detail` is the raw cause. It can carry a filesystem path or an internal id,
+ * so it stays a log field and never becomes copy.
+ */
 export class IsnadiMemoryOperationError extends Schema.TaggedErrorClass<IsnadiMemoryOperationError>()(
   "IsnadiMemoryOperationError",
-  { operation: TrimmedNonEmptyString, detail: TrimmedNonEmptyString },
-) {}
+  {
+    operation: IsnadiMemoryOperation,
+    reason: Schema.optional(IsnadiMemoryFailureReason),
+    detail: TrimmedNonEmptyString,
+  },
+) {
+  override get message(): string {
+    return this.reason === undefined
+      ? ISNADI_MEMORY_FAILURE_COPY[this.operation]
+      : ISNADI_MEMORY_REASON_COPY[this.reason];
+  }
+}
 
 export const IsnadiMemoryPacketFact = Schema.Struct({
   memoryId: IsnadiMemoryRootId,

@@ -1,5 +1,5 @@
 import { Predicate } from "effect";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import type {
   IsnadiMemoryDocument,
   IsnadiMemoryDocumentTarget,
@@ -21,15 +21,6 @@ import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
-
-/** The server's own error text, shown as received, or null when it sent none. */
-export function memoryErrorMessage(cause: unknown) {
-  return cause instanceof Error ? cause.message : null;
-}
-
-function failureMessage(result: Parameters<typeof squashAtomCommandFailure>[0]) {
-  return memoryErrorMessage(squashAtomCommandFailure(result));
-}
 
 function MemoryDocumentEditor({
   document,
@@ -161,7 +152,11 @@ export function BotMemorySheet({
     setBusy(false);
 
     if (Predicate.isTagged(result, "Failure")) {
-      const message = failureMessage(result) ?? t("Memory request failed.");
+      const message = commandFailureMessage(result, {
+        t,
+        fallback: "Memory request failed.",
+      });
+
       setError(message);
       toastManager.add({ type: "error", title: t("Could not save memory"), description: message });
     }
@@ -239,7 +234,11 @@ export function BotMemorySheet({
                     setBusy(false);
 
                     if (Predicate.isTagged(result, "Failure")) {
-                      const message = failureMessage(result);
+                      const message = commandFailureMessage(result, {
+                        t,
+                        fallback: "Memory request failed.",
+                      });
+
                       setError(message);
                       toastManager.add({
                         type: "error",

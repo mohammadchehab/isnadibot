@@ -1,3 +1,4 @@
+import { IsnadiMemoryOperationError } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -164,6 +165,45 @@ describe("classifyCommandFailure", () => {
 });
 
 describe("commandFailureMessage", () => {
+  it("falls back when the server sent a blank message instead of showing nothing", () => {
+    // "" is not nullish, so a caller's own `?? fallback` keeps the empty string:
+    // the toast renders an empty description and the inline error, gated on a
+    // truthy message, never appears. The shared helper trims to null first.
+    const options = { fallback: "Memory request failed." };
+
+    expect(commandFailureMessage(failed({ message: "" }), options)).toBe("Memory request failed.");
+    expect(commandFailureMessage(failed({ message: "   " }), options)).toBe(
+      "Memory request failed.",
+    );
+    expect(
+      commandFailureMessage(failed({ message: "The memory could not be saved." }), options),
+    ).toBe("The memory could not be saved.");
+  });
+
+  it("renders the sentence a memory failure carries, never its raw cause", () => {
+    // The sheet's toast description and its inline error are both this one
+    // value, so proving it here proves what both of them show.
+    const conflict = new IsnadiMemoryOperationError({
+      operation: "document.replace",
+      reason: "memory-changed",
+      detail: "ENOENT: no such file or directory, open '/Users/alex/.isnadi/memory/USER.md'",
+    });
+
+    expect(commandFailureMessage(failed(conflict))).toBe(
+      "Memory changed since you opened it. Reopen memory before saving.",
+    );
+    expect(commandFailureMessage(failed(conflict))).not.toContain("/Users/alex");
+
+    const unread = new IsnadiMemoryOperationError({
+      operation: "facts.list",
+      detail: "ENOENT: no such file or directory, open '/Users/alex/.isnadi/memory/USER.md'",
+    });
+
+    expect(commandFailureMessage(failed(unread), { fallback: "Memory request failed." })).toBe(
+      "The memory could not be read.",
+    );
+  });
+
   it("replaces a known refusal with copy that carries no internal ids", () => {
     const message = commandFailureMessage(failed(rightsRefusal));
 
