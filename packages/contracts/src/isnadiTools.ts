@@ -163,11 +163,13 @@ const scanBracketArithmetic = (line: string, at: number, startingDepth: number):
  * must strip nothing at all: `${…}`, `$'…'`, `$"…"` and `$(…)` are regions whose
  * text this scanner does not read, a backtick is command substitution it does
  * not track, a `(` outside the arithmetic regions is a subshell, group, array
- * assignment or extglob pattern it cannot bound, a line continued by a trailing
- * backslash is not a whole line, and a `<<` whose delimiter is not a literal
- * word has no terminator this scanner can find. In every one of those, a `<<` may or may not be an operator, and reading
- * it as one deletes text the shell would run. Enumerating the regions instead
- * loses this one construct per review round; refusing to guess does not.
+ * assignment or extglob pattern it cannot bound, a bare `[` is an array
+ * subscript or a test expression whose contents it does not read, a line
+ * continued by a trailing backslash is not a whole line, and a `<<` whose
+ * delimiter is not a literal word has no terminator this scanner can find. In
+ * every one of those, a `<<` may or may not be an operator, and reading it as
+ * one deletes text the shell would run. Enumerating the regions instead loses
+ * this one construct per review round; refusing to guess does not.
  */
 const scanHeredocOpener = (
   line: string,
@@ -295,6 +297,14 @@ const scanHeredocOpener = (
     // an opener deletes the command that follows as its body. Where that region
     // ends is not something this scanner can prove, so it strips nothing.
     if (char === "(") return null;
+
+    // A bare `[` is the same arithmetic context as `$[`, spelled without the
+    // `$`: an array subscript. `a[1<<B]=x` expands the shift, reports `B:
+    // command not found`, and runs the next line, so the `<<` opens nothing and
+    // the scanner cannot place it. It is also the `[`/`[[` test builtin, whose
+    // contents are an expression this scanner does not read — same answer, strip
+    // nothing.
+    if (char === "[") return null;
 
     if (char === "$") {
       const next = line[at + 1] ?? "";

@@ -36,6 +36,14 @@ const hiddenBehindARegion = [
     "an extglob case pattern @(…)",
     lines("shopt -s extglob", "case x in @(<<EOF)) ;; esac", PAYLOAD, "EOF"),
   ],
+  // An array subscript is arithmetic without the `$`: the shell expands the
+  // shift, reports the right operand as a missing command, and runs the next
+  // line. Each row's delimiter is that operand, not `EOF`.
+  ["an array subscript shift", lines("a[1<<B]=x", PAYLOAD, "B")],
+  ["an array subscript with a name", lines("a[i<<D]=x", PAYLOAD, "D")],
+  ["an array subscript with spaces", lines("a[1 << B]=x", PAYLOAD, "B")],
+  ["an array subscript append", lines("a[1<<B]+=x", PAYLOAD, "B")],
+  ["an integer array subscript", lines("declare -i a", "a[1<<B]=1", PAYLOAD, "B")],
 ] as const;
 
 /** Shapes where the payload really is body, which the shell writes and never runs. */

@@ -526,11 +526,19 @@ describe("Shell command intent outside the modelled subset", () => {
     // An extglob pattern: `@(…)`, and `+(…)`, `!(…)`, `?(…)`, `*(…)` with it,
     // are pattern lists where a `<<` is not an operator.
     ["an extglob case pattern @(…)", "case x in @(<<EOF)) ;; esac"],
+    // An array subscript is an arithmetic context without the `$`: the shell
+    // expands `a[1<<B]` as a shift, reports `B: command not found`, and runs
+    // the next line. The delimiter is the shift's right operand, not `EOF`.
+    ["an array subscript a[1<<B]", "a[1<<B]=x", "B"],
+    ["an array subscript with a name", "a[i<<D]=x", "D"],
+    ["an array subscript with spaces", "a[1 << B]=x", "B"],
+    ["an array subscript append", "a[1<<B]+=x", "B"],
+    ["an integer array subscript", lines("declare -i a", "a[1<<B]=1"), "B"],
   ] as const;
 
   it("strips nothing when it meets a construct it does not model", () => {
-    for (const [name, openerLine] of shapes) {
-      const command = lines(openerLine, "rm -rf /tmp/x", "EOF");
+    for (const [name, openerLine, delimiter] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", delimiter ?? "EOF");
 
       expect(classifyIsnadiExternalCommand(command), name).toBe("delete");
       // Nothing was stripped, so the destructive line is still there to be read.
@@ -549,8 +557,8 @@ describe("Shell command intent outside the modelled subset", () => {
 
     const cloudShell = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === "Shell")!;
 
-    for (const [name, openerLine] of shapes) {
-      const command = lines(openerLine, "rm -rf /tmp/x", "EOF");
+    for (const [name, openerLine, delimiter] of shapes) {
+      const command = lines(openerLine, "rm -rf /tmp/x", delimiter ?? "EOF");
 
       expect(isnadiToolApprovalForInput(externalShell, { command }), name).toBe("delete");
       expect(
