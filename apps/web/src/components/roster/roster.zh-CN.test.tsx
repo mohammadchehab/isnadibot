@@ -209,7 +209,13 @@ describe("roster in Simplified Chinese", () => {
 
   it("translates the new group dialog", () => {
     const markup = renderInChinese(
-      <NewGroupDialog open bots={[isnadi]} onOpenChange={() => {}} onCreate={() => {}} />,
+      <NewGroupDialog
+        open
+        bots={[isnadi]}
+        groups={[]}
+        onOpenChange={() => {}}
+        onCreate={() => {}}
+      />,
     );
 
     expect(markup).toContain("新建群组");

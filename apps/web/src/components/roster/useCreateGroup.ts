@@ -1,5 +1,6 @@
 import { Predicate } from "effect";
 import { BotId, GroupId } from "@isnadi/contracts";
+import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
@@ -55,7 +56,11 @@ export function useCreateGroup(): (input: NewGroupInput) => Promise<CreateGroupR
       });
 
       if (Predicate.isTagged(result, "Failure")) {
-        toastManager.add({ type: "error", title: t("Could not create group") });
+        toastManager.add({
+          type: "error",
+          title: t("Could not create group"),
+          description: commandFailureMessage(result, { t }),
+        });
 
         return null;
       }

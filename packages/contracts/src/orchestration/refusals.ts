@@ -34,6 +34,15 @@ export const CommandRefusalCodes = [
    */
   "bot-not-a-group-member",
   /**
+   * A business rule about the command, not about the actor and not about a
+   * stale roster: the bot is real and its home is real, but a create may not
+   * silently move it out of that home. It cannot share
+   * `bot-not-a-group-member` above, whose remedy is a refresh — here the user
+   * has to create the space without the bot and add it afterwards, which
+   * `group.member.assign` performs as a deliberate move.
+   */
+  "bot-in-another-group",
+  /**
    * The bot being assigned is not the boss; another bot is. `bot-is-group-boss`
    * would tell the user something false about the bot they picked, so the two
    * stay separate even though both end in the same remedy.

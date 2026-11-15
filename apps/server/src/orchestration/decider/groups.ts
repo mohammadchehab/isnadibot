@@ -86,9 +86,31 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         ...new Set((command.specialistBotIds ?? []).filter((botId) => botId !== command.bossBotId)),
       ];
 
-      yield* Effect.forEach(memberBotIds, (botId) =>
+      const memberBots = yield* Effect.forEach(memberBotIds, (botId) =>
         requireBotNotArchived({ readModel, command, botId }),
       );
+
+      // A bot has one workspace home. A create that names a bot living in
+      // another group would move it without the user asking, so it is refused
+      // and the user is told to create the space without it and add it
+      // afterwards. A bot hired into the group being created carries
+      // `command.groupId`, and a bot imported from another environment carries
+      // none, so both pass; a home naming a deleted group passes too, because
+      // this create is the only way to give that bot a live one.
+      const botInAnotherGroup = memberBots.find(
+        (bot) =>
+          bot.groupId !== null &&
+          bot.groupId !== command.groupId &&
+          readModel.groups.some((group) => group.id === bot.groupId),
+      );
+
+      if (botInAnotherGroup !== undefined) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          refusal: "bot-in-another-group",
+          detail: `Bot '${botInAnotherGroup.id}' already belongs to group '${botInAnotherGroup.groupId}'.`,
+        });
+      }
 
       if (memberBotIds.length < 2) {
         return yield* new OrchestrationCommandInvariantError({

@@ -32,12 +32,20 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
 
   const admin = { personId: AuthSessionId.make("person-admin"), canManageGroups: true } as const;
 
+  const CREATE_BOSS_ID = BotId.make("bot-create-boss");
+
+  const CREATE_SPECIALIST_ID = BotId.make("bot-create-specialist");
+
   const groupReadModel = () =>
     makeReadModel({
       bots: [
         makeBot({ id: BOSS_ID, groupId: GROUP_ID }),
         makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID }),
         makeBot({ id: OTHER_SPECIALIST_ID, groupId: GROUP_ID }),
+        // A create may only name bots with no live home, so the create case
+        // below needs its own two bots rather than the group's own members.
+        makeBot({ id: CREATE_BOSS_ID, groupId: null }),
+        makeBot({ id: CREATE_SPECIALIST_ID, groupId: null }),
       ],
       groups: [
         makeGroup({
@@ -302,8 +310,8 @@ it.layer(NodeServices.layer)("group membership authorization", (it) => {
           commandId: CommandId.make("cmd-create"),
           groupId: GroupId.make("group-new"),
           name: "New group",
-          bossBotId: BOSS_ID,
-          specialistBotIds: [SPECIALIST_ID],
+          bossBotId: CREATE_BOSS_ID,
+          specialistBotIds: [CREATE_SPECIALIST_ID],
           createdAt: NOW,
         },
         {

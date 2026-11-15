@@ -63,6 +63,13 @@ const threadStateRefusals = [
   },
 ] as const;
 
+/** The refusal the decider throws when a create names a bot with another live home. */
+const botInAnotherGroupRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Bot 'bot-4c81' already belongs to group 'group-91b2'.",
+  refusal: "bot-in-another-group",
+};
+
 describe("classifyCommandFailure", () => {
   // The server attaches the code at the throw site, so these cases assert the
   // discriminant and never the sentence.
@@ -85,6 +92,9 @@ describe("classifyCommandFailure", () => {
     );
     expect(classifyCommandFailure(failed({ refusal: "group-already-has-boss" }))).toBe(
       "group-already-has-boss",
+    );
+    expect(classifyCommandFailure(failed({ refusal: "bot-in-another-group" }))).toBe(
+      "bot-in-another-group",
     );
   });
 
@@ -225,6 +235,36 @@ describe("commandFailureMessage", () => {
 
       expect(new Set(sentences).size).toBe(3);
     }
+  });
+
+  it("replaces a second-home refusal with copy that names no bot or group", () => {
+    const message = commandFailureMessage(failed(botInAnotherGroupRefusal));
+
+    expect(message).toBe(
+      "This bot belongs to another space. Create this space without it, then add the bot.",
+    );
+    expect(message).not.toContain("Bot '");
+    expect(message).not.toContain("Group '");
+    expect(message).not.toContain("bot-4c81");
+    expect(message).not.toContain("group-91b2");
+  });
+
+  it("renders the second-home refusal in every locale without an internal id", () => {
+    const sentences = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ].map((t) => commandFailureMessage(failed(botInAnotherGroupRefusal), { t }));
+
+    for (const sentence of sentences) {
+      expect(sentence).not.toContain("Bot '");
+      expect(sentence).not.toContain("Group '");
+      expect(sentence).not.toContain("bot-4c81");
+      expect(sentence).not.toContain("group-91b2");
+    }
+
+    // A catalog that forgot the sentence would fall back to English and collide.
+    expect(new Set(sentences).size).toBe(3);
   });
 
   it("keeps the server sentence for a code it does not know", () => {

@@ -16,12 +16,26 @@ import {
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { BotAvatarView } from "./BotAvatarView";
-import type { Bot } from "./types";
+import type { Bot, Group } from "./types";
 
 export interface NewGroupInput {
   readonly name: string;
   readonly bossBotId: string;
   readonly specialistBotIds: readonly string[];
+}
+
+/**
+ * Whether this dialog may offer the bot. A bot lives in one workspace home at a
+ * time, and `group.create` refuses one that already has a live home, so the
+ * dialog does not offer it in the first place — the refusal is the backstop for
+ * a stale view, not the path the user is meant to walk. A bot whose home group
+ * was deleted has no live home and is offered again.
+ */
+export function isBotOfferable(bot: Bot, groups: readonly Group[]): boolean {
+  return (
+    bot.archivedAt === null &&
+    (bot.groupId === null || !groups.some((group) => group.id === bot.groupId))
+  );
 }
 
 export function canCreateGroup(
@@ -42,24 +56,31 @@ export function groupSelectionHint(selectedIds: readonly string[]): MessageKey |
 export function NewGroupDialog({
   open,
   bots,
+  groups,
   onOpenChange,
   onCreate,
 }: {
   readonly open: boolean;
   readonly bots: readonly Bot[];
+  readonly groups: readonly Group[];
   readonly onOpenChange: (open: boolean) => void;
   readonly onCreate: (input: NewGroupInput) => void;
 }) {
   const { t } = useI18n();
-  const activeBots = useMemo(() => bots.filter((bot) => bot.archivedAt === null), [bots]);
+
+  const offerableBots = useMemo(
+    () => bots.filter((bot) => isBotOfferable(bot, groups)),
+    [bots, groups],
+  );
+
   const [name, setName] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<readonly string[]>(() =>
-    activeBots.slice(0, 2).map((bot) => bot.id),
+    offerableBots.slice(0, 2).map((bot) => bot.id),
   );
 
   const [bossBotId, setBossBotId] = useState(selectedIds[0] ?? "");
-  const selectedBots = activeBots.filter((bot) => selectedIds.includes(bot.id));
+  const selectedBots = offerableBots.filter((bot) => selectedIds.includes(bot.id));
   const selectionHint = groupSelectionHint(selectedIds);
 
   useEffect(() => {
@@ -106,7 +127,7 @@ export function NewGroupDialog({
             <fieldset className="space-y-2">
               <legend className="mb-2 text-sm font-medium">{t("Bots")}</legend>
               <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2">
-                {activeBots.map((bot) => {
+                {offerableBots.map((bot) => {
                   const checked = selectedIds.includes(bot.id);
 
                   return (

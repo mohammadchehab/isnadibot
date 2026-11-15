@@ -15,6 +15,8 @@ export const refusalsCatalog = {
     "أنت لست عضوًا في هذه المساحة. اطلب صلاحية الوصول من الشخص الذي يديرها.",
   "That bot is no longer in this space. Refresh to see the current team.":
     "هذا البوت لم يعد في هذه المساحة. حدّث الصفحة لترى الفريق الحالي.",
+  "This bot belongs to another space. Create this space without it, then add the bot.":
+    "هذا البوت ينتمي إلى مساحة أخرى. أنشئ هذه المساحة بدونه، ثم أضف البوت.",
   "This space already has a boss. Replace the boss before making this bot the boss.":
     "هذه المساحة لديها قائد بالفعل. استبدل القائد قبل تعيين هذا البوت قائدًا.",
   "This chat has work in flight. Wait for it to finish, or respond to it.":
