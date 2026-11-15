@@ -18,6 +18,7 @@ import { normalizePreviewUrl } from "@isnadi/shared/preview";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { resolveDiscoveredServerUrl } from "~/browser/browserTargetResolver";
+import { useI18n } from "~/i18n";
 import {
   BROWSER_HISTORY_MAX_ENTRIES_PER_PROJECT,
   recordVisitForThread,
@@ -49,6 +50,7 @@ import {
   subscribeBrowserViewportChange,
 } from "~/browser/browserViewportActions";
 import { previewRuntimeTabId } from "~/browser/previewRuntimeTabId";
+import { RawErrorDetails, rawErrorMessage } from "~/components/ui/error-details";
 import { toastManager } from "~/components/ui/toast";
 import { AgentBrowserCursor } from "./AgentBrowserCursor";
 import { openPreviewSession } from "./openPreviewSession";
@@ -87,6 +89,7 @@ export function PreviewView({
   onSendAnnotation,
 }: Props) {
   const [focusUrlNonce, setFocusUrlNonce] = useState<number | undefined>(undefined);
+  const { t } = useI18n();
   const [pickActive, setPickActive] = useState(false);
   const activeRecordingTabIds = useActiveBrowserRecordingTabIds();
   const pickActiveRef = useRef(false);
@@ -243,17 +246,21 @@ export function PreviewView({
 
       if (isTagged(result, "Failure")) {
         const error = squashAtomCommandFailure(result);
+
         toastManager.add({
           type: "error",
-          title: "Unable to resize browser viewport",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t("Unable to resize browser viewport"),
+          description: t("An error occurred."),
+          data: {
+            expandableContent: <RawErrorDetails message={rawErrorMessage(error)} />,
+          },
         });
         throw error;
       }
 
       updatePreviewServerSnapshot(threadRef, result.value);
     },
-    [resize, tabId, threadRef],
+    [resize, t, tabId, threadRef],
   );
 
   const handleToggleDeviceToolbar = () => {
@@ -301,14 +308,17 @@ export function PreviewView({
       ? previewBridge.pictureInPicture.close
       : previewBridge.pictureInPicture.open;
 
-    void operation(runtimeTabId).catch((error) => {
+    void operation(runtimeTabId).catch((cause: unknown) => {
       toastManager.add({
         type: "error",
-        title: "Unable to update popped-out preview",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: t("Unable to update popped-out preview"),
+        description: t("An error occurred."),
+        data: {
+          expandableContent: <RawErrorDetails message={rawErrorMessage(cause)} />,
+        },
       });
     });
-  }, [desktopOverlay?.pictureInPicture, runtimeTabId]);
+  }, [desktopOverlay?.pictureInPicture, runtimeTabId, t]);
 
   const handleCapture = usePreviewCapture({
     recordingRuntimeTabId,

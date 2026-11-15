@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 1965,
+  "directMessageCount": 1978,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -22,6 +22,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "description)} \${t(MEMORY_SETTING_DISABLED_HINT)}\`;",
       "MEMORY_SETTING_DISABLED_HINT)}\`;",
       "SHARED_PROJECT_MEMORY_SETTING.label)}",
+      "failure.message), failure.details ?? null),",
     ],
     "apps/mobile/src/features/threads/DurableFactsCard.tsx": [
       "DURABLE_MEMORY_APPROVAL_LABELS[fact.approvalState]),",
@@ -43,6 +44,9 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "status.label)}",
       "stateNote)}</Text> : null}",
       "tone.label)}",
+    ],
+    "apps/web/src/components/ServerUpdateAction.tsx": [
+      "UPDATE_STAGE_MESSAGES[stage]);",
     ],
     "apps/web/src/components/auth/PairingRouteSurface.tsx": [
       "describeAuthGate(auth.bootstrapMethods))}",
@@ -338,6 +342,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/mobile/src/components/AndroidScreenHeader.tsx",
     "apps/mobile/src/components/ConfirmDialogHost.tsx",
     "apps/mobile/src/components/DictationControls.tsx",
+    "apps/mobile/src/components/ErrorBanner.tsx",
     "apps/mobile/src/features/archive/ArchivedThreadsHeader.tsx",
     "apps/mobile/src/features/archive/ArchivedThreadsScreen.tsx",
     "apps/mobile/src/features/archive/archived-thread-rows.tsx",
@@ -419,6 +424,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/CommandPalette.tsx",
     "apps/web/src/components/CommandPaletteContent.tsx",
     "apps/web/src/components/ConfirmDialogHost.tsx",
+    "apps/web/src/components/ServerUpdateAction.tsx",
     "apps/web/src/components/auth/PairingPanel.tsx",
     "apps/web/src/components/auth/PairingRouteSurface.tsx",
     "apps/web/src/components/chat/ChatActionsMenu.tsx",
@@ -481,6 +487,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/plugins/PluginsCatalog.tsx",
     "apps/web/src/components/plugins/PluginsDialog.tsx",
     "apps/web/src/components/plugins/pluginLabel.ts",
+    "apps/web/src/components/preview/PreviewView.tsx",
     "apps/web/src/components/roster/AvatarColorPicker.tsx",
     "apps/web/src/components/roster/AvatarPickerDialog.tsx",
     "apps/web/src/components/roster/BotActivityStatus.tsx",
@@ -611,6 +618,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/space/TaskDialog.tsx",
     "apps/web/src/components/ui/AnchoredToasts.tsx",
     "apps/web/src/components/ui/ToastBody.tsx",
+    "apps/web/src/components/ui/error-details.tsx",
     "apps/web/src/components/ui/sidebar.tsx",
     "apps/web/src/components/ui/sidebarRail.tsx",
     "apps/web/src/components/ui/toast.tsx",

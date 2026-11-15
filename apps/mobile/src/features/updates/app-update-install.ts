@@ -6,6 +6,7 @@ import {
   settlePromise,
   squashAtomCommandFailure,
 } from "@isnadi/client-runtime/state/runtime";
+import { rawCauseMessage } from "../../lib/rawCauseMessage";
 import type {
   AppUpdateCheckOptions,
   AppUpdateClient,
@@ -176,7 +177,10 @@ export function reportUpdateFailure(
   if (isAppUpdateUnavailableError(error)) return;
 
   reportAtomCommandResult(result, { label: "app update check" });
-  onFailure?.(error instanceof Error ? error.message : fallback);
+
+  const details = rawCauseMessage(error);
+
+  onFailure?.(details === null ? { message: fallback } : { message: fallback, details });
 }
 
 function isAppUpdateUnavailableError(cause: unknown): boolean {

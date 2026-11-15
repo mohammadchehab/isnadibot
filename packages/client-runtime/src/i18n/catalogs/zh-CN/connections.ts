@@ -68,6 +68,7 @@ export const connectionsCatalog = {
   "Pairing token": "配对令牌",
   "Pairing with this environment": "正在与此环境配对",
   "Pairing…": "正在配对…",
+  "Enter a pairing token to continue.": "请输入配对令牌以继续。",
   "Paste a one-time token or pairing secret": "粘贴一次性令牌或配对密钥",
   "Saved on this device only. System default follows this device when English or Simplified Chinese is available.":
     "仅保存在此设备上。系统默认会在英语或简体中文可用时跟随此设备。",

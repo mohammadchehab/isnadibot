@@ -71,6 +71,18 @@ describe("PairingPanel", () => {
     expect(html).toContain("Server unreachable.");
   });
 
+  it("keeps the raw cause behind a disclosure instead of inline", () => {
+    const html = renderPanel({
+      kind: "failed",
+      message: "The environment could not be reached. Check the network connection.",
+      details: "fetch failed: ECONNREFUSED 100.64.0.2:3773",
+    });
+
+    expect(html).toContain("The environment could not be reached.");
+    expect(html).not.toContain("ECONNREFUSED");
+    expect(html).toContain("Show details");
+  });
+
   it("confirms success with the environment name", () => {
     const html = renderPanel({ kind: "paired" });
 
@@ -133,20 +145,14 @@ describe("pairing error classification", () => {
   it("keeps an empty token as an inline field error", () => {
     const required = new PrimaryEnvironmentPairingCredentialRequiredError({ providedLength: 0 });
 
-    expect(pairingErrorFromUnknown(required)).toEqual({
-      kind: "missing-token",
-      message: required.message,
-    });
+    expect(pairingErrorFromUnknown(required)).toEqual({ kind: "missing-token" });
   });
 
-  it("keeps other messages as failures", () => {
+  it("keeps other messages as failures, with the raw text behind the disclosure", () => {
     expect(pairingErrorFromMessage("Timed out.")).toEqual({
       kind: "failed",
-      message: "Timed out.",
+      details: "Timed out.",
     });
-    expect(pairingErrorFromUnknown(new Error("Boom"))).toEqual({
-      kind: "failed",
-      message: "Boom",
-    });
+    expect(pairingErrorFromUnknown(new Error("Boom"))).toEqual({ kind: "failed", details: "Boom" });
   });
 });

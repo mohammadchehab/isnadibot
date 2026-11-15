@@ -70,6 +70,15 @@ export function createAppUpdateDeferral(): AppUpdateDeferral {
   return { pendingInstall: false, installInProgress: false };
 }
 
+/**
+ * A failure the update flow reports: the catalogue sentence the interface shows, plus the raw
+ * text the native module returned when it had one, for the disclosure behind it.
+ */
+export interface AppUpdateFailure {
+  readonly message: string;
+  readonly details?: string;
+}
+
 export interface AppUpdateCheckOptions {
   /**
    * "background" (default) installs silently at the next backgrounding,
@@ -81,7 +90,7 @@ export interface AppUpdateCheckOptions {
   readonly client?: AppUpdateClient;
   readonly deferral?: AppUpdateDeferral;
   readonly environment?: AppUpdateEnvironment;
-  readonly onFailure?: (message: string) => void;
+  readonly onFailure?: (failure: AppUpdateFailure) => void;
   readonly onStateChange?: (state: AppUpdateCheckState) => void;
 }
 

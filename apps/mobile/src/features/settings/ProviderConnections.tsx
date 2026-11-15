@@ -29,6 +29,8 @@ import {
 } from "@isnadi/client-runtime/state/runtime";
 
 import { AppText as Text } from "../../components/AppText";
+import { ErrorDetailsDisclosure } from "../../components/ErrorBanner";
+import { rawCauseMessage } from "../../lib/rawCauseMessage";
 import { ProviderAccessSummary } from "./ProviderAccessSummary";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
@@ -67,14 +69,20 @@ function accountName(
     : t("{provider} account", { provider: providerLabel });
 }
 
+/** A failed provider action: the app's own sentence, and the raw cause kept behind a disclosure. */
+type ProviderActionError = { readonly message: string; readonly details?: string };
+
 function commandError(
   result: AtomCommandResult<unknown, unknown>,
   t: (message: string) => string,
-): string {
-  if (!Predicate.isTagged(result, "Failure")) return t("The request failed.");
-  const error = squashAtomCommandFailure(result);
+): ProviderActionError {
+  const message = t("The request failed.");
 
-  return error instanceof Error ? error.message : t("The request failed.");
+  if (!Predicate.isTagged(result, "Failure")) return { message };
+
+  const details = rawCauseMessage(squashAtomCommandFailure(result));
+
+  return details === null ? { message } : { message, details };
 }
 
 function Action({
@@ -128,7 +136,7 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
   const [code, setCode] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ProviderActionError | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   const settle = useCallback(
@@ -142,7 +150,7 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
         return true;
       }
 
-      if (progress.status === "failed") setError(progress.error);
+      if (progress.status === "failed") setError({ message: progress.error });
 
       return progress.status !== "pending";
     },
@@ -204,7 +212,7 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
     try {
       await Linking.openURL(url);
     } catch {
-      setError(t("Could not open the sign-in page. Try Open sign-in again."));
+      setError({ message: t("Could not open the sign-in page. Try Open sign-in again.") });
     }
   };
 
@@ -260,7 +268,7 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
   const saveKey = async () => {
     if (!keyProvider || busy) return;
     const validation = apiKeyValidationError(code, baseUrl);
-    setError(validation);
+    setError(validation === null ? null : { message: validation });
 
     if (validation) return;
     setBusy(true);
@@ -297,11 +305,12 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
     } else {
       if (Predicate.isTagged(result, "Failure")) setError(commandError(result, t));
       else if (Predicate.isTagged(result, "Success"))
-        setError(
-          result.value.status === "failed"
-            ? result.value.error
-            : t("The key was not saved. Try again."),
-        );
+        setError({
+          message:
+            result.value.status === "failed"
+              ? result.value.error
+              : t("The key was not saved. Try again."),
+        });
       await cancel({ environmentId, input: { loginId: started.value.loginId } });
     }
   };
@@ -386,9 +395,18 @@ export function ProviderConnections({ environmentId }: { readonly environmentId:
     >
       <View className="gap-3 p-4">
         {error || query.error ? (
-          <Text accessibilityRole="alert" className="text-sm text-danger">
-            {error ?? query.error}
-          </Text>
+          <View className="gap-1">
+            <Text accessibilityRole="alert" className="text-sm text-danger">
+              {error?.message ?? query.error}
+            </Text>
+            {error?.details ? (
+              <ErrorDetailsDisclosure
+                details={error.details}
+                labelClassName="font-t3-medium text-xs text-danger/80"
+                panelClassName="mt-1 rounded-lg border border-danger/30 px-2.5 py-2 font-mono text-xs leading-5 text-danger"
+              />
+            ) : null}
+          </View>
         ) : null}
         {keyProvider ? (
           <>

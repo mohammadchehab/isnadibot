@@ -42,8 +42,8 @@ export function PairingPendingSurface() {
 
 type PairingError =
   | { readonly kind: "rejected" }
-  | { readonly kind: "missing-token"; readonly message: string }
-  | { readonly kind: "failed"; readonly message: string };
+  | { readonly kind: "missing-token" }
+  | { readonly kind: "failed"; readonly details: string };
 
 const REJECTED_TOKEN_MESSAGE = new PrimaryEnvironmentPairingCredentialRejectedError({
   providedLength: 0,
@@ -57,7 +57,7 @@ export function pairingErrorFromUnknown(cause: unknown): PairingError {
   }
 
   if (isPrimaryEnvironmentPairingCredentialRequiredError(cause)) {
-    return { kind: "missing-token", message: cause.message };
+    return { kind: "missing-token" };
   }
 
   return pairingErrorFromMessage(errorMessageFromUnknown(cause));
@@ -65,7 +65,9 @@ export function pairingErrorFromUnknown(cause: unknown): PairingError {
 
 /** Bootstrap hands the route only a message, so match the rejection by its text. */
 export function pairingErrorFromMessage(message: string): PairingError {
-  return message === REJECTED_TOKEN_MESSAGE ? { kind: "rejected" } : { kind: "failed", message };
+  return message === REJECTED_TOKEN_MESSAGE
+    ? { kind: "rejected" }
+    : { kind: "failed", details: message };
 }
 
 export function PairingRouteSurface({
@@ -167,7 +169,11 @@ export function PairingRouteSurface({
     : pairingError?.kind === "rejected"
       ? { kind: "rejected" }
       : pairingError?.kind === "failed"
-        ? { kind: "failed", message: pairingError.message }
+        ? {
+            kind: "failed",
+            message: t("The environment could not be reached. Check the network connection."),
+            details: pairingError.details,
+          }
         : { kind: "ready" };
 
   return (
@@ -178,7 +184,9 @@ export function PairingRouteSurface({
     >
       <PairingTokenForm
         credential={credential}
-        fieldError={pairingError?.kind === "missing-token" ? pairingError.message : null}
+        fieldError={
+          pairingError?.kind === "missing-token" ? t("Enter a pairing token to continue.") : null
+        }
         isSubmitting={isSubmitting}
         onCredentialChange={setCredential}
         onSubmit={(event) => void handleSubmit(event)}
@@ -227,9 +235,10 @@ export function HostedPairingRouteSurface() {
 
         return {
           ok: false,
-          message: `${errorMessageFromUnknown(squashAtomCommandFailure(result))} ${t(
+          message: t(
             "If the server accepted this one-time token, get a new pairing link before trying again.",
-          )}`,
+          ),
+          details: errorMessageFromUnknown(squashAtomCommandFailure(result)),
         };
       });
       setStatus(next);

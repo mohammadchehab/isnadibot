@@ -71,6 +71,7 @@ export const connectionsCatalog = {
   "Pairing token": "Pairing token",
   "Pairing with this environment": "Pairing with this environment",
   "Pairing…": "Pairing…",
+  "Enter a pairing token to continue.": "Enter a pairing token to continue.",
   "Paste a one-time token or pairing secret": "Paste a one-time token or pairing secret",
   "Saved on this device only. System default follows this device when English or Simplified Chinese is available.":
     "Saved on this device only. System default follows this device when English or Simplified Chinese is available.",

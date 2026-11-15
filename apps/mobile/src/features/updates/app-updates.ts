@@ -7,6 +7,7 @@ import {
   type AppUpdateClient,
   type AppUpdateDeferral,
   type AppUpdateEnvironment,
+  type AppUpdateFailure,
   createAppUpdateDeferral,
 } from "./app-update-types";
 import {
@@ -33,7 +34,7 @@ export type {
 const appUpdateDeferral = createAppUpdateDeferral();
 
 interface AppUpdateCheckProgress {
-  failure: string | undefined;
+  failure: AppUpdateFailure | undefined;
   state: AppUpdateCheckState | undefined;
 }
 
@@ -129,9 +130,9 @@ export async function runAppUpdateCheck(options: AppUpdateCheckOptions = {}): Pr
     applyMode: options.applyMode,
     deferral: options.deferral,
     environment: options.environment,
-    onFailure: (message) => {
-      progress.failure = message;
-      notifyListeners(failureListeners, message);
+    onFailure: (failure) => {
+      progress.failure = failure;
+      notifyListeners(failureListeners, failure);
     },
     onStateChange: (state) => {
       progress.state = state;
@@ -218,7 +219,7 @@ async function performAppUpdateCheck(
   const check = await settlePromise(() => client.checkForUpdateAsync());
 
   if (Predicate.isTagged(check, "Failure")) {
-    reportUpdateFailure(check, "Could not check for updates.", options.onFailure);
+    reportUpdateFailure(check, "Could not check for updates", options.onFailure);
     setState("idle");
 
     return;
@@ -236,7 +237,7 @@ async function performAppUpdateCheck(
   const fetched = await settlePromise(() => client.fetchUpdateAsync());
 
   if (Predicate.isTagged(fetched, "Failure")) {
-    reportUpdateFailure(fetched, "Could not download the update.", options.onFailure);
+    reportUpdateFailure(fetched, "Could not download update", options.onFailure);
     setState("idle");
 
     return;

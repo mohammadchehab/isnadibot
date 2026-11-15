@@ -43,6 +43,13 @@ vi.mock("~/state/session", () => ({
   readPreparedConnection: mocks.readPreparedConnection,
 }));
 
+vi.mock("~/i18n", async () => {
+  const { createTranslator } = await import("@isnadi/client-runtime/i18n");
+  const { translate } = createTranslator("en");
+
+  return { useI18n: () => ({ t: translate }) };
+});
+
 // Stubbed at the direct dependency rather than letting the real module pull in
 // `useSettings` -> `state/server`, which would drag the whole settings and
 // connection graph into a test that only cares about the browser chrome.
