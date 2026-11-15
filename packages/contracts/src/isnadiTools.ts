@@ -65,15 +65,109 @@ export function classifyIsnadiSensitivePath(
 }
 
 /**
- * A heredoc opener on one line, in every form the shell accepts: `<<EOF`,
- * `<<-EOF` (tab-stripped), `<<'EOF'`, `<<"EOF"` and `<<\EOF`.
+ * The delimiter after a `<<` that has already been established as an operator,
+ * in every form the shell accepts: `<<EOF`, `<<-EOF` (tab-stripped), `<<'EOF'`,
+ * `<<"EOF"`, `<<\EOF` and `<< 'EOF'`. Anchored so it matches only at the `<<`.
  */
-const HEREDOC_OPENER = /<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\([A-Za-z_][\w-]*)|([A-Za-z_][\w-]*))/;
+const HEREDOC_DELIMITER =
+  /^<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\([A-Za-z_][\w-]*)|([A-Za-z_][\w-]*))/;
+
+/** Characters after which a `#` starts a comment rather than a literal `#`. */
+const WORD_BOUNDARY = /[\s;&|()<>]/;
+
+type QuoteState = "'" | '"' | null;
+
+interface HeredocOpener {
+  readonly stripLeadingTabs: boolean;
+  readonly delimiter: string;
+}
+
+/** What one line tells the next: the heredoc it opens, and any quote left open. */
+interface HeredocScan {
+  readonly opener: HeredocOpener | null;
+  readonly quote: QuoteState;
+}
+
+/**
+ * The heredoc opener on one line, if the shell would read one, plus the quote
+ * state the line leaves open for the next line. A `<<` inside a quoted string,
+ * inside a `#` comment, or opening a `<<<` herestring is not an operator, so it
+ * opens nothing — the shell runs every line after it, and so must we.
+ */
+const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan => {
+  let quote = startingQuote;
+  let atWordStart = true;
+
+  for (let at = 0; at < line.length; at += 1) {
+    const char = line[at] ?? "";
+
+    if (quote === "'") {
+      if (char === "'") quote = null;
+
+      continue;
+    }
+
+    if (char === "\\") {
+      // A backslash escapes the next character inside double quotes as well as
+      // outside them, which is enough to stop `\"` closing a string and `\<`
+      // opening a heredoc.
+      at += 1;
+      atWordStart = false;
+
+      continue;
+    }
+
+    if (quote === '"') {
+      if (char === '"') quote = null;
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      atWordStart = false;
+
+      continue;
+    }
+
+    if (char === "#" && atWordStart) {
+      // A `#` that starts a word comments out the rest of the line, so a `<<` in
+      // it is text the shell never reads as an operator.
+      return { opener: null, quote };
+    }
+
+    if (char === "<" && line[at + 1] === "<") {
+      if (line[at + 2] === "<") {
+        // `<<<` is a herestring: the word after it is data, not a delimiter.
+        at += 2;
+        atWordStart = false;
+
+        continue;
+      }
+
+      const match = HEREDOC_DELIMITER.exec(line.slice(at));
+      const delimiter = match?.[2] ?? match?.[3] ?? match?.[4] ?? match?.[5];
+
+      if (match && delimiter !== undefined) {
+        return { opener: { stripLeadingTabs: match[1] === "-", delimiter }, quote };
+      }
+    }
+
+    atWordStart = WORD_BOUNDARY.test(char);
+  }
+
+  return { opener: null, quote };
+};
 
 /**
  * `command` with the body of every *terminated* heredoc removed, so the text a
  * script writes or prints is not read as the command's intent. A README body
  * that says "delete a todo" is content, not a destructive command.
+ *
+ * Only a `<<` the shell reads as an operator opens a heredoc. A phantom opener
+ * in a quoted string, a comment or a herestring would otherwise drop every line
+ * up to a later line equal to its "delimiter" from classification, which is a
+ * way to run a destructive command with no approval prompt at all.
  *
  * An unterminated heredoc is left whole on purpose. It swallows the rest of the
  * command, so stripping what follows a stray opener would hide a real
@@ -83,19 +177,18 @@ const HEREDOC_OPENER = /<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\([A-Za-z_][\w-]*)|(
 export function stripHeredocBodies(command: string): string {
   const lines = command.split("\n");
   const kept: string[] = [];
+  let quote: QuoteState = null;
 
   for (let at = 0; at < lines.length; at += 1) {
     const line = lines[at] ?? "";
     kept.push(line);
 
-    const opener = HEREDOC_OPENER.exec(line);
+    const scan = scanHeredocOpener(line, quote);
+    quote = scan.quote;
 
-    if (!opener) continue;
+    if (scan.opener === null) continue;
 
-    const stripLeadingTabs = opener[1] === "-";
-    const delimiter = opener[2] ?? opener[3] ?? opener[4] ?? opener[5];
-
-    if (delimiter === undefined) continue;
+    const { delimiter, stripLeadingTabs } = scan.opener;
 
     const isTerminator = (candidate: string) => {
       const withoutTabs = stripLeadingTabs ? candidate.replace(/^\t+/, "") : candidate;

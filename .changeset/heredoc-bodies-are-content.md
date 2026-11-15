@@ -10,4 +10,6 @@ before classifying, in every quoting form the shell accepts.
 
 An unterminated heredoc is deliberately left whole: it swallows the rest of the
 command, so dropping what follows a stray opener would hide a real destructive
-command behind it.
+command behind it. A `<<` inside a quoted string or a comment, and the `<<<`
+here-string, are text rather than operators, so they open nothing — otherwise a
+command could hide its destructive part behind a `<<` the shell never runs.

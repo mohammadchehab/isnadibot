@@ -54,4 +54,35 @@ describe("critical action classification", () => {
       criticalActionFromShellCommand(heredoc("cat > f.txt <<-EOF", "\trm -rf /", "\tEOF")),
     ).toBeNull();
   });
+
+  it("keeps a `<<` the shell never reads as an operator from hiding a shell command", () => {
+    // The shell runs the `rm` in every one of these; only a scanner that reads
+    // any `<<WORD` as an opener loses it.
+    for (const first of [
+      `echo "see <<EOF below"`,
+      "echo 'use <<EOF to end'",
+      "# example: <<EOF",
+      "grep -c '<<EOF' notes.md",
+      "cat <<< EOF",
+    ]) {
+      expect(criticalActionFromShellCommand(heredoc(first, "rm -rf /tmp/x", "EOF"))).toBe("delete");
+    }
+  });
+
+  it("keeps a `<<` the shell never reads as an operator from hiding a text action", () => {
+    // `rm` is a shell-only token, so the text classifier is proven here with a
+    // word it actually knows. Both classifiers call the one scanner, and this
+    // asserts the second one rather than trusting that the first implies it.
+    for (const first of [
+      `echo "see <<EOF below"`,
+      "echo 'use <<EOF to end'",
+      "# example: <<EOF",
+      "grep -c '<<EOF' notes.md",
+      "cat <<< EOF",
+    ]) {
+      expect(criticalActionFromText(heredoc(first, "deploy to production", "EOF"))).toBe(
+        "production",
+      );
+    }
+  });
 });

@@ -458,5 +458,34 @@ describe("Shell command intent", () => {
       "cat > f.txt <<EOF",
     );
   });
+
+  it("keeps a `<<` the shell never reads as an operator from hiding a command", () => {
+    // The shell reads each of these `<<` as text and runs the line after it. A
+    // scanner that treats any `<<WORD` as an opener drops that line from the
+    // text it classifies, so the command runs with no approval prompt at all.
+    const cases = [
+      [`echo "see <<EOF below"`, "rm -rf /tmp/x", "EOF", "delete"],
+      ["echo 'use <<EOF to end'", "rm -rf /tmp/x", "EOF", "delete"],
+      ["# example: <<EOF", "rm -rf /tmp/x", "EOF", "delete"],
+      ["grep -c '<<EOF' notes.md", "rm -rf /tmp/x", "EOF", "delete"],
+      ["cat <<< EOF", "rm -rf /tmp/x", "EOF", "delete"],
+      ["echo 'use <<E to end'", "rm -rf /tmp/x", "E", "delete"],
+      ["echo x # <<EOF", "git push origin main", "EOF", "production"],
+    ] as const;
+
+    for (const [openerLine, hiddenLine, closingLine, expected] of cases) {
+      const command = heredoc(openerLine, hiddenLine, closingLine);
+
+      expect(classifyIsnadiExternalCommand(command)).toBe(expected);
+      expect(stripHeredocBodies(command)).toBe(command);
+    }
+  });
+
+  it("still strips a real heredoc that shares a line with quoted text", () => {
+    const command = heredoc("echo '<<EOF' > note.txt; cat > f <<MD", "rm -rf /", "MD");
+
+    expect(stripHeredocBodies(command)).toBe("echo '<<EOF' > note.txt; cat > f <<MD");
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
 });
 
