@@ -28,7 +28,7 @@ export const fleetCatalog = {
   "Every bot needs a name.": "Every bot needs a name.",
   "Could not create the space": "Could not create the space",
   "Checking what happened…": "Checking what happened…",
-  "Set up your recruiting squad": "Set up your recruiting squad",
+  "Set up your {template} squad": "Set up your {template} squad",
   "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.":
     "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.",
   "{count} on demand": "{count} on demand",

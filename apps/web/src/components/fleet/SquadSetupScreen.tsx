@@ -13,6 +13,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { HireMemberRow, SQUAD_CELL, SQUAD_COLUMNS } from "./HireMemberRow";
+import { SquadSetupHeading } from "./SquadSetupHeading";
 import { useSquadSetupReadOnly } from "./useSquadSetupAccess";
 import { useCreateSquad } from "./useCreateSquad";
 import { useHireDraft } from "./useHireDraft";
@@ -117,14 +118,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
         </WorkspacePageHeader>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-            <div className="space-y-1">
-              <h1 className="text-xl font-semibold">{t("Set up your recruiting squad")}</h1>
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  "Choose the boss. The boss answers every message by default and hands work to the other bots with @mentions.",
-                )}
-              </p>
-            </div>
+            <SquadSetupHeading templateName={template.name} />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{t("Boss")}</p>
