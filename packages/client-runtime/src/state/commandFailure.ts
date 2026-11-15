@@ -76,6 +76,45 @@ function serverMessage(failure: { readonly cause: Cause.Cause<unknown> }): strin
 }
 
 /**
+ * The shared sentence for a refusal code, or null for a code this client does
+ * not know. A surface that has more specific copy for one code — a delete that
+ * can name the space a bot leads — branches before calling this. Every other
+ * code comes from the one table above, so a code no surface was written for
+ * still says something true instead of echoing the server's sentence and the
+ * internal ids inside it.
+ */
+export function commandRefusalMessage(
+  refusal: CommandFailureRefusal,
+  t: Translate = englishTranslate,
+): string | null {
+  return refusal === "unknown" ? null : t(refusalMessages[refusal]);
+}
+
+/**
+ * The body a surface shows for a refused command, for a caller that has already
+ * classified the refusal: the shared copy when the client knows the code, else
+ * the server's own sentence, else `fallback`. Surfaces with more specific copy
+ * for one code branch first and call this for everything else, so no surface
+ * has to decide on its own which codes fall through to the server's sentence.
+ */
+export function commandRefusalDescription(
+  refusal: CommandFailureRefusal,
+  message: string,
+  options: {
+    readonly t?: Translate;
+    readonly fallback?: string;
+  } = {},
+): string {
+  const { t = englishTranslate, fallback = "The command failed." } = options;
+
+  const shared = commandRefusalMessage(refusal, t);
+
+  if (shared !== null) return shared;
+
+  return message.trim() || t(fallback);
+}
+
+/**
  * The sentence a failed command shows. A refusal code the client knows gets
  * localized copy, because the server's own sentence for it carries internal
  * ids and invariant prose — an `environment-rights` refusal names the person's
@@ -95,9 +134,10 @@ export function commandFailureMessage(
   } = {},
 ): string {
   const { t = englishTranslate, fallback = "The command failed." } = options;
-  const refusal = classifyCommandFailure(failure);
 
-  if (refusal !== "unknown") return t(refusalMessages[refusal]);
+  const shared = commandRefusalMessage(classifyCommandFailure(failure), t);
+
+  if (shared !== null) return shared;
 
   return serverMessage(failure) ?? t(fallback);
 }

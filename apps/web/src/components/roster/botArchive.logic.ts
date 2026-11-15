@@ -1,4 +1,5 @@
 import { createTranslator } from "@isnadi/client-runtime/i18n";
+import { commandRefusalDescription } from "@isnadi/client-runtime/state/runtime";
 import { CommandRefusal } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { Predicate, Schema } from "effect";
@@ -42,9 +43,11 @@ export interface BotArchiveFailureToast {
  *
  * Archiving one of two bots in a space is refused by the decider. That refusal
  * used to reach the toast as the invariant sentence, group id included; the code
- * lets the client say the floor in words instead. A code this client does not
- * know keeps the server's own sentence, the same fallback delete and group
- * delete use, so a newer server's refusal still says something true.
+ * lets the client say the floor in words instead. Every other code the client
+ * knows takes the shared sentence, so the authorization refusals that name a
+ * person id and a group id no longer print them here either. A code this client
+ * does not know keeps the server's own sentence, so a newer server's refusal
+ * still says something true.
  */
 export function botArchiveFailureToast(
   input: {
@@ -68,6 +71,6 @@ export function botArchiveFailureToast(
 
   return {
     title: t("Could not archive {name}", { name: input.botName }),
-    description: input.message.trim() || t("The command failed."),
+    description: commandRefusalDescription(input.refusal, input.message, { t }),
   };
 }

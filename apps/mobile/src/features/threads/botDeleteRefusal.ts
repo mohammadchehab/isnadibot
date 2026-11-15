@@ -1,4 +1,7 @@
-import type { CommandRefusalCode } from "@isnadi/client-runtime/state/runtime";
+import {
+  type CommandRefusalCode,
+  commandRefusalDescription,
+} from "@isnadi/client-runtime/state/runtime";
 
 type Translate = (message: string, params?: Readonly<Record<string, string | number>>) => string;
 
@@ -18,9 +21,11 @@ export interface BotDeleteRefusalCopy {
 /**
  * The sentence a refused delete shows, chosen by the refusal code the server
  * sent. The two guards a user meets most often — a bot that leads a space, and
- * the last two bots in one — are refused by the same code the web roster
- * explains in plain words, so the two clients say the same thing; every other
- * code, including one a newer server added, keeps the server's sentence.
+ * the last two bots in one — are refused by the same codes the web roster
+ * explains in plain words, so the two clients say the same thing. Every other
+ * code the client knows takes the shared sentence, so the authorization
+ * refusals that name a person id and a group id no longer print them here. A
+ * code a newer server added keeps the server's sentence.
  */
 export function botDeleteRefusalCopy(
   input: { readonly failure: DeleteBotFailure; readonly botName: string },
@@ -41,5 +46,8 @@ export function botDeleteRefusalCopy(
     return { title, description: t("Pick a new boss, or delete the space.") };
   }
 
-  return { title, description: input.failure.message.trim() || t("The command failed.") };
+  return {
+    title,
+    description: commandRefusalDescription(input.failure.refusal, input.failure.message, { t }),
+  };
 }

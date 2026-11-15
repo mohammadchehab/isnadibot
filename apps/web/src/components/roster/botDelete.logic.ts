@@ -1,4 +1,5 @@
 import { createTranslator } from "@isnadi/client-runtime/i18n";
+import { commandRefusalDescription } from "@isnadi/client-runtime/state/runtime";
 import { CommandRefusal, type OrchestrationGroup } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { Predicate, Schema } from "effect";
@@ -75,11 +76,13 @@ export interface BotDeleteFailureToast {
 /**
  * The copy a refused delete shows, chosen by the refusal the server sent.
  *
- * A boss refusal offers the way out as a toast action. A code this client does
- * not know keeps the server's own sentence, the same fallback group delete
- * uses, so a newer server's refusal still says something true. The boss and
- * undersized-group refusals are rewritten, because both used to leak ids and
- * invariant prose on paths the app has copy for.
+ * A boss refusal offers the way out as a toast action. The boss and
+ * undersized-group refusals are rewritten here because this surface can say
+ * more than the shared sentence can. Every other code the client knows takes
+ * the shared sentence, so the authorization refusals that name a person id and
+ * a group id no longer print them on the roster menu. A code this client does
+ * not know keeps the server's own sentence, so a newer server's refusal still
+ * says something true.
  */
 export function botDeleteFailureToast(
   input: {
@@ -116,7 +119,7 @@ export function botDeleteFailureToast(
 
   return {
     title: t("Could not delete {name}", { name: input.botName }),
-    description: input.message.trim() || t("The command failed."),
+    description: commandRefusalDescription(input.refusal, input.message, { t }),
     actionLabel: null,
   };
 }
