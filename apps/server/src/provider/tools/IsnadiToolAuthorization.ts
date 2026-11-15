@@ -70,7 +70,7 @@ export function scopeShellCwd<Input>(
     if (toolId !== "ExternalShell" || userRoot === undefined) throw outside();
     const relative = path.relative(userRoot, path.resolve(cwd));
 
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    if (relative.split(/[\\/]+/).includes("..") || path.isAbsolute(relative)) {
       throw new Error(
         `Tool 'ExternalShell' cwd '${cwd}' is outside the user's workspace '${userRoot}'.`,
       );

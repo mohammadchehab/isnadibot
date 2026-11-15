@@ -170,6 +170,22 @@ describe("IsnadiToolRuntime", () => {
     );
   });
 
+  it("refuses an absolute ExternalShell folder whose backslash segments climb out of the workspace", async () => {
+    const runtime = createIsnadiToolRuntime();
+    const user = workspace("abs-backslash-user");
+    runtime.registerSession("thread-1", {
+      runtimeMode: "approval-required",
+      workspaceType: "local",
+      workspace: workspace("abs-backslash-bot"),
+      userComputerWorkspace: user,
+    });
+    const climbing = `${workspaceRoot(user)}/nested\\..\\..\\..`;
+
+    await expect(
+      runtime.requiresApproval("thread-1", "ExternalShell", { command: "pwd", cwd: climbing }),
+    ).rejects.toThrow("outside the user's workspace");
+  });
+
   it("copies files only when both boundaries are registered", async () => {
     const runtime = createIsnadiToolRuntime();
     const bot = workspace("copy-bot");
