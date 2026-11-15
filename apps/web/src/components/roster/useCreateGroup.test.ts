@@ -1,6 +1,6 @@
 import { createTranslator } from "@isnadi/client-runtime/i18n";
 import * as Cause from "effect/Cause";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { useCreateGroup } from "./useCreateGroup";
 
@@ -33,6 +33,12 @@ vi.mock("../ui/toast", () => ({ toastManager: { add: mocks.toast } }));
 const input = { name: "Launch crew", bossBotId: "bot-a", specialistBotIds: ["bot-b"] };
 
 describe("useCreateGroup", () => {
+  // The mocks are hoisted, so a call recorded by one test would otherwise be
+  // read back by the next one's `mock.calls[0]`.
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("shows the coded refusal as the toast description, keeping the title", async () => {
     mocks.create.mockResolvedValue({
       _tag: "Failure",
@@ -53,9 +59,11 @@ describe("useCreateGroup", () => {
       description:
         "This bot belongs to another space. Create this space without it, then add the bot.",
     });
+    expect(mocks.toast.mock.calls[0]?.[0]?.description).not.toContain("group-home");
+    expect(mocks.toast.mock.calls[0]?.[0]?.description).not.toContain("bot-b");
   });
 
-  it("keeps the server's own sentence for a code this client does not know", async () => {
+  it("keeps the title-only toast for a code this client does not know", async () => {
     mocks.create.mockResolvedValue({
       _tag: "Failure",
       cause: Cause.fail({ refusal: "quota-exceeded", message: "Quota reached." }),
@@ -65,10 +73,28 @@ describe("useCreateGroup", () => {
 
     await expect(create(input)).resolves.toBeNull();
 
-    expect(mocks.toast).toHaveBeenCalledWith({
-      type: "error",
-      title: "Could not create group",
-      description: "Quota reached.",
+    expect(mocks.toast).toHaveBeenCalledWith({ type: "error", title: "Could not create group" });
+    expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
+  });
+
+  // A real throw from group.create's own chain, not a synthetic one: the
+  // under-two-member check in decider/groups.ts is uncoded today and names the
+  // group id, and it is the one throw TASK-288 does not reach.
+  it("keeps the title-only toast for an uncoded refusal, so no raw id is shown", async () => {
+    mocks.create.mockResolvedValue({
+      _tag: "Failure",
+      cause: Cause.fail({
+        _tag: "OrchestrationCommandInvariantError",
+        commandType: "group.create",
+        message: "Group 'group-1' requires at least two active bots.",
+      }),
     });
+
+    const create = useCreateGroup();
+
+    await expect(create(input)).resolves.toBeNull();
+
+    expect(mocks.toast).toHaveBeenCalledWith({ type: "error", title: "Could not create group" });
+    expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
   });
 });
