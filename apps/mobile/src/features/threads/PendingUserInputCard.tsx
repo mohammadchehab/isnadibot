@@ -329,7 +329,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                 onFocus={() => props.onInputFocusChange?.(true)}
                 onBlur={() => props.onInputFocusChange?.(false)}
                 placeholder={t("Or type a custom answer")}
-                className="min-h-[54px] rounded-2xl border border-neutral-200 bg-white px-3.5 py-3 font-sans text-base text-neutral-950 dark:border-white/8 dark:bg-neutral-950/70 dark:text-neutral-50"
+                className="min-h-13.5 rounded-2xl border border-neutral-200 bg-white px-3.5 py-3 font-sans text-base text-neutral-950 dark:border-white/8 dark:bg-neutral-950/70 dark:text-neutral-50"
               />
             </View>
           );

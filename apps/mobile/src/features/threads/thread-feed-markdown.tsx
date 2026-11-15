@@ -439,7 +439,7 @@ export function useMarkdownStyles(
             }
 
             return (
-              <View className="mb-[3px] flex-row items-start" key={childKey}>
+              <View className="mb-0.75 flex-row items-start" key={childKey}>
                 <NativeText
                   className="font-sans"
                   style={{

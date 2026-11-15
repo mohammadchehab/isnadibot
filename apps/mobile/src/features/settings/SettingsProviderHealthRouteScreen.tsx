@@ -124,7 +124,7 @@ function BotInboxRow({
             accessibilityRole="button"
             accessibilityState={{ disabled: busy }}
             disabled={busy}
-            className="rounded-[12px] bg-subtle px-3 py-2"
+            className="rounded-xl bg-subtle px-3 py-2"
             onPress={() => void decideMemory({ action: "reject" })}
           >
             <Text className="text-sm font-t3-medium text-foreground">{t("Reject")}</Text>
@@ -133,7 +133,7 @@ function BotInboxRow({
             accessibilityRole="button"
             accessibilityState={{ disabled: busy }}
             disabled={busy}
-            className="rounded-[12px] bg-foreground px-3 py-2"
+            className="rounded-xl bg-foreground px-3 py-2"
             onPress={() => void decideMemory({ action: "approve" })}
           >
             <Text className="text-sm font-t3-medium text-background">{t("Approve")}</Text>
@@ -150,7 +150,7 @@ function BotInboxRow({
             {action === "providers" ? (
               <Pressable
                 accessibilityRole="button"
-                className="rounded-[12px] bg-subtle px-3 py-2"
+                className="rounded-xl bg-subtle px-3 py-2"
                 onPress={() =>
                   navigation.dispatch(
                     StackActions.push("SettingsProviderHealth", {
@@ -170,7 +170,7 @@ function BotInboxRow({
               accessibilityRole="button"
               accessibilityState={{ disabled: busy }}
               disabled={busy}
-              className="rounded-[12px] bg-subtle px-3 py-2"
+              className="rounded-xl bg-subtle px-3 py-2"
               onPress={() => void resolve()}
             >
               <Text className="text-sm font-t3-medium text-foreground">

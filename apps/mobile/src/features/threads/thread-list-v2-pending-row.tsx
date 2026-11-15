@@ -57,16 +57,16 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
       <Text className="text-[17px] font-t3-medium leading-snug text-foreground" numberOfLines={1}>
         {pendingTask.title}
       </Text>
-      <Text className="mt-1 text-[13px] text-foreground-muted" numberOfLines={1}>
+      <Text className="mt-1 text-xs text-foreground-muted" numberOfLines={1}>
         Queued
         {projectTitle ? `  ·  ${projectTitle}` : ""}
         {branch ? (
-          <Text className="text-[13px] text-foreground-muted" style={{ fontFamily: MONO_FONT }}>
+          <Text className="text-xs text-foreground-muted" style={{ fontFamily: MONO_FONT }}>
             {`  ·  ${branch}`}
           </Text>
         ) : null}
         {props.environmentLabel ? (
-          <Text className="text-[13px] text-foreground-tertiary">
+          <Text className="text-xs text-foreground-tertiary">
             {`  ·  ${props.environmentLabel}`}
           </Text>
         ) : null}
