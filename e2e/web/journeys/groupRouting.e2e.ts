@@ -2,6 +2,7 @@ import { type Browser, type Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 import { watchPage } from "../support/diagnostics.ts";
+import { openBlankSpaceDialog, pickBots } from "../support/groupChat.ts";
 import { journeyReport, launchBrowser } from "../support/journey.ts";
 import { startStack, type Stack } from "../support/stack.ts";
 import { stubReplyFrom } from "../support/stubOpenAI.ts";
@@ -70,20 +71,14 @@ describe("group chat routing", () => {
     await page.getByText("Create your first bot").waitFor();
     await createBot("Bot1", true);
     await createBot("Bot2", false);
-    await page.getByTestId("roster-new-bot").click();
-    await page.getByRole("menuitem", { name: "New group" }).click();
+    await openBlankSpaceDialog(page);
 
     const dialog = page.getByRole("dialog");
 
     await dialog.getByLabel("Group name").fill("Crew");
 
     // The first bot picked leads the group.
-    for (const name of ["Bot1", "Bot2"]) {
-      const box = dialog.getByRole("checkbox", { name });
-
-      await box.focus();
-      await box.press("Space");
-    }
+    await pickBots(dialog, ["Bot1", "Bot2"]);
 
     await dialog.getByRole("button", { name: "Create group" }).click();
     await dialog.waitFor({ state: "hidden" });
