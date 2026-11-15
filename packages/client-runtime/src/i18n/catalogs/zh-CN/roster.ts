@@ -351,7 +351,6 @@ export const rosterCatalog = {
     "允许 {name} 查找并加载尚未授予它的注册表技能。",
   "What {name} can load on demand.": "{name} 可按需加载的内容。",
   Dashboard: "仪表板",
-  "Published by {name}": "由 {name} 发布",
   "updated {time}": "{time}更新",
   "Nothing here yet": "这里还没有内容",
   Space: "空间",

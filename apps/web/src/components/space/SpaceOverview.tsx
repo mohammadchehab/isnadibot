@@ -114,7 +114,6 @@ export function SpaceOverview({ group }: { group: Group }) {
   );
 
   const updated = relativeRunTime(spaceUpdatedAt(group, decisions, activity), Date.now(), i18n);
-  const boss = bots.find((bot) => bot.id === group.bossBotId);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.id, bot])), [bots]);
 
   const open = (chat: { environmentId: string; threadId: string }) => void openChat(chat);
@@ -134,7 +133,6 @@ export function SpaceOverview({ group }: { group: Group }) {
     >
       <p className="text-sm text-muted-foreground">
         {t("Dashboard")}
-        {boss ? <bdi> · {t("Published by {name}", { name: boss.name })}</bdi> : null}
         {" · "}
         {t("updated {time}", { time: updated })}
       </p>

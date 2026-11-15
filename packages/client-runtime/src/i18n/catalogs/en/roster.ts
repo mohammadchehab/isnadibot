@@ -367,7 +367,6 @@ export const rosterCatalog = {
     "Let {name} find and load registry skills it has not been given.",
   "What {name} can load on demand.": "What {name} can load on demand.",
   Dashboard: "Dashboard",
-  "Published by {name}": "Published by {name}",
   "updated {time}": "updated {time}",
   "Nothing here yet": "Nothing here yet",
   Space: "Space",
