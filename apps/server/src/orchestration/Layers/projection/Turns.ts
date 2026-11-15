@@ -1,7 +1,16 @@
+import {
+  isTurnEndingActivityKind,
+  THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND,
+  ThreadSilentRunActivityPayload,
+} from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { settledTurnStateForSessionStatus } from "../../TurnSessionState.ts";
 import { type ProjectionDependencies, type ProjectorDefinition } from "./Definitions.ts";
+
+/** The watchdog writes this payload on every silent window; anything else is not a silence. */
+const isSilentRunPayload = Schema.is(ThreadSilentRunActivityPayload);
 
 export function createTurns({
   projectionThreadSessionRepository,
@@ -28,6 +37,7 @@ export function createTurns({
         ...existing.value,
         status: "starting",
         lastError: null,
+        lastErrorCode: null,
         updatedAt: event.payload.createdAt,
       });
 
@@ -47,6 +57,9 @@ export function createTurns({
       mcpServerIds: [...(event.payload.session.mcpServerIds ?? [])],
       activeTurnId: event.payload.session.activeTurnId,
       lastError: event.payload.session.lastError,
+      // Like `lastError`, a session-set that names no code clears it, so a reason never outlives the
+      // failure that set it.
+      lastErrorCode: event.payload.session.lastErrorCode ?? null,
       // A session-set with no category clears it, so a recovered sign-in stops reading as a problem.
       unavailability: event.payload.session.unavailability ?? null,
       updatedAt: event.payload.session.updatedAt,
@@ -224,6 +237,7 @@ export function createTurns({
               ? pendingTurnStart.value.requestedAt
               : event.occurredAt,
             completedAt: null,
+            silentAt: null,
             checkpointTurnCount: null,
             checkpointRef: null,
             checkpointStatus: null,
@@ -299,10 +313,49 @@ export function createTurns({
           requestedAt: event.payload.createdAt,
           startedAt: event.payload.createdAt,
           completedAt: settlesTurn ? event.payload.updatedAt : null,
+          silentAt: null,
           checkpointTurnCount: null,
           checkpointRef: null,
           checkpointStatus: null,
           checkpointFiles: [],
+        });
+
+        return;
+      }
+
+      // A turn-ending activity travels on the turn row so every surface reads it without the
+      // activity stream: the turn is over, and the next message starts one instead of steering
+      // into a provider that stopped talking. `turn.silent.cleared` is the reverse state — the
+      // provider spoke again, so the same turn is open once more.
+      case "thread.activity-appended": {
+        const activity = event.payload.activity;
+
+        if (
+          activity.turnId === null ||
+          (!isTurnEndingActivityKind(activity.kind) &&
+            activity.kind !== THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND)
+        ) {
+          return;
+        }
+
+        const existingTurn = yield* projectionTurnRepository.getByTurnId({
+          threadId: event.payload.threadId,
+          turnId: activity.turnId,
+        });
+
+        if (Option.isNone(existingTurn)) {
+          return;
+        }
+
+        yield* projectionTurnRepository.upsertByTurnId({
+          ...existingTurn.value,
+          // The cleared report carries only the provider, so the kind decides: anything that is
+          // not a clear records the silence it reported, and a clear puts the turn back to open.
+          silentAt:
+            activity.kind !== THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND &&
+            isSilentRunPayload(activity.payload)
+              ? activity.payload.lastActivityAt
+              : null,
         });
 
         return;
@@ -342,6 +395,7 @@ export function createTurns({
           requestedAt: event.payload.createdAt,
           startedAt: event.payload.createdAt,
           completedAt: event.payload.createdAt,
+          silentAt: null,
           checkpointTurnCount: null,
           checkpointRef: null,
           checkpointStatus: null,
@@ -407,6 +461,7 @@ export function createTurns({
           requestedAt: event.payload.completedAt,
           startedAt: event.payload.completedAt,
           completedAt: event.payload.completedAt,
+          silentAt: null,
           checkpointTurnCount: event.payload.checkpointTurnCount,
           checkpointRef: event.payload.checkpointRef,
           checkpointStatus: event.payload.status,

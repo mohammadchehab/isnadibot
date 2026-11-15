@@ -441,6 +441,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           mcp_server_ids_json AS "mcpServerIds",
           active_turn_id AS "activeTurnId",
           last_error AS "lastError",
+          last_error_code AS "lastErrorCode",
           unavailability,
           updated_at AS "updatedAt"
         FROM projection_thread_sessions
@@ -464,6 +465,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           sessions.mcp_server_ids_json AS "mcpServerIds",
           sessions.active_turn_id AS "activeTurnId",
           sessions.last_error AS "lastError",
+          sessions.last_error_code AS "lastErrorCode",
           sessions.unavailability,
           sessions.updated_at AS "updatedAt"
         FROM projection_thread_sessions sessions
@@ -491,6 +493,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           sessions.mcp_server_ids_json AS "mcpServerIds",
           sessions.active_turn_id AS "activeTurnId",
           sessions.last_error AS "lastError",
+          sessions.last_error_code AS "lastErrorCode",
           sessions.unavailability,
           sessions.updated_at AS "updatedAt"
         FROM projection_thread_sessions sessions
@@ -534,6 +537,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           turns.requested_at AS "requestedAt",
           turns.started_at AS "startedAt",
           turns.completed_at AS "completedAt",
+          turns.silent_at AS "silentAt",
           turns.assistant_message_id AS "assistantMessageId",
           turns.pending_message_id AS "pendingMessageId",
           turns.responding_bot_id AS "respondingBotId",
@@ -596,6 +600,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           turns.requested_at AS "requestedAt",
           turns.started_at AS "startedAt",
           turns.completed_at AS "completedAt",
+          turns.silent_at AS "silentAt",
           turns.assistant_message_id AS "assistantMessageId",
           turns.pending_message_id AS "pendingMessageId",
           turns.responding_bot_id AS "respondingBotId",
@@ -625,6 +630,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           turns.requested_at AS "requestedAt",
           turns.started_at AS "startedAt",
           turns.completed_at AS "completedAt",
+          turns.silent_at AS "silentAt",
           turns.assistant_message_id AS "assistantMessageId",
           turns.pending_message_id AS "pendingMessageId",
           turns.responding_bot_id AS "respondingBotId",

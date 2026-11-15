@@ -5,6 +5,7 @@ import type {
   EnvironmentThreadShell,
 } from "@isnadi/client-runtime/state/shell";
 import type { EnvironmentThreadSearchMatch } from "@isnadi/client-runtime/state/thread-search";
+import { sessionFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { canSnooze, resolveSnoozePresets } from "@isnadi/client-runtime/state/thread-settled";
 import type { MenuAction } from "@react-native-menu/menu";
 import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
@@ -501,17 +502,20 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
 
   const online = status === "working" || status === "approval" || status === "input";
 
-  // Preview line: live state first, then where the work lives.
+  // Preview line: live state first, then where the work lives. A session the server closed for a
+  // typed reason renders from the shared map, so the sentence is translated and a reason this build
+  // does not know falls back to the server's own prose.
+  const sessionFailure = status === "failed" ? sessionFailureMessage(thread.session, t) : null;
+
   const previewText =
-    status === "failed" && thread.session?.lastError
-      ? thread.session.lastError
-      : [
-          statusLabel?.label ? `${statusLabel.label}…` : null,
-          projectTitleText || null,
-          props.environmentLabel,
-        ]
-          .filter(Boolean)
-          .join("  ·  ");
+    sessionFailure ??
+    [
+      statusLabel?.label ? `${statusLabel.label}…` : null,
+      projectTitleText || null,
+      props.environmentLabel,
+    ]
+      .filter(Boolean)
+      .join("  ·  ");
 
   // Roster row, matching the web bot roster: blob avatar with presence dot,
   // bot name, the chat title as a task chip, timestamp, and a preview line.
@@ -570,7 +574,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           <Text
             className={cn(
               "mt-0.5 text-[14px]",
-              status === "failed" && thread.session?.lastError
+              sessionFailure
                 ? selected
                   ? "text-user-bubble-foreground-muted"
                   : "text-red-600/80 dark:text-red-400/80"

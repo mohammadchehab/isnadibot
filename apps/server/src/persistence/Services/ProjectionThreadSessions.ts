@@ -32,6 +32,10 @@ export const ProjectionThreadSession = Schema.Struct({
   mcpServerIds: Schema.Array(McpServerId),
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(Schema.String),
+  // The code behind `lastError`'s prose, so a surface renders the sentence from the shared map and
+  // the causes stay distinguishable. Null for sessions written before this was tracked, and for a
+  // failure that carried no code of its own.
+  lastErrorCode: Schema.NullOr(TrimmedNonEmptyString),
   // Why the session cannot be used right now, so a reload still shows a sign-in problem. Null for
   // sessions that were written before this was tracked. Stored as the string the event carried, not
   // the closed union: an event written by a newer server names a reason this one does not know, and

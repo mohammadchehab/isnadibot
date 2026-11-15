@@ -1,4 +1,8 @@
-import { type OrchestrationEvent, type ProviderRuntimeEvent } from "@isnadi/contracts";
+import {
+  TURN_WENT_SILENT_REFUSAL,
+  type OrchestrationEvent,
+  type ProviderRuntimeEvent,
+} from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -6,6 +10,7 @@ import * as Option from "effect/Option";
 import type * as PlatformError from "effect/PlatformError";
 import * as Stream from "effect/Stream";
 import { makeDrainableWorker } from "@isnadi/shared/DrainableWorker";
+import { isLiveSessionStatus } from "@isnadi/shared/botStatus";
 import { CheckpointReactor, type CheckpointReactorShape } from "../Services/CheckpointReactor.ts";
 import { forkParked } from "../../serverActivation.ts";
 import type { CheckpointStoreError } from "../../checkpointing/Errors.ts";
@@ -46,6 +51,7 @@ const make = Effect.gen(function* () {
   });
 
   const {
+    captureCheckpointForSettledTurn,
     captureCheckpointFromTurnCompletion,
     ensurePreTurnBaselineFromTurnStart,
     ensurePreTurnBaselineFromDomainTurnStart,
@@ -85,6 +91,38 @@ const make = Effect.gen(function* () {
     if (event.type === "thread.turn-start-requested" || event.type === "thread.message-sent") {
       if (event.type === "thread.turn-start-requested") pending.add(event.payload.threadId);
       yield* ensurePreTurnBaselineFromDomainTurnStart(event);
+
+      return;
+    }
+
+    // A turn can reach a final-terminal state without its provider ever reporting an ending: when
+    // a provider goes quiet on a live session, the silence watchdog settles the turn itself. That
+    // ending arrives as the session leaving "running" with no active turn, so it settles the
+    // checkpoint exactly like a provider-reported ending — otherwise a turn the provider abandoned
+    // keeps no checkpoint and the work it did is never recoverable.
+    if (event.type === "thread.session-set") {
+      const { threadId, session } = event.payload;
+
+      if (session.activeTurnId !== null || isLiveSessionStatus(session.status)) return;
+
+      const settledTurnId = startedTurns.get(threadId);
+
+      // Only the watchdog's settlement is this reactor's business: a turn the provider ended has
+      // already been handled on the runtime path, and its session-set is the same ending arriving
+      // twice.
+      if (settledTurnId === undefined || session.lastErrorCode !== TURN_WENT_SILENT_REFUSAL) return;
+
+      startedTurns.delete(threadId);
+
+      yield* captureCheckpointForSettledTurn({
+        threadId,
+        turnId: settledTurnId,
+        // The turn failed: the provider stopped answering. "error" is the same status a provider
+        // that reports its own failure gets, so the turn row keeps reading as failed instead of
+        // being rewritten to "completed" by the checkpoint it captured.
+        status: "error",
+        createdAt: event.occurredAt,
+      });
 
       return;
     }
@@ -211,7 +249,8 @@ const make = Effect.gen(function* () {
         if (
           event.type !== "thread.turn-start-requested" &&
           event.type !== "thread.message-sent" &&
-          event.type !== "thread.checkpoint-revert-requested"
+          event.type !== "thread.checkpoint-revert-requested" &&
+          event.type !== "thread.session-set"
         ) {
           return Effect.void;
         }

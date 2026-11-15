@@ -68,6 +68,7 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "fleet-roles-share-name": "Two bots share that name",
   "thread-does-not-take-mentions":
     "Bot mentions only work in a space chat. Remove the mention and send again.",
+  "turn-went-silent": "This turn stopped responding, so it was closed. Try again.",
 };
 
 /**
@@ -111,6 +112,35 @@ export function commandRefusalMessage(
   t: Translate = englishTranslate,
 ): string | null {
   return refusal === "unknown" ? null : t(refusalMessages[refusal]);
+}
+
+/**
+ * The shared sentence for a code the server attached to a session, or null when
+ * this client does not know the code — a newer server may name a reason this
+ * build has never heard of, and the caller falls back to the session's own
+ * prose. Same table as a refused command, because a turn the server ended is
+ * the same kind of news: a typed reason the surface should not invent wording
+ * for.
+ */
+export function sessionRefusalMessage(
+  code: string | null | undefined,
+  t: Translate = englishTranslate,
+): string | null {
+  return code != null && isCommandRefusal(code) ? t(refusalMessages[code]) : null;
+}
+
+/**
+ * What a surface shows for a session the server put in an error state: the shared sentence when
+ * the session carries a code this client knows, else the server's own prose, else nothing.
+ */
+export function sessionFailureMessage(
+  session:
+    | { readonly lastError: string | null; readonly lastErrorCode?: string | undefined }
+    | null
+    | undefined,
+  t: Translate = englishTranslate,
+): string | null {
+  return sessionRefusalMessage(session?.lastErrorCode, t) ?? session?.lastError ?? null;
 }
 
 /**

@@ -45,6 +45,28 @@ const makeThread = (
   },
 });
 
+/**
+ * A chat that still holds an open turn but whose session row did not survive the restart. No
+ * adapter can emit a terminal event for it, so startup is the only thing that can end it.
+ */
+const makeThreadWithOpenTurn = (id: string, silentAt: string | null = null) => ({
+  id: ThreadId.make(id),
+  archivedAt: null,
+  deletedAt: null,
+  session: null,
+  latestTurn: {
+    turnId: TurnId.make("turn-open"),
+    state: "running" as const,
+    requestedAt: updatedAt,
+    startedAt: updatedAt,
+    completedAt: null,
+    assistantMessageId: null,
+    ...(silentAt === null ? {} : { silentAt }),
+  },
+});
+
+type TestThread = ReturnType<typeof makeThread> | ReturnType<typeof makeThreadWithOpenTurn>;
+
 const makeAgentController = (liveThreadIds: ReadonlyArray<ThreadId> = []) =>
   ({
     authenticateMcpServer: () => Effect.die("unused"),
@@ -62,13 +84,13 @@ const makeAgentController = (liveThreadIds: ReadonlyArray<ThreadId> = []) =>
     streamEvents: Stream.empty,
   }) satisfies AgentController.AgentController["Service"];
 
-const queryWithThreads = (threads: ReadonlyArray<ReturnType<typeof makeThread>>) =>
+const queryWithThreads = (threads: ReadonlyArray<TestThread>) =>
   Layer.mock(ProjectionSnapshotQuery.ProjectionSnapshotQuery)({
     getCommandReadModel: () => Effect.succeed({ threads } as never),
   });
 
 const runReconciliation = (input: {
-  readonly threads: ReadonlyArray<ReturnType<typeof makeThread>>;
+  readonly threads: ReadonlyArray<TestThread>;
   readonly liveThreadIds?: ReadonlyArray<ThreadId>;
   readonly directory: ProviderSessionDirectory.ProviderSessionDirectory["Service"];
   readonly dispatch: OrchestrationEngine.OrchestrationEngineService["Service"]["dispatch"];
@@ -166,6 +188,50 @@ it.effect("reconciles multiple active and archived orphans but skips live sessio
           assert.deepStrictEqual(binding.runtimePayload, { activeTurnId: null });
           assert.deepStrictEqual(binding.resumeCursor, { cursor: binding.threadId });
         }
+      }),
+    ),
+  );
+});
+
+// The safety net behind the invariant: a turn is open iff nothing terminal happened to it. When
+// no adapter emitted a terminal event — a crash, a killed session, a provider that returns
+// nothing — startup is the only thing left that can end the turn.
+it.effect("settles an open turn whose provider session did not survive the restart", () => {
+  const orphanTurn = makeThreadWithOpenTurn("thread-orphan-turn");
+  const silentTurn = makeThreadWithOpenTurn("thread-silent-turn", updatedAt);
+  const liveThread = makeThreadWithOpenTurn("thread-live-turn");
+  const dispatched: OrchestrationCommand[] = [];
+
+  return runReconciliation({
+    threads: [orphanTurn, silentTurn, liveThread],
+    liveThreadIds: [liveThread.id],
+    directory: {
+      getBinding: () => Effect.succeed(Option.none()),
+      upsert: () => Effect.die("unused"),
+      getProvider: () => Effect.die("unused"),
+      listThreadIds: () => Effect.die("unused"),
+      listBindings: () => Effect.die("unused"),
+    },
+    dispatch: (command) =>
+      Effect.sync(() => dispatched.push(command)).pipe(Effect.as({ sequence: dispatched.length })),
+  }).pipe(
+    Effect.tap(() =>
+      Effect.sync(() => {
+        // The silent turn is already not open, and the live thread still has its session.
+        assert.deepStrictEqual(
+          dispatched.map((command) => command.type === "thread.session.set" && command.threadId),
+          [orphanTurn.id],
+        );
+
+        const settled = dispatched[0];
+
+        assert.equal(settled?.type, "thread.session.set");
+
+        if (settled?.type !== "thread.session.set") return;
+
+        assert.equal(settled.session.status, "error");
+        assert.equal(settled.session.activeTurnId, null);
+        assert.equal(settled.session.lastError, ServerRuntimeStartup.ORPHANED_PROVIDER_TURN_ERROR);
       }),
     ),
   );

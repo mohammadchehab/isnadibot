@@ -384,6 +384,7 @@ projectionRepositoriesLayer("Projection repositories", (it) => {
         requestedAt: "2026-03-24T00:00:00.000Z",
         startedAt: "2026-03-24T00:00:00.000Z",
         completedAt: null,
+        silentAt: null,
         checkpointTurnCount: null,
         checkpointRef: null,
         checkpointStatus: null,

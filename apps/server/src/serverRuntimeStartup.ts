@@ -309,6 +309,8 @@ export {
 export {
   reconcileProviderSessions,
   DELEGATION_RESTART_FAILURE_MESSAGE,
+  ORPHANED_PROVIDER_SESSION_ERROR,
+  ORPHANED_PROVIDER_TURN_ERROR,
   reconcileDelegations,
 } from "./startupReconciliation.ts";
 

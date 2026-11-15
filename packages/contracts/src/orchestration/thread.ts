@@ -122,6 +122,13 @@ export const OrchestrationSession = Schema.Struct({
   activeTurnId: Schema.NullOr(TurnId),
   lastError: Schema.NullOr(TrimmedNonEmptyString),
   /**
+   * Why the last turn ended in error, as a code a client renders from the shared map rather than
+   * from `lastError`'s prose. A plain string on the wire for the same reason as `unavailability`:
+   * a code an older client has never heard of must arrive as a value it can ignore rather than
+   * fail the decode of the whole snapshot.
+   */
+  lastErrorCode: Schema.optional(TrimmedNonEmptyString),
+  /**
    * Why the provider could not start a turn. A plain string on the wire: a session is decoded
    * inside the shell snapshot, so a category an older client has never heard of must arrive as a
    * value it can ignore rather than fail the decode of the whole snapshot.
@@ -313,6 +320,14 @@ export const OrchestrationLatestTurn = Schema.Struct({
    * the session's: the turn is decoded inside a snapshot every client reads as one object.
    */
   unavailability: Schema.optional(TrimmedNonEmptyString),
+  /**
+   * When this turn's provider last went quiet: the `lastActivityAt` of its latest
+   * `turn.silent` activity, cleared when output resumes. A running turn with a
+   * `silentAt` is not evidence of work — the chat says "No response from
+   * <provider>" — so a bot whose turn is silent reads as free, and a new turn
+   * supersedes it. Optional so a snapshot from before it existed decodes.
+   */
+  silentAt: Schema.optional(Schema.NullOr(IsoDateTime)),
 });
 
 export type OrchestrationLatestTurn = typeof OrchestrationLatestTurn.Type;

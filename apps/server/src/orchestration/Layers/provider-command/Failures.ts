@@ -18,7 +18,7 @@ import {
   isModelsExhaustedError,
   isProviderAdapterRequestError,
   isUnsupportedEngineError,
-  withoutUnavailability,
+  withoutStaleFailure,
 } from "./Fields.ts";
 import type { createDependencies } from "./Dependencies.ts";
 import type { createContext } from "./Context.ts";
@@ -291,7 +291,7 @@ export function createFailures({
       threadId: input.threadId,
       session: {
         ...(session
-          ? withoutUnavailability(session)
+          ? withoutStaleFailure(session)
           : {
               threadId: input.threadId,
               providerName: null,

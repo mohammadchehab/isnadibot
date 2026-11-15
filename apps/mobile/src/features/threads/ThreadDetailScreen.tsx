@@ -1,4 +1,5 @@
 import type { ThreadSilentRun } from "@isnadi/client-runtime/silent-run";
+import { sessionFailureMessage } from "@isnadi/client-runtime/state/runtime";
 import { useMobileI18n } from "../../lib/i18n";
 import type { EnvironmentConnectionPhase } from "@isnadi/client-runtime/connection";
 import type { EnvironmentThreadStatus } from "@isnadi/client-runtime/state/threads";
@@ -635,7 +636,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
               {props.canResumeThread ? (
                 <View className="mx-4 mb-3 flex-row items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                   <ResumeErrorSummary
-                    error={props.selectedThread.session?.lastError ?? null}
+                    error={sessionFailureMessage(props.selectedThread.session, t)}
                     context={{
                       unavailability: props.resumeFailureUnavailability ?? null,
                       providerName: selectedProviderName,

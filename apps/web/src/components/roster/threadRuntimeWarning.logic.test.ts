@@ -174,6 +174,53 @@ describe("latestBotThreadFailure", () => {
     ).toEqual({ message: "Claude is not signed in.", unavailability: "missing-login" });
   });
 
+  it("renders a turn the server closed for a typed reason from the shared map", () => {
+    const silentTurn = {
+      ...runningTurn,
+      state: "error" as const,
+      completedAt: timestamp,
+    };
+
+    expect(
+      latestBotThreadFailure({
+        activities: [],
+        latestTurn: silentTurn,
+        session: {
+          status: "error",
+          // The server's own prose, deliberately different: the code decides the sentence, so a
+          // server that words it differently cannot change what the user reads.
+          lastError: "provider went quiet",
+          lastErrorCode: "turn-went-silent",
+        },
+        lastUserMessageAt: timestamp,
+      }),
+    ).toEqual({
+      message: "This turn stopped responding, so it was closed. Try again.",
+      unavailability: null,
+    });
+  });
+
+  it("falls back to the session's own prose for a reason this build does not know", () => {
+    const silentTurn = {
+      ...runningTurn,
+      state: "error" as const,
+      completedAt: timestamp,
+    };
+
+    expect(
+      latestBotThreadFailure({
+        activities: [],
+        latestTurn: silentTurn,
+        session: {
+          status: "error",
+          lastError: "A reason from a newer server.",
+          lastErrorCode: "some-future-reason",
+        },
+        lastUserMessageAt: timestamp,
+      }),
+    ).toEqual({ message: "A reason from a newer server.", unavailability: null });
+  });
+
   it("keeps a failed turn's category", () => {
     const failedTurn = {
       ...runningTurn,

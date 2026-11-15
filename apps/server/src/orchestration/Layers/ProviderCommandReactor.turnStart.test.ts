@@ -1,5 +1,5 @@
 import { ComposioOperationError, ProviderDriverKind, ProviderInstanceId } from "@isnadi/contracts";
-import { CommandId, DEFAULT_PROVIDER_INTERACTION_MODE, ThreadId } from "@isnadi/contracts";
+import { CommandId, DEFAULT_PROVIDER_INTERACTION_MODE, EventId, ThreadId } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import { it as effectIt } from "@effect/vitest";
@@ -8,6 +8,7 @@ import { ProviderAdapterRequestError } from "../../provider/Errors.ts";
 import { ISNADI_TURN_USAGE_RESERVATION_TOKENS } from "../../usage/BotUsageLedger.ts";
 import {
   asMessageId,
+  asTurnId,
   createProviderCommandHarness,
 } from "./test-support/ProviderCommandHarness.ts";
 
@@ -67,6 +68,80 @@ describe("ProviderCommandReactor", () => {
 
     expect(harness.sendTurn).toHaveBeenCalledOnce();
     expect(harness.sendTurn.mock.calls[0]?.[0]).toMatchObject({ input: "send this only once" });
+  });
+
+  // The defect behind "a message sent after a silent turn started no turn": the dead turn stays
+  // running at the provider, so a send steered into it and the user had to press Stop first.
+  it("ends a turn the watchdog reported silent before starting the next one", async () => {
+    const harness = await createHarness();
+    const now = "2026-11-15T05:33:00.000Z";
+    const silentTurnId = asTurnId("turn-silent");
+
+    await harness.runEffect(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-running-silent"),
+        threadId: ThreadId.make("thread-1"),
+        session: {
+          threadId: ThreadId.make("thread-1"),
+          status: "running",
+          providerName: "codex",
+          runtimeMode: "full-access",
+          activeTurnId: silentTurnId,
+          lastError: null,
+          updatedAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    await harness.runEffect(
+      harness.engine.dispatch({
+        type: "thread.activity.append",
+        commandId: CommandId.make("cmd-activity-silent"),
+        threadId: ThreadId.make("thread-1"),
+        activity: {
+          id: EventId.make("silence-watchdog:silent:thread-1:turn-silent"),
+          tone: "error",
+          kind: "turn.silent",
+          summary: "No response from Codex",
+          payload: { provider: "codex", lastActivityAt: now },
+          turnId: silentTurnId,
+          createdAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    await harness.drain();
+
+    await harness.runEffect(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.make("cmd-turn-after-silence"),
+        threadId: ThreadId.make("thread-1"),
+        message: {
+          messageId: asMessageId("message-after-silence"),
+          role: "user",
+          text: "try again",
+          attachments: [],
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await harness.drain();
+
+    // The interrupt must land before the send: steering a new message into a turn the
+    // watchdog already reported silent is the defect. `invocationCallOrder` is shared
+    // across mocks, so it orders the two calls against each other, not within one mock.
+    expect(harness.interruptTurn).toHaveBeenCalledOnce();
+    expect(harness.sendTurn).toHaveBeenCalledOnce();
+    expect(harness.interruptTurn.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.sendTurn.mock.invocationCallOrder[0]!,
+    );
   });
 
   it.each([

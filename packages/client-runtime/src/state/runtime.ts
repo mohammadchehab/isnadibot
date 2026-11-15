@@ -299,4 +299,6 @@ export {
   commandFailureMessage,
   commandRefusalDescription,
   commandRefusalMessage,
+  sessionFailureMessage,
+  sessionRefusalMessage,
 } from "./commandFailure.ts";

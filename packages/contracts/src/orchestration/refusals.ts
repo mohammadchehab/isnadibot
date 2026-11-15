@@ -199,7 +199,24 @@ export const CommandRefusalCodes = [
    * chat's state is fine — the mention is simply misplaced.
    */
   "thread-does-not-take-mentions",
+  /**
+   * Not a refusal, and named here on purpose: the server ended a turn because the provider stopped
+   * answering and the turn outlived the provider's liveness window. It carries the same job a
+   * refusal code does — the surface renders the sentence from the one shared map instead of
+   * printing the server's prose — so it joins this vocabulary rather than growing a second one that
+   * would have to be kept in step.
+   *
+   * Distinct from the session-gone case: there the provider died with its session, here the session
+   * is alive and the provider simply stopped. Same remedy (try again), different diagnosis.
+   */
+  "turn-went-silent",
 ] as const;
+
+/**
+ * The code attached to a turn the server ended because its provider went quiet: the session is
+ * still alive, so nothing else will ever end it. Distinct from the session-gone case.
+ */
+export const TURN_WENT_SILENT_REFUSAL: CommandRefusal = "turn-went-silent";
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);
 

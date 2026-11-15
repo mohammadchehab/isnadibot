@@ -15,6 +15,14 @@ export interface SilenceWatchdogCallbacks {
   readonly onSilent: (lastActivityAtMs: number) => Effect.Effect<void>;
   /** Runs when activity arrives after `onSilent`, closing the window. */
   readonly onResumed: Effect.Effect<void>;
+  /**
+   * Runs when the turn has been silent for longer than the provider's liveness window; the turn
+   * must be settled. `silentForMs` is how long the provider has said nothing, for the log.
+   */
+  readonly onExpired: (input: {
+    readonly lastActivityAtMs: number;
+    readonly silentForMs: number;
+  }) => Effect.Effect<void>;
 }
 
 export interface SilenceWatchdogHandle {
@@ -31,8 +39,12 @@ type WatchdogSignal = "activity" | "pause" | "resume" | "stop";
  * provider activity, `suspend`/`resume` bracket waits on the user (approvals,
  * questions), and `stop` disposes it when the turn ends. Stopping never runs
  * `onResumed`; the turn ending is its own reverse state.
+ *
+ * `livenessWindowMs` is the provider's own window (see `provider/LivenessWindow`), not a server
+ * constant: how long a provider can legitimately say nothing is a fact about that provider.
  */
 export const startSilenceWatchdog = (input: {
+  readonly livenessWindowMs: number;
   readonly callbacks: SilenceWatchdogCallbacks;
 }): Effect.Effect<SilenceWatchdogHandle, never, Scope.Scope> =>
   Effect.gen(function* () {
@@ -53,15 +65,34 @@ export const startSilenceWatchdog = (input: {
           silent = true;
         }
 
-        // Only an unpaused, not-yet-silent turn needs a timer; otherwise wait for a signal.
-        const signal =
-          silent || paused > 0
-            ? yield* Queue.take(wake)
-            : Option.getOrUndefined(
-                yield* Queue.take(wake).pipe(
-                  Effect.timeoutOption(Duration.millis(SILENCE_WATCHDOG_SILENT_MS - elapsed)),
-                ),
-              );
+        // A silent turn waits the provider's liveness window for it to speak again; if it never
+        // does, the mark has outlived the window and the turn is settled. The window is measured
+        // from the last event of any kind: `touch` resets `lastActivity`, so a turn visibly
+        // producing tool activity never reaches this branch. A turn waiting on the user has no
+        // timer at all: the user is the reason it is quiet, so there is nothing to time.
+        const waited = yield* Queue.take(wake).pipe(
+          paused > 0
+            ? Effect.map(Option.some)
+            : silent
+              ? Effect.timeoutOption(Duration.millis(Math.max(0, input.livenessWindowMs - elapsed)))
+              : Effect.timeoutOption(Duration.millis(SILENCE_WATCHDOG_SILENT_MS - elapsed)),
+        );
+
+        if (Option.isNone(waited)) {
+          if (silent) {
+            yield* input.callbacks.onExpired({
+              lastActivityAtMs: lastActivity,
+              silentForMs: (yield* Clock.currentTimeMillis) - lastActivity,
+            });
+
+            return;
+          }
+
+          // The silence timer fired; the next pass reports it.
+          continue;
+        }
+
+        const signal = waited.value;
 
         if (signal === "stop") return;
 
