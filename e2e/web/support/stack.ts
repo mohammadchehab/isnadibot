@@ -28,25 +28,47 @@ const POLL_INTERVAL_MS = 250;
 const REQUEST_TIMEOUT_MS = 5_000;
 
 /**
+ * The origins to probe for `origin`: the name itself, then every address family it can mean.
+ *
+ * A dev server binds one family, and `localhost` can resolve to the other, so a probe of the name
+ * alone is refused while the browser reaches the app fine. Trying every family makes the readiness
+ * check hold on an IPv4-only box and on an IPv6-only box alike, instead of reporting a healthy stack
+ * as a broken one.
+ */
+export function probeOrigins(origin: string): ReadonlyArray<string> {
+  const url = new URL(origin);
+
+  if (url.hostname !== "localhost") return [origin];
+
+  const port = url.port === "" ? "" : `:${url.port}`;
+
+  return [origin, `${url.protocol}//[::1]${port}`, `${url.protocol}//127.0.0.1${port}`];
+}
+
+/**
  * Waits until the dev stack can serve a browser: the web server answers `/`, has transformed its
  * entry module, and the API proxy reaches the server. The server prints its pairing URL as soon as
  * it listens, which can be well before Vite is ready, and a cold first page load against a busy
  * machine then outlasts the browser's own action timeouts. Each step waits on what it needs.
  */
-async function waitUntilServed(origin: string, budgetMs: number): Promise<void> {
+export async function waitUntilServed(origin: string, budgetMs: number): Promise<void> {
   const startedAt = performance.now();
-  let lastSeen = "no response";
+  const origins = probeOrigins(origin);
 
-  const fetchText = (path: string): Promise<string | null> =>
+  const lastSeen = new Map<string, string>(
+    origins.map((base): [string, string] => [base, "no response"]),
+  );
+
+  const fetchOne = (base: string, path: string): Promise<string | null> =>
     new Promise((resolve) => {
-      const request = NodeHttp.get(new URL(path, origin), (response) => {
+      const request = NodeHttp.get(new URL(path, base), (response) => {
         const chunks: Array<Buffer> = [];
 
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
         response.on("end", () => {
           const ok = response.statusCode !== undefined && response.statusCode < 400;
 
-          lastSeen = `HTTP ${String(response.statusCode)}`;
+          lastSeen.set(base, `HTTP ${String(response.statusCode)}`);
 
           resolve(ok ? Buffer.concat(chunks).toString("utf8") : null);
         });
@@ -58,10 +80,23 @@ async function waitUntilServed(origin: string, budgetMs: number): Promise<void> 
 
       // Nothing is listening yet, or the request timed out.
       request.on("error", (error) => {
-        lastSeen = error.message;
+        lastSeen.set(base, error.message);
         resolve(null);
       });
     });
+
+  const fetchText = async (path: string): Promise<string | null> => {
+    for (const base of origins) {
+      const body = await fetchOne(base, path);
+
+      if (body !== null) return body;
+    }
+
+    return null;
+  };
+
+  const tried = () =>
+    origins.map((base) => `${base} (${lastSeen.get(base) ?? "no response"})`).join(", ");
 
   const served = async (path: string): Promise<string> => {
     for (;;) {
@@ -70,7 +105,7 @@ async function waitUntilServed(origin: string, budgetMs: number): Promise<void> 
       if (body !== null) return body;
 
       if (performance.now() - startedAt > budgetMs)
-        throw new Error(`${path} was not served by ${origin} in time (last: ${lastSeen}).`);
+        throw new Error(`${path} was not served in time; tried ${tried()}.`);
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
