@@ -6,7 +6,7 @@ import { createTranslator } from "../i18n/translator.ts";
 import type { MessageKey, TranslationParams } from "../i18n/types.ts";
 
 /** The translator shape every client passes in; the web and mobile `t` both fit it. */
-type Translate = (message: string, params?: TranslationParams) => string;
+export type Translate = (message: string, params?: TranslationParams) => string;
 
 const englishTranslate: Translate = createTranslator("en").translate;
 
@@ -58,6 +58,8 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "workspace-root-in-use": "Another project already uses that folder. Choose a different one.",
   "unknown-fleet-template":
     "This template is not available in this version. Update the app, then try again.",
+  "thread-does-not-take-mentions":
+    "Bot mentions only work in a space chat. Remove the mention and send again.",
 };
 
 /**

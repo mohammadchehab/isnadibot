@@ -13,7 +13,11 @@ import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import { resolveGroupAddressing, resolveGroupResponderBotId } from "../groupResponder.ts";
 
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  noShippedSurfaceInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireActiveGroupMember,
@@ -98,6 +102,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       if (sourceProposedPlan && !sourcePlan) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "stale-view",
           detail: `Proposed plan '${sourceProposedPlan.planId}' does not exist on thread '${sourceProposedPlan.threadId}'.`,
         });
       }
@@ -105,6 +110,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       if (sourceThread && sourceThread.projectId !== targetThread.projectId) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "stale-view",
           detail: `Proposed plan '${sourceProposedPlan?.planId}' belongs to thread '${sourceThread.id}' in a different project.`,
         });
       }
@@ -136,9 +142,11 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         let selectedBotId: BotId | null;
 
         if (command.addressing !== undefined && command.respondingBotId !== undefined) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* noShippedSurfaceInvariantError({
             commandType: command.type,
             detail: `Send either addressing or respondingBotId, not both.`,
+            reason:
+              "ClientThreadTurnStartCommand carries both addressing and respondingBotId, so the contract allows both at once; no shipped composer sets both, because each picks one routing shape. This exclusion ends the moment a client offers a control that sends both.",
           });
         }
 
@@ -189,9 +197,11 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
         );
 
         if (command.senderPersonId === undefined) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* internalInvariantError({
             commandType: command.type,
             detail: `A person member must send turns to group '${group.id}'.`,
+            reason:
+              "senderPersonId is stamped by applyAuthenticatedCommandActor on every command arriving through the HTTP and WebSocket entry points, so no client can omit it; an internal dispatch that does is a server bug.",
           });
         }
 
@@ -228,6 +238,7 @@ export const decideThreadTurns = Effect.fn("decideThreadTurns")(function* ({
       } else if (command.respondingBotId !== undefined || command.addressing !== undefined) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-does-not-take-mentions",
           detail: `Bot mentions can only route turns on a group-owned thread.`,
         });
       }

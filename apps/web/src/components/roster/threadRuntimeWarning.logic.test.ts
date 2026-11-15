@@ -4,10 +4,12 @@ import {
   type OrchestrationThreadActivity,
   TurnId,
 } from "@isnadi/contracts";
+import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   activeThreadRuntimeWarning,
+  commandFailure,
   latestBotThreadFailure,
   latestThreadRuntimeError,
 } from "./threadRuntimeWarning.logic";
@@ -253,5 +255,45 @@ describe("latestBotThreadFailure", () => {
         lastUserMessageAt: timestamp,
       }),
     ).toBeNull();
+  });
+});
+
+describe("commandFailure", () => {
+  /**
+   * A refused command as it crosses the wire: the server's sentence names the
+   * chat, and the code is what a client switches on. Every chat-send path hands
+   * this straight to the user, which is why the helper — not each call site —
+   * has to prefer the catalog copy.
+   */
+  const refusalFailure = (refusal: string) => ({
+    cause: Cause.fail({
+      message:
+        "Orchestration command invariant failed (thread.turn.start): Bot mentions can only route turns on a group-owned thread.",
+      refusal,
+    }),
+  });
+
+  /** The English catalog, as the web `t` looks it up: key in, sentence out. */
+  const translate = (message: string) => message;
+
+  it("shows the catalog sentence for a coded refusal, not the server's invariant prose", () => {
+    const failure = commandFailure(refusalFailure("thread-does-not-take-mentions"), translate);
+
+    expect(failure.message).toBe(
+      "Bot mentions only work in a space chat. Remove the mention and send again.",
+    );
+    expect(failure.message).not.toContain("group-owned thread");
+  });
+
+  it("keeps the server sentence for a code this client does not know", () => {
+    const failure = commandFailure(refusalFailure("a-code-from-a-newer-server"), translate);
+
+    expect(failure.message).toContain("group-owned thread");
+  });
+
+  it("still shows catalog copy when a caller passes no translator", () => {
+    const failure = commandFailure(refusalFailure("stale-view"));
+
+    expect(failure.message).toBe("Something here has changed. Refresh to see the latest.");
   });
 });

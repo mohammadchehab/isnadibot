@@ -6,7 +6,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireBotNotArchived,
@@ -61,9 +61,11 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       });
 
       if (command.botId != null && command.groupId != null) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: "A thread cannot belong to both a bot and a group.",
+          reason:
+            "ThreadCreateCommand's schema filter rejects a payload carrying both botId and groupId at decode, so the command never reaches the decider in this shape; a client cannot produce it.",
         });
       }
 

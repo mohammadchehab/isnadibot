@@ -9,6 +9,7 @@ import {
   pendingUserInputStepAfterAnswer,
 } from "../../pendingUserInput";
 import type { PendingUserInput } from "../../session-logic";
+import { useI18n } from "../../i18n";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { type BotThreadFailure, commandFailure } from "./threadRuntimeWarning.logic";
@@ -25,6 +26,7 @@ export function useThreadPendingUserInput(input: {
   readonly onFailure: (failure: BotThreadFailure) => void;
 }) {
   const { linkedThreadRef, onFailure, pendingUserInputs } = input;
+  const { t } = useI18n();
 
   const respondToUserInputCommand = useAtomCommand(threadEnvironment.respondToUserInput, {
     reportFailure: false,
@@ -67,14 +69,14 @@ export function useThreadPendingUserInput(input: {
       if (Predicate.isTagged(result, "Failure")) {
         respondingRequestIdsRef.current.delete(requestId);
         setRespondingRequestIds((current) => current.filter((id) => id !== requestId));
-        onFailure(commandFailure(result));
+        onFailure(commandFailure(result, t));
 
         return false;
       }
 
       return true;
     },
-    [linkedThreadRef, onFailure, respondToUserInputCommand],
+    [linkedThreadRef, onFailure, respondToUserInputCommand, t],
   );
 
   /**

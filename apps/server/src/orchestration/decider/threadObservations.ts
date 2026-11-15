@@ -9,7 +9,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, noShippedSurfaceInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireThread } from "../commandInvariants.ts";
 import {
@@ -85,9 +85,11 @@ export const decideThreadObservations = Effect.fn("decideThreadObservations")(fu
           sessionComingAlive ||
           threadHasQueuedTurnStart(thread, command.createdAt)
         ) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* noShippedSurfaceInvariantError({
             commandType: command.type,
             detail: `thread ${command.threadId} was re-engaged after settle; skipping session stop`,
+            reason:
+              "ThreadSessionStopCommand is client-dispatchable and carries onlyIfSettled, so the contract allows a client to send a conditional stop; the only site that sets it today is the server's own settle-stop parking dispatch, which catches and logs the refusal, so no shipped surface sends it. This exclusion ends when a client sends one.",
           });
         }
       }

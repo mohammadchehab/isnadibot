@@ -4,6 +4,7 @@ import {
   latestTurnFailure,
 } from "@isnadi/client-runtime/provider-availability";
 import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandFailureMessage, type Translate } from "@isnadi/client-runtime/state/runtime";
 import type {
   OrchestrationLatestTurn,
   OrchestrationSession,
@@ -91,9 +92,19 @@ export interface BotThreadFailure {
   readonly providerInstanceId?: string;
 }
 
-/** A failed command, keeping the category the server attached to a provider failure. */
+/**
+ * A failed command, keeping the category the server attached to a provider failure.
+ *
+ * A refusal code this client knows is shown in the user's own language, because
+ * the server's own sentence carries internal ids and invariant prose — the reason
+ * every coded refusal used to leak on this surface. A code this client does not
+ * know keeps the server's sentence, so a newer server still says something true.
+ * `t` comes from the caller: this module has no translator of its own, and every
+ * send path that reaches it already holds one.
+ */
 export function commandFailure(
   result: Parameters<typeof squashAtomCommandFailure>[0],
+  t?: Translate,
 ): BotThreadFailure {
   const error = squashAtomCommandFailure(result);
 
@@ -106,7 +117,10 @@ export function commandFailure(
       : null;
 
   return {
-    message: error instanceof Error ? error.message : "Could not send the message.",
+    message: commandFailureMessage(result, {
+      ...(t === undefined ? {} : { t }),
+      fallback: "Could not send the message.",
+    }),
     unavailability: knownUnavailability(unavailability) ?? null,
   };
 }

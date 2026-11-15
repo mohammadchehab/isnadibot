@@ -144,6 +144,14 @@ export const CommandRefusalCodes = [
    * site.
    */
   "unknown-fleet-template",
+  /**
+   * Bot mentions arrived for a chat that is not a space chat. A composer's
+   * addressing state can outlive the chat it was set in, so the client is not
+   * necessarily stale; the remedy is to remove the mention and send again, which
+   * no existing code names. It cannot share `thread-state-invalid` because the
+   * chat's state is fine — the mention is simply misplaced.
+   */
+  "thread-does-not-take-mentions",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);

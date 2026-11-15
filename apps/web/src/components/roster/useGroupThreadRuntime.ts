@@ -19,6 +19,7 @@ import { effectiveHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
+import { useI18n } from "../../i18n";
 import { newMessageId, newThreadId } from "../../lib/utils";
 import { resolveAppModelSelectionState } from "../../modelSelection";
 import {
@@ -66,6 +67,7 @@ import {
 const NO_ENVIRONMENT = "" as EnvironmentId;
 
 export function useGroupThreadRuntime(groupId: string) {
+  const { t } = useI18n();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverGroups = useAtomValue(environmentGroupsAtom(primaryEnvironmentId ?? NO_ENVIRONMENT));
@@ -225,13 +227,13 @@ export function useGroupThreadRuntime(groupId: string) {
     setResuming(false);
 
     if (Predicate.isTagged(result, "Failure")) {
-      setError(commandFailure(result));
+      setError(commandFailure(result, t));
 
       return false;
     }
 
     return true;
-  }, [canResume, linkedThreadRef, resumeTurnCommand, resuming]);
+  }, [canResume, linkedThreadRef, resumeTurnCommand, resuming, t]);
 
   // Ends the running turn; the server clears the responder queue with it.
   const stop = useCallback(async (): Promise<boolean> => {
@@ -247,7 +249,7 @@ export function useGroupThreadRuntime(groupId: string) {
     });
 
     if (Predicate.isTagged(result, "Failure")) {
-      setError(commandFailure(result));
+      setError(commandFailure(result, t));
 
       return false;
     }
@@ -258,6 +260,7 @@ export function useGroupThreadRuntime(groupId: string) {
     linkedThreadRef,
     rememberedThread?.responderQueue,
     rememberedThread?.session,
+    t,
   ]);
 
   // A change applies from the next user message; the server rejects it for a non-group chat.
@@ -271,14 +274,14 @@ export function useGroupThreadRuntime(groupId: string) {
       });
 
       if (Predicate.isTagged(result, "Failure")) {
-        setError(commandFailure(result));
+        setError(commandFailure(result, t));
 
         return false;
       }
 
       return true;
     },
-    [linkedThreadRef, setHopBudgetCommand],
+    [linkedThreadRef, setHopBudgetCommand, t],
   );
 
   const send = useCallback(
@@ -399,7 +402,7 @@ export function useGroupThreadRuntime(groupId: string) {
             });
 
             if (Predicate.isTagged(modeResult, "Failure")) {
-              setError(commandFailure(modeResult));
+              setError(commandFailure(modeResult, t));
 
               return false;
             }
@@ -428,7 +431,7 @@ export function useGroupThreadRuntime(groupId: string) {
           });
 
           if (Predicate.isTagged(result, "Failure")) {
-            setError(commandFailure(result));
+            setError(commandFailure(result, t));
 
             return false;
           }
@@ -477,6 +480,7 @@ export function useGroupThreadRuntime(groupId: string) {
       settings.localExecutionMode,
       setRuntimeMode,
       startTurn,
+      t,
     ],
   );
 
