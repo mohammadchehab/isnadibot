@@ -1,5 +1,6 @@
 import { FLEET_TEMPLATES, type FleetTemplate } from "@isnadi/contracts";
 import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
+import { commandRefusalMessage } from "@isnadi/client-runtime/state/runtime";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
@@ -12,6 +13,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { HireMemberRow, SQUAD_CELL, SQUAD_COLUMNS } from "./HireMemberRow";
+import { useSquadSetupReadOnly } from "./useSquadSetupAccess";
 import { useCreateSquad } from "./useCreateSquad";
 import { useHireDraft } from "./useHireDraft";
 
@@ -84,6 +86,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
   } = useHireDraft(template);
 
   const { create, pending } = useCreateSquad();
+  const readOnly = useSquadSetupReadOnly();
   const [creating, setCreating] = useState(false);
 
   const boss =
@@ -225,6 +228,10 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
           <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
             {locked ? (
               t("Checking what happened…")
+            ) : readOnly ? (
+              // The server refuses every hire this client sends, so the screen
+              // says why here rather than after a press that cannot work.
+              commandRefusalMessage("environment-rights", t)
             ) : blocker ? (
               <BlockerNotice blocker={blocker} />
             ) : null}
@@ -232,7 +239,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
           <Button
             // While the outcome is unknown the send may still land, so Create
             // stays live: pressing it asks the server the same question again.
-            disabled={busy || blocker !== undefined}
+            disabled={busy || readOnly || blocker !== undefined}
             onClick={() => {
               if (busy) return;
 
