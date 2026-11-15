@@ -70,9 +70,11 @@ export function useCreateGroup(): (input: NewGroupInput) => Promise<CreateGroupR
       // title-only is right for both: a throw the server has not coded yet, and
       // a coded refusal from a newer server whose code this client lacks.
       //
-      // INTERIM — TASK-288 and TASK-303 code these throws; removing the gate
-      // restores the echo fallback for newer-server codes, which TASK-294
-      // decides. Same gate TASK-289 put on the group editor.
+      // INTERIM — TASK-303a codes the rest of group.create's chain; the
+      // under-two-member throw is reachable from this surface, so the gate
+      // stays until then. Removing it also restores the echo fallback for
+      // newer-server codes, which TASK-294 decides. Same gate TASK-289 put on
+      // the group editor.
       if (classifyCommandFailure(result) === "unknown") {
         toastManager.add({ type: "error", title: t("Could not create group") });
 
