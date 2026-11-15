@@ -125,8 +125,11 @@ export const CommandRefusalCodes = [
    * Deliberately NOT used where the entity's new state is itself the user's next
    * action — an archived thread they must unarchive, a bot already in the group,
    * an id taken on create — because each of those has a specific remedy of its
-   * own. It IS used where the entity moved and the only thing the user can do is
-   * look again: a card already closed when they went to close it.
+   * own. The test is reachability, not existence: a deleted routine is not still
+   * there for the user even though the record is, because both clients filter it
+   * out and nothing restores it, so a refresh is the whole remedy and this
+   * literal fits. It IS used where the entity moved and the only thing the user
+   * can do is look again: a card already closed when they went to close it.
    */
   "stale-view",
   /**
@@ -266,6 +269,31 @@ export const CommandRefusalCodes = [
    * bootstrap turn start that admits before it creates a thread or worktree.
    */
   "server-is-updating",
+  /**
+   * A routine command named a procedure version the routine has already moved
+   * past: a draft save sent against the version the screen was showing, or an
+   * approval of it. Two sites, one fact and one remedy — another device changed
+   * the routine, so refresh and repeat the action against what is there now.
+   *
+   * Not `stale-view`, whose sentence is about an entity that is gone: the
+   * routine is present and healthy, and the refresh is the prelude rather than
+   * the whole fix. Not `thread-state-invalid` either, for the reason
+   * `work-item-state-invalid` exists — a routine is not a chat, and borrowing
+   * that literal would print a false noun.
+   */
+  "routine-version-conflict",
+  /**
+   * A routine's current procedure carries no approval, so nothing may be enabled
+   * or run from it: the procedure was edited after it was approved, or never
+   * approved at all. Both sites that reach it — enable and a non-dry run — share
+   * the one remedy, which is to approve the procedure.
+   *
+   * Not `entity-archived`, whose remedy is to restore: nothing is archived here.
+   * Not `routine-version-conflict` above, which is about a stale client and
+   * asks for a refresh; a refresh changes nothing here, because the approval is
+   * genuinely absent on the server.
+   */
+  "routine-procedure-unapproved",
 ] as const;
 
 /**

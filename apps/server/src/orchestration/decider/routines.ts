@@ -7,7 +7,6 @@ import {
   type OrchestrationCommandInvariantError,
   internalInvariantError,
   noShippedSurfaceInvariantError,
-  pendingRefusalInvariantError,
   refusedInvariantError,
 } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
@@ -106,12 +105,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       );
 
       if (existing?.lifecycle === "deleted") {
-        return yield* pendingRefusalInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' is deleted.`,
-          reason:
-            "The routine record still exists with `lifecycle: deleted`, so `stale-view` would tell the user it is gone when it is present; no existing code names a deleted routine.",
-          ticket: "TASK-305",
+          refusal: "stale-view",
         });
       }
 
@@ -120,12 +117,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         command.expectedProcedureVersion !== undefined &&
         command.expectedProcedureVersion !== existing.procedureVersion
       ) {
-        return yield* pendingRefusalInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' procedure version changed.`,
-          reason:
-            "The draft was written against a procedure version another device has since replaced; no existing code names a version conflict.",
-          ticket: "TASK-305",
+          refusal: "routine-version-conflict",
         });
       }
 
@@ -175,17 +170,19 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         (routine) => routine.id === command.routineId,
       );
 
-      if (
-        existing === undefined ||
-        existing.lifecycle === "deleted" ||
-        existing.procedureVersion !== command.procedureVersion
-      ) {
-        return yield* pendingRefusalInvariantError({
+      if (existing === undefined || existing.lifecycle === "deleted") {
+        return yield* refusedInvariantError({
+          commandType: command.type,
+          detail: `Routine '${command.routineId}' does not exist.`,
+          refusal: "stale-view",
+        });
+      }
+
+      if (existing.procedureVersion !== command.procedureVersion) {
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' cannot approve procedure version ${command.procedureVersion}.`,
-          reason:
-            "The approval names a procedure version the routine no longer holds; no existing code names a version conflict.",
-          ticket: "TASK-305",
+          refusal: "routine-version-conflict",
         });
       }
 
@@ -214,17 +211,19 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
         (routine) => routine.id === command.routineId,
       );
 
-      if (
-        existing === undefined ||
-        existing.lifecycle === "deleted" ||
-        existing.approvalVersion !== existing.procedureVersion
-      ) {
-        return yield* pendingRefusalInvariantError({
+      if (existing === undefined || existing.lifecycle === "deleted") {
+        return yield* refusedInvariantError({
+          commandType: command.type,
+          detail: `Routine '${command.routineId}' does not exist.`,
+          refusal: "stale-view",
+        });
+      }
+
+      if (existing.approvalVersion !== existing.procedureVersion) {
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' requires approval before enable.`,
-          reason:
-            "The routine's procedure has been edited since it was approved, so the user has to approve it again; no existing code names that remedy.",
-          ticket: "TASK-305",
+          refusal: "routine-procedure-unapproved",
         });
       }
 
@@ -310,12 +309,10 @@ export const decideRoutines = Effect.fn("decideRoutines")(function* ({
       }
 
       if (command.trigger !== "dry-run" && existing.approvalVersion !== existing.procedureVersion) {
-        return yield* pendingRefusalInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Routine '${command.routineId}' procedure approval is stale.`,
-          reason:
-            "The routine still exists and is approved, but for an older procedure version, so `stale-view` would say it is gone; the remedy is to approve the current version, which no existing code names.",
-          ticket: "TASK-305",
+          refusal: "routine-procedure-unapproved",
         });
       }
 
