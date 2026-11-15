@@ -21,6 +21,8 @@ import * as Layer from "effect/Layer";
 
 import * as Queue from "effect/Queue";
 
+import * as Schedule from "effect/Schedule";
+
 import * as Schema from "effect/Schema";
 
 import {
@@ -181,6 +183,38 @@ export const getHttpServerUrl = (pathname = "") =>
     return `http://127.0.0.1:${address.port}${pathname}`;
   });
 
+/**
+ * One browser-session POST, retried on a transport failure and nothing else.
+ *
+ * A suite that appends a thousand events before it asks for a socket can starve
+ * the server's accept queue past undici's 10s connect timeout on loopback, which
+ * reds a green PR for a reason that has nothing to do with the PR. A bounded
+ * retry lets that run recover instead of waiting on the runner's mood.
+ *
+ * A response the server actually answered is never retried, so a refusal still
+ * reaches the caller on its first attempt.
+ */
+export const postBrowserSession = (
+  bootstrapUrl: string,
+  credential: string,
+  headers?: Record<string, string>,
+) =>
+  fetchEffect(bootstrapUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...headers,
+    },
+    body: jsonRequestBody({
+      credential,
+    }),
+  }).pipe(
+    Effect.retry({
+      schedule: Schedule.max([Schedule.exponential("100 millis"), Schedule.recurs(2)]),
+      while: (error) => Predicate.isTagged(error, "TestHttpRequestError"),
+    }),
+  );
+
 export const bootstrapBrowserSession = (
   credential = defaultDesktopBootstrapToken,
   options?: {
@@ -190,16 +224,7 @@ export const bootstrapBrowserSession = (
   Effect.gen(function* () {
     const bootstrapUrl = yield* getHttpServerUrl("/api/auth/browser-session");
 
-    const response = yield* fetchEffect(bootstrapUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...options?.headers,
-      },
-      body: jsonRequestBody({
-        credential,
-      }),
-    });
+    const response = yield* postBrowserSession(bootstrapUrl, credential, options?.headers);
 
     const body = yield* responseJsonEffect<{
       readonly authenticated: boolean;
