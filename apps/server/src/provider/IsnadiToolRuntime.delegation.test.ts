@@ -371,10 +371,62 @@ describe("IsnadiToolRuntime", () => {
 
     await expect(runtime.execute(execution)).resolves.toMatchObject({
       phase: "failure",
-      failureCode: "internal",
+      failureCode: "denied",
       fatalToThread: false,
       billedBotId: "reviewer",
       summary: "Provider unavailable",
+    });
+  });
+
+  it("keeps the approval when the handoff never leaves", async () => {
+    const runtime = createIsnadiToolRuntime();
+
+    const execution = {
+      threadId: "thread-1",
+      toolId: "SendToAgent" as const,
+      toolCallId: "tool-delegate",
+      input: {
+        botId: BotId.make("reviewer"),
+        task: "Review the patch",
+        expectedResult: "A verdict",
+      },
+      approvalMode: "require-grant" as const,
+    };
+
+    runtime.registerSession("thread-1", {
+      botId: BotId.make("parent"),
+      runtimeMode: "full-access",
+      workspaceType: "local",
+      delegation: {
+        depth: 0,
+        activeDelegations: 0,
+        access: {
+          allowedToolIds: ["SendToAgent"],
+          memoryScopes: [],
+          sandbox: "local",
+          runtimeMode: "full-access",
+          hasUserComputer: false,
+          enabledMcpServerIds: [],
+          disabledMcpServerIds: [],
+          approvalCeiling: "send",
+        },
+        send: async () => {
+          throw new Error("Provider unavailable");
+        },
+      },
+    });
+    runtime.grantApproval(execution);
+
+    await expect(runtime.execute(execution)).resolves.toMatchObject({
+      phase: "failure",
+      failureCode: "denied",
+    });
+
+    // The send never happened, so the approval was not spent: the boss can
+    // retry without asking the user again. A consumed grant would throw here.
+    await expect(runtime.execute(execution)).resolves.toMatchObject({
+      phase: "failure",
+      failureCode: "denied",
     });
   });
 });
