@@ -296,4 +296,6 @@ export {
   type CommandFailureRefusal,
   classifyCommandFailure,
   commandFailureMessage,
+  commandRefusalDescription,
+  commandRefusalMessage,
 } from "./commandFailure.ts";

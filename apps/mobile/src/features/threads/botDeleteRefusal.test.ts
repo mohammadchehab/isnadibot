@@ -2,7 +2,8 @@ import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import { createTranslator } from "@isnadi/client-runtime/i18n";
-import { commandRefusalOf } from "@isnadi/client-runtime/state/runtime";
+import { commandRefusalMessage, commandRefusalOf } from "@isnadi/client-runtime/state/runtime";
+import { CommandRefusalCodes } from "@isnadi/contracts";
 
 import { botDeleteRefusalCopy, type DeleteBotFailure } from "./botDeleteRefusal";
 
@@ -97,5 +98,42 @@ describe("botDeleteRefusalCopy", () => {
       description:
         "xx:Deleting this bot would leave this space with fewer than two. Add another bot first.",
     });
+  });
+
+  it("never prints an id or the invariant prose, for any refusal code", () => {
+    // TASK-302: the two authorization refusals carried a person id and a group
+    // id because this copy had no branch for them. The shared table fixes every
+    // code at once, so the guarantee is per code, not per branch.
+    const serverSentence = (code: string) =>
+      `Orchestration command invariant failed (bot.delete): Person 'person-9f2a' is not a member of group 'group-7c1d'. [${code}]`;
+
+    for (const code of CommandRefusalCodes) {
+      const copy = botDeleteRefusalCopy(
+        { failure: { refusal: code, message: serverSentence(code) }, botName },
+        englishTranslate,
+      );
+
+      expect(`${copy.title} ${copy.description}`).not.toMatch(/person-9f2a|group-7c1d|invariant/i);
+    }
+  });
+
+  it("says the shared sentence for the two refusals that used to leak ids", () => {
+    for (const code of ["environment-rights", "actor-not-a-group-member"] as const) {
+      const shared = commandRefusalMessage(code);
+
+      expect(shared).not.toBeNull();
+      expect(
+        botDeleteRefusalCopy(
+          {
+            failure: {
+              refusal: code,
+              message: `Person 'person-9f2a' is not a member of group 'group-7c1d'.`,
+            },
+            botName,
+          },
+          englishTranslate,
+        ).description,
+      ).toBe(shared);
+    }
   });
 });
