@@ -354,6 +354,67 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
     }),
   );
 
+  // delegation.create and delegation.state.set are in InternalOrchestrationCommand,
+  // so a client cannot dispatch either one. The exclusion has to say that at the
+  // throw, because there is no code for a client to switch on and there never will be.
+  it.effect("an internal refusal carries its reason instead of a code", () =>
+    Effect.gen(function* () {
+      const mismatchedBill = makeDelegation({ billedBotId: OTHER_BOT_ID });
+
+      const createError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel(),
+        command: {
+          type: "delegation.create",
+          commandId: CommandId.make("command-internal-billing"),
+          delegation: mismatchedBill,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(createError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the billing invariant to refuse");
+      }
+
+      expect(createError.refusal).toBeUndefined();
+      expect(createError.internalReason).toContain("InternalOrchestrationCommand");
+
+      const queued = makeDelegation();
+
+      const completed = makeDelegation({
+        phase: {
+          _tag: "Completed",
+          childThreadId: CHILD_THREAD_ID,
+          childTurnId: CHILD_TURN_ID,
+          startedAt: NOW,
+          completedAt: LATER,
+          acknowledgedAt: null,
+          result: {
+            summary: "Done.",
+            childThreadId: CHILD_THREAD_ID,
+            childTurnId: CHILD_TURN_ID,
+          },
+        },
+        updatedAt: LATER,
+      });
+
+      const transitionError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([queued]),
+        command: {
+          type: "delegation.state.set",
+          commandId: CommandId.make("command-internal-transition"),
+          delegation: completed,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(transitionError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the transition invariant to refuse");
+      }
+
+      // The phase table is server-owned, so no client-chosen pair reaches this.
+      expect(transitionError.refusal).toBeUndefined();
+      expect(transitionError.internalReason).toContain("server-owned");
+    }),
+  );
+
   it.effect("rejects illegal transitions and ownership changes", () =>
     Effect.gen(function* () {
       const queued = makeDelegation();

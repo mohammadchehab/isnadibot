@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CommandId, DelegationId } from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import { decideOrchestrationCommand } from "./decider.ts";
 import { projectEvent } from "./projector.ts";
 import {
@@ -132,6 +133,99 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
       expect(String(supersededError)).toContain(
         "This bot work was already retried. Use the newer card instead.",
       );
+    }),
+  );
+
+  // The architect ruled the two neighbouring guards apart: one reads this
+  // record's own phase and is unreachable, the other reads the rest of the
+  // collection and is a stale view. This test is what stops a later reader
+  // "fixing" the pair into consistency.
+  it.effect("a stale collection is a code while a stale phase is an exclusion", () =>
+    Effect.gen(function* () {
+      const running = makeDelegation({
+        phase: {
+          _tag: "Running",
+          childThreadId: CHILD_THREAD_ID,
+          childTurnId: null,
+          startedAt: NOW,
+          progress: null,
+        },
+      });
+
+      const openError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([running]),
+        command: {
+          type: "delegation.retry",
+          commandId: CommandId.make("command-retry-own-phase"),
+          delegationId: running.delegationId,
+          createdAt: LATER,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(openError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the own-phase guard to refuse");
+      }
+
+      // Own phase: terminal once a client can see it, so no surface reaches it.
+      expect(openError.refusal).toBeUndefined();
+      expect(openError.internalReason).toContain("only its own record");
+
+      const canceled = makeDelegation({
+        delegationId: DelegationId.make("delegation-canceled-asymmetry"),
+        phase: {
+          _tag: "Canceled",
+          childThreadId: null,
+          childTurnId: null,
+          startedAt: null,
+          completedAt: LATER,
+          canceledBy: "user",
+        },
+      });
+
+      const successor = makeDelegation({
+        delegationId: DelegationId.make("delegation-retry-of-canceled-asymmetry"),
+        retryOfDelegationId: canceled.delegationId,
+      });
+
+      const supersededError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([canceled, successor]),
+        command: {
+          type: "delegation.retry",
+          commandId: CommandId.make("command-retry-rest-of-collection"),
+          delegationId: canceled.delegationId,
+          createdAt: LATER,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(supersededError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the already-retried guard to refuse");
+      }
+
+      // Rest of the collection: another device added a sibling, so refresh.
+      expect(supersededError.refusal).toBe("stale-view");
+      expect(supersededError.internalReason).toBeUndefined();
+
+      const active = [1, 2, 3].map((index) =>
+        makeDelegation({ delegationId: DelegationId.make(`delegation-busy-${index}`) }),
+      );
+
+      const capError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([canceled, ...active]),
+        command: {
+          type: "delegation.retry",
+          commandId: CommandId.make("command-retry-cap-code"),
+          delegationId: canceled.delegationId,
+          createdAt: LATER,
+        },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(capError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the concurrency guard to refuse");
+      }
+
+      // Same reason-kind as the create-time cap, so it reuses that code rather
+      // than minting a fourth for "this bot has too much in flight".
+      expect(capError.refusal).toBe("delegation-limit-reached");
     }),
   );
 });
