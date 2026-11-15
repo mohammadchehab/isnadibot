@@ -48,8 +48,10 @@ export function SpaceView({
     >
       <WorkspacePageHeader className="border-b border-border" detailsPanelOpen={detailsPanelOpen}>
         <div className="flex min-w-0 items-center gap-2">
-          <GroupMemberStack group={group} bots={bots} />
-          <span className="truncate text-sm font-medium">
+          {/* Only the Group chat header draws the member stack; every other space tab is
+              name then tabs, so the stack never lands on a tab label. */}
+          {tab === "chat" ? <GroupMemberStack group={group} bots={bots} /> : null}
+          <span className="min-w-0 truncate text-sm font-medium">
             <bdi>{group.name}</bdi>
           </span>
         </div>
