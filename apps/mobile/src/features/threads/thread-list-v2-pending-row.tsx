@@ -7,6 +7,8 @@ import { AppText as Text } from "../../components/AppText";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { useThemeColor } from "../../lib/useThemeColor";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
+import { useQueuedMessageFailureActions } from "../../state/use-queued-message-failure-actions";
+import { QueuedMessageFailureNotice } from "./QueuedMessageFailureNotice";
 import { MONO_FONT, SIDEBAR_V2_ROW_RADIUS } from "./thread-list-v2-presentation";
 import { ThreadListV2SectionDivider } from "./thread-list-v2-shelves";
 
@@ -36,9 +38,12 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
 }) {
   const { t } = useMobileI18n();
   const { pendingTask, onSelectPendingTask, onDeletePendingTask } = props;
+  const { retryQueuedMessage } = useQueuedMessageFailureActions();
   const drawerColor = useThemeColor("--color-drawer");
   const pressedBackgroundColor = useThemeColor("--color-subtle");
   const sidebarPane = props.pane === "sidebar";
+
+  const failure = pendingTask.message.failure;
 
   const projectTitle =
     props.projectTitle ?? props.project?.title ?? pendingTask.creation.projectTitle ?? "";
@@ -58,7 +63,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
         {pendingTask.title}
       </Text>
       <Text className="mt-1 text-xs text-foreground-muted" numberOfLines={1}>
-        Queued
+        {failure ? t("Not sent") : t("Queued")}
         {projectTitle ? `  ·  ${projectTitle}` : ""}
         {branch ? (
           <Text className="text-xs text-foreground-muted" style={{ fontFamily: MONO_FONT }}>
@@ -109,6 +114,16 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
           )}
         </Pressable>
       </ControlPillMenu>
+      {failure ? (
+        <QueuedMessageFailureNotice
+          className={sidebarPane ? "px-3 pb-2" : "bg-screen px-5 pb-3"}
+          failure={failure}
+          onDiscard={() => onDeletePendingTask(pendingTask)}
+          onRetry={() => {
+            void retryQueuedMessage(pendingTask.message);
+          }}
+        />
+      ) : null}
     </>
   );
 });

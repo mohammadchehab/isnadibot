@@ -300,6 +300,7 @@ function render(sessionStatus: "idle" | "running" = "idle") {
     }),
     serverConfig: null,
     queueCount: 0,
+    failedQueuedMessages: [],
     environmentId: EnvironmentId.make("environment"),
     projectCwd: null,
     onPickDraftImages: vi.fn(),

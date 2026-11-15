@@ -222,6 +222,16 @@ export function isQueuedThreadCreationSendable(message: QueuedThreadMessage): bo
   return message.creation.workspaceMode !== "worktree" || Boolean(message.creation.branch);
 }
 
+/**
+ * A queued message that carries a recorded failure waits for the user: the
+ * drain kept it with its reason precisely so it would not send itself later. A
+ * message written at 09:00 must not land at 17:00 because someone finally fixed
+ * the roster. The queue is ordered, so the thread waits with the held item.
+ */
+export function isQueuedThreadMessageHeld(message: QueuedThreadMessage): boolean {
+  return message.failure !== undefined;
+}
+
 function errorMessage(cause: unknown): string | null {
   if (cause instanceof Error) {
     return cause.message;
@@ -295,8 +305,8 @@ export const SELF_CLEARING_THREAD_OUTBOX_REFUSALS: ReadonlySet<CommandRefusalTyp
  * all" and "a code this client does not know" into one `unknown`: the drain
  * treats those differently, so the difference has to survive here.
  */
-function readRefusal(error: unknown): CommandRefusalType | "unknown" | null {
-  const raw = Predicate.isObjectOrArray(error) && "refusal" in error ? error.refusal : undefined;
+function readRefusal(cause: unknown): CommandRefusalType | "unknown" | null {
+  const raw = Predicate.isObjectOrArray(cause) && "refusal" in cause ? cause.refusal : undefined;
 
   if (!Predicate.isString(raw)) {
     return null;
@@ -306,8 +316,8 @@ function readRefusal(error: unknown): CommandRefusalType | "unknown" | null {
 }
 
 /** An auth refusal carries no refusal code, but needs a person just the same. */
-function isAuthorizationFailure(error: unknown): boolean {
-  return Predicate.isTagged(error, "EnvironmentAuthorizationError");
+function isAuthorizationFailure(cause: unknown): boolean {
+  return Predicate.isTagged(cause, "EnvironmentAuthorizationError");
 }
 
 export type ThreadOutboxFailureAction = "retry" | "block" | "discard";

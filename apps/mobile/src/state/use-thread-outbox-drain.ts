@@ -30,6 +30,7 @@ import {
 } from "./thread-outbox";
 import {
   isQueuedThreadCreationSendable,
+  isQueuedThreadMessageHeld,
   modelSelectionsEqual,
   resolveThreadOutboxDeliveryAction,
   resolveThreadOutboxFailureAction,
@@ -387,7 +388,7 @@ export function useThreadOutboxDrain(): void {
       // actions are skipped — a message written at 09:00 must not land at 17:00
       // because someone finally fixed the roster. The queue is ordered, so this
       // thread waits with it.
-      if (nextQueuedMessage.failure !== undefined) {
+      if (isQueuedThreadMessageHeld(nextQueuedMessage)) {
         continue;
       }
 

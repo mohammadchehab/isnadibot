@@ -18,6 +18,7 @@ import {
   encodeQueuedThreadMessage,
   groupQueuedThreadMessages,
   isQueuedThreadCreationSendable,
+  isQueuedThreadMessageHeld,
   modelSelectionsEqual,
   resolveThreadOutboxDeliveryAction,
   resolveThreadOutboxFailureAction,
@@ -356,7 +357,7 @@ describe("thread outbox", () => {
 const refusedSend = (refusal: string, message: string) =>
   new OrchestrationDispatchCommandError({ message, refusal });
 
-const decide = (error: unknown) =>
+const decide = (error: Error) =>
   resolveThreadOutboxFailureAction({ stage: "start-turn", error, interrupted: false });
 
 describe("queued message failures", () => {
@@ -406,7 +407,7 @@ describe("queued message failures", () => {
         "group-has-no-responder",
         "Group 'group-product' has no boss bot that can respond.",
       ),
-    ).toBe("This space needs a boss. Choose which bot leads it.");
+    ).toBe("No bot in this space can answer right now. Set a boss, or add a bot.");
   });
 
   it("blocks a refusal that needs a person, and one it cannot name", () => {
@@ -440,6 +441,34 @@ describe("queued message failures", () => {
 
   it("names the refusals that clear on their own instead of inferring them", () => {
     expect([...SELF_CLEARING_THREAD_OUTBOX_REFUSALS]).toEqual(["thread-is-busy"]);
+  });
+
+  it("holds every item that carries a failure, so nothing resends itself later", () => {
+    const queued = queuedMessage({
+      messageId: "message-1",
+      createdAt: "2026-06-08T10:00:01.000Z",
+    });
+
+    expect(isQueuedThreadMessageHeld(queued)).toBe(false);
+
+    // Both terminal actions are held: "block" waits for a person to fix the
+    // roster, "discard" for the user to dismiss it. Neither may send later.
+    expect(
+      isQueuedThreadMessageHeld({
+        ...queued,
+        failure: {
+          refusal: "group-has-no-responder",
+          action: "block",
+          at: "2026-06-08T10:00:02.000Z",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isQueuedThreadMessageHeld({
+        ...queued,
+        failure: { refusal: "unknown", action: "discard", at: "2026-06-08T10:00:02.000Z" },
+      }),
+    ).toBe(true);
   });
 
   it("takes an auth refusal down the blocking path", () => {
