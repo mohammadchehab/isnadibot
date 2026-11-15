@@ -176,6 +176,10 @@ Work one bot sends to another with `SendToAgent`. It runs in a child thread and 
 
 A thread with queued, running, or blocked delegations. Derived by `isThreadWaitingOnChildren`, never persisted.
 
+#### Delegation wake
+
+The `thread.turn.start` that `DelegationWakeReactor` dispatches, with trigger `delegation-results`, when an idle parent thread has unacknowledged finished delegations and is no longer waiting on children. No user message is involved. See [delegation.md](delegation.md).
+
 ### Channels
 
 External channels connect a messaging conversation (Telegram, Slack, Discord, iMessage, or WhatsApp) to normal Isnadi orchestration. See [channels.md](./channels.md) and the [user guide](../user/channels.md).

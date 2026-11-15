@@ -134,7 +134,7 @@ describe("ThreadDelegationCard", () => {
     );
 
     expect(html).toContain("Child crashed.");
-    expect(html).toContain("Result waiting for the next reply");
+    expect(html).toContain("Bot is picking up the result");
     expect(html).toContain("Unknown bot");
   });
 

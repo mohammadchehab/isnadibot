@@ -284,7 +284,7 @@ export function DelegationCard({
       {presentation.delivery ? (
         <p className="mt-1 text-xs text-muted-foreground" data-delivery={presentation.delivery}>
           {presentation.delivery === "pending"
-            ? t("Result waiting for the next reply")
+            ? t("Bot is picking up the result")
             : t("Result delivered to {name}", { name: parentName })}
         </p>
       ) : null}
