@@ -63,6 +63,7 @@ import { useThreadSelection } from "../state/use-thread-selection";
 import { environmentSnapshotAtom } from "../state/shell";
 import { environmentBotsAtom, environmentGroupsAtom } from "./bots";
 import { enqueueThreadOutboxMessage } from "./thread-outbox";
+import { isQueuedThreadMessageHeld } from "./thread-outbox-model";
 import { useThreadOutboxMessages } from "./use-thread-outbox";
 import { threadEnvironment } from "./threads";
 import { useAtomCommand } from "./use-atom-command";
@@ -233,6 +234,14 @@ export function useThreadComposerState() {
   // re-renders the composer rather than the whole thread route.
   const selectedDraft = useComposerDraftSettings(selectedThreadKey);
   const selectedThreadQueueCount = selectedThreadQueuedMessages.length;
+
+  // Queued messages the drain stopped on: they stay in the outbox so the user
+  // keeps the text, and the composer is where that chat says why.
+  const selectedThreadFailedMessages = useMemo(
+    () => selectedThreadQueuedMessages.filter(isQueuedThreadMessageHeld),
+    [selectedThreadQueuedMessages],
+  );
+
   const selectedThread = selectedThreadDetail ?? selectedThreadShell;
   // A direct bot chat shows and sends with the bot's engine, never a stale draft.
   const engineBot = useThreadEngineBot(selectedThreadShell?.environmentId, selectedThread);
@@ -605,6 +614,7 @@ export function useThreadComposerState() {
     selectedThreadFeed,
     selectedThreadWaitingOnChildren,
     selectedThreadQueueCount,
+    selectedThreadFailedMessages,
     activeWorkStartedAt,
     modelSelection,
     runtimeMode,

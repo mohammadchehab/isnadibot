@@ -27,6 +27,9 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { themeColorWithAlpha } from "../../lib/mobileTheme";
 import { scopedThreadKey } from "../../lib/scopedEntities";
+import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
+import { useQueuedMessageFailureActions } from "../../state/use-queued-message-failure-actions";
+import { QueuedMessageFailureNotice } from "./QueuedMessageFailureNotice";
 import { AppText as Text } from "../../components/AppText";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerActionIsDictation } from "@isnadi/client-runtime/dictation";
@@ -100,6 +103,8 @@ export interface ThreadComposerProps {
   readonly selectedThread: OrchestrationThreadShell;
   readonly serverConfig: T3ServerConfig | null;
   readonly queueCount: number;
+  /** Queued messages the drain stopped on; each says why and offers a way out. */
+  readonly failedQueuedMessages: ReadonlyArray<QueuedThreadMessage>;
   readonly environmentId: EnvironmentId;
   readonly projectCwd: string | null;
   readonly editorRef?: RefObject<ComposerEditorHandle | null>;
@@ -121,6 +126,11 @@ const NO_PROVIDERS: NonNullable<ThreadComposerProps["serverConfig"]>["providers"
 
 export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposerProps) {
   const { t, plural } = useMobileI18n();
+  const { retryQueuedMessage, discardQueuedMessage } = useQueuedMessageFailureActions();
+  // Only the messages still waiting on the network will go out by themselves;
+  // the stopped ones are held until the user decides, so counting them here
+  // would promise a send that never comes.
+  const sendableQueueCount = Math.max(0, props.queueCount - props.failedQueuedMessages.length);
   const { themeAppearance } = useAppearancePreferences();
   const isDarkMode = themeAppearance === "dark";
   const foregroundColor = useThemeColor("--color-foreground");
@@ -730,16 +740,33 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
         ) : null}
 
         {/* Queue count */}
-        {props.queueCount > 0 ? (
+        {sendableQueueCount > 0 ? (
           <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
             <Text className="pt-2 text-xs text-foreground-muted">
-              {plural(props.queueCount, {
+              {plural(sendableQueueCount, {
                 one: "{count} queued message will send automatically.",
                 other: "{count} queued messages will send automatically.",
               })}
             </Text>
           </Animated.View>
         ) : null}
+
+        {props.failedQueuedMessages.map((message) =>
+          message.failure === undefined ? null : (
+            <QueuedMessageFailureNotice
+              key={message.messageId}
+              className="mt-2"
+              failure={message.failure}
+              messageText={message.text}
+              onRetry={() => {
+                void retryQueuedMessage(message);
+              }}
+              onDiscard={() => {
+                void discardQueuedMessage(message);
+              }}
+            />
+          ),
+        )}
       </Animated.View>
 
       <ImageViewing

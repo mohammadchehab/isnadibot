@@ -95,6 +95,7 @@ export const commonLabelsCatalog = {
   "Reset to default": "重置为默认",
   "Stop generation": "停止生成",
   "Try again": "重试",
+  Discard: "放弃",
   General: "通用",
   English: "英语",
   "System default": "系统默认",

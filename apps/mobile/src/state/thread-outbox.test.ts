@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { EnvironmentNotRegisteredError } from "@isnadi/client-runtime/connection";
 import { isTransportConnectionErrorMessage } from "@isnadi/client-runtime/errors";
 import { EnvironmentRpcUnavailableError } from "@isnadi/client-runtime/rpc";
+import { commandRefusalDescription } from "@isnadi/client-runtime/state/runtime";
 import {
   EnvironmentAuthorizationError,
   EnvironmentId,
@@ -17,15 +18,18 @@ import {
   encodeQueuedThreadMessage,
   groupQueuedThreadMessages,
   isQueuedThreadCreationSendable,
+  isQueuedThreadMessageHeld,
   modelSelectionsEqual,
   resolveThreadOutboxDeliveryAction,
   resolveThreadOutboxFailureAction,
   resolveQueuedThreadSettings,
+  SELF_CLEARING_THREAD_OUTBOX_REFUSALS,
   shouldRetryThreadOutboxDelivery,
   threadOutboxHydrationRetryDelayMs,
   threadOutboxRetryDelayMs,
   type QueuedThreadMessage,
 } from "./thread-outbox-model";
+import { persistQueuedThreadFailure } from "./thread-outbox-failure";
 import { queuedMessage } from "./thread-outbox.test-support";
 
 describe("thread outbox", () => {
@@ -337,14 +341,172 @@ describe("thread outbox", () => {
         stage: "settings-sync",
         error: deterministicFailure,
         interrupted: false,
-      }),
+      }).action,
     ).toBe("retry");
     expect(
       resolveThreadOutboxFailureAction({
         stage: "start-turn",
         error: deterministicFailure,
         interrupted: false,
-      }),
+      }).action,
     ).toBe("discard");
+  });
+});
+
+/** A refusal the server sent, with the sentence that carries its internal ids. */
+const refusedSend = (refusal: string, message: string) =>
+  new OrchestrationDispatchCommandError({ message, refusal });
+
+const decide = (error: Error) =>
+  resolveThreadOutboxFailureAction({ stage: "start-turn", error, interrupted: false });
+
+describe("queued message failures", () => {
+  it("keeps a refused message with its reason instead of removing it", async () => {
+    const message = queuedMessage({
+      messageId: "message-1",
+      createdAt: "2026-06-08T10:00:01.000Z",
+    });
+
+    const decision = decide(
+      refusedSend(
+        "group-has-no-responder",
+        "Group 'group-product' has no boss bot that can respond.",
+      ),
+    );
+
+    expect(decision.action).toBe("block");
+
+    if (decision.action === "retry") {
+      throw new Error("a refusal that needs a person must not retry");
+    }
+
+    const written: Array<QueuedThreadMessage> = [];
+
+    await persistQueuedThreadFailure({
+      message,
+      failure: decision,
+      now: "2026-06-08T10:00:09.000Z",
+      update: async (next) => {
+        written.push(next);
+
+        return true;
+      },
+    });
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.text).toBe("message-1");
+    expect(written[0]?.failure).toEqual({
+      refusal: "group-has-no-responder",
+      action: "block",
+      at: "2026-06-08T10:00:09.000Z",
+    });
+
+    // The user reads the catalog sentence, not the server's prose and its ids.
+    expect(
+      commandRefusalDescription(
+        "group-has-no-responder",
+        "Group 'group-product' has no boss bot that can respond.",
+      ),
+    ).toBe("No bot in this space can answer right now. Set a boss, or add a bot.");
+  });
+
+  it("blocks a refusal that needs a person, and one it cannot name", () => {
+    expect(decide(refusedSend("group-has-no-responder", "no boss"))).toEqual({
+      action: "block",
+      refusal: "group-has-no-responder",
+    });
+    expect(decide(refusedSend("actor-not-a-group-member", "not a member"))).toEqual({
+      action: "block",
+      refusal: "actor-not-a-group-member",
+    });
+    // A code a newer server added still blocks: the user is told and nothing is
+    // lost, which fails safe against retrying forever.
+    expect(decide(refusedSend("a-code-from-a-newer-server", "new reason"))).toEqual({
+      action: "block",
+      refusal: "unknown",
+    });
+  });
+
+  it("retries a refusal whose condition clears on its own, and a dropped socket", () => {
+    expect(decide(refusedSend("thread-is-busy", "work in flight"))).toEqual({ action: "retry" });
+    expect(decide(new Error("Socket is not connected"))).toEqual({ action: "retry" });
+    expect(
+      resolveThreadOutboxFailureAction({
+        stage: "start-turn",
+        error: refusedSend("group-has-no-responder", "no boss"),
+        interrupted: true,
+      }),
+    ).toEqual({ action: "retry" });
+  });
+
+  it("names the refusals that clear on their own instead of inferring them", () => {
+    expect([...SELF_CLEARING_THREAD_OUTBOX_REFUSALS]).toEqual(["thread-is-busy"]);
+  });
+
+  it("holds every item that carries a failure, so nothing resends itself later", () => {
+    const queued = queuedMessage({
+      messageId: "message-1",
+      createdAt: "2026-06-08T10:00:01.000Z",
+    });
+
+    expect(isQueuedThreadMessageHeld(queued)).toBe(false);
+
+    // Both terminal actions are held: "block" waits for a person to fix the
+    // roster, "discard" for the user to dismiss it. Neither may send later.
+    expect(
+      isQueuedThreadMessageHeld({
+        ...queued,
+        failure: {
+          refusal: "group-has-no-responder",
+          action: "block",
+          at: "2026-06-08T10:00:02.000Z",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isQueuedThreadMessageHeld({
+        ...queued,
+        failure: { refusal: "unknown", action: "discard", at: "2026-06-08T10:00:02.000Z" },
+      }),
+    ).toBe(true);
+  });
+
+  it("takes an auth refusal down the blocking path", () => {
+    expect(
+      decide(
+        new EnvironmentAuthorizationError({
+          message: "Missing scope",
+          requiredScope: "orchestration:operate",
+        }),
+      ),
+    ).toEqual({ action: "block", refusal: "environment-rights" });
+  });
+
+  it("discards a failure that carries no refusal code at all", () => {
+    expect(
+      decide(new OrchestrationDispatchCommandError({ message: "Thread no longer exists" })),
+    ).toEqual({ action: "discard", refusal: "unknown" });
+  });
+
+  it("decodes a stored v3 item as never failed", () => {
+    const legacy = queuedMessage({
+      messageId: "message-1",
+      createdAt: "2026-06-08T10:00:01.000Z",
+    });
+
+    expect(decodeQueuedThreadMessage({ schemaVersion: 3, ...legacy })).toEqual(legacy);
+  });
+
+  it("round-trips a recorded failure", () => {
+    const failed = {
+      ...queuedMessage({ messageId: "message-1", createdAt: "2026-06-08T10:00:01.000Z" }),
+      failure: {
+        refusal: "group-has-no-responder",
+        action: "block",
+        at: "2026-06-08T10:00:09.000Z",
+      },
+    } satisfies QueuedThreadMessage;
+
+    expect(decodeQueuedThreadMessage(encodeQueuedThreadMessage(failed))).toEqual(failed);
   });
 });

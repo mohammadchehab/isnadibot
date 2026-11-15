@@ -39,6 +39,7 @@ export const chatCatalog = {
   "Plan mode (legacy)": "وضع التخطيط (قديم)",
   "Queue chat": "ضع المحادثة في قائمة الانتظار",
   Queued: "في قائمة الانتظار",
+  "Not sent": "لم يُرسل",
   "Retry now": "أعد المحاولة الآن",
   "Return to chat": "العودة إلى المحادثة",
   "Review changes": "راجع التغييرات",

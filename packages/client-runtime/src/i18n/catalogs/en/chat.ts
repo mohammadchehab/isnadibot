@@ -39,6 +39,7 @@ export const chatCatalog = {
   "Plan mode (legacy)": "Plan mode (legacy)",
   "Queue chat": "Queue chat",
   Queued: "Queued",
+  "Not sent": "Not sent",
   "Retry now": "Retry now",
   "Return to chat": "Return to chat",
   "Review changes": "Review changes",

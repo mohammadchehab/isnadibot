@@ -261,6 +261,7 @@ function renderMenu(draftMessage: string, config: ServerConfig | null = serverCo
     }),
     serverConfig: config,
     queueCount: 0,
+    failedQueuedMessages: [],
     environmentId: EnvironmentId.make("environment"),
     projectCwd: null,
     onPickDraftImages: vi.fn(),
