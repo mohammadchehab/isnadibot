@@ -2,6 +2,7 @@ import {
   ISNADI_TOOL_CATALOG,
   BotId,
   DelegationId,
+  type GroupId,
   MessageId,
   ProviderInstanceId,
   ThreadId,
@@ -197,6 +198,76 @@ export function childAccess(
     disabledMcpServerIds: bot.disabledMcpServerIds,
     approvalCeiling: "secrets",
   };
+}
+
+/**
+ * Whether a handoff stays inside the space the user hired, which is what makes
+ * it an internal move rather than a send across their trust boundary: same
+ * space iff the acting bot and the target share a home group.
+ *
+ * The anchor is the **home** (`bot.groupId`), never a group roster. A roster is
+ * forgeable: `CreateChannel` writes a group whose members the calling bot
+ * chooses, and writes no home for any of them, so a roster test would let a bot
+ * author its way into the silent allow this predicate exists to prevent.
+ *
+ * Homes are written by `bot.create`, `bot.update`, `group.member.assign` and
+ * `group.delete`, and no tool can use any of them to move an *existing* bot
+ * into the caller's space:
+ * - `UpdateBotProfile` dispatches `bot.update`, but its input is name, title,
+ *   label and description only, and tool input rejects excess properties, so
+ *   it cannot carry a `groupId`. `isnadiToolCatalogWritesHomes` pins that.
+ * - `CreateAgent` dispatches `bot.create` carrying `groupId`, which places a
+ *   **brand-new** bot in the calling thread's own group. That grants a bot no
+ *   reach over a bot that already has a home.
+ * - No tool dispatches `group.member.assign` or `group.delete`.
+ *
+ * A thread with no group is a direct chat, and absence fails closed: a direct
+ * chat implies consent for that bot, not for every bot in the environment.
+ *
+ * This predicate deliberately reads no group creator or origin field. Whether a
+ * group was made by a person or by a bot is not what decides trust here: the
+ * user's hire is recorded as each bot's home, and a bot that authors a group
+ * still cannot author a home. Adding a creator check would refuse the channel
+ * path — a bot opening a channel for bots the user already hired into one space
+ * is exactly the internal move this allows — while proving nothing about the
+ * homes. Leave it on homes.
+ */
+export function isSameSpaceHandoff(input: {
+  readonly threadGroupId: GroupId | null;
+  readonly actingBotHome: GroupId | null;
+  readonly targetBotHome: GroupId | null;
+}): boolean {
+  if (input.threadGroupId === null) return false;
+
+  return input.actingBotHome !== null && input.actingBotHome === input.targetBotHome;
+}
+
+/**
+ * Resolves {@link isSameSpaceHandoff} against a read model: the thread supplies
+ * the group the handoff happens in, and each bot supplies its home. Kept here
+ * rather than at the session boundary so the forgery case — a bot-authored
+ * channel whose roster names bots that live elsewhere — is a testable snapshot
+ * instead of a live session.
+ */
+export function isSameSpaceHandoffInSnapshot(
+  snapshot: OrchestrationReadModel,
+  input: {
+    readonly threadId: ThreadId;
+    readonly actingBotId: BotId;
+    readonly targetBotId: BotId;
+  },
+): boolean {
+  const thread = snapshot.threads.find(
+    (candidate) => String(candidate.id) === String(input.threadId),
+  );
+
+  const homeOf = (botId: BotId) => snapshot.bots.find((bot) => bot.id === botId)?.groupId ?? null;
+
+  return isSameSpaceHandoff({
+    threadGroupId: thread?.groupId ?? null,
+    actingBotHome: homeOf(input.actingBotId),
+    targetBotHome: homeOf(input.targetBotId),
+  });
 }
 
 /**

@@ -31,6 +31,14 @@ export interface IsnadiRuntimeToolDefinition {
 export interface IsnadiToolSession {
   readonly botId?: BotId;
   readonly botName?: string;
+  /**
+   * Whether a `SendToAgent` target shares the calling bot's home group, which
+   * makes the handoff an internal move inside the space the user hired rather
+   * than a send across their trust boundary. Async because it reads the
+   * orchestration snapshot, and supplied only where the session has an
+   * environment to read. Absent means crossing, so the approval stays.
+   */
+  readonly sameSpaceTarget?: (targetBotId: BotId) => Promise<boolean>;
   readonly billedBotId?: BotId;
   readonly runtimeMode: RuntimeMode;
   readonly workspaceType: IsnadiToolWorkspaceType;

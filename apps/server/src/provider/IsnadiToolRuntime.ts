@@ -4,6 +4,7 @@ import * as Predicate from "effect/Predicate";
 import { decodeIsnadiRuntimeToolInput } from "./tools/IsnadiToolInputs.ts";
 import { RequestContext } from "@mastra/core/request-context";
 import {
+  BotId,
   ISNADI_TOOL_CATALOG,
   type IsnadiToolId,
   type IsnadiToolReceipt,
@@ -48,6 +49,8 @@ import { isUnknownDelegationBot } from "./delegation/IsnadiDelegationPolicy.ts";
 const isDelegationContextTooLong = Schema.is(IsnadiDelegationContextTooLongError);
 
 const isDelegationProviderUnsupported = Schema.is(IsnadiDelegationProviderUnsupportedError);
+
+const isBotId = Schema.is(BotId);
 
 const MEMORY_TOOL_DEFINITIONS = [
   { id: "memory", description: ISNADI_MEMORY_TOOL_DESCRIPTION },
@@ -230,6 +233,34 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
   const decodedGrantInput = (toolId: IsnadiRuntimeToolId, input: IsnadiToolExecution["input"]) =>
     decodeIsnadiRuntimeToolInput(toolId, input, { approvalGrant: true }).input;
 
+  /**
+   * Whether a `SendToAgent` target shares the calling bot's space. A same-space
+   * handoff is an internal move whose audit trail is the delegation record, so
+   * it needs no approval; a target outside the space keeps the approval it had.
+   * Anything the session cannot resolve reads as "not the same space", which
+   * keeps the approval rather than quietly dropping it — including a session
+   * with no environment to read, where the relationship is simply unknown.
+   */
+  const sameSpaceTarget = async (
+    session: IsnadiToolSession,
+    toolId: IsnadiRuntimeToolId,
+    input: IsnadiToolExecution["input"],
+  ) => {
+    if (toolId !== "SendToAgent") return false;
+
+    const resolve = session.sameSpaceTarget;
+
+    if (resolve === undefined) return false;
+
+    if (!Predicate.isObjectOrArray(input) || !("botId" in input)) return false;
+
+    const target = input.botId;
+
+    if (!isBotId(target)) return false;
+
+    return resolve(target);
+  };
+
   const requiresApproval = async (
     session: IsnadiToolSession,
     tool: IsnadiRuntimeToolDefinition,
@@ -256,6 +287,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
       {
         localFullAccess: session.runtimeMode === "full-access",
         workspaceType: session.workspaceType,
+        sameSpaceTarget: await sameSpaceTarget(session, tool.id, input),
       },
       input,
     );
