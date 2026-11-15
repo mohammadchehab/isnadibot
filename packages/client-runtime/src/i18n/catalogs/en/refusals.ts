@@ -25,5 +25,12 @@ export const refusalsCatalog = {
     "That action does not fit this chat's current state. Refresh and try again.",
   "Channel delivery is not available for this chat or message.":
     "Channel delivery is not available for this chat or message.",
+  "Something here has changed. Refresh to see the latest.":
+    "Something here has changed. Refresh to see the latest.",
+  "It already exists. Refresh to see it.": "It already exists. Refresh to see it.",
+  "It is archived. Restore it first, then try again.":
+    "It is archived. Restore it first, then try again.",
+  "Another project already uses that folder. Choose a different one.":
+    "Another project already uses that folder. Choose a different one.",
   "The command failed.": "The command failed.",
 } as const;

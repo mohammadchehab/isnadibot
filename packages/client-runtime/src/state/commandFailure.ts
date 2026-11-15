@@ -47,6 +47,10 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "thread-state-invalid":
     "That action does not fit this chat's current state. Refresh and try again.",
   "channel-delivery-unavailable": "Channel delivery is not available for this chat or message.",
+  "stale-view": "Something here has changed. Refresh to see the latest.",
+  "already-exists": "It already exists. Refresh to see it.",
+  "entity-archived": "It is archived. Restore it first, then try again.",
+  "workspace-root-in-use": "Another project already uses that folder. Choose a different one.",
 };
 
 /**

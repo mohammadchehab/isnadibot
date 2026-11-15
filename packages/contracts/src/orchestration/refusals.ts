@@ -79,6 +79,40 @@ export const CommandRefusalCodes = [
    * the surface offered an action that cannot apply to this message or chat.
    */
   "channel-delivery-unavailable",
+  /**
+   * The entity a command named is gone: a project, bot, group, thread, MCP
+   * server or delegation another device deleted, so the client acted on a view
+   * the server has already left behind. Its remedy is a refresh, which is why
+   * every one of those lookups shares this literal rather than carrying its own
+   * — the user's next move is the same whichever entity went missing.
+   *
+   * Deliberately NOT used for an entity that still exists in another state (an
+   * archived thread, a bot already in the group) or for an id that is taken on
+   * create: those tell the user "this is gone" about something that is right
+   * there, and each has its own remedy.
+   */
+  "stale-view",
+  /**
+   * A create arrived for an id the environment already holds. The entity is
+   * there and fine; the client created against a view that predates it. Its
+   * remedy is the same refresh `stale-view` asks for, but the sentence differs:
+   * telling the user "it has already been removed" about something that exists
+   * would be false, so the two keep separate literals.
+   */
+  "already-exists",
+  /**
+   * The entity exists but sits in the state the command cannot act on: a bot
+   * archived when a turn needs it live, or a thread already archived. One
+   * remedy — unarchive — covers all three sites, which is why they share this
+   * literal instead of borrowing `stale-view`: a refresh would change nothing.
+   */
+  "entity-archived",
+  /**
+   * A project cannot take a workspace root another project already owns. The
+   * folder is in use, not missing, so neither `stale-view` nor `already-exists`
+   * describes it, and the remedy — pick a different folder — is its own.
+   */
+  "workspace-root-in-use",
 ] as const;
 
 export const CommandRefusal = Schema.Literals(CommandRefusalCodes);
