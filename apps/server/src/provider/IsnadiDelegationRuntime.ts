@@ -6,7 +6,6 @@ import * as DateTime from "effect/DateTime";
 import {
   IsnadiDelegationPhase,
   ISNADI_DELEGATION_CONTEXT_MAX_CHARS,
-  ISNADI_DELEGATION_MAX_CONCURRENCY,
   ISNADI_DELEGATION_MAX_DEPTH,
   ISNADI_TOOL_CATALOG,
   CommandId,
@@ -143,17 +142,11 @@ export function createIsnadiDelegationRuntime(options: IsnadiDelegationRuntimeOp
       throw new Error(`Bot work depth cannot exceed ${ISNADI_DELEGATION_MAX_DEPTH}.`);
     }
 
-    const active = snapshot.delegations.filter(
-      (delegation) =>
-        delegation.parentThreadId === parent.threadId &&
-        !TERMINAL_PHASES.has(delegation.phase._tag),
-    );
-
-    if (active.length >= ISNADI_DELEGATION_MAX_CONCURRENCY) {
-      throw new Error(
-        `A turn cannot run more than ${ISNADI_DELEGATION_MAX_CONCURRENCY} bot work items.`,
-      );
-    }
+    // The concurrency limit is enforced by the decider, which refuses with the
+    // `delegation-limit-reached` code. A pre-check here counted by parent thread
+    // while the decider counts by parent bot, so the two disagreed and this one
+    // threw prose before any delegation or thread existed — an approved handoff
+    // vanished with nothing for the boss to act on.
 
     if (
       request.context !== undefined &&

@@ -94,9 +94,15 @@ describe("IsnadiDelegationRuntime", () => {
       "depth",
     );
     const active = [1, 2, 3].map((index) => delegation(DelegationId.make(`active-${index}`)));
+    // The decider owns the cap, and the code it refuses with is the contract the
+    // boss acts on. Asserting the sentence instead would pass on wording while
+    // the code the client switches on went unasserted.
     await expect(
       harness(snapshot({ delegations: active })).runtime.send(parent(), request() as never),
-    ).rejects.toThrow("more than 3");
+    ).rejects.toMatchObject({
+      _tag: "OrchestrationCommandInvariantError",
+      refusal: "delegation-limit-reached",
+    });
   });
 
   it("hands bounded parent context to the child and rejects oversized context", async () => {

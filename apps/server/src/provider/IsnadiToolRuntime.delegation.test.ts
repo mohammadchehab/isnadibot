@@ -9,6 +9,7 @@ import {
 } from "@isnadi/contracts";
 import { createIsnadiToolRuntime, type IsnadiToolSession } from "./IsnadiToolRuntime.ts";
 import { IsnadiWorkerError } from "./IsnadiWorkerRuntime.ts";
+import { OrchestrationCommandInvariantError } from "../orchestration/Errors.ts";
 import { makeIsnadiToolRuntimeTestSupport } from "./test-support/IsnadiToolRuntime.ts";
 
 const { directories, workspace } = makeIsnadiToolRuntimeTestSupport();
@@ -371,10 +372,119 @@ describe("IsnadiToolRuntime", () => {
 
     await expect(runtime.execute(execution)).resolves.toMatchObject({
       phase: "failure",
-      failureCode: "internal",
+      failureCode: "denied",
       fatalToThread: false,
       billedBotId: "reviewer",
       summary: "Provider unavailable",
     });
+  });
+
+  it("keeps the approval when the handoff never leaves", async () => {
+    const runtime = createIsnadiToolRuntime();
+
+    const execution = {
+      threadId: "thread-1",
+      toolId: "SendToAgent" as const,
+      toolCallId: "tool-delegate",
+      input: {
+        botId: BotId.make("reviewer"),
+        task: "Review the patch",
+        expectedResult: "A verdict",
+      },
+      approvalMode: "require-grant" as const,
+    };
+
+    runtime.registerSession("thread-1", {
+      botId: BotId.make("parent"),
+      runtimeMode: "full-access",
+      workspaceType: "local",
+      delegation: {
+        depth: 0,
+        activeDelegations: 0,
+        access: {
+          allowedToolIds: ["SendToAgent"],
+          memoryScopes: [],
+          sandbox: "local",
+          runtimeMode: "full-access",
+          hasUserComputer: false,
+          enabledMcpServerIds: [],
+          disabledMcpServerIds: [],
+          approvalCeiling: "send",
+        },
+        send: async () => {
+          throw new Error("Provider unavailable");
+        },
+      },
+    });
+    runtime.grantApproval(execution);
+
+    await expect(runtime.execute(execution)).resolves.toMatchObject({
+      phase: "failure",
+      failureCode: "denied",
+    });
+
+    // The send never happened, so the approval was not spent: the boss can
+    // retry without asking the user again. A consumed grant would throw here.
+    await expect(runtime.execute(execution)).resolves.toMatchObject({
+      phase: "failure",
+      failureCode: "denied",
+    });
+  });
+
+  it("hands the boss the decider's refusal code, not its internal command type", async () => {
+    const runtime = createIsnadiToolRuntime();
+
+    const execution = {
+      threadId: "thread-1",
+      toolId: "SendToAgent" as const,
+      toolCallId: "tool-delegate",
+      input: {
+        botId: BotId.make("reviewer"),
+        task: "Review the patch",
+        expectedResult: "A verdict",
+      },
+      approvalMode: "require-grant" as const,
+    };
+
+    runtime.registerSession("thread-1", {
+      botId: BotId.make("parent"),
+      runtimeMode: "full-access",
+      workspaceType: "local",
+      delegation: {
+        depth: 0,
+        activeDelegations: 0,
+        access: {
+          allowedToolIds: ["SendToAgent"],
+          memoryScopes: [],
+          sandbox: "local",
+          runtimeMode: "full-access",
+          hasUserComputer: false,
+          enabledMcpServerIds: [],
+          disabledMcpServerIds: [],
+          approvalCeiling: "send",
+        },
+        send: async () => {
+          throw new OrchestrationCommandInvariantError({
+            commandType: "delegation.create",
+            detail: "Bot 'bot-parent' already has 3 active delegations.",
+            refusal: "delegation-limit-reached",
+          });
+        },
+      },
+    });
+    runtime.grantApproval(execution);
+
+    const result = await runtime.execute(execution);
+
+    // The code is what the boss switches on: "the squad is busy" and "that bot
+    // cannot take this" both arrive as `denied` without it.
+    expect(result).toMatchObject({
+      phase: "failure",
+      failureCode: "denied",
+      refusal: "delegation-limit-reached",
+      summary: "Bot 'bot-parent' already has 3 active delegations.",
+    });
+    // The summary is what the boss reads, and a command type is a server detail.
+    expect(JSON.stringify(result)).not.toContain("delegation.create");
   });
 });
