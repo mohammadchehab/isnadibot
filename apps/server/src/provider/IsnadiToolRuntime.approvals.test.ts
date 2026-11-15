@@ -403,6 +403,32 @@ describe("IsnadiToolRuntime", () => {
       }),
     ).resolves.toEqual({ text: "# Notes" });
 
+    // A session that can still ask its user keeps the card.
+    runtime.registerSession("thread-read-askable", {
+      runtimeMode: "approval-required",
+      workspaceType: "local",
+      userComputerWorkspace: workspace("thread-read-askable"),
+      catalogHandlers: { ExternalRead: async () => ({ text: "# Notes" }) },
+      delegation: {
+        depth: 0,
+        activeDelegations: 0,
+        access: {
+          allowedToolIds: ["ExternalRead"],
+          memoryScopes: [],
+          sandbox: "local",
+          runtimeMode: "approval-required",
+          hasUserComputer: true,
+          enabledMcpServerIds: [],
+          disabledMcpServerIds: [],
+          approvalCeiling: "user-computer",
+        },
+        send: vi.fn(),
+      },
+    });
+    await expect(
+      runtime.requiresApproval("thread-read-askable", "ExternalRead", input),
+    ).resolves.toBe(true);
+
     register("thread-read-missing", false);
     await expect(
       runtime.requiresApproval("thread-read-missing", "ExternalRead", input),

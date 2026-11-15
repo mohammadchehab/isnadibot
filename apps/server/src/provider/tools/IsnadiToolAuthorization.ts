@@ -99,6 +99,10 @@ export function delegationPreApprovesRead(input: {
 
   if (tool?.id !== "ExternalRead" || !grant) return false;
 
+  // Only a 'none' ceiling means nobody can answer a card. Any session that can still ask its
+  // user keeps its approval card, so a top-level bot never loses it.
+  if (grant.approvalCeiling !== "none") return false;
+
   if (!grant.hasUserComputer || !grant.allowedToolIds.includes("ExternalRead")) return false;
 
   return (
