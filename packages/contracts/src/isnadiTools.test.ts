@@ -1,9 +1,11 @@
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   ISNADI_DELEGATION_CONTEXT_MAX_CHARS,
   ISNADI_TOOL_CATALOG,
+  IsnadiToolInputSchemas,
   IsnadiToolReceipt,
   isnadiToolApprovalForInput,
   isnadiToolRequiresApproval,
@@ -304,3 +306,50 @@ describe("Isnadi tool contracts", () => {
     ).toThrow();
   });
 });
+
+/**
+ * The same-space handoff predicate allows a `SendToAgent` without approval when
+ * both bots share a home (`bot.groupId`). It holds only while no tool can move
+ * an existing bot into the caller's space, and the tool that could is the one
+ * whose input can name a `groupId`.
+ *
+ * Two tools do dispatch commands that carry a home: `UpdateBotProfile`
+ * (`bot.update`) and `CreateAgent` (`bot.create`). What keeps them safe is the
+ * shape of their input, not the command: neither can name a `groupId`, and tool
+ * input rejects excess properties, so `bot.update` can never be handed one.
+ * `CreateAgent`'s home comes from the calling thread, which places a brand-new
+ * bot and grants no reach over a bot that already has a home.
+ *
+ * A future tool that could name a home fails here rather than at the boundary.
+ */
+describe("Isnadi tool catalog writes no bot home", () => {
+  it("gives no tool an input field that names a home", () => {
+    const namingAHome = ISNADI_TOOL_CATALOG.filter((tool) =>
+      inputFieldNames(IsnadiToolInputSchemas[tool.id]).includes("groupId"),
+    ).map((tool) => tool.id);
+
+    expect(namingAHome).toEqual([]);
+  });
+
+  it("reads every tool's input, so an unreadable shape cannot hide one", () => {
+    const unreadable = ISNADI_TOOL_CATALOG.filter(
+      (tool) => inputFieldNames(IsnadiToolInputSchemas[tool.id]).length === 0,
+    ).map((tool) => tool.id);
+
+    expect(unreadable).toEqual([]);
+  });
+});
+
+/** Field names of a tool input, descending into the members of a union. */
+function inputFieldNames(schema: Schema.Top): ReadonlyArray<string> {
+  // Effect schemas are functions, so `Predicate.isObject` is false for them.
+  if (Predicate.hasProperty(schema, "fields") && Predicate.isObject(schema.fields)) {
+    return Object.keys(schema.fields);
+  }
+
+  if (Predicate.hasProperty(schema, "members") && Array.isArray(schema.members)) {
+    return schema.members.flatMap((member: Schema.Top) => inputFieldNames(member));
+  }
+
+  return [];
+}
