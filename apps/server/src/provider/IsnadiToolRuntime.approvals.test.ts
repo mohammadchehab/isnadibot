@@ -369,6 +369,7 @@ describe("IsnadiToolRuntime", () => {
         runtimeMode: "approval-required",
         workspaceType: "local",
         userComputerWorkspace: workspace(threadId),
+        userComputerRoot: process.cwd(),
         catalogHandlers: { ExternalRead: async () => ({ text: "# Notes" }) },
         delegation: {
           depth: 0,

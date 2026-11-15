@@ -410,6 +410,7 @@ export function createEvents(deps: {
           workspaceType: active.toolSession.workspaceType,
           approvalCeiling: grant?.approvalCeiling,
           grant,
+          readRoot: active.toolSession.userComputerRoot,
         });
 
         if (ceilingRefusal) {
@@ -429,6 +430,7 @@ export function createEvents(deps: {
             input: toolInput,
             workspaceType: active.toolSession.workspaceType,
             grant,
+            readRoot: active.toolSession.userComputerRoot,
           })
         ) {
           active.session.respondToToolApproval({

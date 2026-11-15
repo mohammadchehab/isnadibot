@@ -5,6 +5,9 @@ import {
   type IsnadiDelegationAccessGrant,
   type ProviderRuntimeEvent,
 } from "@isnadi/contracts";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -37,6 +40,7 @@ const delegatedAccess = (
 const runDelegatedCall = (
   overrides: Partial<IsnadiDelegationAccessGrant>,
   args: { readonly path: string },
+  cwd: string = process.cwd(),
 ) => {
   const bridge = makeBridge();
   const mastra = mastraHarnessFixture();
@@ -67,7 +71,7 @@ const runDelegatedCall = (
       threadId: codexThreadId,
       provider: ProviderDriverKind.make("codex"),
       providerInstanceId: codexInstanceId,
-      cwd: process.cwd(),
+      cwd,
       botId: BotId.make("delegated-child"),
       modelSelection: codexSelection,
       runtimeMode: "approval-required",
@@ -96,12 +100,35 @@ const runDelegatedCall = (
   }).pipe(Effect.provide(layer), Effect.orDie);
 };
 
-const readme = { path: "/Users/someone/project/README.md" };
+/** A granted folder with a README, a sibling folder outside it, and a link that leaves it. */
+const makeFolders = () => {
+  const base = NodeFS.realpathSync(
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "isnadi-read-")),
+  );
+
+  const root = NodePath.join(base, "project");
+  const outside = NodePath.join(base, "elsewhere");
+
+  NodeFS.mkdirSync(root);
+  NodeFS.mkdirSync(outside);
+  NodeFS.writeFileSync(NodePath.join(root, "README.md"), "# Project");
+  NodeFS.writeFileSync(NodePath.join(outside, "notes.txt"), "private");
+  NodeFS.symlinkSync(outside, NodePath.join(root, "link-out"));
+
+  return { root, outside };
+};
+
+const declined = (message: string) => ({
+  toolCallId: "delegated-call",
+  decision: "decline",
+  declineContext: { reason: "approval_ceiling", message: expect.stringContaining(message) },
+});
 
 describe("AgentControllerLive delegated reads", () => {
-  it.effect("lets a read-only delegation read the user's files without a card", () =>
+  it.effect("lets a read-only delegation read inside its folder without a card", () =>
     Effect.gen(function* () {
-      const { mastra, events } = yield* runDelegatedCall({}, readme);
+      const { root } = makeFolders();
+      const { mastra, events } = yield* runDelegatedCall({}, { path: "README.md" }, root);
 
       expect(events.filter((event) => event.type === "request.opened")).toEqual([]);
       expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith({
@@ -111,24 +138,66 @@ describe("AgentControllerLive delegated reads", () => {
     }),
   );
 
-  it.effect("names the missing grant when the delegation has no user computer", () =>
+  it.effect("refuses a read outside the folder, naming the folder", () =>
     Effect.gen(function* () {
-      const { mastra } = yield* runDelegatedCall({ hasUserComputer: false }, readme);
+      const { root, outside } = makeFolders();
 
-      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith({
-        toolCallId: "delegated-call",
-        decision: "decline",
-        declineContext: {
-          reason: "approval_ceiling",
-          message: expect.stringContaining("not granted user-computer access"),
-        },
-      });
+      const { mastra, events } = yield* runDelegatedCall(
+        {},
+        { path: NodePath.join(outside, "notes.txt") },
+        root,
+      );
+
+      expect(events.filter((event) => event.type === "request.opened")).toEqual([]);
+      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
+        declined("may only read inside the granted folder"),
+      );
     }),
   );
 
-  it.effect("still refuses a protected path under the same grant", () =>
+  it.effect("refuses a symlink inside the folder that points out of it", () =>
     Effect.gen(function* () {
-      const { mastra } = yield* runDelegatedCall({}, { path: "/Users/someone/project/.env" });
+      const { root } = makeFolders();
+      const { mastra } = yield* runDelegatedCall({}, { path: "link-out/notes.txt" }, root);
+
+      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
+        declined("resolves outside it"),
+      );
+    }),
+  );
+
+  it.effect("refuses a .. escape", () =>
+    Effect.gen(function* () {
+      const { root } = makeFolders();
+      const { mastra } = yield* runDelegatedCall({}, { path: "../elsewhere/notes.txt" }, root);
+
+      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
+        declined("resolves outside it"),
+      );
+    }),
+  );
+
+  it.effect("names the missing grant when the delegation has no user computer", () =>
+    Effect.gen(function* () {
+      const { root } = makeFolders();
+
+      const { mastra } = yield* runDelegatedCall(
+        { hasUserComputer: false },
+        { path: "README.md" },
+        root,
+      );
+
+      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
+        declined("not granted user-computer access"),
+      );
+    }),
+  );
+
+  it.effect("still refuses a protected path inside the folder", () =>
+    Effect.gen(function* () {
+      const { root } = makeFolders();
+      NodeFS.writeFileSync(NodePath.join(root, ".env"), "KEY=1");
+      const { mastra } = yield* runDelegatedCall({}, { path: ".env" }, root);
 
       expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
         expect.objectContaining({ decision: "decline" }),

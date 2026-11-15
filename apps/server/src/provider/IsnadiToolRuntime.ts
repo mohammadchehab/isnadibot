@@ -294,6 +294,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
       workspaceType: session.workspaceType,
       approvalCeiling: session.delegation?.access.approvalCeiling,
       grant: session.delegation?.access,
+      readRoot: session.userComputerRoot,
     });
 
     if (refusal) throw new Error(refusal);
@@ -304,6 +305,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
         input,
         workspaceType: session.workspaceType,
         grant: session.delegation?.access,
+        readRoot: session.userComputerRoot,
       })
     )
       return false;

@@ -1,3 +1,5 @@
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
 import * as Predicate from "effect/Predicate";
 import {
   type IsnadiDelegationAccessGrant,
@@ -83,36 +85,101 @@ export const approvalUnavailableRefusal = (toolName: string) =>
   `Tool '${toolName}' needs approval, and this chat cannot ask anyone for it. Finish without it or report the blocker.`;
 
 /**
- * Whether the delegation's own grant already approves this call. A boss that
- * delegates `ExternalRead` with user-computer access has consented to reads of
- * the user's computer, so an ordinary read needs no card, and a `none` ceiling
- * (which nobody can answer) must not strand it. Only the plain `user-computer`
- * class is covered: a protected path (secrets, production) keeps its approval.
+ * The real location of a path with every symlink followed. A path that does not
+ * exist yet resolves through its nearest existing ancestor, so a `..` or a link
+ * cannot hide behind a missing leaf.
  */
-export function delegationPreApprovesRead(input: {
+function realLocation(target: string): string {
+  const missing: string[] = [];
+  let current = NodePath.resolve(target);
+
+  for (;;) {
+    try {
+      return NodePath.join(NodeFS.realpathSync(current), ...missing.toReversed());
+    } catch {
+      const parent = NodePath.dirname(current);
+
+      if (parent === current) return NodePath.resolve(target);
+      missing.push(NodePath.basename(current));
+      current = parent;
+    }
+  }
+}
+
+const isInsideRoot = (root: string, target: string) => {
+  const relative = NodePath.relative(root, target);
+
+  return relative === "" || (!relative.startsWith("..") && !NodePath.isAbsolute(relative));
+};
+
+/**
+ * What a delegation's own grant says about an `ExternalRead`: `approve` when it
+ * is an ordinary read inside the granted folder, `outside` (with the reason the
+ * boss should see) when it leaves that folder, and `none` when the grant does
+ * not speak to this call at all. A boss that delegates `ExternalRead` with
+ * user-computer access has consented to reads of the folder the task names, so
+ * such a read needs no card, and a `none` ceiling (which nobody can answer)
+ * must not strand it. The path is resolved with symlinks followed, so a link
+ * or `..` cannot lead out of the folder. A protected path (secrets, production)
+ * keeps its approval as a second gate.
+ */
+type DelegatedReadVerdict =
+  | { readonly kind: "none" }
+  | { readonly kind: "approve" }
+  | { readonly kind: "outside"; readonly reason: string };
+
+export function delegatedReadVerdict(input: {
   readonly tool: IsnadiToolDefinition | undefined;
   readonly input: unknown;
   readonly workspaceType: IsnadiToolWorkspaceType | undefined;
   readonly grant?: IsnadiDelegationAccessGrant | undefined;
-}): boolean {
+  /** The folder the delegation may read: the user computer root of its session. */
+  readonly readRoot?: string | undefined;
+}): DelegatedReadVerdict {
   const { tool, grant } = input;
 
-  if (tool?.id !== "ExternalRead" || !grant) return false;
+  if (tool?.id !== "ExternalRead" || !grant) return { kind: "none" };
 
   // Only a 'none' ceiling means nobody can answer a card. Any session that can still ask its
   // user keeps its approval card, so a top-level bot never loses it.
-  if (grant.approvalCeiling !== "none") return false;
+  if (grant.approvalCeiling !== "none") return { kind: "none" };
 
-  if (!grant.hasUserComputer || !grant.allowedToolIds.includes("ExternalRead")) return false;
+  if (!grant.hasUserComputer || !grant.allowedToolIds.includes("ExternalRead")) {
+    return { kind: "none" };
+  }
 
-  return (
-    isnadiToolApprovalForInput(
-      tool,
-      input.input,
-      input.workspaceType === undefined ? {} : { workspaceType: input.workspaceType },
-    ) === "user-computer"
+  const action = isnadiToolApprovalForInput(
+    tool,
+    input.input,
+    input.workspaceType === undefined ? {} : { workspaceType: input.workspaceType },
   );
+
+  // A protected path asks for more than a read; the ceiling refuses it.
+  if (action !== "user-computer") return { kind: "none" };
+
+  const requested = field(input.input, "path");
+
+  if (!input.readRoot || !Predicate.isString(requested)) {
+    return {
+      kind: "outside",
+      reason: `Tool 'ExternalRead' has no granted folder to read from, and nobody here can approve a read. Report that blocker to your boss so they re-delegate with a folder.`,
+    };
+  }
+
+  const root = realLocation(input.readRoot);
+  const target = realLocation(NodePath.resolve(input.readRoot, requested));
+
+  if (isInsideRoot(root, target)) return { kind: "approve" };
+
+  return {
+    kind: "outside",
+    reason: `Tool 'ExternalRead' may only read inside the granted folder '${input.readRoot}', and '${requested}' resolves outside it. Nobody here can approve a wider read. Report that blocker to your boss so they re-delegate with the right folder.`,
+  };
 }
+
+/** Whether the delegation's grant approves this read with no card. */
+export const delegationPreApprovesRead = (input: Parameters<typeof delegatedReadVerdict>[0]) =>
+  delegatedReadVerdict(input).kind === "approve";
 
 /**
  * The refusal for a call whose approval nobody can give. It names the missing
@@ -139,6 +206,7 @@ export function approvalCeilingRefusal(input: {
   readonly workspaceType: IsnadiToolWorkspaceType | undefined;
   readonly approvalCeiling: IsnadiToolApprovalClass | undefined;
   readonly grant?: IsnadiDelegationAccessGrant | undefined;
+  readonly readRoot?: string | undefined;
 }): string | null {
   const { tool, approvalCeiling } = input;
 
@@ -146,7 +214,11 @@ export function approvalCeilingRefusal(input: {
   // never reach it, so they keep whatever gate they had.
   if (!tool || !approvalCeiling) return null;
 
-  if (delegationPreApprovesRead({ ...input, tool })) return null;
+  const read = delegatedReadVerdict({ ...input, tool });
+
+  if (read.kind === "approve") return null;
+
+  if (read.kind === "outside") return read.reason;
 
   const action = isnadiToolApprovalForInput(
     tool,
