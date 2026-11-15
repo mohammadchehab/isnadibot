@@ -1,8 +1,15 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { BotId, CommandId, DelegationId, type IsnadiDelegationRecord } from "@isnadi/contracts";
+import {
+  BotId,
+  ClientOrchestrationCommand,
+  CommandId,
+  DelegationId,
+  type IsnadiDelegationRecord,
+} from "@isnadi/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import { decideOrchestrationCommand } from "./decider.ts";
 import {
   makeDelegation,
@@ -19,6 +26,9 @@ import {
   OTHER_BOT_ID,
   PARENT_THREAD_ID,
 } from "./test-support/DelegationDeciderFixtures.ts";
+
+/** Whether a payload survives the contract a client dispatch is decoded against. */
+const clientCanDispatch = Schema.is(ClientOrchestrationCommand);
 
 it.layer(NodeServices.layer)("delegation decider", (it) => {
   it.effect("creates and projects the full delegation record", () =>
@@ -351,6 +361,76 @@ it.layer(NodeServices.layer)("delegation decider", (it) => {
 
       expect(error.refusal).toBe("delegation-limit-reached");
       expect(error.detail).toContain("3 active delegations");
+    }),
+  );
+
+  // delegation.create and delegation.state.set are in InternalOrchestrationCommand,
+  // so a client cannot dispatch either one. That is the claim the throw makes, so
+  // the test proves the dispatchability rather than only reading the label back:
+  // decoding the same payload as a client command must fail.
+  it.effect("files a throw a client cannot dispatch as internal-command", () =>
+    Effect.gen(function* () {
+      const mismatchedBill = makeDelegation({ billedBotId: OTHER_BOT_ID });
+
+      const createCommand = {
+        type: "delegation.create" as const,
+        commandId: CommandId.make("command-internal-billing"),
+        delegation: mismatchedBill,
+      };
+
+      expect(clientCanDispatch(createCommand)).toBe(false);
+
+      const createError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel(),
+        command: createCommand,
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(createError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the billing invariant to refuse");
+      }
+
+      expect(createError.refusal).toBeUndefined();
+      expect(createError.exclusion?.kind).toBe("internal-command");
+
+      const queued = makeDelegation();
+
+      const completed = makeDelegation({
+        phase: {
+          _tag: "Completed",
+          childThreadId: CHILD_THREAD_ID,
+          childTurnId: CHILD_TURN_ID,
+          startedAt: NOW,
+          completedAt: LATER,
+          acknowledgedAt: null,
+          result: {
+            summary: "Done.",
+            childThreadId: CHILD_THREAD_ID,
+            childTurnId: CHILD_TURN_ID,
+          },
+        },
+        updatedAt: LATER,
+      });
+
+      const transitionCommand = {
+        type: "delegation.state.set" as const,
+        commandId: CommandId.make("command-internal-transition"),
+        delegation: completed,
+      };
+
+      expect(clientCanDispatch(transitionCommand)).toBe(false);
+
+      const transitionError = yield* decideOrchestrationCommand({
+        readModel: makeReadModel([queued]),
+        command: transitionCommand,
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(transitionError, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected the transition invariant to refuse");
+      }
+
+      // The phase table is server-owned, so no client-chosen pair reaches this.
+      expect(transitionError.refusal).toBeUndefined();
+      expect(transitionError.exclusion?.kind).toBe("internal-command");
     }),
   );
 

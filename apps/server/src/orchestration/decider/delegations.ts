@@ -14,7 +14,11 @@ import * as NodeUtil from "node:util";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  noShippedSurfaceInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   requireBotNotArchived,
@@ -67,9 +71,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       }
 
       if (delegation.billedBotId !== delegation.childBotId) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${delegation.delegationId}' must bill child bot '${delegation.childBotId}'.`,
+          reason:
+            "delegation.create is in InternalOrchestrationCommand, so no client can dispatch it: the only dispatcher is the server's own delegation runtime, which builds the record and stamps billedBotId from the child bot it is about to run.",
         });
       }
 
@@ -83,9 +89,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
             });
 
       if (parentDelegation !== null && parentDelegation.childBotId !== delegation.parentBotId) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Parent delegation '${parentDelegation.delegationId}' does not belong to bot '${delegation.parentBotId}'.`,
+          reason:
+            "delegation.create is internal, and the runtime derives parentDelegationId from the parent thread's own record rather than from user input, so a parent naming a different bot is a server bug in that lookup.",
         });
       }
 
@@ -101,9 +109,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         delegation.depth !== expectedDepth ||
         !NodeUtil.isDeepStrictEqual(delegation.ancestorBotIds, expectedAncestorBotIds)
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${delegation.delegationId}' has an invalid ancestor chain or depth.`,
+          reason:
+            "delegation.create is internal; depth and ancestorBotIds are computed by the delegation runtime from the parent record it just read, never supplied by a client, so a mismatch means the runtime built the chain wrong.",
         });
       }
 
@@ -130,9 +140,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       }
 
       if (!Predicate.isTagged(delegation.phase, "Queued")) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: "New delegations must start queued.",
+          reason:
+            "delegation.create is internal and the runtime always creates the record in Queued, so a non-Queued payload means the trusted path built the wrong phase rather than that a user chose one.",
         });
       }
 
@@ -158,9 +170,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       const next = command.delegation;
 
       if (!hasSameDelegationOwnership(current, next)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${next.delegationId}' ownership and access fields are immutable.`,
+          reason:
+            "delegation.state.set is in InternalOrchestrationCommand, so no client can dispatch it: only startup reconciliation, the delegation runtime and the provider-command layer set state, and each carries the ownership fields forward from the record it read.",
         });
       }
 
@@ -173,9 +187,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         (currentChildThreadId !== null && nextChildThreadId !== currentChildThreadId) ||
         (currentChildTurnId !== null && nextChildTurnId !== currentChildTurnId)
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${next.delegationId}' child ownership is immutable once assigned.`,
+          reason:
+            "delegation.state.set is internal, and its writers carry childThreadId and childTurnId forward unchanged; reassigning them would mean a server writer rebuilt the record instead of updating the one it read.",
         });
       }
 
@@ -184,9 +200,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         (next.phase.result.childThreadId !== next.phase.childThreadId ||
           next.phase.result.childTurnId !== next.phase.childTurnId)
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${next.delegationId}' result must come from its child thread and turn.`,
+          reason:
+            "delegation.state.set is internal, and the Completed phase is built by the delegation runtime from the child thread and turn it just ran, so a result naming anything else is the runtime reporting the wrong run.",
         });
       }
 
@@ -195,9 +213,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       }
 
       if (!(Date.parse(next.updatedAt) >= Date.parse(current.updatedAt))) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${next.delegationId}' cannot move updatedAt backward.`,
+          reason:
+            "delegation.state.set is internal, and updatedAt is stamped by the server's clock on every write, so a backward timestamp means a server writer used a stale clock rather than that a client sent one.",
         });
       }
 
@@ -241,15 +261,19 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
           !releasesOnly &&
           (!assignsChildOwnership || !changesOnlyChildOwnership)
         ) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* internalInvariantError({
             commandType: command.type,
             detail: `Delegation '${next.delegationId}' cannot change data without a state transition.`,
+            reason:
+              "delegation.state.set is internal, and every server writer builds the next record from the one it read, so a same-phase data change means a writer rebuilt it instead of carrying it forward.",
           });
         }
       } else if (!isDelegationTransitionAllowed(current.phase._tag, next.phase._tag)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Delegation '${next.delegationId}' cannot transition from '${current.phase._tag}' to '${next.phase._tag}'.`,
+          reason:
+            "delegation.state.set is internal: a client can dispatch only delegation.cancel and delegation.retry, never a state set, and ISNADI_DELEGATION_TRANSITIONS is server-owned, so no client-chosen pair of phases can reach this guard.",
         });
       }
 
@@ -316,9 +340,13 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         !Predicate.isTagged(original.phase, "Failed") &&
         !Predicate.isTagged(original.phase, "Canceled")
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* noShippedSurfaceInvariantError({
           commandType: command.type,
           detail: "Only failed or canceled bot work can be retried.",
+          // The asymmetry with the already-retried guard below is why one of the
+          // pair is an exclusion and the other a code, so it is stated here.
+          reason:
+            "DelegationRetryCommand is client-dispatchable and carries only the delegation id, so a client can send a retry for a non-terminal phase; no shipped surface does, because the retry button is offered only when the record's own phase is Failed or Canceled (delegationActions). This exclusion ends the moment a surface offers retry off a non-terminal phase, which must code it first. The next guard checks the rest of the delegations collection instead, which another device can add to, and that is why it carries stale-view while this one carries no code.",
         });
       }
 
@@ -330,6 +358,11 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: "This bot work was already retried. Use the newer card instead.",
+          // The record itself is unchanged — a terminal phase never moves. What
+          // this device's view is missing is the sibling retry another device
+          // created, so the remedy is a refresh, and `isDelegationSuperseded`
+          // gates the retry button on this same predicate.
+          refusal: "stale-view",
         });
       }
 
@@ -347,6 +380,9 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `This bot already has ${activeDelegationCount} bot work items running. Wait for one to finish, then retry.`,
+          // Same reason-kind as the create-time cap above: this bot has too many
+          // bot work items in flight. One reason-kind, one code.
+          refusal: "delegation-limit-reached",
         });
       }
 
