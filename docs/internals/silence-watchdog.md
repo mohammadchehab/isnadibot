@@ -39,6 +39,14 @@ Three behaviors follow:
 
 Silence is a **reversible mark on a running turn**, not a terminal state. `turn.silent.cleared` removes `silentAt` and the same turn is open again. This is deliberate: a literal terminal state would strand a turn that resumes after a long tool run.
 
+## The mark expires
+
+A mark that can be withdrawn can also be forgotten, and a turn nothing ends stays open forever. So the mark is provisional in both directions: it never ends the turn by itself, and it does not stand indefinitely. The watchdog waits `SILENT_TURN_LIVENESS_MS` (30 minutes, measured from the last provider activity, so it runs from the moment the notice appears) for output. If none arrives, `onExpired` settles the turn the way a provider error does: a `thread.session.set` with status `error`, `activeTurnId` null, and the typed reason `SILENT_TURN_EXPIRED_ERROR`. The session leaving `running` is what makes the turn terminal, and the silence inbox item resolves with it. A turn already ended, or a newer turn that took over, is left alone.
+
+The window is deliberately far longer than the 90-second silent one. A single long tool call emits no provider events, and ending a turn that is merely quiet would be a lie about work still in progress. 30 minutes matches the inactivity window the provider session reaper already trusts for a session with no sign of life; once the turn is settled and `activeTurnId` is null, that reaper can also stop the session.
+
+The watchdog only covers turns this process started. A mark that outlived a restart has no watchdog, and is settled by startup reconciliation below.
+
 ## Startup reconciliation
 
 The silence report only exists if the watchdog got to run. `startupReconciliation` covers the rest: an open turn whose provider session did not survive the restart is settled into a terminal state with a typed reason, `ORPHANED_PROVIDER_TURN_ERROR`. A thread with no session row gets a synthesized error session so the projector settles its turn. Without this the invariant is only as good as every adapter's error path.

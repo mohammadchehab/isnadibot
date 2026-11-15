@@ -4,6 +4,7 @@ import {
   THREAD_SILENT_RUN_ACTIVITY_KIND,
 } from "@isnadi/contracts";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { SILENT_TURN_EXPIRED_ERROR } from "./runtime-ingestion/Watchdogs.ts";
 import {
   asTurnId,
   asEventId,
@@ -11,6 +12,12 @@ import {
   SILENT_MS,
   makeSilenceWatchdogHarness,
 } from "./test-support/SilenceWatchdogHarness.ts";
+
+/**
+ * How long a silent mark stands before the turn is settled, pinned here on purpose: the window is
+ * part of the contract this file proves, so moving it has to be a visible change to the test.
+ */
+const LIVENESS_WINDOW_MS = 30 * 60 * 1_000;
 
 describe("ProviderRuntimeIngestion silence watchdog", () => {
   const testScope = makeSilenceWatchdogHarness();
@@ -108,6 +115,61 @@ describe("ProviderRuntimeIngestion silence watchdog", () => {
     expect(silentKinds(await harness.watchdogActivities())).toEqual([
       THREAD_SILENT_RUN_ACTIVITY_KIND,
     ]);
+  });
+
+  it("settles a turn whose silence outlives the liveness window, with a typed reason", async () => {
+    const harness = await createHarness({ botOwned: true });
+    const turnId = asTurnId("turn-silent-expired");
+    harness.emitTurnStarted(turnId);
+    await harness.drain();
+
+    await harness.adjustClock(SILENT_MS);
+    await harness.drain();
+    expect(silenceIncidents(harness)).toMatchObject([{ status: "open" }]);
+
+    // The mark is provisional, so it does not end the turn on its own.
+    await harness.adjustClock(LIVENESS_WINDOW_MS - 1);
+    await harness.drain();
+
+    const waiting = (await harness.readModel()).threads.find(
+      (t) => t.id === asThreadId("thread-1"),
+    );
+
+    expect(waiting?.latestTurn?.state).toBe("running");
+
+    await harness.adjustClock(1);
+    await harness.drain();
+
+    const settled = (await harness.readModel()).threads.find(
+      (t) => t.id === asThreadId("thread-1"),
+    );
+
+    expect(settled?.latestTurn?.state).toBe("error");
+    expect(settled?.session?.status).toBe("error");
+    expect(settled?.session?.lastError).toBe(SILENT_TURN_EXPIRED_ERROR);
+    expect(settled?.session?.activeTurnId).toBeNull();
+    // The incident is closed by the turn ending, so it is not left claiming the chat is running.
+    expect(silenceIncidents(harness)).toMatchObject([{ status: "resolved" }]);
+  });
+
+  it("keeps the turn open when the provider speaks inside the liveness window", async () => {
+    const harness = await createHarness({ botOwned: true });
+    const turnId = asTurnId("turn-silent-recovered");
+    harness.emitTurnStarted(turnId);
+    await harness.drain();
+
+    await harness.adjustClock(SILENT_MS);
+    await harness.drain();
+    await harness.adjustClock(LIVENESS_WINDOW_MS - 1_000);
+    harness.emitReasoning(turnId, "back-after-a-long-tool-run");
+    await harness.drain();
+    await harness.adjustClock(LIVENESS_WINDOW_MS);
+    await harness.drain();
+
+    const thread = (await harness.readModel()).threads.find((t) => t.id === asThreadId("thread-1"));
+    expect(thread?.latestTurn?.state).toBe("running");
+    expect(thread?.session?.status).toBe("running");
+    expect(thread?.session?.activeTurnId).toBe(turnId);
   });
 
   it.each(["completed", "interrupted", "aborted"] as const)(
