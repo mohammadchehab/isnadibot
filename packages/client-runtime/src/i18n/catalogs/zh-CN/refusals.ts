@@ -52,5 +52,9 @@ export const refusalsCatalog = {
     "此机器人由机器人创建的机器人创建。如需更深层级，请自行创建机器人。",
   "This change could not be applied. Update the app, then try again.":
     "无法应用此更改。请更新应用后重试。",
+  "That action does not fit this card's current state. Pick a different action.":
+    "该操作不符合此卡片的当前状态。请选择其他操作。",
+  "This space already has as many open cards as it can hold. Close one first.":
+    "此空间已拥有尽可能多的未关闭卡片。请先关闭一张。",
   "The command failed.": "命令失败。",
 } as const;

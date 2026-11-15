@@ -5,6 +5,7 @@ import {
   type BotId,
   type ClientWorkItemCommand,
   type CommandId,
+  type CommandRefusal,
   type GroupId,
   type OrchestrationGroup,
   type OrchestrationReadModel,
@@ -47,7 +48,21 @@ const PROGRESS_SOURCES: ReadonlySet<WorkItem["state"]> = new Set([
 
 const BLOCKABLE: ReadonlySet<WorkItem["state"]> = new Set(["assigned", "in-progress", "review"]);
 
-const reject = (command: WorkItemCommand, detail: string) =>
+/**
+ * A refusal a person's board can reach, so it carries the code the client turns
+ * into a sentence. The `detail` stays for the log and never becomes the toast.
+ */
+const reject = (command: WorkItemCommand, detail: string, refusal: CommandRefusal) =>
+  new OrchestrationCommandInvariantError({ commandType: command.type, detail, refusal });
+
+/**
+ * A refusal no person can produce, so there is no sentence to show. The four bot
+ * guards sit behind the server-built `work-item.bot-act` wrapper, and the two
+ * claim guards behind `work-item.claim`, which `ClientWorkItemCommand` does not
+ * carry. Each call site states its own R/A/C/U reason. TASK-304 makes this a
+ * required constructor argument so a new uncoded throw cannot compile.
+ */
+const rejectInternal = (command: WorkItemCommand, detail: string) =>
   new OrchestrationCommandInvariantError({ commandType: command.type, detail });
 
 function requireItem(
@@ -58,7 +73,11 @@ function requireItem(
 
   return item
     ? Effect.succeed(item)
-    : Effect.fail(reject(command, `Work item '${command.workItemId}' does not exist.`));
+    : Effect.fail(
+        // The card was deleted elsewhere, so the board drew a view the server
+        // has already left behind. Nothing about the card's state is in play.
+        reject(command, `Work item '${command.workItemId}' does not exist.`, "stale-view"),
+      );
 }
 
 function isGroupMemberBot(group: OrchestrationGroup, botId: BotId) {
@@ -84,11 +103,16 @@ function requireActorAllowed(input: {
     });
   }
 
+  // The four guards below are R and A at once, so they carry no code: a bot
+  // actor arrives only through `BotWorkItemCommand`, which is internal and built
+  // by the server after resolving the bot from its own session. The person
+  // branch returns above, so nobody can send these from outside and nobody who
+  // can is a person.
   const botId = input.actor.botId;
 
   if (!isGroupMemberBot(input.group, botId)) {
     return Effect.fail(
-      reject(input.command, `Bot '${botId}' is not in group '${input.group.id}'.`),
+      rejectInternal(input.command, `Bot '${botId}' is not in group '${input.group.id}'.`),
     );
   }
 
@@ -100,7 +124,7 @@ function requireActorAllowed(input: {
 
   if (!MEMBER_BOT_COMMANDS.has(input.command.type)) {
     return Effect.fail(
-      reject(
+      rejectInternal(
         input.command,
         `Only the boss of group '${input.group.id}' can run '${input.command.type}'.`,
       ),
@@ -108,12 +132,12 @@ function requireActorAllowed(input: {
   }
 
   if (input.item === undefined) {
-    return Effect.fail(reject(input.command, `Bot '${botId}' has no work item to change.`));
+    return Effect.fail(rejectInternal(input.command, `Bot '${botId}' has no work item to change.`));
   }
 
   if (input.item.ownerBotId !== botId) {
     return Effect.fail(
-      reject(
+      rejectInternal(
         input.command,
         `Bot '${botId}' neither owns work item '${input.item.id}' nor is its boss.`,
       ),
@@ -276,7 +300,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
     const items = readModel.workItems ?? [];
 
     if (items.some((item) => item.id === command.workItemId)) {
-      return yield* reject(command, `Work item '${command.workItemId}' already exists.`);
+      return yield* reject(
+        command,
+        `Work item '${command.workItemId}' already exists.`,
+        "already-exists",
+      );
     }
 
     if (
@@ -286,6 +314,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       return yield* reject(
         command,
         `This space has ${WORK_ITEM_OPEN_LIMIT} open items. Close some first.`,
+        "work-item-limit-reached",
       );
     }
 
@@ -315,10 +344,16 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       // trigger, so it cannot tell a live dispatcher turn from a settled one. The dispatcher reads
       // the DB-backed model and is the only producer of this command today — a second producer
       // would reopen the two-bots-on-one-item window this guard closes.
-      if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
+      // Both guards below are internal: R, not U. `work-item.claim` is not in
+      // `ClientWorkItemCommand` at all, so the contract cannot carry it. The
+      // dispatcher is the only producer, and it swallows this invariant into a
+      // `false` (`FleetDispatcherReactor.ts:130-135`), so no sentence is ever
+      // rendered and there is nothing for the client to say.
+      if (!isOpen(item))
+        return yield* rejectInternal(command, "A finished item must be reopened first.");
 
       if (item.ownerBotId !== undefined || item.state !== "queued") {
-        return yield* reject(
+        return yield* rejectInternal(
           command,
           `Work item '${item.id}' is already ${item.ownerBotId === undefined ? item.state : `taken by '${item.ownerBotId}'`}.`,
         );
@@ -334,7 +369,12 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
     }
 
     case "work-item.assign": {
-      if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
+      if (!isOpen(item))
+        return yield* reject(
+          command,
+          "A finished item must be reopened first.",
+          "work-item-state-invalid",
+        );
 
       const cleared = carry(item, { owner: true, block: true });
 
@@ -343,7 +383,14 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       }
 
       if (!isGroupMemberBot(group, command.ownerBotId)) {
-        return yield* reject(command, `Bot '${command.ownerBotId}' is not in group '${group.id}'.`);
+        // The owner being assigned, not the actor: the person's owner picker
+        // drew its roster from a view the server has already left behind, so
+        // the remedy is the refresh `bot-not-a-group-member` names.
+        return yield* reject(
+          command,
+          `Bot '${command.ownerBotId}' is not in group '${group.id}'.`,
+          "bot-not-a-group-member",
+        );
       }
 
       return yield* changed("work-item.assigned", {
@@ -356,10 +403,19 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
     }
 
     case "work-item.update": {
-      if (!isOpen(item)) return yield* reject(command, "A finished item must be reopened first.");
+      if (!isOpen(item))
+        return yield* reject(
+          command,
+          "A finished item must be reopened first.",
+          "work-item-state-invalid",
+        );
 
       if (command.state !== undefined && !PROGRESS_SOURCES.has(item.state)) {
-        return yield* reject(command, `A ${item.state} item cannot move to ${command.state}.`);
+        return yield* reject(
+          command,
+          `A ${item.state} item cannot move to ${command.state}.`,
+          "work-item-state-invalid",
+        );
       }
 
       const moved = carry(item, { block: command.state !== undefined });
@@ -377,7 +433,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
 
     case "work-item.block": {
       if (!BLOCKABLE.has(item.state))
-        return yield* reject(command, `A ${item.state} item cannot be blocked.`);
+        return yield* reject(
+          command,
+          `A ${item.state} item cannot be blocked.`,
+          "work-item-state-invalid",
+        );
 
       return yield* changed("work-item.blocked", {
         ...item,
@@ -390,7 +450,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
 
     case "work-item.unblock": {
       if (item.state !== "blocked")
-        return yield* reject(command, "Only a blocked item can be unblocked.");
+        return yield* reject(
+          command,
+          "Only a blocked item can be unblocked.",
+          "work-item-state-invalid",
+        );
 
       return yield* changed("work-item.unblocked", {
         ...carry(item, { block: true }),
@@ -400,7 +464,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
     }
 
     case "work-item.close": {
-      if (!isOpen(item)) return yield* reject(command, `The item is already ${item.state}.`);
+      // Another device closed it first. The card's new state is not the user's
+      // next action here — there is nothing left to do with it — so the only
+      // move is to look again, which is exactly `stale-view`.
+      if (!isOpen(item))
+        return yield* reject(command, `The item is already ${item.state}.`, "stale-view");
       const open = carry(item, { block: true });
 
       return yield* changed(
@@ -413,7 +481,11 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
 
     case "work-item.reopen": {
       if (isOpen(item))
-        return yield* reject(command, "Only a done or closed item can be reopened.");
+        return yield* reject(
+          command,
+          "Only a done or closed item can be reopened.",
+          "work-item-state-invalid",
+        );
 
       if (
         (readModel.workItems ?? []).filter(
@@ -423,6 +495,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
         return yield* reject(
           command,
           `This space has ${WORK_ITEM_OPEN_LIMIT} open items. Close some first.`,
+          "work-item-limit-reached",
         );
       }
 

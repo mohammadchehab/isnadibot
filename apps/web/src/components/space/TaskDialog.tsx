@@ -22,6 +22,7 @@ import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
+import { workItemFailureToast } from "./workItemFailure.logic";
 
 const TITLE_MAX_LENGTH = 200;
 
@@ -162,7 +163,9 @@ function TaskForm({
 
     if (Predicate.isTagged(written, "Failure")) {
       setBusy(false);
-      toastManager.add({ type: "error", title: t("Could not save the card") });
+      toastManager.add(
+        workItemFailureToast({ cause: written.cause, title: t("Could not save the card") }, t),
+      );
 
       return;
     }
@@ -172,7 +175,9 @@ function TaskForm({
 
       if (Predicate.isTagged(assigned, "Failure")) {
         setBusy(false);
-        toastManager.add({ type: "error", title: t("Could not save the owner") });
+        toastManager.add(
+          workItemFailureToast({ cause: assigned.cause, title: t("Could not save the owner") }, t),
+        );
 
         return;
       }

@@ -53,5 +53,9 @@ export const refusalsCatalog = {
     "هذا البوت أنشأه بوت أنشأه بوت. أنشئ البوت بنفسك للتعمق أكثر.",
   "This change could not be applied. Update the app, then try again.":
     "تعذّر تطبيق هذا التغيير. حدّث التطبيق ثم حاول مجددًا.",
+  "That action does not fit this card's current state. Pick a different action.":
+    "هذا الإجراء لا يناسب حالة هذه البطاقة الحالية. اختر إجراءً آخر.",
+  "This space already has as many open cards as it can hold. Close one first.":
+    "تحتوي هذه المساحة بالفعل على أكبر عدد ممكن من البطاقات المفتوحة. أغلق بطاقة واحدة أولًا.",
   "The command failed.": "فشل الأمر.",
 } as const;

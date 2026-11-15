@@ -25,6 +25,7 @@ import { Card } from "../ui/card";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { toastManager } from "../ui/toast";
 import { TaskDialog } from "./TaskDialog";
+import { workItemFailureToast } from "./workItemFailure.logic";
 
 /** One card is an open summary from the shell or a finished item from the paged read. */
 export type BoardCard = WorkItemSummary | WorkItem;
@@ -145,7 +146,9 @@ export function SpaceTasks({ group }: { group: Group }) {
     setBusyCardId(null);
 
     if (Predicate.isTagged(result, "Failure")) {
-      toastManager.add({ type: "error", title: t("Could not update the card") });
+      toastManager.add(
+        workItemFailureToast({ cause: result.cause, title: t("Could not update the card") }, t),
+      );
 
       return;
     }
