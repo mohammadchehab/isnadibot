@@ -24,5 +24,11 @@ export const refusalsCatalog = {
   "That action does not fit this chat's current state. Refresh and try again.":
     "该操作不符合此对话的当前状态。请刷新后重试。",
   "Channel delivery is not available for this chat or message.": "此对话或此消息不支持频道投递。",
+  "Something here has changed. Refresh to see the latest.":
+    "这里的内容已发生变化。请刷新以查看最新内容。",
+  "It already exists. Refresh to see it.": "它已存在。请刷新以查看。",
+  "It is archived. Restore it first, then try again.": "它已归档。请先恢复，然后重试。",
+  "Another project already uses that folder. Choose a different one.":
+    "另一个项目已使用该文件夹。请选择其他文件夹。",
   "The command failed.": "命令失败。",
 } as const;

@@ -99,6 +99,7 @@ export function requireProject(input: {
     invariantError(
       input.command.type,
       `Project '${input.projectId}' does not exist for command '${input.command.type}'.`,
+      "stale-view",
     ),
   );
 }
@@ -116,6 +117,7 @@ export function requireProjectAbsent(input: {
     invariantError(
       input.command.type,
       `Project '${input.projectId}' already exists and cannot be created twice.`,
+      "already-exists",
     ),
   );
 }
@@ -142,6 +144,7 @@ export function requireProjectWorkspaceRootAbsent(input: {
     invariantError(
       input.command.type,
       `Project '${existingProject.id}' already owns workspace root '${normalizedWorkspaceRoot}'.`,
+      "workspace-root-in-use",
     ),
   );
 }
@@ -159,6 +162,7 @@ export function requireBot(input: {
         invariantError(
           input.command.type,
           `Bot '${input.botId}' does not exist for command '${input.command.type}'.`,
+          "stale-view",
         ),
       );
 }
@@ -173,6 +177,7 @@ export function requireBotAbsent(input: {
         invariantError(
           input.command.type,
           `Bot '${input.botId}' already exists and cannot be created twice.`,
+          "already-exists",
         ),
       )
     : Effect.void;
@@ -191,6 +196,7 @@ export function requireDelegation(input: {
         invariantError(
           input.command.type,
           `Delegation '${input.delegationId}' does not exist for command '${input.command.type}'.`,
+          "stale-view",
         ),
       );
 }
@@ -205,6 +211,7 @@ export function requireDelegationAbsent(input: {
         invariantError(
           input.command.type,
           `Delegation '${input.delegationId}' already exists and cannot be created twice.`,
+          "already-exists",
         ),
       )
     : Effect.void;
@@ -223,6 +230,7 @@ export function requireBotArchived(input: {
             invariantError(
               input.command.type,
               `Bot '${input.botId}' is not archived for command '${input.command.type}'.`,
+              "stale-view",
             ),
           ),
     ),
@@ -244,6 +252,7 @@ export function requireMcpServer(input: {
     invariantError(
       input.command.type,
       `MCP server '${input.mcpServerId}' does not exist for command '${input.command.type}'.`,
+      "stale-view",
     ),
   );
 }
@@ -261,6 +270,7 @@ export function requireBotNotArchived(input: {
             invariantError(
               input.command.type,
               `Bot '${input.botId}' is archived for command '${input.command.type}'.`,
+              "entity-archived",
             ),
           ),
     ),
@@ -280,6 +290,7 @@ export function requireMcpServerAbsent(input: {
     invariantError(
       input.command.type,
       `MCP server '${input.mcpServerId}' already exists and cannot be created twice.`,
+      "already-exists",
     ),
   );
 }
@@ -297,6 +308,7 @@ export function requireGroup(input: {
         invariantError(
           input.command.type,
           `Group '${input.groupId}' does not exist for command '${input.command.type}'.`,
+          "stale-view",
         ),
       );
 }
@@ -383,6 +395,7 @@ export function requireGroupOwnedThreadMutationAuthorized(input: {
       invariantError(
         input.command.type,
         `Group '${input.thread.groupId}' does not exist for command '${input.command.type}'.`,
+        "stale-view",
       ),
     );
   }
@@ -400,6 +413,7 @@ export function requireGroupAbsent(input: {
         invariantError(
           input.command.type,
           `Group '${input.groupId}' already exists and cannot be created twice.`,
+          "already-exists",
         ),
       )
     : Effect.void;
@@ -422,6 +436,7 @@ export function requireGroupMember(input: {
       return yield* invariantError(
         input.command.type,
         `Bot '${input.botId}' is not a member of group '${input.groupId}'.`,
+        "bot-not-a-group-member",
       );
     }
 
@@ -443,6 +458,7 @@ export function requireActiveGroupMember(input: {
             invariantError(
               input.command.type,
               `Bot '${input.botId}' is archived and cannot respond for group '${input.groupId}'.`,
+              "entity-archived",
             ),
           ),
     ),
@@ -464,6 +480,7 @@ export function requireThread(input: {
     invariantError(
       input.command.type,
       `Thread '${input.threadId}' does not exist for command '${input.command.type}'.`,
+      "stale-view",
     ),
   );
 }
@@ -481,6 +498,7 @@ export function requireThreadArchived(input: {
             invariantError(
               input.command.type,
               `Thread '${input.threadId}' is not archived for command '${input.command.type}'.`,
+              "stale-view",
             ),
           ),
     ),
@@ -500,6 +518,7 @@ export function requireThreadNotArchived(input: {
             invariantError(
               input.command.type,
               `Thread '${input.threadId}' is already archived and cannot handle command '${input.command.type}'.`,
+              "entity-archived",
             ),
           ),
     ),
@@ -524,6 +543,7 @@ export function requireThreadAbsent(input: {
     invariantError(
       input.command.type,
       `Thread '${input.threadId}' already exists and cannot be created twice.`,
+      "already-exists",
     ),
   );
 }

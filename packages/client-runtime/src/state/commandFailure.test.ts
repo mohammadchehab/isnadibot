@@ -32,6 +32,37 @@ const staleMemberRefusal = {
   refusal: "bot-not-a-group-member",
 };
 
+/** A uuid-shaped id, so the catalog test can prove no catalog interpolates one. */
+const THREAD_UUID = "5d0e9b1c-2a47-4f6e-9c3b-7d81e4a2b0f5";
+
+/** The refusal the decider throws when another device already removed the entity. */
+const staleViewRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: `Thread '${THREAD_UUID}' does not exist for command 'thread.archive'.`,
+  refusal: "stale-view",
+};
+
+/** The refusal the decider throws when a create races another device's. */
+const alreadyExistsRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Bot 'bot-4c81' already exists and cannot be created twice.",
+  refusal: "already-exists",
+};
+
+/** The refusal the decider throws when the entity sits in a state the command cannot act on. */
+const archivedRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Bot 'bot-4c81' is archived for command 'thread.turn.start'.",
+  refusal: "entity-archived",
+};
+
+/** The refusal the decider throws when another project already owns the folder. */
+const folderTakenRefusal = {
+  _tag: "OrchestrationCommandInvariantError",
+  message: "Project 'project-1' already owns workspace root '/code/isnadi'.",
+  refusal: "workspace-root-in-use",
+};
+
 /** The refusal the decider throws when another bot already leads the space. */
 const bossTakenRefusal = {
   _tag: "OrchestrationCommandInvariantError",
@@ -95,6 +126,12 @@ describe("classifyCommandFailure", () => {
     );
     expect(classifyCommandFailure(failed({ refusal: "bot-in-another-group" }))).toBe(
       "bot-in-another-group",
+    );
+    expect(classifyCommandFailure(failed({ refusal: "stale-view" }))).toBe("stale-view");
+    expect(classifyCommandFailure(failed({ refusal: "already-exists" }))).toBe("already-exists");
+    expect(classifyCommandFailure(failed({ refusal: "entity-archived" }))).toBe("entity-archived");
+    expect(classifyCommandFailure(failed({ refusal: "workspace-root-in-use" }))).toBe(
+      "workspace-root-in-use",
     );
   });
 
@@ -233,6 +270,54 @@ describe("commandFailureMessage", () => {
         expect(sentence).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
       }
 
+      expect(new Set(sentences).size).toBe(3);
+    }
+  });
+
+  it("replaces each not-found refusal with copy that carries no internal id", () => {
+    expect(commandFailureMessage(failed(staleViewRefusal))).toBe(
+      "Something here has changed. Refresh to see the latest.",
+    );
+    expect(commandFailureMessage(failed(alreadyExistsRefusal))).toBe(
+      "It already exists. Refresh to see it.",
+    );
+    expect(commandFailureMessage(failed(archivedRefusal))).toBe(
+      "It is archived. Restore it first, then try again.",
+    );
+    expect(commandFailureMessage(failed(folderTakenRefusal))).toBe(
+      "Another project already uses that folder. Choose a different one.",
+    );
+  });
+
+  it("renders the not-found family in every locale without an internal id", () => {
+    const translators = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ];
+
+    const refusals = [staleViewRefusal, alreadyExistsRefusal, archivedRefusal, folderTakenRefusal];
+
+    for (const refusal of refusals) {
+      const sentences = translators.map((t) => commandFailureMessage(failed(refusal), { t }));
+
+      for (const sentence of sentences) {
+        expect(sentence).not.toContain("Bot '");
+        expect(sentence).not.toContain("Group '");
+        expect(sentence).not.toContain("Thread '");
+        expect(sentence).not.toContain("Project '");
+        expect(sentence).not.toContain("MCP server '");
+        expect(sentence).not.toContain("Delegation '");
+        expect(sentence).not.toContain("bot-4c81");
+        expect(sentence).not.toContain("project-1");
+        expect(sentence).not.toContain(THREAD_UUID);
+
+        // `workspace-root-in-use` carries a filesystem path in `detail`; the
+        // shared sentence must never render it.
+        expect(sentence).not.toContain("/code/");
+      }
+
+      // A catalog that forgot the sentence would fall back to English and collide.
       expect(new Set(sentences).size).toBe(3);
     }
   });

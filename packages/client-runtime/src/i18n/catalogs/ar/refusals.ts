@@ -25,5 +25,11 @@ export const refusalsCatalog = {
     "هذا الإجراء لا يناسب حالة هذه المحادثة الحالية. حدّث الصفحة وحاول مجددًا.",
   "Channel delivery is not available for this chat or message.":
     "تسليم القناة غير متاح لهذه المحادثة أو لهذه الرسالة.",
+  "Something here has changed. Refresh to see the latest.":
+    "لقد تغيّر شيء هنا. حدّث الصفحة لترى الأحدث.",
+  "It already exists. Refresh to see it.": "إنه موجود بالفعل. حدّث الصفحة لتراه.",
+  "It is archived. Restore it first, then try again.": "إنه مؤرشف. استعده أولًا ثم حاول مرة أخرى.",
+  "Another project already uses that folder. Choose a different one.":
+    "مشروع آخر يستخدم هذا المجلد بالفعل. اختر مجلدًا مختلفًا.",
   "The command failed.": "فشل الأمر.",
 } as const;
