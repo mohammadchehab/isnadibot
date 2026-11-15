@@ -19,14 +19,19 @@ export type SquadSetupHardBlock = "environment-rights" | "no-provider";
  */
 export type SquadSetupCaptionBlocker = Exclude<FleetHireBlocker, { kind: "no-provider" }>;
 
-/** Which hard block, if any, the screen is under. The client's own rights come first: they refuse every hire. */
+/**
+ * Which hard block, if any, the screen is under. The client's own rights come first: they refuse
+ * every hire. A missing provider is looked for across every blocker, because the plan does not
+ * order them: a member with no name typed and no provider connected reports `empty-name` first,
+ * and that is the frame's state, so reading only the first blocker would draw no band at all.
+ */
 export function squadSetupHardBlock(
   readOnly: boolean,
-  blocker: FleetHireBlocker | undefined,
+  blockers: ReadonlyArray<FleetHireBlocker>,
 ): SquadSetupHardBlock | null {
   if (readOnly) return "environment-rights";
 
-  return blocker?.kind === "no-provider" ? "no-provider" : null;
+  return blockers.some((blocker) => blocker.kind === "no-provider") ? "no-provider" : null;
 }
 
 /** The first blocker that is still the footer's to name, once `no-provider` is drawn as the band. */

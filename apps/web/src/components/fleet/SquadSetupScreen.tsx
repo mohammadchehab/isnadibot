@@ -108,8 +108,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
 
   const less = stepHopBudget(draft.hopBudget, -1);
   const more = stepHopBudget(draft.hopBudget, 1);
-  const blocker = blockers[0];
-  const hardBlock = squadSetupHardBlock(readOnly, blocker);
+  const hardBlock = squadSetupHardBlock(readOnly, blockers);
   const captionBlocker = squadSetupCaptionBlocker(blockers);
 
   // Picking a boss other than the template's is its own state: the heading names
@@ -247,7 +246,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
           <Button
             // While the outcome is unknown the send may still land, so Create
             // stays live: pressing it asks the server the same question again.
-            disabled={busy || readOnly || blocker !== undefined}
+            disabled={busy || readOnly || blockers.length > 0}
             onClick={() => {
               if (busy) return;
 

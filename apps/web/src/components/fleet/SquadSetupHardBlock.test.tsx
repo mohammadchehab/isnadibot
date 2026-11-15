@@ -19,19 +19,27 @@ const duplicateName = decodeBlocker({ kind: "duplicate-name", names: ["alex"] })
 
 describe("squad setup hard blocks", () => {
   it("reads a client without the write scope as hard-blocked, whatever else blocks it", () => {
-    expect(squadSetupHardBlock(true, undefined)).toBe("environment-rights");
-    expect(squadSetupHardBlock(true, noProvider)).toBe("environment-rights");
-    expect(squadSetupHardBlock(true, emptyName)).toBe("environment-rights");
+    expect(squadSetupHardBlock(true, [])).toBe("environment-rights");
+    expect(squadSetupHardBlock(true, [noProvider])).toBe("environment-rights");
+    expect(squadSetupHardBlock(true, [emptyName])).toBe("environment-rights");
+    expect(squadSetupHardBlock(true, [emptyName, noProvider])).toBe("environment-rights");
   });
 
   it("reads a squad with no provider to run it as hard-blocked", () => {
-    expect(squadSetupHardBlock(false, noProvider)).toBe("no-provider");
+    expect(squadSetupHardBlock(false, [noProvider])).toBe("no-provider");
+  });
+
+  it("finds the missing provider behind a blocker the plan reports first", () => {
+    // planFleetHire pushes empty-name before no-provider for the same member, so
+    // [empty-name, no-provider] is the frame's state and must still draw the band.
+    expect(squadSetupHardBlock(false, [emptyName, noProvider])).toBe("no-provider");
+    expect(squadSetupHardBlock(false, [duplicateName, noProvider])).toBe("no-provider");
   });
 
   it("leaves the reasons the user clears on this screen without a band", () => {
-    expect(squadSetupHardBlock(false, emptyName)).toBeNull();
-    expect(squadSetupHardBlock(false, duplicateName)).toBeNull();
-    expect(squadSetupHardBlock(false, undefined)).toBeNull();
+    expect(squadSetupHardBlock(false, [emptyName])).toBeNull();
+    expect(squadSetupHardBlock(false, [duplicateName])).toBeNull();
+    expect(squadSetupHardBlock(false, [])).toBeNull();
   });
 });
 
