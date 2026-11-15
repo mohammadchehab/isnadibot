@@ -27,6 +27,10 @@ import { ServerConfig } from "../../../config.ts";
 import { persistIsnadiPreviewSnapshot } from "../../IsnadiPreviewSnapshotAttachment.ts";
 import { SubscriptionAuthService } from "../../../subscription-auth/service.ts";
 import { isnadiActionNeedsApproval, criticalIsnadiAction } from "../../IsnadiMastraHarness.ts";
+import {
+  approvalCeilingRefusal,
+  approvalUnavailableRefusal,
+} from "../../tools/IsnadiToolAuthorization.ts";
 
 import { type IsnadiChannelRuntime } from "../../IsnadiChannelRuntime.ts";
 import { type IsnadiBotStateRuntime } from "../../IsnadiBotStateRuntime.ts";
@@ -389,6 +393,33 @@ export function createEvents(deps: {
         const toolInput = deps.omitNullToolFields(event.args);
         const action = criticalIsnadiAction(event.toolName, toolInput);
 
+        // The session's own grant covers a worker chat a restart orphaned, which the
+        // runtimes no longer track.
+        const grant =
+          deps.wired().delegationRuntime?.accessForThread(threadId) ??
+          deps.workerRuntime.accessForThread(threadId) ??
+          active.toolSession.delegation?.access;
+
+        // A delegation's ceiling decides what can be approved here at all, and the
+        // runtime enforces it when the call runs. Ask it before any card goes out, so
+        // nobody answers a question whose answer would then be refused.
+        const ceilingRefusal = approvalCeilingRefusal({
+          tool: ISNADI_TOOL_CATALOG.find((tool) => tool.id === event.toolName),
+          input: toolInput,
+          workspaceType: active.toolSession.workspaceType,
+          approvalCeiling: grant?.approvalCeiling,
+        });
+
+        if (ceilingRefusal) {
+          active.session.respondToToolApproval({
+            toolCallId: event.toolCallId,
+            decision: "decline",
+            declineContext: { reason: "approval_ceiling", message: ceilingRefusal },
+          });
+
+          return;
+        }
+
         const oneUseApproval =
           isnadiActionNeedsApproval(event.toolName, toolInput) ||
           deps.mcpToolNeedsApproval(mcpManager, event.toolName);
@@ -442,21 +473,16 @@ export function createEvents(deps: {
           return;
         }
 
-        // The session's own grant covers a worker chat a restart orphaned, which the
-        // runtimes no longer track.
-        const grant =
-          deps.wired().delegationRuntime?.accessForThread(threadId) ??
-          deps.workerRuntime.accessForThread(threadId) ??
-          active.toolSession.delegation?.access;
-
         if (grant?.approvalCeiling === "none") {
           // Nobody can answer a prompt here, so the call fails now instead of waiting.
+          // MCP tools carry no catalog definition, so the ceiling check above cannot
+          // classify them; this is the same refusal a catalog tool gets there.
           active.session.respondToToolApproval({
             toolCallId: event.toolCallId,
             decision: "decline",
             declineContext: {
               reason: "approval_unavailable",
-              message: `Tool '${event.toolName}' needs approval, and this chat cannot ask anyone for it. Finish without it or report the blocker.`,
+              message: approvalUnavailableRefusal(event.toolName),
             },
           });
 

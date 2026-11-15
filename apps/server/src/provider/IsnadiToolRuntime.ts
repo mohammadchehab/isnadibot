@@ -9,7 +9,6 @@ import {
   type IsnadiToolId,
   type IsnadiToolReceipt,
   ThreadId,
-  isnadiToolApprovalForInput,
   isnadiToolRequiresApproval,
   filterIsnadiTools,
   IsnadiDelegationContextTooLongError,
@@ -32,7 +31,7 @@ import {
 } from "./tools/IsnadiToolTypes.ts";
 import {
   ensureWorkspaceCwd,
-  APPROVAL_RANK,
+  approvalCeilingRefusal,
   canonicalInput,
   requiredString,
   field,
@@ -287,16 +286,15 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
 
     if (!isnadiTool) throw new Error(`Tool '${tool.id}' has no definition.`);
     ensureWorkspaceCwd(isnadiTool.id, input);
-    const ceiling = session.delegation?.access.approvalCeiling;
 
-    if (
-      ceiling &&
-      APPROVAL_RANK.indexOf(
-        isnadiToolApprovalForInput(isnadiTool, input, { workspaceType: session.workspaceType }),
-      ) > APPROVAL_RANK.indexOf(ceiling)
-    ) {
-      throw new Error(`Tool '${tool.id}' exceeds this delegation's approval ceiling.`);
-    }
+    const refusal = approvalCeilingRefusal({
+      tool: isnadiTool,
+      input,
+      workspaceType: session.workspaceType,
+      approvalCeiling: session.delegation?.access.approvalCeiling,
+    });
+
+    if (refusal) throw new Error(refusal);
 
     return isnadiToolRequiresApproval(
       isnadiTool,
