@@ -68,8 +68,9 @@ function chatBotId(chat: BotStatusChat): BotId | null {
 }
 
 /**
- * The chat a delegated sub-chat belongs to. A sub-chat is a chat of its root's
- * bot, which is what makes a bot's status cover its whole tree.
+ * The chat at the top of a sub-chat's parent chain: the bot or group chat the
+ * sub-chat hangs off. It supplies an owner only to a chat that has no bot of its
+ * own — see {@link ownerOf}.
  */
 function rootOf(chat: BotStatusChat, byId: ReadonlyMap<string, BotStatusChat>): BotStatusChat {
   const seen = new Set<string>();
@@ -116,15 +117,31 @@ function needsSignIn(chat: BotStatusChat): boolean {
 }
 
 /**
- * The chats that speak for a bot: its own and its sub-chats, minus the archived
- * ones. Both status and idle time read the same set, so the two never disagree
- * about which chats a bot has.
+ * The bot a chat is attributed to: its own when it has one, and otherwise the
+ * bot of the chat its parent chain leads to.
+ *
+ * A chat's own bot is the truth for that chat — a delegated child carries the
+ * bot that is answering in it, whether the child was started by that bot or by a
+ * group. Walking to the root only supplies an owner for a child that names no
+ * bot of its own. It is a fallback, not the rule: in bot-to-bot delegation the
+ * child's own bot is its root's, so preferring the child's own value answers the
+ * same there, and a child a group started is charged to the bot that is actually
+ * waiting rather than to whichever bot happens to be responding in the group.
+ */
+function ownerOf(chat: BotStatusChat, byId: ReadonlyMap<string, BotStatusChat>): BotId | null {
+  return chatBotId(chat) ?? chatBotId(rootOf(chat, byId));
+}
+
+/**
+ * The chats that speak for a bot: the ones {@link ownerOf} attributes to it,
+ * minus the archived ones. Both status and idle time read the same set, so the
+ * two never disagree about which chats a bot has.
  */
 function ownedChats(input: BotStatusInput): ReadonlyArray<BotStatusChat> {
   const byId = new Map(input.chats.map((chat) => [chat.id, chat]));
 
   return input.chats.filter(
-    (chat) => chat.archivedAt === null && chatBotId(rootOf(chat, byId)) === input.botId,
+    (chat) => chat.archivedAt === null && ownerOf(chat, byId) === input.botId,
   );
 }
 
@@ -132,7 +149,7 @@ function ownedChats(input: BotStatusInput): ReadonlyArray<BotStatusChat> {
  * The five states, in precedence order asking, sign-in-required, held, busy,
  * idle:
  *
- * - asking: a pending approval or question anywhere in the bot's chat tree, so
+ * - asking: a pending approval or question in any chat the bot speaks for, so
  *   the same rule `selectDecisions` shows the user applies here.
  * - sign-in-required: the bot is not running anything and one of its chats
  *   cannot start because its provider needs signing in. Only the user can clear

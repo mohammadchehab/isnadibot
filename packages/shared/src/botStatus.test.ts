@@ -249,18 +249,34 @@ describe("deriveBotStatus", () => {
     expect(status({ chats: [theirs], botId: OTHER })).toBe("busy");
   });
 
-  it("counts a delegated sub-chat toward the bot its root chat belongs to", () => {
+  it("counts a bot-to-bot sub-chat toward the bot that owns both", () => {
     const root = chat({ id: ThreadId.make("root") });
 
     const sub = chat({
       id: ThreadId.make("sub"),
-      botId: OTHER,
+      botId: BOSS,
       parentThreadId: ThreadId.make("root"),
       hasPendingUserInput: true,
     });
 
     expect(status({ chats: [root, sub] })).toBe("asking");
     expect(status({ chats: [root, sub], botId: OTHER })).toBe("idle");
+  });
+
+  it("counts a sub-chat a group delegated toward the bot asking in it, not the group's responder", () => {
+    // The group has no owner bot, so BOSS is only its current responder — the
+    // delegator. The child is OTHER's chat, and OTHER is the one waiting.
+    const group = chat({ id: ThreadId.make("group"), botId: null, respondingBotId: BOSS });
+
+    const child = chat({
+      id: ThreadId.make("child"),
+      botId: OTHER,
+      parentThreadId: ThreadId.make("group"),
+      hasPendingUserInput: true,
+    });
+
+    expect(status({ chats: [group, child] })).toBe("idle");
+    expect(status({ chats: [group, child], botId: OTHER })).toBe("asking");
   });
 
   it("stops when a parent chain loops instead of spinning", () => {
@@ -397,18 +413,18 @@ describe("deriveBotStatus sign-in-required", () => {
     expect(status({ chats: [theirs], botId: OTHER })).toBe("sign-in-required");
   });
 
-  it("counts a delegated sub-chat's sign-in requirement toward its root chat's bot", () => {
-    const root = chat({ id: ThreadId.make("root") });
+  it("counts a sub-chat a group delegated toward the bot that cannot sign in", () => {
+    const group = chat({ id: ThreadId.make("group"), botId: null, respondingBotId: BOSS });
 
-    const sub = chat({
-      id: ThreadId.make("sub"),
+    const child = chat({
+      id: ThreadId.make("child"),
       botId: OTHER,
-      parentThreadId: ThreadId.make("root"),
+      parentThreadId: ThreadId.make("group"),
       latestTurn: EXPIRED_TURN,
     });
 
-    expect(status({ chats: [root, sub] })).toBe("sign-in-required");
-    expect(status({ chats: [root, sub], botId: OTHER })).toBe("idle");
+    expect(status({ chats: [group, child] })).toBe("idle");
+    expect(status({ chats: [group, child], botId: OTHER })).toBe("sign-in-required");
   });
 
   it("picks the higher state for every pair of signals, and for all of them at once", () => {
@@ -508,7 +524,7 @@ describe("idleSince", () => {
     expect(idleOf([groupChat], OTHER)).toBeNull();
   });
 
-  it("counts a delegated sub-chat toward the bot its root chat belongs to", () => {
+  it("counts a delegated sub-chat that names no bot of its own toward its root chat's bot", () => {
     const root = chat({ id: ThreadId.make("root"), latestTurn: COMPLETED });
 
     const child = chat({
@@ -519,5 +535,24 @@ describe("idleSince", () => {
     });
 
     expect(idleOf([root, child])).toBe("2026-11-13T11:00:00Z");
+  });
+
+  it("counts a sub-chat a group delegated toward the bot working in it", () => {
+    const group = chat({
+      id: ThreadId.make("group"),
+      botId: null,
+      respondingBotId: BOSS,
+      latestTurn: COMPLETED,
+    });
+
+    const child = chat({
+      id: ThreadId.make("child"),
+      botId: OTHER,
+      parentThreadId: ThreadId.make("group"),
+      latestTurn: { ...COMPLETED, completedAt: "2026-11-13T11:00:00Z" },
+    });
+
+    expect(idleOf([group, child])).toBe(NOW);
+    expect(idleOf([group, child], OTHER)).toBe("2026-11-13T11:00:00Z");
   });
 });
