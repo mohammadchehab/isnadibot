@@ -21,6 +21,7 @@ import {
   PARENT_TURN_ID,
   access,
   bot,
+  defaultSandbox,
   delegation,
   harness,
   parent,
@@ -125,6 +126,7 @@ describe("IsnadiDelegationRuntime", () => {
     let rejectNextStateSet = false;
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: async (command) => {
         if (rejectNextStateSet && command.type === "delegation.state.set") {

@@ -2,12 +2,14 @@ import * as Predicate from "effect/Predicate";
 import { describe } from "vite-plus/test";
 import {
   DelegationId,
+  ISNADI_TOOL_CATALOG,
   McpServerId,
   MessageId,
   ThreadId,
   TurnId,
   IsnadiDelegationRecord,
   IsnadiToolInputSchemas,
+  filterIsnadiTools,
   type OrchestrationCommand,
 } from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
@@ -21,10 +23,13 @@ import {
   CHILD_BOT_ID,
   CHILD_TURN_ID,
   NOW,
+  OTHER_BOT_ID,
   PARENT_BOT_ID,
   PARENT_THREAD_ID,
   PARENT_TURN_ID,
   access,
+  bot,
+  defaultSandbox,
   delegation,
   harness,
   parent,
@@ -130,6 +135,36 @@ describe("IsnadiDelegationRuntime", () => {
     });
   });
 
+  it("hands work to a bot with no sandbox of its own in a workspace it can use", async () => {
+    const test = harness(
+      snapshot({
+        bots: [bot(PARENT_BOT_ID), bot(CHILD_BOT_ID, { sandbox: null }), bot(OTHER_BOT_ID)],
+      }),
+    );
+
+    // The parent is an ordinary local turn, which holds the user's computer.
+    await test.runtime.send(
+      parent({ access: access({ hasUserComputer: true }) }),
+      request() as never,
+    );
+
+    const granted = test.state.delegations.at(-1)!.access;
+    expect(granted).toMatchObject({ sandbox: "local", hasUserComputer: true });
+
+    // What the child's session reads off the grant: a local workspace, and the
+    // user-computer tools it used to report as missing.
+    const availableToolIds = filterIsnadiTools({
+      capabilities: new Set(["bot-workspace", "user-computer"] as const),
+      workspaceType: "local",
+      hasUserComputer: granted.hasUserComputer,
+      localFullAccess: false,
+      implementedTools: new Set(ISNADI_TOOL_CATALOG.map((tool) => tool.id)),
+    }).map((tool) => tool.id);
+
+    expect(availableToolIds).toContain("ExternalShell");
+    expect(availableToolIds).toContain("ExternalRead");
+  });
+
   it("anchors the record on the parent turn's user message", async () => {
     const latestTurn = (turnId: TurnId) => ({
       turnId,
@@ -175,6 +210,7 @@ describe("IsnadiDelegationRuntime", () => {
     const child = Promise.withResolvers<IsnadiDelegationChildOutcome>();
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: test.dispatch,
       awaitChild: () => child.promise,
@@ -319,6 +355,7 @@ describe("IsnadiDelegationRuntime", () => {
     const child = Promise.withResolvers<IsnadiDelegationChildOutcome>();
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: test.dispatch,
       awaitChild: () => child.promise,
@@ -368,6 +405,7 @@ describe("IsnadiDelegationRuntime", () => {
     const commands: OrchestrationCommand[] = [];
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => snapshot(),
       dispatch: async (command) => {
         commands.push(command);
@@ -464,6 +502,7 @@ describe("IsnadiDelegationRuntime", () => {
     const children: Array<PromiseWithResolvers<IsnadiDelegationChildOutcome>> = [];
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: test.dispatch,
       awaitChild: () => {

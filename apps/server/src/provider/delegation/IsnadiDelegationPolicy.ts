@@ -1,6 +1,7 @@
 import {
   ISNADI_TOOL_CATALOG,
   BotId,
+  type BotSandbox,
   DelegationId,
   MessageId,
   ProviderInstanceId,
@@ -13,6 +14,7 @@ import {
   type OrchestrationReadModel,
   TurnId,
   isGroupBotMember,
+  resolveBotSandbox,
 } from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
 import { PendingWaiterTimeoutError } from "../PendingWaiters.ts";
@@ -97,6 +99,12 @@ export interface IsnadiDelegationChildOutcome {
 
 export interface IsnadiDelegationRuntimeOptions {
   readonly readSnapshot: () => Promise<OrchestrationReadModel>;
+  /**
+   * The environment's default sandbox provider, read per delegation so a
+   * settings change reaches work started after it. A bot with no sandbox of its
+   * own uses it, exactly as a direct turn in that bot's chat does.
+   */
+  readonly defaultSandbox: () => Promise<BotSandbox>;
   readonly dispatch: (
     command: OrchestrationCommand,
   ) => Promise<{ readonly sequence: number } | void>;
@@ -184,13 +192,16 @@ export function childAccess(
   bot: OrchestrationBot,
   parentMcpServerIds: ReadonlyArray<IsnadiDelegationAccessGrant["enabledMcpServerIds"][number]>,
   requestedMemoryScopes: IsnadiDelegationAccessGrant["memoryScopes"] | undefined,
+  defaultSandbox: BotSandbox,
 ): IsnadiDelegationAccessGrant {
+  const resolved = resolveBotSandbox(bot.sandbox, defaultSandbox);
+
   return {
     allowedToolIds: ISNADI_TOOL_CATALOG.map((tool) => tool.id),
     memoryScopes: requestedMemoryScopes ?? [],
-    sandbox: bot.sandbox,
+    sandbox: resolved.sandbox,
     runtimeMode: bot.runtimeMode,
-    hasUserComputer: bot.sandbox === "local",
+    hasUserComputer: resolved.hasUserComputer,
     enabledMcpServerIds: parentMcpServerIds.filter(
       (serverId) => !bot.disabledMcpServerIds.includes(serverId),
     ),

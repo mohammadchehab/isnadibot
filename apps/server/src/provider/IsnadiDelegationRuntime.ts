@@ -23,6 +23,7 @@ import {
   IsnadiDelegationProviderUnsupportedError,
   type OrchestrationCommand,
   TurnId,
+  resolveBotSandbox,
 } from "@isnadi/contracts";
 import { driverSupportsDelegation } from "@isnadi/shared/delegationProviders";
 import { withoutErrorStack } from "@isnadi/shared/errorText";
@@ -191,7 +192,12 @@ export function createIsnadiDelegationRuntime(options: IsnadiDelegationRuntimeOp
 
     const grant = intersectDelegationAccess({
       parent: parent.access,
-      child: childAccess(bot, parent.access.enabledMcpServerIds, request.memoryScopes),
+      child: childAccess(
+        bot,
+        parent.access.enabledMcpServerIds,
+        request.memoryScopes,
+        await options.defaultSandbox(),
+      ),
       requested: request,
     });
 
@@ -552,13 +558,15 @@ export function createIsnadiDelegationRuntime(options: IsnadiDelegationRuntimeOp
       throw new Error("The routine's chat or bot is not available.");
     }
 
+    const ownerSandbox = resolveBotSandbox(owner.sandbox, await options.defaultSandbox());
+
     // The owner's default grant, the same one an ordinary turn in this chat gets.
     const access: IsnadiDelegationAccessGrant = {
       allowedToolIds: ISNADI_TOOL_CATALOG.map((tool) => tool.id),
       memoryScopes: ["private", "bot", "project", "group", "workspace"],
-      sandbox: owner.sandbox,
+      sandbox: ownerSandbox.sandbox,
       runtimeMode: input.runtimeMode,
-      hasUserComputer: owner.sandbox === "local",
+      hasUserComputer: ownerSandbox.hasUserComputer,
       enabledMcpServerIds: (snapshot.mcpServers ?? [])
         .filter((server) => server.enabled && !owner.disabledMcpServerIds.includes(server.id))
         .map((server) => server.id),

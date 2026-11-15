@@ -346,6 +346,14 @@ const make = (options?: AgentControllerLiveOptions) =>
         return publish;
       },
       failureDetail,
+      // Without the settings service the environment has no configured default,
+      // so a bot with no sandbox of its own gets the schema's own default.
+      defaultSandbox: () =>
+        Option.isSome(serverSettings)
+          ? runPromise(serverSettings.value.getSettings).then(
+              (settings) => settings.sandbox.defaultProvider,
+            )
+          : Promise.resolve("local" as const),
     });
 
     const { bundle } = yield* createHarness({

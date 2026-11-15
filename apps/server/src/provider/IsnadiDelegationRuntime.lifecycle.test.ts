@@ -14,6 +14,7 @@ import {
   PARENT_BOT_ID,
   PARENT_THREAD_ID,
   PARENT_TURN_ID,
+  defaultSandbox,
   delegation,
   harness,
   parent,
@@ -125,6 +126,7 @@ describe("IsnadiDelegationRuntime", () => {
     const test = harness();
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: async (command) => test.dispatch(command),
       awaitChild: async () => {
@@ -153,6 +155,7 @@ describe("IsnadiDelegationRuntime", () => {
     const test = harness();
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: async (command) => test.dispatch(command),
       awaitChild: async (childThreadId) => {
@@ -196,6 +199,7 @@ describe("IsnadiDelegationRuntime", () => {
     let raceArmed = false;
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => {
         const current = test.state;
 
@@ -265,6 +269,7 @@ describe("IsnadiDelegationRuntime", () => {
     const watchErrors: unknown[] = [];
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: test.dispatch,
       awaitChild: () => child.promise,
@@ -353,6 +358,7 @@ describe("IsnadiDelegationRuntime", () => {
     const order: string[] = [];
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: async (command) => {
         if (command.type === "thread.turn.start") order.push("turn.start");

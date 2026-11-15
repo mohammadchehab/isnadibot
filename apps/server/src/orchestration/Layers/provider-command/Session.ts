@@ -10,6 +10,7 @@ import {
   ThreadId,
   type ProviderSession,
   SANDBOX_PROVIDER_CREDENTIALS,
+  resolveBotSandbox,
 } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -295,7 +296,10 @@ export function createSession({
               (group) => group.id === thread.groupId,
             );
 
-    const effectiveSandbox = respondingBot?.sandbox ?? serverSettings.sandbox.defaultProvider;
+    const effectiveSandbox = resolveBotSandbox(
+      respondingBot?.sandbox ?? null,
+      serverSettings.sandbox.defaultProvider,
+    ).sandbox;
 
     const sandboxEnvironment =
       effectiveSandbox === "local"
