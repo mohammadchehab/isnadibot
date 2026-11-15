@@ -1,4 +1,11 @@
-import { BotId, EnvironmentId, ThreadId } from "@isnadi/contracts";
+import {
+  BotId,
+  DelegationId,
+  EnvironmentId,
+  ThreadId,
+  TurnId,
+  type IsnadiDelegationRecord,
+} from "@isnadi/contracts";
 import type { Decision } from "@isnadi/client-runtime/decisions";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -20,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     parentThreadId?: string;
   }>,
   bots: [] as ReadonlyArray<Bot>,
+  delegations: [] as ReadonlyArray<IsnadiDelegationRecord>,
   usage: { turns: 0, isPending: false, hasError: false },
   openChat: vi.fn(),
   snapshot: null as ReturnType<typeof makeShellSnapshot> | null,
@@ -55,6 +63,7 @@ vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => ENVI
 // The Overview reads the environment's own chats; the threads here stand in for them.
 const activitySnapshot = () =>
   makeShellSnapshot({
+    delegations: mocks.delegations,
     threads: mocks.threads.map((thread) => ({
       id: thread.id,
       title: thread.title,
@@ -127,6 +136,54 @@ const decision = (threadId: string, title: string, updatedAt: string): Decision 
   updatedAt,
 });
 
+const CHILD_THREAD = ThreadId.make("thread-child");
+
+const CHILD_TURN = TurnId.make("turn-child");
+
+const grace: Bot = {
+  ...ada,
+  id: "bot-2",
+  name: "Grace",
+  title: "Researcher",
+};
+
+/** A delegation record as the snapshot carries it, with the phase under test supplied. */
+const delegationRecord = (
+  phase: IsnadiDelegationRecord["phase"],
+  overrides: Partial<IsnadiDelegationRecord> = {},
+): IsnadiDelegationRecord => ({
+  delegationId: DelegationId.make(`delegation-${phase._tag}`),
+  parentDelegationId: null,
+  parentBotId: BotId.make("bot-1"),
+  childBotId: BotId.make("bot-2"),
+  parentThreadId: ThreadId.make("thread-1"),
+  parentTurnId: TurnId.make("turn-parent"),
+  ancestorBotIds: [BotId.make("bot-1")],
+  depth: 1,
+  task: "Compare three flights.",
+  expectedResult: "A short comparison.",
+  deadline: null,
+  access: {
+    allowedToolIds: [],
+    memoryScopes: [],
+    sandbox: "local",
+    runtimeMode: "approval-required",
+    hasUserComputer: false,
+    enabledMcpServerIds: [],
+    disabledMcpServerIds: [],
+    approvalCeiling: "send",
+  },
+  billedBotId: BotId.make("bot-2"),
+  keep: false,
+  anchorMessageId: null,
+  retryOfDelegationId: null,
+  trigger: "bot",
+  createdAt: "2026-11-03T10:00:00.000Z",
+  updatedAt: "2026-11-03T11:00:00.000Z",
+  phase,
+  ...overrides,
+});
+
 const render = () => renderToStaticMarkup(<SpaceOverview group={group} />);
 
 beforeEach(() => {
@@ -134,6 +191,7 @@ beforeEach(() => {
   mocks.decisions = [];
   mocks.threads = [];
   mocks.bots = [ada];
+  mocks.delegations = [];
   mocks.usage = { turns: 0, isPending: false, hasError: false };
   mocks.snapshot = null;
 });
@@ -185,6 +243,80 @@ describe("SpaceOverview", () => {
 
     expect(html).toContain("Build the todo app");
     expect(html).toContain("Bot work for Ada");
+  });
+
+  it("gives a delegation one row carrying its task and state, not its child chat too", () => {
+    mocks.bots = [ada, grace];
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T10:00:00.000Z",
+        waiting: false,
+      },
+      {
+        id: "thread-child",
+        title: "Child chat the delegation ran",
+        updatedAt: "2026-11-03T11:00:00.000Z",
+        waiting: false,
+        parentThreadId: "thread-1",
+      },
+    ];
+    mocks.delegations = [
+      delegationRecord({
+        _tag: "Running",
+        childThreadId: CHILD_THREAD,
+        childTurnId: null,
+        startedAt: "2026-11-03T10:30:00.000Z",
+        progress: null,
+      }),
+    ];
+
+    const html = render();
+
+    // The delegation is the row: its task, the child bot, and the state it is in.
+    expect(html).toContain("Compare three flights.");
+    expect(html).toContain("avatar:Grace");
+    // The state shares the meta line with the time rather than sitting in the row's
+    // fixed-width right-hand zone, where it would take width from the task.
+    expect(html).toContain("running · ");
+    // Its child chat is the same work, so it does not get a second row.
+    expect(html).not.toContain("Child chat the delegation ran");
+    // The chat that started it is still listed.
+    expect(html).toContain("Build the todo app");
+  });
+
+  it("offers Open on a delegation that has a child chat", () => {
+    mocks.bots = [ada, grace];
+    mocks.threads = [
+      { id: "thread-1", title: "chat one", updatedAt: "2026-11-03T10:00:00.000Z", waiting: false },
+    ];
+    mocks.delegations = [
+      delegationRecord({
+        _tag: "Completed",
+        childThreadId: CHILD_THREAD,
+        childTurnId: null,
+        startedAt: "2026-11-03T10:30:00.000Z",
+        completedAt: "2026-11-03T11:00:00.000Z",
+        acknowledgedAt: null,
+        result: { summary: "Flight B.", childThreadId: CHILD_THREAD, childTurnId: CHILD_TURN },
+      }),
+    ];
+
+    expect(render()).toContain("Open");
+  });
+
+  it("leaves Open off a queued delegation, which has no child chat yet", () => {
+    mocks.bots = [ada, grace];
+    mocks.threads = [
+      { id: "thread-1", title: "chat one", updatedAt: "2026-11-03T10:00:00.000Z", waiting: false },
+    ];
+    mocks.delegations = [delegationRecord({ _tag: "Queued" })];
+
+    const html = render();
+
+    expect(html).toContain("queued");
+    expect(html).not.toContain("Open");
   });
 
   it("offers Review only on a waiting row", () => {
