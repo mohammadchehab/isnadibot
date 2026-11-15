@@ -38,6 +38,8 @@ export const refusalsCatalog = {
     "你只能以自己的身份退出空间。如需移除其他人，你需要管理该空间。",
   "This template is not available in this version. Update the app, then try again.":
     "此版本中没有该模板。请更新应用后重试。",
+  "This role is not available in this version. Update the app, then try again.":
+    "此版本中没有该角色。请更新应用后重试。",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "机器人提及仅在空间聊天中有效。请移除提及后重新发送。",
   "The command failed.": "命令失败。",

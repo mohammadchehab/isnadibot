@@ -40,6 +40,8 @@ export const refusalsCatalog = {
     "You can only leave a space as yourself. To remove someone else, you need to manage the space.",
   "This template is not available in this version. Update the app, then try again.":
     "This template is not available in this version. Update the app, then try again.",
+  "This role is not available in this version. Update the app, then try again.":
+    "This role is not available in this version. Update the app, then try again.",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "Bot mentions only work in a space chat. Remove the mention and send again.",
   "The command failed.": "The command failed.",
