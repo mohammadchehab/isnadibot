@@ -369,13 +369,31 @@ it.layer(NodeServices.layer)("invariant exclusions", (it) => {
 
       // The positive control: a coded throw keeps its code, so the assertions
       // below cannot pass by the translation dropping everything.
-      const refused = toDispatchCommandError(
-        refusedInvariantError({ commandType: "thread.update", detail, refusal: "stale-view" }),
-        "fallback",
-      );
+      const invariant = refusedInvariantError({
+        commandType: "thread.update",
+        detail,
+        refusal: "stale-view",
+      });
+
+      const refused = toDispatchCommandError(invariant, "fallback");
 
       expect(refused.refusal).toBe("stale-view");
-      expect(refused.message).toContain(detail);
+
+      // TASK-383: a coded throw is rendered from the client's own table, so its
+      // detail and command type are redundant on the wire. The invariant's own
+      // getter keeps both for the server's log; the encode must not carry them.
+      expect(invariant.message).toContain("thread.update");
+
+      const refusedWire = JSON.stringify(yield* encodeDispatchError(refused));
+
+      expect(refusedWire).not.toContain(detail);
+      expect(refusedWire).not.toContain("thread.update");
+      expect(refusedWire).not.toContain("Orchestration command invariant failed");
+      expect(refusedWire).toContain("stale-view");
+
+      // A `Defect` encodes an `Error` as `{ name, message }`, so forwarding the
+      // cause would put the same sentence on the wire a second time.
+      expect(refused).not.toHaveProperty("cause");
 
       const excluded = toDispatchCommandError(
         internalInvariantError({
@@ -396,8 +414,15 @@ it.layer(NodeServices.layer)("invariant exclusions", (it) => {
       // guard open, which is a fact for the server's log and not a sentence a
       // user reads. It must not survive the encode either.
       const excludedWire = yield* encodeDispatchError(excluded);
+      const excludedJson = JSON.stringify(excludedWire);
 
-      expect(JSON.stringify(excludedWire)).not.toContain("rejects this at decode");
+      // TASK-383: with no code, the detail is the only sentence a client can
+      // print, so it stays — but without the command type in front of it.
+      expect(excludedJson).toContain(detail);
+      expect(excludedJson).not.toContain("thread.update");
+      expect(excludedJson).not.toContain("Orchestration command invariant failed");
+
+      expect(excludedJson).not.toContain("rejects this at decode");
 
       const pending = toDispatchCommandError(
         pendingRefusalInvariantError({
@@ -420,8 +445,12 @@ it.layer(NodeServices.layer)("invariant exclusions", (it) => {
       // the in-process object, because the encoded form is what a client reads.
       const pendingWire = yield* encodeDispatchError(pending);
 
-      expect(JSON.stringify(pendingWire)).not.toContain("TASK-000");
-      expect(JSON.stringify(pendingWire)).not.toContain("has no code of its own yet");
+      const pendingJson = JSON.stringify(pendingWire);
+
+      expect(pendingJson).toContain(detail);
+      expect(pendingJson).not.toContain("TASK-000");
+      expect(pendingJson).not.toContain("has no code of its own yet");
+      expect(pendingJson).not.toContain("thread.update");
     }),
   );
 });
