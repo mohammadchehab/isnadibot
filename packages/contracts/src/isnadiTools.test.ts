@@ -1,5 +1,5 @@
-import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -354,12 +354,17 @@ describe("Isnadi tool contracts", () => {
  * `CreateAgent`'s home comes from the calling thread, which places a brand-new
  * bot and grants no reach over a bot that already has a home.
  *
+ * The guard reads every field a tool input can reach, at any depth, so a home
+ * nested in a target struct, a list element or a union member still fails here.
+ * A shape the guard cannot read fails it too, because an unread shape cannot be
+ * proven free of a home.
+ *
  * A future tool that could name a home fails here rather than at the boundary.
  */
 describe("Isnadi tool catalog writes no bot home", () => {
   it("gives no tool an input field that names a home", () => {
     const namingAHome = ISNADI_TOOL_CATALOG.filter((tool) =>
-      inputFieldNames(IsnadiToolInputSchemas[tool.id]).includes("groupId"),
+      namesABotHome(IsnadiToolInputSchemas[tool.id]),
     ).map((tool) => tool.id);
 
     expect(namingAHome).toEqual([]);
@@ -367,23 +372,177 @@ describe("Isnadi tool catalog writes no bot home", () => {
 
   it("reads every tool's input, so an unreadable shape cannot hide one", () => {
     const unreadable = ISNADI_TOOL_CATALOG.filter(
-      (tool) => inputFieldNames(IsnadiToolInputSchemas[tool.id]).length === 0,
+      (tool) => walkInputFields(IsnadiToolInputSchemas[tool.id]).unreadable.length > 0,
     ).map((tool) => tool.id);
 
     expect(unreadable).toEqual([]);
   });
 });
 
-/** Field names of a tool input, descending into the members of a union. */
-function inputFieldNames(schema: Schema.Top): ReadonlyArray<string> {
-  // Effect schemas are functions, so `Predicate.isObject` is false for them.
-  if (Predicate.hasProperty(schema, "fields") && Predicate.isObject(schema.fields)) {
-    return Object.keys(schema.fields);
+describe("The bot home guard reads nested shapes", () => {
+  it("finds a home behind a nested target struct", () => {
+    const nested = Schema.Struct({
+      target: Schema.Struct({ groupId: Schema.String }),
+    });
+
+    expect(namesABotHome(nested)).toBe(true);
+  });
+
+  it("finds a home inside a list element and an optional field", () => {
+    const listed = Schema.Struct({
+      targets: Schema.Array(Schema.Struct({ groupId: Schema.String })),
+    });
+
+    const optional = Schema.Struct({
+      target: Schema.optional(Schema.Struct({ groupId: Schema.String })),
+    });
+
+    expect(namesABotHome(listed)).toBe(true);
+    expect(namesABotHome(optional)).toBe(true);
+  });
+  it("finds a home behind a suspended schema", () => {
+    const suspended: Schema.Top = Schema.suspend(() =>
+      Schema.Struct({
+        child: Schema.optional(suspended),
+        groupId: Schema.optional(Schema.String),
+      }),
+    );
+
+    expect(namesABotHome(suspended)).toBe(true);
+  });
+
+  it("fails on a union member it cannot read instead of skipping it", () => {
+    const hiding = Schema.Union([Schema.Struct({ name: Schema.String }), Schema.Unknown]);
+
+    expect(walkInputFields(hiding).unreadable).toEqual(["Unknown"]);
+  });
+
+  it("reads an ordinary input without calling it unreadable", () => {
+    const plain = Schema.Struct({ name: Schema.String, count: Schema.Number });
+
+    expect(walkInputFields(plain)).toEqual({
+      paths: ["name", "count"],
+      unreadable: [],
+    });
+  });
+});
+
+/** Whether a tool input can name a bot home at any depth. */
+function namesABotHome(schema: Schema.Top): boolean {
+  return walkInputFields(schema).paths.some((path) => path.split(".").includes("groupId"));
+}
+
+type AstNode = SchemaAST.AST;
+
+/**
+ * AST tags that carry no fields of their own. A leaf is readable: it is known
+ * to hold no name, so it never counts as an unread shape.
+ */
+const LEAF_AST_TAGS: ReadonlySet<string> = new Set([
+  "BigInt",
+  "Boolean",
+  "Enum",
+  "Literal",
+  "Never",
+  "Null",
+  "Number",
+  "ObjectKeyword",
+  "String",
+  "Symbol",
+  "TemplateLiteral",
+  "Undefined",
+  "UniqueSymbol",
+  "Void",
+]);
+
+type InputFieldWalk = {
+  /** Dotted path of every field read, with `[]` marking an array element. */
+  readonly paths: ReadonlyArray<string>;
+  /** Tags of shapes the walk could not see into. */
+  readonly unreadable: ReadonlyArray<string>;
+};
+
+/**
+ * Every field a tool input can reach, at any depth, plus the shapes the walk
+ * could not read. Effect schemas are class instances whose shapes live on
+ * `.ast`, so this walks the AST rather than the schema.
+ */
+function walkInputFields(schema: Schema.Top): InputFieldWalk {
+  const paths: string[] = [];
+  const unreadable: string[] = [];
+  // A suspended schema can refer to itself, so each node is read once.
+  const visited = new Set<AstNode>();
+
+  const walk = (node: AstNode, prefix: string): void => {
+    if (visited.has(node)) {
+      return;
+    }
+
+    visited.add(node);
+
+    if (LEAF_AST_TAGS.has(node._tag)) {
+      return;
+    }
+
+    if (SchemaAST.isObjects(node)) {
+      walkObjectFields(node, prefix, paths, walk);
+
+      return;
+    }
+
+    if (SchemaAST.isArrays(node)) {
+      for (const element of [...node.elements, ...node.rest]) {
+        walk(element, `${prefix}[]`);
+      }
+
+      return;
+    }
+
+    if (SchemaAST.isUnion(node)) {
+      for (const member of node.types) {
+        walk(member, prefix);
+      }
+
+      return;
+    }
+
+    if (SchemaAST.isSuspend(node)) {
+      walk(node.thunk(), prefix);
+
+      return;
+    }
+
+    if (SchemaAST.isDeclaration(node) && node.typeParameters.length > 0) {
+      for (const parameter of node.typeParameters) {
+        walk(parameter, prefix);
+      }
+
+      return;
+    }
+
+    unreadable.push(node._tag);
+  };
+
+  walk(schema.ast, "");
+
+  return { paths, unreadable };
+}
+
+/** Records a struct's own fields, then reads each field's shape. */
+function walkObjectFields(
+  node: SchemaAST.Objects,
+  prefix: string,
+  paths: string[],
+  walk: (node: AstNode, prefix: string) => void,
+): void {
+  for (const signature of node.propertySignatures) {
+    const path = prefix === "" ? String(signature.name) : `${prefix}.${String(signature.name)}`;
+
+    paths.push(path);
+    walk(signature.type, path);
   }
 
-  if (Predicate.hasProperty(schema, "members") && Array.isArray(schema.members)) {
-    return schema.members.flatMap((member: Schema.Top) => inputFieldNames(member));
+  for (const signature of node.indexSignatures) {
+    walk(signature.type, `${prefix}[*]`);
   }
-
-  return [];
 }
