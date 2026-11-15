@@ -78,6 +78,7 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
     "That action does not fit this card's current state. Pick a different action.",
   "work-item-limit-reached":
     "This space already has as many open cards as it can hold. Close one first.",
+  "server-is-updating": "The server is installing an update. Try again in a moment.",
 };
 
 /**

@@ -208,6 +208,7 @@ export const createWsOrchestrationCommands = ({
           ? Effect.fail(
               new OrchestrationDispatchCommandError({
                 message: "The server is installing an update. Try again in a moment.",
+                refusal: "server-is-updating",
               }),
             )
           : dispatchAdmittedBootstrapTurnStart(command, admission),

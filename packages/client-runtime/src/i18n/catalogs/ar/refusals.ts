@@ -57,5 +57,7 @@ export const refusalsCatalog = {
     "هذا الإجراء لا يناسب حالة هذه البطاقة الحالية. اختر إجراءً آخر.",
   "This space already has as many open cards as it can hold. Close one first.":
     "تحتوي هذه المساحة بالفعل على أكبر عدد ممكن من البطاقات المفتوحة. أغلق بطاقة واحدة أولًا.",
+  "The server is installing an update. Try again in a moment.":
+    "الخادم يثبّت تحديثًا. أعد المحاولة بعد قليل.",
   "The command failed.": "فشل الأمر.",
 } as const;

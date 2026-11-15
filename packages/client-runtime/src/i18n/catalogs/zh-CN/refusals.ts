@@ -56,5 +56,6 @@ export const refusalsCatalog = {
     "该操作不符合此卡片的当前状态。请选择其他操作。",
   "This space already has as many open cards as it can hold. Close one first.":
     "此空间已拥有尽可能多的未关闭卡片。请先关闭一张。",
+  "The server is installing an update. Try again in a moment.": "服务器正在安装更新。请稍后再试。",
   "The command failed.": "命令失败。",
 } as const;

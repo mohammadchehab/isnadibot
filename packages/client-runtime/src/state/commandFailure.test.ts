@@ -118,6 +118,28 @@ const botInAnotherGroupRefusal = {
   refusal: "bot-in-another-group",
 };
 
+/**
+ * The two shapes the update gate raises. Both carry the same sentence, and both
+ * wrap it in server prose: the engine's invariant error prefixes the command
+ * type, and the bootstrap dispatch error is the bare sentence. Neither wrapper
+ * is copy a user should read, which is why the code has to reach the client.
+ */
+const serverIsUpdatingRefusals = [
+  {
+    _tag: "OrchestrationCommandInvariantError",
+    message:
+      "Orchestration command invariant failed (thread.turn.start): The server is installing an update. Try again in a moment.",
+    refusal: "server-is-updating",
+  },
+  {
+    _tag: "OrchestrationDispatchCommandError",
+    message: "The server is installing an update. Try again in a moment.",
+    refusal: "server-is-updating",
+  },
+] as const;
+
+const serverIsUpdatingSentence = "The server is installing an update. Try again in a moment.";
+
 describe("classifyCommandFailure", () => {
   // The server attaches the code at the throw site, so these cases assert the
   // discriminant and never the sentence.
@@ -162,6 +184,12 @@ describe("classifyCommandFailure", () => {
   it("reads each thread-state code rather than falling back to unknown", () => {
     for (const { refusal } of threadStateRefusals) {
       expect(classifyCommandFailure(failed({ refusal }))).toBe(refusal);
+    }
+  });
+
+  it("reads the update-gate code from both of its sites", () => {
+    for (const refusal of serverIsUpdatingRefusals) {
+      expect(classifyCommandFailure(failed(refusal))).toBe("server-is-updating");
     }
   });
 
@@ -480,6 +508,32 @@ describe("commandFailureMessage", () => {
     expect(new Set(sentences).size).toBe(3);
   });
 
+  it("shows the update gate's sentence instead of the invariant wrapper", () => {
+    for (const refusal of serverIsUpdatingRefusals) {
+      const message = commandFailureMessage(failed(refusal));
+
+      expect(message).toBe(serverIsUpdatingSentence);
+      expect(message).not.toContain("Orchestration command invariant failed");
+      expect(message).not.toContain("thread.turn.start");
+    }
+  });
+
+  it("renders the update gate's refusal in each locale, all three distinct", () => {
+    const sentences = [
+      createTranslator("en").translate,
+      createTranslator("ar", arCatalog).translate,
+      createTranslator("zh-CN", zhCNCatalog).translate,
+    ].map((t) => commandFailureMessage(failed(serverIsUpdatingRefusals[0]), { t }));
+
+    for (const sentence of sentences) {
+      expect(sentence).not.toContain("Orchestration command invariant failed");
+      expect(sentence).not.toContain("thread.turn.start");
+    }
+
+    // A catalog that forgot the sentence would fall back to English and collide.
+    expect(new Set(sentences).size).toBe(3);
+  });
+
   it("keeps the server sentence for a code it does not know", () => {
     expect(
       commandFailureMessage(failed({ refusal: "quota-exceeded", message: "Quota reached." })),
@@ -514,7 +568,7 @@ describe("commandFailureMessage", () => {
 
 /**
  * Every refusal code the shared vocabulary held when this branch was rebased
- * onto main, plus the ones this branch adds.
+ * onto main, plus the one this branch adds.
  *
  * Pinned rather than derived on purpose. `refusalParity` walks whatever
  * `CommandRefusalCodes` happens to hold, so a code that a merge or a rebase
@@ -555,13 +609,15 @@ const SHIPPED_REFUSAL_CODES = [
   "bot-creation-limit-reached",
   "bot-creation-chain-too-deep",
   "bot-origin-forbidden",
+  "work-item-state-invalid",
+  "work-item-limit-reached",
 ] as const;
 
 /** The codes this branch adds on top of the list above. */
-const ADDED_REFUSAL_CODES = ["work-item-state-invalid", "work-item-limit-reached"] as const;
+const ADDED_REFUSAL_CODES = ["server-is-updating"] as const;
 
 describe("the refusal vocabulary", () => {
-  it("still carries every code it shipped with, plus the ones this branch adds", () => {
+  it("still carries every code it shipped with, plus the one this branch adds", () => {
     for (const code of [...SHIPPED_REFUSAL_CODES, ...ADDED_REFUSAL_CODES]) {
       expect(CommandRefusalCodes).toContain(code);
     }

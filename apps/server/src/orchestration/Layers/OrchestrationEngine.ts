@@ -41,7 +41,7 @@ import {
   type OrchestrationDispatchError,
   type OrchestrationProjectorDecodeError,
   internalInvariantError,
-  pendingRefusalInvariantError,
+  refusedInvariantError,
 } from "../Errors.ts";
 import { decideOrchestrationCommand } from "../decider.ts";
 import { createEmptyReadModel, projectEvent } from "../projector.ts";
@@ -644,12 +644,10 @@ const makeOrchestrationEngine = Effect.gen(function* () {
             : undefined;
 
         if (admission === null) {
-          return yield* pendingRefusalInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             detail: "The server is installing an update. Try again in a moment.",
-            reason:
-              "The turn-start admission gate is closed because the server is mid-update; the remedy is to retry once it finishes, and no existing code names a maintenance window. TASK-335 mints it.",
-            ticket: "TASK-335",
+            refusal: "server-is-updating",
           });
         }
 
