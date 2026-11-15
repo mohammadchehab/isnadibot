@@ -248,6 +248,13 @@ export function isSameSpaceHandoff(input: {
  * rather than at the session boundary so the forgery case — a bot-authored
  * channel whose roster names bots that live elsewhere — is a testable snapshot
  * instead of a live session.
+ *
+ * `targetBotId` is the tool's `botId` text, which is a bot ID *or* an exact
+ * name, so it is matched through {@link matchDelegationTarget} first: a
+ * name-addressed target has to reach the same answer as an id-addressed one, or
+ * the boss delegating to a squad mate by name — the natural way an agent
+ * addresses one — is the one path that still prompts. A target the delegation
+ * itself could not resolve is not the same space, so the approval stays.
  */
 export function isSameSpaceHandoffInSnapshot(
   snapshot: OrchestrationReadModel,
@@ -263,10 +270,18 @@ export function isSameSpaceHandoffInSnapshot(
 
   const homeOf = (botId: BotId) => snapshot.bots.find((bot) => bot.id === botId)?.groupId ?? null;
 
+  const target = matchDelegationTarget(
+    snapshot,
+    { threadId: input.threadId, botId: input.actingBotId },
+    input.targetBotId,
+  );
+
+  if (target.kind !== "bot") return false;
+
   return isSameSpaceHandoff({
     threadGroupId: thread?.groupId ?? null,
     actingBotHome: homeOf(input.actingBotId),
-    targetBotHome: homeOf(input.targetBotId),
+    targetBotHome: homeOf(target.botId),
   });
 }
 
@@ -308,24 +323,46 @@ export function childInstructions(input: {
 const sameText = (left: string, right: string) =>
   left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
 
+/** What a `TargetBotId` text — "bot id or exact name" — names, once resolved. */
+export type DelegationTargetMatch =
+  | { readonly kind: "bot"; readonly botId: BotId }
+  | {
+      readonly kind: "ambiguous";
+      readonly requested: BotId;
+      readonly candidates: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+    }
+  | {
+      readonly kind: "unknown";
+      readonly requested: BotId;
+      readonly members: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+    };
+
 /**
- * Resolves the bot a delegation tool names. An exact bot ID wins; otherwise the
+ * Matches the bot a delegation tool names. An exact bot ID wins; otherwise the
  * text is an exact name, then an exact label, matched only among active bots
  * reachable from the parent thread (never the calling bot), so a name never
  * reveals a bot outside the group. Several matches fail rather than pick one.
  * Returns the requested ID unchanged when it is a known bot, so the caller's
  * archived and group checks still give their own errors.
+ *
+ * This is the one place a `TargetBotId` text becomes a bot, so everything that
+ * has to agree about *which* bot a handoff means reads it here: the delegation
+ * itself, and the same-space approval predicate. It returns the outcome instead
+ * of throwing because the approval predicate must fail closed rather than turn
+ * a bad target into an error on a path the tool has not run yet.
  */
-export function resolveDelegationTargetId(
+export function matchDelegationTarget(
   snapshot: OrchestrationReadModel,
   parent: Pick<IsnadiDelegationParent, "threadId" | "botId">,
   requested: BotId,
-): BotId {
-  if (snapshot.bots.some((candidate) => candidate.id === requested)) return requested;
+): DelegationTargetMatch {
+  if (snapshot.bots.some((candidate) => candidate.id === requested)) {
+    return { kind: "bot", botId: requested };
+  }
 
   const parentThread = snapshot.threads.find((thread) => thread.id === parent.threadId);
 
-  if (!parentThread) return requested;
+  if (!parentThread) return { kind: "bot", botId: requested };
 
   const members = snapshot.bots.filter(
     (candidate) =>
@@ -344,17 +381,42 @@ export function resolveDelegationTargetId(
     });
 
     if (matches.length > 1) {
-      throw new IsnadiDelegationAmbiguousBotError({
+      return {
+        kind: "ambiguous",
         requested,
         candidates: matches.map((match) => ({ id: match.id, name: match.name })),
-      });
+      };
     }
 
-    if (matches[0]) return matches[0].id;
+    if (matches[0]) return { kind: "bot", botId: matches[0].id };
+  }
+
+  return {
+    kind: "unknown",
+    requested,
+    members: members.map((member) => ({ id: member.id, name: member.name })),
+  };
+}
+
+/** {@link matchDelegationTarget} for callers that want the bot or an error. */
+export function resolveDelegationTargetId(
+  snapshot: OrchestrationReadModel,
+  parent: Pick<IsnadiDelegationParent, "threadId" | "botId">,
+  requested: BotId,
+): BotId {
+  const match = matchDelegationTarget(snapshot, parent, requested);
+
+  if (match.kind === "bot") return match.botId;
+
+  if (match.kind === "ambiguous") {
+    throw new IsnadiDelegationAmbiguousBotError({
+      requested: match.requested,
+      candidates: match.candidates,
+    });
   }
 
   throw new IsnadiDelegationUnknownBotError({
-    requested,
-    members: members.map((member) => ({ id: member.id, name: member.name })),
+    requested: match.requested,
+    members: match.members,
   });
 }
