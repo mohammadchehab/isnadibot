@@ -9,6 +9,7 @@ import {
 } from "../baseSchemas.ts";
 import { IsnadiAwaitHandleId } from "./inputs.ts";
 import { IsnadiToolApprovalClass } from "./catalog.ts";
+import { CommandRefusal } from "../orchestration/refusals.ts";
 
 export const IsnadiToolReceiptPhase = Schema.Literals([
   "start",
@@ -40,6 +41,13 @@ export const IsnadiToolReceipt = Schema.Struct({
   progress: Schema.optional(NonNegativeInt),
   approvalClass: Schema.optional(IsnadiToolApprovalClass),
   failureCode: Schema.optional(IsnadiToolFailureCode),
+  /**
+   * Why the command was refused, when the failure came from a decider refusal.
+   * `failureCode` says the tool call was denied; this says which denial, so a
+   * bot can tell "the squad is busy" from "that bot cannot take this" and act
+   * on the difference.
+   */
+  refusal: Schema.optional(CommandRefusal),
   fatalToThread: Schema.Literal(false).pipe(
     Schema.withDecodingDefault(Effect.succeed(false as const)),
   ),

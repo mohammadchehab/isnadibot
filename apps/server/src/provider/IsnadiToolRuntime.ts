@@ -44,6 +44,9 @@ import {
 } from "./tools/IsnadiWorkspaceTools.ts";
 
 import { isUnknownDelegationBot } from "./delegation/IsnadiDelegationPolicy.ts";
+import { OrchestrationCommandInvariantError } from "../orchestration/Errors.ts";
+
+const isCommandInvariantRefusal = Schema.is(OrchestrationCommandInvariantError);
 
 const isDelegationContextTooLong = Schema.is(IsnadiDelegationContextTooLongError);
 
@@ -102,8 +105,16 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
     cause: unknown,
     failureCode: NonNullable<IsnadiToolReceipt["failureCode"]>,
     billedBotId?: IsnadiToolSession["botId"],
+    refusal?: IsnadiToolReceipt["refusal"],
   ): IsnadiToolReceipt => {
-    const summary = cause instanceof Error ? cause.message : String(cause);
+    // A decider refusal's message names the internal command type it was raised
+    // for, which is a server detail the bot has no use for. Its `detail` is the
+    // part that says what was refused.
+    const summary = isCommandInvariantRefusal(cause)
+      ? cause.detail
+      : cause instanceof Error
+        ? cause.message
+        : String(cause);
 
     const receipt = {
       receiptId: input.toolCallId,
@@ -115,6 +126,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
       failureCode,
       fatalToThread: false,
       ...(billedBotId ? { billedBotId } : {}),
+      ...(refusal ? { refusal } : {}),
       createdAt: options?.now?.() ?? DateTime.formatIso(DateTime.nowUnsafe()),
     } satisfies IsnadiToolReceipt;
 
@@ -376,6 +388,11 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
 
             if (isDelegationProviderUnsupported(cause)) failureCode = "denied";
 
+            // The decider says why it refused; carrying that through is what
+            // lets the boss tell "the squad is busy" from "that bot cannot take
+            // this" and choose a different next move for each.
+            const refusal = isCommandInvariantRefusal(cause) ? cause.refusal : undefined;
+
             // The send never happened, so the user's approval was not spent.
             if (consumedGrant !== undefined) grants.set(consumedGrant.key, consumedGrant.value);
 
@@ -385,6 +402,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
               cause,
               failureCode,
               delegationInput.botId,
+              refusal,
             );
           }
         } else if (
