@@ -37,7 +37,7 @@ export const DEFAULT_MOBILE_THEME_VARIABLES = {
     "--color-switch-inactive-thumb": "#8e8e93",
     "--color-danger": "#fef2f2",
     "--color-danger-border": "rgba(239, 68, 68, 0.12)",
-    "--color-danger-foreground": "#dc2626",
+    "--color-danger-foreground": "#b91c1c",
     "--color-input": "#ffffff",
     "--color-input-border": "rgba(0, 0, 0, 0.1)",
     "--color-sidebar-search": "rgba(118, 118, 128, 0.12)",

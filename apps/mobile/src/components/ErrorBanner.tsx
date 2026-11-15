@@ -35,10 +35,14 @@ export function ErrorDetailsDisclosure(props: {
   );
 }
 
-const BANNER_DETAILS_LABEL = "font-t3-medium text-xs text-rose-700/80 dark:text-rose-300/80";
+const BANNER_DETAILS_LABEL = "font-t3-medium text-xs text-danger-foreground";
 
+// The panel is a code surface, not a second alarm: it takes the neutral subtle
+// fill so the raw text reads as machine output sitting inside the banner rather
+// than as a louder version of it. Web's ThreadErrorBanner draws the same
+// distinction with `bg-muted/60` and `text-foreground/75`.
 const BANNER_DETAILS_PANEL =
-  "mt-1 rounded-lg border border-rose-300/60 bg-rose-50/70 px-2.5 py-2 font-mono text-xs leading-5 text-rose-800 dark:border-rose-400/24 dark:bg-rose-950/40 dark:text-rose-200";
+  "mt-1 rounded-lg border border-danger-border bg-subtle px-2.5 py-2 font-mono text-xs leading-5 text-foreground-secondary";
 
 /**
  * A failure banner. `message` is the app's own sentence, which every catalogue carries; `details`
@@ -48,10 +52,8 @@ export function ErrorBanner(props: { readonly message: string; readonly details?
   const hasDetails = props.details !== undefined && props.details.trim().length > 0;
 
   return (
-    <View className="rounded-2xl border border-rose-300/70 bg-rose-100/80 px-3.5 py-3 dark:border-rose-400/28 dark:bg-rose-500/12">
-      <Text className="font-t3-medium text-sm text-rose-700 dark:text-rose-300">
-        {props.message}
-      </Text>
+    <View className="rounded-2xl border border-danger-border bg-danger px-3.5 py-3">
+      <Text className="font-t3-medium text-sm text-danger-foreground">{props.message}</Text>
       {hasDetails ? (
         <ErrorDetailsDisclosure
           className="mt-1.5"
