@@ -47,5 +47,11 @@ export const refusalsCatalog = {
     "إشارات البوت تعمل فقط في محادثة المساحة. أزل الإشارة ثم أرسل مجددًا.",
   "This turn stopped responding, so it was closed. Try again.":
     "توقف هذا الدور عن الاستجابة، لذا تم إغلاقه. حاول مرة أخرى.",
+  "This bot has already made as many bots as it can. Create the bot yourself to go further.":
+    "هذا البوت أنشأ بالفعل أكبر عدد ممكن من البوتات. أنشئ البوت بنفسك للمضي قدمًا.",
+  "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.":
+    "هذا البوت أنشأه بوت أنشأه بوت. أنشئ البوت بنفسك للتعمق أكثر.",
+  "This change could not be applied. Update the app, then try again.":
+    "تعذّر تطبيق هذا التغيير. حدّث التطبيق ثم حاول مجددًا.",
   "The command failed.": "فشل الأمر.",
 } as const;

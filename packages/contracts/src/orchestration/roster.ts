@@ -356,6 +356,11 @@ export const OrchestrationBot = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   groupId: Schema.NullOr(GroupId),
+  /**
+   * The bot that created this one; null when a person did. The decode default keeps a snapshot
+   * from a server that predates the field readable, and reads there exactly as it behaved then.
+   */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   archivedAt: Schema.NullOr(IsoDateTime),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -432,6 +437,8 @@ export const OrchestrationGroup = Schema.Struct({
   fleetTemplateId: Schema.NullOr(FleetTemplateId).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  /** The bot that created this space; null when a person did. Same shape as a bot's own origin. */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

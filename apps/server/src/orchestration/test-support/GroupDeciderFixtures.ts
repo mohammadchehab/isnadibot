@@ -59,6 +59,7 @@ export function makeBot(input: {
   readonly id: OrchestrationBot["id"];
   readonly groupId?: OrchestrationBot["groupId"];
   readonly archivedAt?: OrchestrationBot["archivedAt"];
+  readonly createdByBotId?: OrchestrationBot["createdByBotId"];
   readonly provider?: string;
   readonly model?: string;
 }): OrchestrationBot {
@@ -82,6 +83,7 @@ export function makeBot(input: {
     voiceEnabled: false,
     channelBindings: [],
     groupId: input.groupId ?? null,
+    createdByBotId: input.createdByBotId ?? null,
     archivedAt: input.archivedAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -94,6 +96,7 @@ export function makeGroup(
     readonly name?: string;
     readonly bossBotId?: OrchestrationGroup["bossBotId"];
     readonly members?: OrchestrationGroup["members"];
+    readonly createdByBotId?: OrchestrationGroup["createdByBotId"];
   } = {},
 ): OrchestrationGroup {
   return {
@@ -106,6 +109,7 @@ export function makeGroup(
       { kind: "person", personId: PERSON_ID, displayName: "Member" },
     ],
     fleetTemplateId: null,
+    createdByBotId: input.createdByBotId ?? null,
     createdAt: NOW,
     updatedAt: NOW,
   };

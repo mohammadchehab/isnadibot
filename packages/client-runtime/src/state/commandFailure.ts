@@ -69,6 +69,11 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "thread-does-not-take-mentions":
     "Bot mentions only work in a space chat. Remove the mention and send again.",
   "turn-went-silent": "This turn stopped responding, so it was closed. Try again.",
+  "bot-creation-limit-reached":
+    "This bot has already made as many bots as it can. Create the bot yourself to go further.",
+  "bot-creation-chain-too-deep":
+    "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.",
+  "bot-origin-forbidden": "This change could not be applied. Update the app, then try again.",
 };
 
 /**

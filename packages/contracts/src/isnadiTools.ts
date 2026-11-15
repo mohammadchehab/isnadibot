@@ -27,6 +27,11 @@ export interface IsnadiToolAvailabilityContext {
   readonly activeDelegations?: number;
   /** 0 for a bot turn, 1 inside a temporary worker. */
   readonly workerDepth?: number;
+  /**
+   * True when the turn is running as a bot, so a tool it calls is bot-authored. Only the tool
+   * runtime knows this: the decider's actor names a person even for a bot's own turn.
+   */
+  readonly botAuthored?: boolean;
 }
 
 export function filterIsnadiTools(
@@ -505,9 +510,23 @@ export function isnadiToolRequiresApproval(
      * read model to look them up in.
      */
     readonly sameSpaceTarget?: boolean;
+    /**
+     * True when the tool call comes from a bot's own turn rather than from the
+     * person. The decider's actor names a person either way, so the caller
+     * supplies this and this module decides whether it changes the answer.
+     */
+    readonly botAuthored?: boolean;
   },
   input?: Parameters<typeof decodeIsnadiToolInput>[1],
 ): boolean {
+  // A bot minting a bot spends the user's tokens on a bot the user never asked for. The hard
+  // ceiling that actually bounds it lives in the decider, which is the only place the count is
+  // available; this prompt is the visible decision on top, and shipping it alone would bound
+  // nothing. It is deliberately unconditional for bot-authored creation: the first-creation-free
+  // shape the threat read preferred would need a read-model snapshot on this path, which the tool
+  // session does not carry, and would duplicate the decider's authority.
+  if (tool.id === "CreateAgent" && context.botAuthored === true) return true;
+
   const approval = isnadiToolApprovalForInput(tool, input, context);
 
   if (tool.id === "Shell" && context.workspaceType === "local") return true;

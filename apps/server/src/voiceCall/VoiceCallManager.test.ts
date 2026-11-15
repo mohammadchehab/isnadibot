@@ -115,6 +115,7 @@ const bot = {
   imageProvider: null,
   voiceEnabled: true,
   groupId: null,
+  createdByBotId: null,
   archivedAt: null,
   createdAt: now,
   updatedAt: now,

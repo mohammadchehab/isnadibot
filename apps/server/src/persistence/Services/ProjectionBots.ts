@@ -39,6 +39,8 @@ export const ProjectionBot = Schema.Struct({
   voiceEnabled: Schema.Boolean,
   channelBindings: Schema.optional(Schema.Array(ChannelBinding)),
   groupId: Schema.NullOr(GroupId),
+  /** The bot that created this one; null when a person did. Absent reads as null. */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   archivedAt: Schema.NullOr(IsoDateTime),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,

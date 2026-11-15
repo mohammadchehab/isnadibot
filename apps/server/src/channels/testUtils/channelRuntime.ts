@@ -309,6 +309,7 @@ function makeBot(
     voiceEnabled: false,
     channelBindings: input.channelBindings ?? [],
     groupId: null,
+    createdByBotId: null,
     archivedAt: input.archivedAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,

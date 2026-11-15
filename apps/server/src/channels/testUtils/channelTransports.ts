@@ -196,6 +196,7 @@ const makeBot = (): OrchestrationBot => ({
   voiceEnabled: false,
   channelBindings: [],
   groupId: null,
+  createdByBotId: null,
   archivedAt: null,
   createdAt: NOW,
   updatedAt: NOW,

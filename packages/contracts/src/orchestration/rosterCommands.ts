@@ -84,6 +84,13 @@ export const BotCreateCommand = Schema.Struct({
   personalityTone: Schema.optional(BotPersonalityTone),
   voiceEnabled: Schema.optional(Schema.Boolean),
   groupId: Schema.NullOr(GroupId),
+  /**
+   * The bot that created this one; null when a person did. Server-set: the dispatch layer forces
+   * null for a client command, and only the bot tool runtime — which dispatches with no actor —
+   * supplies a real id. It is both the origin the creation ceiling counts and the audit trail.
+   * Not an input to the same-space handoff predicate, which compares homes, not creators.
+   */
+  createdByBotId: Schema.optional(Schema.NullOr(BotId)),
   createdAt: IsoDateTime,
 });
 
@@ -343,6 +350,12 @@ export const GroupCreateCommand = Schema.Struct({
   keepBusy: Schema.optional(Schema.Boolean),
   /** Set when a hire path creates the group from a fleet template; absent for a hand-made group. */
   fleetTemplateId: Schema.optional(FleetTemplateId),
+  /**
+   * The bot that created this space; null when a person did. Same field shape as
+   * `bot.create`, and server-set the same way. Spaces carry it for attribution only — this
+   * command has no creation ceiling.
+   */
+  createdByBotId: Schema.optional(Schema.NullOr(BotId)),
   createdAt: IsoDateTime,
 });
 

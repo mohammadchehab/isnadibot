@@ -62,6 +62,7 @@ const makeOtherGroup = (): OrchestrationGroup => ({
   fleetTemplateId: null,
   createdAt: NOW,
   updatedAt: NOW,
+  createdByBotId: null,
 });
 
 const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({

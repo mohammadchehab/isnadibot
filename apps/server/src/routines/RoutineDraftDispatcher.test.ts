@@ -59,6 +59,7 @@ function bot(id: BotId): OrchestrationBot {
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
+    createdByBotId: null,
   };
 }
 

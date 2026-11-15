@@ -17,6 +17,12 @@ import type * as PlatformError from "effect/PlatformError";
 import { OrchestrationCommandInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
+  ISNADI_BOT_CREATION_MAX_CHAIN_DEPTH,
+  ISNADI_BOT_CREATION_MAX_PER_CHAIN_ROOT,
+  botCreatedBotsUnderRoot,
+  walkBotCreationChain,
+} from "./botCreationBounds.ts";
+import {
   findBotById,
   findGroupById,
   requireBot,
@@ -104,6 +110,52 @@ export const decideBots = Effect.fn("decideBots")(function* ({
       yield* requireBotAbsent({ readModel, command, botId: command.botId });
       yield* authorizeBotInGroup({ readModel, command, actor, groupId: command.groupId });
 
+      // The origin is server-set, so no client can claim one: `applyAuthenticatedCommandActor`
+      // forces it to null for a client command, and only a bot's own tool runtime — which
+      // dispatches with no actor at all — supplies a real id. An actor present alongside a bot
+      // origin is a command no legitimate client can produce, so it is refused rather than
+      // trusted; a client that could name a creator could also launder one.
+      //
+      // This field is NOT an input to the same-space handoff predicate, which compares homes.
+      // Strengthening that predicate to require a person-made bot would break a bot-made bot
+      // inside the user's own space, which is the flow it exists to allow.
+      const createdByBotId = command.createdByBotId ?? null;
+
+      if (createdByBotId !== null && actor !== undefined) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: "A bot origin is set by the server, never carried by a client command.",
+          refusal: "bot-origin-forbidden",
+        });
+      }
+
+      // Two independent ceilings on a bot making bots, both read from the read model this decider
+      // already holds, so neither adds IO. They are checked at decide time, before the event
+      // exists: a ceiling applied in the projector would run after the bot was created, which is
+      // not a ceiling. A person's creation is neither counted nor bounded — the bound exists to
+      // stop a bot spending the user's tokens, not to stop the user.
+      if (createdByBotId !== null) {
+        const chain = walkBotCreationChain(readModel.bots, createdByBotId);
+
+        if (chain.creatorDepth + 1 > ISNADI_BOT_CREATION_MAX_CHAIN_DEPTH) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `Bot '${createdByBotId}' already sits ${chain.creatorDepth} bots down a chain, and a chain may not run deeper than ${ISNADI_BOT_CREATION_MAX_CHAIN_DEPTH}.`,
+            refusal: "bot-creation-chain-too-deep",
+          });
+        }
+
+        const alreadyMade = botCreatedBotsUnderRoot(readModel.bots, createdByBotId);
+
+        if (alreadyMade.length >= ISNADI_BOT_CREATION_MAX_PER_CHAIN_ROOT) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: command.type,
+            detail: `The bots made under '${chain.rootId}' already number ${alreadyMade.length}, the most this environment allows.`,
+            refusal: "bot-creation-limit-reached",
+          });
+        }
+      }
+
       // A group the same sequence creates later is not in the read model yet.
       // The bot carries the id now and the group's own `group.created` names it
       // as a member, so no `group.member-assigned` belongs here.
@@ -146,6 +198,7 @@ export const decideBots = Effect.fn("decideBots")(function* ({
           voiceEnabled: command.voiceEnabled ?? false,
           channelBindings: [],
           groupId: command.groupId,
+          createdByBotId,
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },

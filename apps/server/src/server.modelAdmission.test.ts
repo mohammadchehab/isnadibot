@@ -102,6 +102,7 @@ it.describe("ws bot engine model routing preflight", () => {
       imageProvider: null,
       voiceEnabled: false,
       groupId: null,
+      createdByBotId: null,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,

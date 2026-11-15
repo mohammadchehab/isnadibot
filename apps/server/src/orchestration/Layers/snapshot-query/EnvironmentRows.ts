@@ -57,6 +57,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
         image_provider AS "imageProvider", voice_enabled AS "voiceEnabled",
         personality_tone AS "personalityTone",
         channel_bindings_json AS "channelBindings", group_id AS "groupId",
+        created_by_bot_id AS "createdByBotId",
         archived_at AS "archivedAt", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_bots
       ORDER BY created_at ASC, bot_id ASC
@@ -70,7 +71,8 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
         hop_budget AS "hopBudget", keep_busy AS "keepBusy",
-        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt",
+        fleet_template_id AS "fleetTemplateId",
+        created_by_bot_id AS "createdByBotId", created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM projection_groups
       ORDER BY created_at ASC, group_id ASC
@@ -158,6 +160,7 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
         voice_enabled AS "voiceEnabled",
         personality_tone AS "personalityTone",
         channel_bindings_json AS "channelBindings", group_id AS "groupId",
+        created_by_bot_id AS "createdByBotId",
         archived_at AS "archivedAt", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_bots
       WHERE bot_id = ${botId}
@@ -172,7 +175,8 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
         hop_budget AS "hopBudget", keep_busy AS "keepBusy",
-        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt",
+        fleet_template_id AS "fleetTemplateId",
+        created_by_bot_id AS "createdByBotId", created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM projection_groups
       WHERE group_id = ${groupId}

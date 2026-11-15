@@ -115,6 +115,7 @@ export const stubBot = {
   voiceEnabled: false,
   channelBindings: [],
   groupId: null,
+  createdByBotId: null,
   archivedAt: null,
   createdAt: "2026-04-01T00:00:00.000Z",
   updatedAt: "2026-04-01T00:00:00.000Z",
@@ -126,6 +127,7 @@ export const stubGroup = {
   bossBotId: stubBot.id,
   members: [{ kind: "bot" as const, botId: stubBot.id, role: "boss" as const }],
   fleetTemplateId: null,
+  createdByBotId: null,
   createdAt: "2026-04-01T00:00:00.000Z",
   updatedAt: "2026-04-01T00:00:00.000Z",
 };

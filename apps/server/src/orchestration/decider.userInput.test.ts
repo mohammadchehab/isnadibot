@@ -49,6 +49,7 @@ const archivedBot: OrchestrationBot = {
   archivedAt: NOW,
   createdAt: NOW,
   updatedAt: NOW,
+  createdByBotId: null,
 };
 
 function makeThread(): OrchestrationThread {
@@ -171,6 +172,7 @@ it.layer(NodeServices.layer)("user input response decider", (it) => {
                       bossBotId: BOT_ID,
                       members: [{ kind: "bot" as const, botId: BOT_ID, role: "boss" as const }],
                       fleetTemplateId: null,
+                      createdByBotId: null,
                       createdAt: NOW,
                       updatedAt: NOW,
                     },

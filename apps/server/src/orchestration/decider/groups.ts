@@ -60,6 +60,19 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       yield* requireEnvironmentManageRights({ command, actor });
       yield* requireGroupAbsent({ readModel, command, groupId: command.groupId });
 
+      // Same origin shape as `bot.create`, server-set the same way: a client's command carries
+      // none, and only a bot's own dispatch may name its creator. Attribution only here — a space
+      // has no creation ceiling, which is a separate question this command does not answer.
+      const createdByBotId = command.createdByBotId ?? null;
+
+      if (createdByBotId !== null && actor !== undefined) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: "A bot origin is set by the server, never carried by a client command.",
+          refusal: "bot-origin-forbidden",
+        });
+      }
+
       // A fleet hire always goes through `fleet.hire`, which derives the
       // template itself. A group.create that names a template is the old
       // client path, so refuse one the catalogue does not have rather than
@@ -145,6 +158,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
           ...(command.hopBudget === undefined ? {} : { hopBudget: command.hopBudget }),
           ...(command.keepBusy === undefined ? {} : { keepBusy: command.keepBusy }),
           fleetTemplateId: command.fleetTemplateId ?? null,
+          createdByBotId,
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },

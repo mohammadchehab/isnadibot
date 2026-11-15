@@ -302,6 +302,11 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
         localFullAccess: session.runtimeMode === "full-access",
         workspaceType: session.workspaceType,
         sameSpaceTarget: await sameSpaceTarget(session, tool.id, input),
+        // The decider's actor names a person even on a bot's own turn, so this is the only place
+        // that knows a tool call was bot-authored. It gates CreateAgent, whose hard ceiling lives
+        // in the decider; the prompt is the visible decision on top of that bound, never a
+        // substitute for it.
+        botAuthored: session.botId !== undefined,
       },
       input,
     );
