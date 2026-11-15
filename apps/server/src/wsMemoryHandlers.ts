@@ -2,6 +2,7 @@ import type * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import * as Effect from "effect/Effect";
 import {
   IsnadiMemoryId,
+  type IsnadiMemoryFailureReason,
   IsnadiMemoryOperationError,
   type IsnadiMemoryMutationResult,
   WS_METHODS,
@@ -16,7 +17,28 @@ import { exportIsnadiMemory } from "./memory/MemoryExport.ts";
 import { applyIsnadiMemoryImport, previewIsnadiMemoryImport } from "./memory/MemoryImport.ts";
 
 import { isOrchestrationDispatchCommandError, nowIso, memoryOperationError } from "./wsSupport.ts";
+import { isBotMemoryError } from "./memory/BotMemoryTypes.ts";
 import type { WsConnection } from "./wsConnection.ts";
+
+/**
+ * The condition a failed document save named, when it is one the user can act
+ * on. These two codes mean something else elsewhere: `access-denied` on an
+ * archive path is "the archive belongs to a different bot", which is not a
+ * changed bot and has no remedy of its own. So the map stays with the one call
+ * site where it is true rather than moving into the shared flattening.
+ */
+const documentReplaceReason = (cause: unknown): IsnadiMemoryFailureReason | undefined => {
+  if (!isBotMemoryError(cause)) return undefined;
+
+  switch (cause.code) {
+    case "invalid-operation":
+      return "memory-changed";
+    case "access-denied":
+      return "bot-changed";
+    default:
+      return undefined;
+  }
+};
 
 export const createWsMemoryHandlers = ({
   agentController,
@@ -54,7 +76,11 @@ export const createWsMemoryHandlers = ({
                 .readConversationMemory(input.threadId)
                 .pipe(Effect.mapError((cause) => memoryOperationError("documents.export", cause)))
             : Effect.fail(
-                memoryOperationError("documents.export", "Observational memory is unavailable."),
+                memoryOperationError(
+                  "documents.export",
+                  "Observational memory is unavailable.",
+                  "memory-unavailable",
+                ),
               ),
         }).pipe(
           Effect.flatMap(({ access, createdAt, conversation }) =>
@@ -94,6 +120,7 @@ export const createWsMemoryHandlers = ({
                 memoryOperationError(
                   "documents.importPreview",
                   "Observational memory is unavailable.",
+                  "memory-unavailable",
                 ),
               ),
         }).pipe(
@@ -125,7 +152,11 @@ export const createWsMemoryHandlers = ({
             Effect.flatMap((settings) =>
               settings.memory.enabled === false
                 ? Effect.fail(
-                    memoryOperationError("documents.importApply", "Memory is turned off."),
+                    memoryOperationError(
+                      "documents.importApply",
+                      "Memory is turned off.",
+                      "memory-off",
+                    ),
                   )
                 : Effect.succeed(settings),
             ),
@@ -140,6 +171,7 @@ export const createWsMemoryHandlers = ({
                 memoryOperationError(
                   "documents.importApply",
                   "Observational memory is unavailable.",
+                  "memory-unavailable",
                 ),
               ),
         }).pipe(
@@ -178,7 +210,13 @@ export const createWsMemoryHandlers = ({
       observeRpcEffect(
         WS_METHODS.memoryArchiveExport,
         entityMemoryRepository === null
-          ? Effect.fail(memoryOperationError("archive.export", "Durable memory is unavailable."))
+          ? Effect.fail(
+              memoryOperationError(
+                "archive.export",
+                "Durable memory is unavailable.",
+                "memory-unavailable",
+              ),
+            )
           : Effect.all({
               access: resolveMemoryAccess("archive.export", input.threadId),
               conversations: resolveMemoryAccess("archive.export", input.threadId).pipe(
@@ -205,7 +243,11 @@ export const createWsMemoryHandlers = ({
         WS_METHODS.memoryArchivePreviewImport,
         entityMemoryRepository === null
           ? Effect.fail(
-              memoryOperationError("archive.previewImport", "Durable memory is unavailable."),
+              memoryOperationError(
+                "archive.previewImport",
+                "Durable memory is unavailable.",
+                "memory-unavailable",
+              ),
             )
           : resolveMemoryAccess("archive.previewImport", input.threadId).pipe(
               Effect.flatMap((access) =>
@@ -227,14 +269,22 @@ export const createWsMemoryHandlers = ({
         WS_METHODS.memoryArchiveApplyImport,
         entityMemoryRepository === null
           ? Effect.fail(
-              memoryOperationError("archive.applyImport", "Durable memory is unavailable."),
+              memoryOperationError(
+                "archive.applyImport",
+                "Durable memory is unavailable.",
+                "memory-unavailable",
+              ),
             )
           : serverSettings.getSettings.pipe(
               Effect.mapError((cause) => memoryOperationError("archive.applyImport", cause)),
               Effect.flatMap((settings) =>
                 settings.memory.enabled === false
                   ? Effect.fail(
-                      memoryOperationError("archive.applyImport", "Memory is turned off."),
+                      memoryOperationError(
+                        "archive.applyImport",
+                        "Memory is turned off.",
+                        "memory-off",
+                      ),
                     )
                   : resolveMemoryAccess("archive.applyImport", input.threadId),
               ),
@@ -258,7 +308,13 @@ export const createWsMemoryHandlers = ({
       observeRpcEffect(
         WS_METHODS.memoryFactsList,
         entityMemoryRepository === null
-          ? Effect.fail(memoryOperationError("facts.list", "Durable memory is unavailable."))
+          ? Effect.fail(
+              memoryOperationError(
+                "facts.list",
+                "Durable memory is unavailable.",
+                "memory-unavailable",
+              ),
+            )
           : resolveMemoryAccess("facts.list", input.threadId).pipe(
               Effect.flatMap((access) =>
                 exportIsnadiMemory({
@@ -323,7 +379,13 @@ export const createWsMemoryHandlers = ({
       observeRpcEffect(
         WS_METHODS.memoryFactMutate,
         entityMemoryRepository === null
-          ? Effect.fail(memoryOperationError("facts.mutate", "Durable memory is unavailable."))
+          ? Effect.fail(
+              memoryOperationError(
+                "facts.mutate",
+                "Durable memory is unavailable.",
+                "memory-unavailable",
+              ),
+            )
           : Effect.all({
               access: resolveMemoryAccess("facts.mutate", input.threadId),
               memoryId: randomUUID.pipe(Effect.map((uuid) => IsnadiMemoryId.make(`rpc:${uuid}`))),
@@ -346,13 +408,17 @@ export const createWsMemoryHandlers = ({
 
                     if (memoryApprovals === null) {
                       return Effect.fail(
-                        memoryOperationError("facts.mutate", "Memory approvals are unavailable."),
+                        memoryOperationError(
+                          "facts.mutate",
+                          "Memory approvals are unavailable.",
+                          "approvals-unavailable",
+                        ),
                       );
                     }
 
                     if (decision.decision === "approve" && !settings.memory.enabled) {
                       return Effect.fail(
-                        memoryOperationError("facts.mutate", "Memory is turned off."),
+                        memoryOperationError("facts.mutate", "Memory is turned off.", "memory-off"),
                       );
                     }
 
@@ -365,6 +431,7 @@ export const createWsMemoryHandlers = ({
                         memoryOperationError(
                           "facts.mutate",
                           "Private bot memory is turned off. The fact cannot be saved to a bot-private scope.",
+                          "memory-off",
                         ),
                       );
                     }
@@ -386,7 +453,7 @@ export const createWsMemoryHandlers = ({
 
                   if (settings.memory.enabled === false) {
                     return Effect.fail(
-                      memoryOperationError("facts.mutate", "Memory is turned off."),
+                      memoryOperationError("facts.mutate", "Memory is turned off.", "memory-off"),
                     );
                   }
 
@@ -399,6 +466,7 @@ export const createWsMemoryHandlers = ({
                       memoryOperationError(
                         "facts.mutate",
                         "Private bot memory is turned off. The fact cannot be moved to a bot-private scope.",
+                        "memory-off",
                       ),
                     );
                   }
@@ -442,7 +510,11 @@ export const createWsMemoryHandlers = ({
                 .readConversationMemory(input.threadId)
                 .pipe(Effect.mapError((cause) => memoryOperationError("documents.inspect", cause)))
             : Effect.fail(
-                memoryOperationError("documents.inspect", "Observational memory is unavailable."),
+                memoryOperationError(
+                  "documents.inspect",
+                  "Observational memory is unavailable.",
+                  "memory-unavailable",
+                ),
               ),
         }).pipe(
           Effect.flatMap(({ access, conversation }) =>
@@ -473,6 +545,7 @@ export const createWsMemoryHandlers = ({
                     input.target === "memory"
                       ? "Private bot memory is turned off."
                       : "Memory is turned off.",
+                    "memory-off",
                   ),
                 )
               : Effect.tryPromise({
@@ -484,7 +557,8 @@ export const createWsMemoryHandlers = ({
                       input.expectedBotId,
                       input.expectedContent,
                     ),
-                  catch: (cause) => memoryOperationError("document.replace", cause),
+                  catch: (cause) =>
+                    memoryOperationError("document.replace", cause, documentReplaceReason(cause)),
                 }),
           ),
         ),
@@ -503,7 +577,11 @@ export const createWsMemoryHandlers = ({
               ),
             )
           : Effect.fail(
-              memoryOperationError("observations.clear", "Observational memory is unavailable."),
+              memoryOperationError(
+                "observations.clear",
+                "Observational memory is unavailable.",
+                "memory-unavailable",
+              ),
             ),
         { "rpc.aggregate": "memory" },
       ),

@@ -76,4 +76,4 @@ export function assertSafeId(label: string, value: string): void {
   }
 }
 
-const isBotMemoryError = Schema.is(BotMemoryError);
+export const isBotMemoryError = Schema.is(BotMemoryError);

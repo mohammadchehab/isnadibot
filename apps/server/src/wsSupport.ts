@@ -8,6 +8,8 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import {
+  type IsnadiMemoryFailureReason,
+  type IsnadiMemoryOperation,
   IsnadiMemoryOperationError,
   type AuthAccessStreamEvent,
   AuthSessionId,
@@ -88,9 +90,20 @@ export const portabilityFailure = (operation: "export" | "preview" | "apply", ca
     ? cause
     : portabilityError(operation);
 
-export const memoryOperationError = (operation: string, cause: unknown) =>
+/**
+ * A memory failure the surface can put on a screen. The sentence the user reads
+ * comes from `operation`, or from `reason` when the producer named one of the
+ * authored conditions; the cause itself only ever lands in `detail`, because it
+ * carries paths and internal ids.
+ */
+export const memoryOperationError = (
+  operation: IsnadiMemoryOperation,
+  cause: unknown,
+  reason?: IsnadiMemoryFailureReason,
+) =>
   new IsnadiMemoryOperationError({
     operation,
+    ...(reason === undefined ? {} : { reason }),
     detail:
       cause instanceof Error
         ? cause.message

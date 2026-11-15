@@ -164,6 +164,21 @@ describe("classifyCommandFailure", () => {
 });
 
 describe("commandFailureMessage", () => {
+  it("falls back when the server sent a blank message instead of showing nothing", () => {
+    // "" is not nullish, so a caller's own `?? fallback` keeps the empty string:
+    // the toast renders an empty description and the inline error, gated on a
+    // truthy message, never appears. The shared helper trims to null first.
+    const options = { fallback: "Memory request failed." };
+
+    expect(commandFailureMessage(failed({ message: "" }), options)).toBe("Memory request failed.");
+    expect(commandFailureMessage(failed({ message: "   " }), options)).toBe(
+      "Memory request failed.",
+    );
+    expect(
+      commandFailureMessage(failed({ message: "The memory could not be saved." }), options),
+    ).toBe("The memory could not be saved.");
+  });
+
   it("replaces a known refusal with copy that carries no internal ids", () => {
     const message = commandFailureMessage(failed(rightsRefusal));
 

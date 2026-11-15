@@ -2,6 +2,7 @@ import * as Match from "effect/Match";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import {
+  type IsnadiMemoryOperation,
   IsnadiMemoryTenantId,
   IsnadiMemoryUserId,
   type IsnadiMemoryThreadAccess,
@@ -19,7 +20,7 @@ export const createWsMemoryAccess = (
   projectionGroups: ProjectionGroups.ProjectionGroupRepository["Service"],
   agentController: AgentController.AgentController["Service"],
 ) => {
-  const resolveMemoryAccess = (operation: string, threadId: ThreadId) =>
+  const resolveMemoryAccess = (operation: IsnadiMemoryOperation, threadId: ThreadId) =>
     Effect.gen(function* () {
       const thread = yield* projectionSnapshotQuery
         .getThreadShellById(threadId)
@@ -77,7 +78,7 @@ export const createWsMemoryAccess = (
       } satisfies IsnadiMemoryThreadAccess;
     });
 
-  const resolveBotMemoryAccess = (operation: string, threadId: ThreadId) =>
+  const resolveBotMemoryAccess = (operation: IsnadiMemoryOperation, threadId: ThreadId) =>
     resolveMemoryAccess(operation, threadId).pipe(
       Effect.flatMap((access) => {
         const botId = access.respondingBotId ?? access.botId;

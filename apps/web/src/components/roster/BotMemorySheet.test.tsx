@@ -4,7 +4,6 @@ import { EnvironmentId, ThreadId } from "@isnadi/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { memoryDocumentCopy } from "./botMemoryCopy";
-import { memoryErrorMessage } from "./BotMemorySheet";
 import { resolveBotThreadTarget } from "./botThreadRuntime.logic";
 
 describe("BotMemorySheet", () => {
@@ -56,9 +55,18 @@ describe("BotMemorySheet", () => {
     expect(transfer).not.toContain('aria-label={t("Import memory archive")}');
   });
 
-  it("keeps server failures and falls back for unknown errors", () => {
-    expect(memoryErrorMessage(new Error("Memory is too large."))).toBe("Memory is too large.");
-    expect(memoryErrorMessage(null)).toBeNull();
+  it("shows every failure through the shared helper, so a blank message falls back", () => {
+    const source = NodeFS.readFileSync(new URL("./BotMemorySheet.tsx", import.meta.url), "utf8");
+
+    // No private cause.message echo: the sheet had one, and it returned "" for an
+    // error with no message, which the toast rendered as an empty description and
+    // the inline error treated as falsy. Both paths now go through the shared
+    // helper, which falls back to this surface's own sentence.
+    expect(source).not.toContain("memoryErrorMessage");
+    expect(source).not.toContain("cause instanceof Error ? cause.message");
+    expect(source).toContain("commandFailureMessage");
+    expect(source.match(/commandFailureMessage\(result/g)).toHaveLength(2);
+    expect(source.match(/fallback: "Memory request failed\."/g)).toHaveLength(2);
   });
 
   it("wires the authorized bot thread into the panel", () => {

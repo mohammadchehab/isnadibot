@@ -4,7 +4,7 @@ import * as NodeURL from "node:url";
 import { describe, expect, it } from "@effect/vitest";
 import { PortabilityArchiveError } from "@isnadi/contracts";
 
-import { portabilityError, portabilityFailure } from "./wsSupport.ts";
+import { memoryOperationError, portabilityError, portabilityFailure } from "./wsSupport.ts";
 
 const SERVER_SOURCE_DIR = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
 
@@ -65,6 +65,57 @@ describe("A portability failure describes the work, not the cause", () => {
 
   it("takes a written sentence without wrapping it", () => {
     expect(portabilityError("export", WRITTEN_SENTENCE).message).toBe(WRITTEN_SENTENCE);
+  });
+});
+
+/**
+ * A memory failure the store can name is a condition with its own remedy, so the
+ * reason travels with it. The flattening used to drop it and leave the surface
+ * with only the operation's generic sentence.
+ */
+describe("A memory failure keeps the condition the store named", () => {
+  it("carries the reason through the flattening", () => {
+    const error = memoryOperationError("document.replace", new Error(RAW_CAUSE), "memory-changed");
+
+    expect(error.reason).toBe("memory-changed");
+    expect(error.message).toBe("Memory changed since you opened it. Reopen memory before saving.");
+    expect(error.message).not.toContain("/Users/alex");
+    expect(error.detail).toContain("/Users/alex");
+  });
+
+  it("falls back to the operation's own sentence when no reason was named", () => {
+    const error = memoryOperationError("facts.list", new Error(RAW_CAUSE));
+
+    expect(error.reason).toBeUndefined();
+    expect(error.message).toBe("The memory could not be read.");
+    expect(error.message).not.toContain("/Users/alex");
+  });
+});
+
+/**
+ * The tripwire for the next memory handler. An authored condition is written
+ * copy the user can act on, so it must name one of the closed reasons; a handler
+ * that passes only the sentence falls back to the operation's generic line and
+ * loses the remedy. The scan reads the source because the failing branches need
+ * a store or a provider to break first.
+ */
+describe("No memory handler states an authored condition without a reason", () => {
+  it("finds no authored sentence passed without one", () => {
+    const source = NodeFS.readFileSync(
+      NodePath.join(SERVER_SOURCE_DIR, "wsMemoryHandlers.ts"),
+      "utf8",
+    );
+
+    expect(memoryConditionsWithoutReason(source)).toEqual([]);
+  });
+
+  it("catches a handler that drops the reason, so the scan cannot pass by accident", () => {
+    const leaking = `memoryOperationError("facts.mutate", "Memory is turned off.")`;
+
+    const clean = `memoryOperationError("facts.mutate", "Memory is turned off.", "memory-off")`;
+
+    expect(memoryConditionsWithoutReason(leaking)).toHaveLength(1);
+    expect(memoryConditionsWithoutReason(clean)).toEqual([]);
   });
 });
 
@@ -249,6 +300,66 @@ function subscriptionAuthErrorArguments(source: string): ReadonlyArray<string> {
   }
 
   return arguments_;
+}
+
+/** The authored condition of every `memoryOperationError` call that names no reason. */
+function memoryConditionsWithoutReason(source: string): ReadonlyArray<string> {
+  const offenders: string[] = [];
+  const call = /memoryOperationError\(/g;
+
+  for (let match = call.exec(source); match !== null; match = call.exec(source)) {
+    const [operation, condition, reason] = topLevelArguments(
+      argumentAt(source, match.index + match[0].length - 1),
+    );
+
+    // A plain string literal is copy someone wrote for this condition. Any other
+    // second argument is the cause itself, whose sentence already comes from the
+    // operation.
+    if (condition === undefined || !/^\s*"/.test(condition)) continue;
+
+    if (reason !== undefined && reason.trim().length > 0) continue;
+
+    offenders.push(`${operation?.trim() ?? ""}, ${condition.trim()}`);
+  }
+
+  return offenders;
+}
+
+/** Split an argument list on the commas outside a nested call, string or template. */
+function topLevelArguments(text: string): ReadonlyArray<string> {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (quote !== null) {
+      if (character === "\\") {
+        index += 1;
+      } else if (character === quote) {
+        quote = null;
+      }
+
+      continue;
+    }
+
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+    } else if (character === "(" || character === "[" || character === "{") {
+      depth += 1;
+    } else if (character === ")" || character === "]" || character === "}") {
+      depth -= 1;
+    } else if (character === "," && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+
+  parts.push(text.slice(start));
+
+  return parts.filter((part) => part.trim().length > 0);
 }
 
 /** Whether a producer builds its reason from the cause it was handed. */
