@@ -155,8 +155,42 @@ export const CommandRefusalCodes = [
    * ship, so nothing was deleted and no refresh can produce it. Advising a
    * refresh here would be false in the same way it would be on a not-archived
    * site.
+   *
+   * The family has two members — this literal and `unknown-fleet-role` below —
+   * and they share the one remedy. What splits them is the noun the sentence
+   * puts in front of the user: a template or a role. Keep them apart. Reusing
+   * this one for a role names the wrong thing, and widening it to "template or
+   * role" puts a schema word in user copy, so neither costs less than the
+   * second literal does.
    */
   "unknown-fleet-template",
+  /**
+   * The role half of the version-skew family above: a hire named a boss role
+   * its own copy of the template has and this build's copy does not. Same
+   * remedy as `unknown-fleet-template` — update, not refresh — and a separate
+   * literal only so the sentence can name a role instead of a template.
+   */
+  "unknown-fleet-role",
+  /**
+   * A hire's role has no engine the environment can run. The client resolves
+   * engines with `fleet.plan` and sends them back as picks, so a role without
+   * one is a choice the user still has to make — pick another provider — not a
+   * stale view. The server's own detail names the role's id, which is why the
+   * code has to reach the client.
+   */
+  "fleet-role-has-no-provider",
+  /**
+   * A hire left a role's name empty. The remedy is to type one, which no other
+   * code names. It cannot share `fleet-roles-share-name` below: nothing is
+   * duplicated here, the name is simply missing.
+   */
+  "fleet-role-needs-name",
+  /**
+   * Two roles in one hire would share a name, and a space's chat addresses bots
+   * by name. The remedy is to rename one of the two, which is neither the
+   * missing name above nor a refresh.
+   */
+  "fleet-roles-share-name",
   /**
    * Bot mentions arrived for a chat that is not a space chat. A composer's
    * addressing state can outlive the chat it was set in, so the client is not

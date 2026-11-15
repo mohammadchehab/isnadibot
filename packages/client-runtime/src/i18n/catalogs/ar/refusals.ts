@@ -41,6 +41,8 @@ export const refusalsCatalog = {
     "يمكنك مغادرة المساحة بنفسك فقط. لإزالة شخص آخر، تحتاج إلى إدارة المساحة.",
   "This template is not available in this version. Update the app, then try again.":
     "هذا القالب غير متاح في هذا الإصدار. حدّث التطبيق ثم حاول مجددًا.",
+  "This role is not available in this version. Update the app, then try again.":
+    "هذا الدور غير متاح في هذا الإصدار. حدّث التطبيق ثم حاول مجددًا.",
   "Bot mentions only work in a space chat. Remove the mention and send again.":
     "إشارات البوت تعمل فقط في محادثة المساحة. أزل الإشارة ثم أرسل مجددًا.",
   "The command failed.": "فشل الأمر.",

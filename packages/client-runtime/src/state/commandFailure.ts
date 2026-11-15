@@ -59,6 +59,13 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "workspace-root-in-use": "Another project already uses that folder. Choose a different one.",
   "unknown-fleet-template":
     "This template is not available in this version. Update the app, then try again.",
+  "unknown-fleet-role":
+    "This role is not available in this version. Update the app, then try again.",
+  // The three hire blockers reuse the words squad setup already shows for the
+  // same conditions, so a toast and the pre-submit notice say the same thing.
+  "fleet-role-has-no-provider": "No provider can run this bot yet.",
+  "fleet-role-needs-name": "Every bot needs a name.",
+  "fleet-roles-share-name": "Two bots share that name",
   "thread-does-not-take-mentions":
     "Bot mentions only work in a space chat. Remove the mention and send again.",
 };

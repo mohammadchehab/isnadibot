@@ -2,6 +2,8 @@ import {
   FLEET_TEMPLATES,
   GroupId,
   BotId,
+  type CommandRefusal,
+  type FleetHireBlocker,
   type OrchestrationCommand,
   type OrchestrationReadModel,
   fleetRole,
@@ -10,10 +12,27 @@ import { planFleetHire } from "@isnadi/shared/fleet";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
 import { requireEnvironmentManageRights } from "../commandInvariants.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import type { DecideCommandSequence, DecideOrchestrationCommandResult } from "./eventBase.ts";
+
+/**
+ * The refusal code for one hire blocker. One code per kind because each names a
+ * different remedy — pick another engine, type a name, rename one of two — and
+ * because the client already shows those three sentences for the same kinds in
+ * squad setup, so the toast and the pre-submit notice cannot drift apart.
+ */
+const refusalForBlocker = (kind: FleetHireBlocker["kind"]): CommandRefusal => {
+  switch (kind) {
+    case "no-provider":
+      return "fleet-role-has-no-provider";
+    case "empty-name":
+      return "fleet-role-needs-name";
+    case "duplicate-name":
+      return "fleet-roles-share-name";
+  }
+};
 
 /**
  * Hiring a fleet is one command that decides many events. It reuses
@@ -56,6 +75,9 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `No fleet template at index ${command.templateIndex}.`,
+          // Same reason-kind as an unknown id: the client asked for a template
+          // this build does not ship, so the remedy is to update, not refresh.
+          refusal: "unknown-fleet-template",
         });
       }
 
@@ -65,6 +87,10 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `Role '${bossRoleId}' is not part of template '${template.id}'.`,
+          // The client named a boss role its own copy of the template has and
+          // this build's copy does not, so the remedy is to update the app —
+          // the same family as an unknown template, named for a role instead.
+          refusal: "unknown-fleet-role",
         });
       }
 
@@ -75,12 +101,20 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
         names: new Map((command.names ?? []).map((entry) => [entry.roleId, entry.name])),
       });
 
-      if (plan.blockers.length > 0) {
+      const firstBlocker = plan.blockers[0];
+
+      if (firstBlocker !== undefined) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
           detail: `The hire is blocked: ${plan.blockers
             .map((blocker) => (blocker.kind === "duplicate-name" ? blocker.kind : blocker.roleId))
             .join(", ")}.`,
+          // The client names its first blocker in the footer and lists the rest
+          // behind it, so refusing with the first keeps the toast on the row the
+          // user was already looking at. The detail above keeps the ids for a
+          // client that does not know the code; the code is what a client that
+          // does know it renders instead.
+          refusal: refusalForBlocker(firstBlocker.kind),
         });
       }
 
@@ -93,9 +127,11 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
       });
 
       if (membersWithRoles.length !== plan.members.length) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Template '${template.id}' names a role that is not in the fleet catalogue.`,
+          reason:
+            "FLEET_TEMPLATES and the role catalogue are both static in the contracts package, and planFleetHire only emits the roles a template names, so the two can disagree only in a build where one shipped without the other — not from any client input.",
         });
       }
 
@@ -113,9 +149,11 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
       const bossBotId = squad.find((entry) => entry.member.isBoss)?.botId;
 
       if (bossBotId === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Template '${template.id}' names no boss member.`,
+          reason:
+            "The boss member is chosen by the static template's bossRoleId, which was already checked against template.roleIds above, so a plan with no boss means a shipped template contradicts itself — a build-time bug, not a client input.",
         });
       }
 
