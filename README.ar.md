@@ -29,7 +29,9 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/hero.png" alt="IsnadiBot على سطح المكتب والآيفون" width="100%">
+  <img src=".github/assets/fleet-demo.gif" alt="توظيف فريق هندسة برمجيات في IsnadiBot: المخطِّط يقسّم المهمة ويوزّعها على المعماري ومصمم الواجهات والمهندس" width="100%">
+  <br>
+  <sub>وظّف فريقًا، أعطِ القائد مهمة، وشاهده يوزّع العمل. ردود Claude حقيقية، بسرعة مضاعفة. <a href=".github/assets/fleet-demo.mp4">شاهد الفيديو</a>.</sub>
 </p>
 
 ---
@@ -42,6 +44,10 @@
 >
 > بدأ IsnadiBot نسخةً متفرعة من مشروع مرخّص بـ MIT من [OpenCore](https://github.com/opencoredev) ويحتفظ بتاريخه
 > الكامل. راجع قسم «شكر وتقدير» في الأسفل.
+
+<p align="center">
+  <img src=".github/assets/hero.png" alt="IsnadiBot على سطح المكتب والآيفون" width="100%">
+</p>
 
 ---
 
@@ -225,25 +231,6 @@ IsnadiBot مستودع pnpm متعدد الحزم. خادم البيئة يقو�
 <div dir="rtl">
 
 جدول المكوّنات الكامل موجود في [النسخة الإنجليزية](./README.md#-architecture).
-
----
-
-## 🤝 المساهمون
-
-يبحث IsnadiBot عن مساهمين. [خارطة الطريق](ROADMAP.md) تسرد المزايا المفتوحة لمن يريد تبنّيها، من اختبارات
-شاملة للمحادثات الجماعية إلى التكامل المستمر، و[CONTRIBUTING.md](CONTRIBUTING.md) يشرح كيف تبدأ. علّق على
-مشكلة (issue) أو افتح واحدة لتحجزها.
-
-إن كان IsnadiBot مفيدًا لك، فنجمة ⭐ تساعد الآخرين على اكتشافه.
-
-بدأ IsnadiBot نسخةً متفرعة من نسخة OpenCore المتفرعة من T3 Code. كل الإيداعات من المشروعين ما زالت في هذا
-المستودع، لذا ساهم كل من في الأسفل في بنائه. شكرًا لكم.
-
-<p align="center">
-  <a href="https://github.com/mohammadchehab/isnadibot/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=mohammadchehab/isnadibot&max=200&columns=12" alt="المساهمون في IsnadiBot">
-  </a>
-</p>
 
 ---
 
