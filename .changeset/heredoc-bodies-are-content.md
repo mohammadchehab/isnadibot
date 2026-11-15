@@ -14,3 +14,7 @@ command behind it. A `<<` inside a quoted string or a comment, the `<<<`
 here-string, and an arithmetic region such as `$((1 << n))` or `$[1<<k]` where
 it is a shift, are text rather than operators, so they open nothing — otherwise
 a command could hide its destructive part behind a `<<` the shell never runs.
+An arithmetic region is tracked by nesting depth and across line breaks, so a
+region spread over several lines, or a subscript such as `$[ a[1] << k ]` whose
+own bracket is not the region's, is still read as arithmetic and not as an
+opener.

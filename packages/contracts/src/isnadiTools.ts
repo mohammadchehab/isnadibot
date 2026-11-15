@@ -82,19 +82,37 @@ interface HeredocOpener {
   readonly delimiter: string;
 }
 
-/** What one line tells the next: the heredoc it opens, and any quote left open. */
+/** An arithmetic region the shell is still inside when a line ends. */
+interface ArithmeticRegion {
+  readonly kind: "paren" | "bracket";
+  /** Closers still owed: `$[a[1]` owes two, so a nested subscript is not the end. */
+  readonly depth: number;
+}
+
+/** What one line tells the next: the heredoc it opens, and any quote or arithmetic region left open. */
 interface HeredocScan {
   readonly opener: HeredocOpener | null;
   readonly quote: QuoteState;
+  readonly arithmetic: ArithmeticRegion | null;
+}
+
+/** Where an arithmetic scan stopped, and the closers it still owes. */
+interface ArithmeticScan {
+  /** The index just past the closer, or `line.length` when the region runs on. */
+  readonly next: number;
+  readonly depth: number;
 }
 
 /**
- * The index just past the `)` that closes the parenthesised group opening at
- * `at`, so an arithmetic region is skipped as one unit. An unterminated group
- * runs to the end of the line, which is where the shell stops reading it too.
+ * The index just past the `)` that closes the parenthesised group the scan
+ * starts in, so an arithmetic region is skipped as one unit. `startingDepth` is
+ * the closers already owed when the line begins inside a region a previous line
+ * opened; zero starts at the opening paren. A group still open when the line
+ * ends returns the depth it owes, because the shell keeps reading on the next
+ * line rather than ending the region there.
  */
-const skipArithmeticParens = (line: string, at: number): number => {
-  let depth = 0;
+const scanArithmeticParens = (line: string, at: number, startingDepth: number): ArithmeticScan => {
+  let depth = startingDepth;
 
   for (let cursor = at; cursor < line.length; cursor += 1) {
     const char = line[cursor];
@@ -103,32 +121,74 @@ const skipArithmeticParens = (line: string, at: number): number => {
     else if (char === ")") {
       depth -= 1;
 
-      if (depth === 0) return cursor + 1;
+      if (depth <= 0) return { next: cursor + 1, depth: 0 };
     }
   }
 
-  return line.length;
+  return { next: line.length, depth };
 };
 
-/** The index just past the `]` that closes the `$[` arithmetic group at `at`. */
-const skipBracketArithmetic = (line: string, at: number): number => {
-  const close = line.indexOf("]", at);
+/**
+ * The same scan for `$[…]`, counting brackets instead of taking the first `]`.
+ * A nested subscript such as `$[a[1] << k]` is one region, so the `]` that
+ * closes `a[1]` does not end it and leave the `<<` looking like an opener.
+ */
+const scanBracketArithmetic = (line: string, at: number, startingDepth: number): ArithmeticScan => {
+  let depth = startingDepth;
 
-  return close === -1 ? line.length : close + 1;
+  for (let cursor = at; cursor < line.length; cursor += 1) {
+    const char = line[cursor];
+
+    if (char === "[") depth += 1;
+    else if (char === "]") {
+      depth -= 1;
+
+      if (depth <= 0) return { next: cursor + 1, depth: 0 };
+    }
+  }
+
+  return { next: line.length, depth };
 };
 
 /**
  * The heredoc opener on one line, if the shell would read one, plus the quote
- * state the line leaves open for the next line. A `<<` inside a quoted string,
- * inside a `#` comment, opening a `<<<` herestring, or sitting in an arithmetic
- * region (`$((…))`, `((…))`, `$[…]`) where it is a shift is not an operator, so
- * it opens nothing — the shell runs every line after it, and so must we.
+ * and arithmetic state the line leaves open for the next line. A `<<` inside a
+ * quoted string, inside a `#` comment, opening a `<<<` herestring, or sitting in
+ * an arithmetic region (`$((…))`, `((…))`, `$[…]`) where it is a shift is not an
+ * operator, so it opens nothing — the shell runs every line after it, and so
+ * must we. An arithmetic region may open on one line and close on a later one,
+ * so the region a line ends inside is carried the way a quote is.
  */
-const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan => {
+const scanHeredocOpener = (
+  line: string,
+  startingQuote: QuoteState,
+  startingArithmetic: ArithmeticRegion | null,
+): HeredocScan => {
   let quote = startingQuote;
   let atWordStart = true;
+  let at = 0;
 
-  for (let at = 0; at < line.length; at += 1) {
+  // A region a previous line opened is resumed before anything else is read:
+  // up to its closer the line is arithmetic, where a `<<` is a shift.
+  if (startingArithmetic !== null) {
+    const resumed =
+      startingArithmetic.kind === "paren"
+        ? scanArithmeticParens(line, 0, startingArithmetic.depth)
+        : scanBracketArithmetic(line, 0, startingArithmetic.depth);
+
+    if (resumed.depth > 0) {
+      return {
+        opener: null,
+        quote,
+        arithmetic: { kind: startingArithmetic.kind, depth: resumed.depth },
+      };
+    }
+
+    at = resumed.next;
+    atWordStart = false;
+  }
+
+  for (; at < line.length; at += 1) {
     const char = line[at] ?? "";
 
     if (quote === "'") {
@@ -163,28 +223,44 @@ const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan
     if (char === "#" && atWordStart) {
       // A `#` that starts a word comments out the rest of the line, so a `<<` in
       // it is text the shell never reads as an operator.
-      return { opener: null, quote };
+      return { opener: null, quote, arithmetic: null };
     }
 
     // `<<` inside an arithmetic region is a shift operator, not a heredoc
     // opener. Skip the whole region so its contents are never read as shell
     // operators, in every form the shell accepts: `$((…))`, `((…))` and `$[…]`.
+    // A region still open at the end of the line is carried to the next one.
     if (char === "$" && line[at + 1] === "(" && line[at + 2] === "(") {
-      at = skipArithmeticParens(line, at + 1) - 1;
+      const region = scanArithmeticParens(line, at + 1, 0);
+
+      if (region.depth > 0)
+        return { opener: null, quote, arithmetic: { kind: "paren", depth: region.depth } };
+
+      at = region.next - 1;
       atWordStart = false;
 
       continue;
     }
 
     if (char === "(" && line[at + 1] === "(") {
-      at = skipArithmeticParens(line, at) - 1;
+      const region = scanArithmeticParens(line, at, 0);
+
+      if (region.depth > 0)
+        return { opener: null, quote, arithmetic: { kind: "paren", depth: region.depth } };
+
+      at = region.next - 1;
       atWordStart = false;
 
       continue;
     }
 
     if (char === "$" && line[at + 1] === "[") {
-      at = skipBracketArithmetic(line, at + 1) - 1;
+      const region = scanBracketArithmetic(line, at + 1, 0);
+
+      if (region.depth > 0)
+        return { opener: null, quote, arithmetic: { kind: "bracket", depth: region.depth } };
+
+      at = region.next - 1;
       atWordStart = false;
 
       continue;
@@ -203,14 +279,18 @@ const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan
       const delimiter = match?.[2] ?? match?.[3] ?? match?.[4] ?? match?.[5];
 
       if (match && delimiter !== undefined) {
-        return { opener: { stripLeadingTabs: match[1] === "-", delimiter }, quote };
+        return {
+          opener: { stripLeadingTabs: match[1] === "-", delimiter },
+          quote,
+          arithmetic: null,
+        };
       }
     }
 
     atWordStart = WORD_BOUNDARY.test(char);
   }
 
-  return { opener: null, quote };
+  return { opener: null, quote, arithmetic: null };
 };
 
 /**
@@ -222,7 +302,9 @@ const scanHeredocOpener = (line: string, startingQuote: QuoteState): HeredocScan
  * in a quoted string, a `#` comment, a herestring, or an arithmetic region
  * (`$((…))`, `((…))`, `$[…]`) where `<<` is a shift would otherwise drop every
  * line up to a later line equal to its "delimiter" from classification, which
- * is a way to run a destructive command with no approval prompt at all.
+ * is a way to run a destructive command with no approval prompt at all. An
+ * arithmetic region may span lines, so the one a line ends inside is carried to
+ * the next; a line inside it never opens a heredoc.
  *
  * An unterminated heredoc is left whole on purpose. It swallows the rest of the
  * command, so stripping what follows a stray opener would hide a real
@@ -233,13 +315,15 @@ export function stripHeredocBodies(command: string): string {
   const lines = command.split("\n");
   const kept: string[] = [];
   let quote: QuoteState = null;
+  let arithmetic: ArithmeticRegion | null = null;
 
   for (let at = 0; at < lines.length; at += 1) {
     const line = lines[at] ?? "";
     kept.push(line);
 
-    const scan = scanHeredocOpener(line, quote);
+    const scan = scanHeredocOpener(line, quote, arithmetic);
     quote = scan.quote;
+    arithmetic = scan.arithmetic;
 
     if (scan.opener === null) continue;
 

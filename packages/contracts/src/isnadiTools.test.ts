@@ -494,3 +494,77 @@ describe("Shell command intent", () => {
   });
 });
 
+describe("Shell command intent inside an arithmetic region", () => {
+  const lines = (...parts: ReadonlyArray<string>) => parts.join("\n");
+
+  /**
+   * Shapes where a `<<` the shell reads as a shift was read back as a heredoc
+   * opener, so the destructive line after it was stripped as body and nothing
+   * was classified. Two conditions make a shape bite, and both must hold: the
+   * misread delimiter has to be a word, because `HEREDOC_DELIMITER` starts with
+   * a letter, and a later line equal to it has to exist, or the heredoc is
+   * unterminated and `stripHeredocBodies` leaves everything alone.
+   */
+  const shapes = [
+    // The first `]` is `a[1]`'s, not the region's, so the region ended early and
+    // the `<< k` after it read as an opener.
+    ["nested subscript $[ a[1] << k ]", ["echo $[ a[1] << k ]"], "k"],
+    ["$[a[0]<<k]", ["echo $[a[0]<<k]"], "k"],
+    // The region opens on one line and closes on a later one, so a scanner that
+    // reads one line at a time never sees it as arithmetic at all.
+    ["$(( opened on its own line", ["echo $((", "1 << n", "))"], "n"],
+    ["(( opened on its own line", ["((", "1 << n", "))"], "n"],
+    ["$[ opened on its own line", ["echo $[", "1 << k", "]"], "k"],
+  ] as const;
+
+  it("keeps the destructive line after a shift, in every shape", () => {
+    for (const [name, prefix, delimiter] of shapes) {
+      const command = lines(...prefix, "rm -rf /tmp/x", delimiter);
+
+      expect(classifyIsnadiExternalCommand(command), name).toBe("delete");
+      // Nothing was stripped: the destructive line is still there to be read.
+      expect(stripHeredocBodies(command), name).toBe(command);
+    }
+  });
+
+  it("makes the tool ask for approval, so the shell cannot run unapproved", () => {
+    // `localFullAccess` with a command present skips ExternalShell's own
+    // `user-computer` approval, which leaves the classifier as the only gate.
+    // Returning no class there is the bypass: approval is then not required.
+    const tool = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === "ExternalShell")!;
+    const command = lines("echo $((", "1 << n", "))", "rm -rf /tmp/x", "n");
+
+    expect(isnadiToolApprovalForInput(tool, { command })).toBe("delete");
+    expect(isnadiToolRequiresApproval(tool, { localFullAccess: true }, { command })).toBe(true);
+  });
+
+  it("carries a paren region across lines so its second line never opens a heredoc", () => {
+    const command = lines("echo $((", "1 << n", "))", "rm -rf /tmp/x", "n");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("carries a bracket region's depth, so a subscript inside it does not close it", () => {
+    const command = lines("echo $[", "a[1] << k", "]", "rm -rf /tmp/x", "k");
+
+    expect(stripHeredocBodies(command)).toBe(command);
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+
+  it("still strips a real heredoc opened after the carried region closes", () => {
+    const command = lines("echo $((", "1 << n", ")); cat > f.txt <<EOF", "rm -rf /tmp/x", "EOF");
+
+    expect(stripHeredocBodies(command)).toBe(lines("echo $((", "1 << n", ")); cat > f.txt <<EOF"));
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("keeps every later line inside a region that never closes", () => {
+    // An unterminated region is a shell syntax error, so the command cannot run
+    // anyway; keeping the text is the fail-closed side of the same choice an
+    // unterminated heredoc gets.
+    const command = lines("echo $((", "1 << n", "rm -rf /tmp/x");
+
+    expect(classifyIsnadiExternalCommand(command)).toBe("delete");
+  });
+});
