@@ -67,6 +67,7 @@ import { DecisionsGroup } from "./DecisionsGroup";
 import { RosterPanelHeader, RosterRailCreateMenu, RosterSidebarHeader } from "./RosterHeaders";
 import { focusTargetAfterRosterArchive, runCreateBotOnce } from "./rosterCommands.logic";
 import { botArchiveFailureToast, classifyBotArchiveFailure } from "./botArchive.logic";
+import { bossGroupOf } from "./botDelete.logic";
 
 export { focusTargetAfterRosterArchive, runCreateBotOnce } from "./rosterCommands.logic";
 
@@ -341,6 +342,8 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
           refusal: classifyBotArchiveFailure(result),
           message: error instanceof Error ? error.message : "",
           botName: bot.name,
+          // The space this bot leads, named the same way the delete toast names it.
+          bossSpaceName: bossGroupOf(groups, bot.id)?.name ?? null,
         },
         t,
       );

@@ -1,6 +1,6 @@
 import { createTranslator } from "@isnadi/client-runtime/i18n";
 import { commandRefusalDescription } from "@isnadi/client-runtime/state/runtime";
-import { CommandRefusal, type OrchestrationGroup } from "@isnadi/contracts";
+import { CommandRefusal } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import { Predicate, Schema } from "effect";
 
@@ -13,12 +13,13 @@ const isCommandRefusal = Schema.is(CommandRefusal);
 /**
  * The group this bot leads, or null when it leads none. The decider refuses a
  * boss delete by the same test, so the space named before the delete and the
- * space its refusal would name are the same one.
+ * space its refusal would name are the same one. Generic over the roster's own
+ * group shape, so the roster and the settings form share one predicate.
  */
-export function bossGroupOf(
-  groups: readonly OrchestrationGroup[],
+export function bossGroupOf<Group extends { readonly bossBotId: string | null }>(
+  groups: readonly Group[],
   botId: string,
-): OrchestrationGroup | null {
+): Group | null {
   return groups.find((group) => group.bossBotId === botId) ?? null;
 }
 

@@ -44,7 +44,12 @@ describe("refusal parity across the roster toasts", () => {
         bossSpaceName: "Bookkeeping",
       });
 
-      const archived = botArchiveFailureToast({ refusal: code, message, botName: "Ada" });
+      const archived = botArchiveFailureToast({
+        refusal: code,
+        message,
+        botName: "Ada",
+        bossSpaceName: "Bookkeeping",
+      });
 
       expect(`${deleted.title} ${deleted.description}`).not.toMatch(INTERNAL_PROSE);
       expect(`${archived.title} ${archived.description}`).not.toMatch(INTERNAL_PROSE);
@@ -68,8 +73,12 @@ describe("refusal parity across the roster toasts", () => {
         }).description,
       ).toBe(shared);
       expect(
-        botArchiveFailureToast({ refusal: code, message: serverSentence(code), botName: "Ada" })
-          .description,
+        botArchiveFailureToast({
+          refusal: code,
+          message: serverSentence(code),
+          botName: "Ada",
+          bossSpaceName: "Bookkeeping",
+        }).description,
       ).toBe(shared);
     }
   });
