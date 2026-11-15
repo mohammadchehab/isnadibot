@@ -1,7 +1,12 @@
 import type { FleetTemplateId } from "@isnadi/contracts";
 import type { HireDraft } from "@isnadi/client-runtime/fleet/hire";
+import {
+  classifyCommandFailure,
+  commandFailureMessage,
+} from "@isnadi/client-runtime/state/runtime";
 import { useNavigate } from "@tanstack/react-router";
 import { Predicate } from "effect";
+import type * as Cause from "effect/Cause";
 import { useCallback, useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
@@ -26,6 +31,28 @@ interface CreateSquad {
   readonly create: (draft: HireDraft, onFailure: (draft: HireDraft) => void) => Promise<void>;
   /** A squad the server accepted whose group the shell snapshot has not shown yet. */
   readonly pending: boolean;
+}
+
+/**
+ * The toast for a hire that made no space, naming the reason when this client
+ * understands the refusal. Only a code this build knows may carry a
+ * description: the server's own sentence for an `environment-rights` refusal
+ * names the person's id and the scope, and a throw it has not coded yet names
+ * whatever ids it was given. Both keep the title alone instead.
+ */
+function createFailureToast(
+  t: (message: string) => string,
+  cause: Cause.Cause<unknown> | undefined,
+) {
+  if (cause === undefined || classifyCommandFailure({ cause }) === "unknown") {
+    return { type: "error" as const, title: t("Could not create the space") };
+  }
+
+  return {
+    type: "error" as const,
+    title: t("Could not create the space"),
+    description: commandFailureMessage({ cause }, { t }),
+  };
 }
 
 /**
@@ -90,7 +117,7 @@ export function useCreateSquad(): CreateSquad {
       });
 
       if (Predicate.isTagged(result, "Failure")) {
-        toastManager.add({ type: "error", title: t("Could not create the space") });
+        toastManager.add(createFailureToast(t, result.cause));
 
         return;
       }
@@ -99,7 +126,9 @@ export function useCreateSquad(): CreateSquad {
 
       if (outcome.status !== "sent") {
         onFailure(outcome.status === "failed" ? outcome.draft : draft);
-        toastManager.add({ type: "error", title: t("Could not create the space") });
+        toastManager.add(
+          createFailureToast(t, outcome.status === "failed" ? outcome.cause : undefined),
+        );
 
         return;
       }

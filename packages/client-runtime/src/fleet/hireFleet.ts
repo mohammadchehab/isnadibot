@@ -358,7 +358,17 @@ export type HireFleetResult =
       readonly groupId?: GroupId;
     }
   | { readonly status: "blocked"; readonly blockers: ReadonlyArray<FleetHireBlocker> }
-  | { readonly status: "failed"; readonly outcome: HireSendOutcome; readonly draft: HireDraft };
+  | {
+      readonly status: "failed";
+      readonly outcome: HireSendOutcome;
+      readonly draft: HireDraft;
+      /**
+       * What the send failed with, when the server answered it. A dropped socket
+       * carries no sentence worth repeating, so an unknown outcome leaves this
+       * out and the screen keeps its title-only toast.
+       */
+      readonly cause?: Cause.Cause<unknown>;
+    };
 
 /** How the hire reaches the server as a command: the draft the screen finished. */
 export interface HireFleetInput {
@@ -446,5 +456,6 @@ function replayResult(
       ...draft,
       send: outcome === "unknown" ? { status: "unknown" } : { status: "failed", edited: false },
     },
+    ...(outcome === "failed" ? { cause: exit.cause } : {}),
   };
 }
