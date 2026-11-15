@@ -1,4 +1,5 @@
 import type { Decision } from "@isnadi/client-runtime/decisions";
+import type { OrchestrationThreadShell } from "@isnadi/contracts";
 import { relativeRunTime, routineDateLabel } from "@isnadi/client-runtime/routines";
 import {
   spaceActivity,
@@ -15,7 +16,7 @@ import { useMemo } from "react";
 
 import { useI18n } from "../../i18n";
 import { useSpaceUsage } from "../../state/botUsage";
-import { useDecisions, useThreadShells } from "../../state/entities";
+import { useDecisions } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
 import { useOpenChat } from "../chat/useOpenChat";
@@ -29,10 +30,12 @@ import { SpaceTile } from "./SpaceTile";
 
 const NO_ROUTINES: ReadonlyArray<SpaceRoutine> = [];
 
+const NO_THREADS: ReadonlyArray<OrchestrationThreadShell> = [];
+
 /**
- * The space's dashboard. Everything is derived from data the client already holds (chat
- * shells, decisions, the routine snapshot, each member's usage window), so it adds no
- * server read model.
+ * The space's dashboard. Everything is derived from data the client already holds (the
+ * environment's chats, decisions, the routine snapshot, each member's usage window), so it
+ * adds no server read model.
  */
 export function SpaceOverview({ group }: { group: Group }) {
   const i18n = useI18n();
@@ -40,7 +43,6 @@ export function SpaceOverview({ group }: { group: Group }) {
   const environmentId = usePrimaryEnvironmentId();
   const openChat = useOpenChat();
   const bots = useRosterStore((state) => state.bots);
-  const shells = useThreadShells();
   const allDecisions = useDecisions(environmentId);
   const snapshot = useEnvironmentSnapshot();
   const localDay = useLocalDay();
@@ -50,11 +52,9 @@ export function SpaceOverview({ group }: { group: Group }) {
 
   const waiting = new Map(decisions.map((decision) => [decision.threadId, decision]));
 
-  const activity = spaceActivity(
-    shells.filter((shell) => shell.environmentId === environmentId),
-    group,
-    new Set(waiting.keys()),
-  );
+  // The environment's own chat list, not the sidebar's. The sidebar lists top-level chats
+  // only, so reading it here hid every delegation a bot ran for this space.
+  const activity = spaceActivity(snapshot?.threads ?? NO_THREADS, group, new Set(waiting.keys()));
 
   const memberIds = useMemo(() => [...spaceMembers(group)].sort(), [group]);
 

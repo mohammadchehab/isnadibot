@@ -1,6 +1,5 @@
 import { BotId, EnvironmentId, ThreadId } from "@isnadi/contracts";
 import type { Decision } from "@isnadi/client-runtime/decisions";
-import { scopeThreadShell } from "@isnadi/client-runtime/state/models";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -13,7 +12,13 @@ const BOT_ID = BotId.make("bot-1");
 
 const mocks = vi.hoisted(() => ({
   decisions: [] as ReadonlyArray<Decision>,
-  threads: [] as ReadonlyArray<{ id: string; title: string; updatedAt: string; waiting: boolean }>,
+  threads: [] as ReadonlyArray<{
+    id: string;
+    title: string;
+    updatedAt: string;
+    waiting: boolean;
+    parentThreadId?: string;
+  }>,
   bots: [] as ReadonlyArray<Bot>,
   usage: { turns: 0, isPending: false, hasError: false },
   openChat: vi.fn(),
@@ -43,23 +48,27 @@ vi.mock("@isnadi/client-runtime/routines", () => ({
 
 vi.mock("../../state/entities", () => ({
   useDecisions: () => mocks.decisions,
-  useThreadShells: () =>
-    makeShellSnapshot({
-      threads: mocks.threads.map((thread) => ({
-        id: thread.id,
-        title: thread.title,
-        botId: "bot-1",
-        groupId: "g1",
-        updatedAt: thread.updatedAt,
-        hasPendingApprovals: thread.waiting,
-      })),
-    }).threads.map((thread) => scopeThreadShell(ENVIRONMENT, thread)),
 }));
 
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => ENVIRONMENT }));
 
+// The Overview reads the environment's own chats; the threads here stand in for them.
+const activitySnapshot = () =>
+  makeShellSnapshot({
+    threads: mocks.threads.map((thread) => ({
+      id: thread.id,
+      title: thread.title,
+      botId: "bot-1",
+      groupId: "g1",
+      updatedAt: thread.updatedAt,
+      hasPendingApprovals: thread.waiting,
+      ...(thread.parentThreadId === undefined ? {} : { parentThreadId: thread.parentThreadId }),
+    })),
+  });
+
 vi.mock("../../state/environmentSnapshot", () => ({
-  useEnvironmentSnapshot: () => mocks.snapshot,
+  useEnvironmentSnapshot: () =>
+    mocks.snapshot ?? (mocks.threads.length === 0 ? null : activitySnapshot()),
 }));
 
 vi.mock("../chat/useOpenChat", () => ({ useOpenChat: () => mocks.openChat }));
@@ -153,6 +162,29 @@ describe("SpaceOverview", () => {
     expect(html).toContain("avatar:Ada");
     expect(html).toContain("<bdi>Ada</bdi>");
     expect(html).toContain("chat one");
+  });
+
+  it("lists the work a bot did for the space, not only the space's own chat", () => {
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T10:00:00.000Z",
+        waiting: false,
+      },
+      {
+        id: "delegation-thread-2",
+        title: "Bot work for Ada",
+        updatedAt: "2026-11-03T11:00:00.000Z",
+        waiting: false,
+        parentThreadId: "thread-1",
+      },
+    ];
+
+    const html = render();
+
+    expect(html).toContain("Build the todo app");
+    expect(html).toContain("Bot work for Ada");
   });
 
   it("offers Review only on a waiting row", () => {
