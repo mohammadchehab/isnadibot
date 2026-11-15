@@ -294,6 +294,7 @@ export {
 
 export {
   type CommandFailureRefusal,
+  type Translate,
   classifyCommandFailure,
   commandFailureMessage,
   commandRefusalDescription,

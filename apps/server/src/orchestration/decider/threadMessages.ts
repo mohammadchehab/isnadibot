@@ -2,7 +2,7 @@ import { type OrchestrationCommand, type OrchestrationReadModel } from "@isnadi/
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireActiveGroupMember, requireGroup, requireThread } from "../commandInvariants.ts";
 import {
@@ -176,14 +176,17 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
       if (!thread.messages.some((message) => message.id === command.messageId)) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "stale-view",
           detail: `Message '${command.messageId}' is not visible in thread '${command.threadId}'.`,
         });
       }
 
       if (actor === undefined && command.botId === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: "Trusted bot reactions require a bot identity.",
+          reason:
+            "actor is undefined only on the trusted-bot path, and that path always names a botId; a client reaction is stamped with an actor, so no shipped client reaches this guard.",
         });
       }
 
@@ -197,9 +200,11 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
         const reactionBotId = thread.respondingBotId ?? group.bossBotId;
 
         if (reactionBotId === null || command.botId !== reactionBotId) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* internalInvariantError({
             commandType: command.type,
             detail: `Bot '${command.botId}' cannot react in thread '${command.threadId}'.`,
+            reason:
+              "Inside the actor === undefined trusted-bot branch: the server itself supplies botId from the responding bot or the group boss, so a mismatch is a server bug rather than a user situation.",
           });
         }
 
@@ -210,9 +215,11 @@ export const decideThreadMessages = Effect.fn("decideThreadMessages")(function* 
           botId: reactionBotId,
         });
       } else if (actor === undefined && thread.botId !== command.botId) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* internalInvariantError({
           commandType: command.type,
           detail: `Bot '${command.botId}' cannot react in thread '${command.threadId}'.`,
+          reason:
+            "Inside the actor === undefined trusted-bot branch of a direct chat: the server supplies the thread's own botId, so a mismatch is a server bug rather than a user situation.",
         });
       }
 

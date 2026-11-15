@@ -9,7 +9,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireThread } from "../commandInvariants.ts";
 import {
@@ -85,9 +85,11 @@ export const decideThreadObservations = Effect.fn("decideThreadObservations")(fu
           sessionComingAlive ||
           threadHasQueuedTurnStart(thread, command.createdAt)
         ) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* internalInvariantError({
             commandType: command.type,
             detail: `thread ${command.threadId} was re-engaged after settle; skipping session stop`,
+            reason:
+              "onlyIfSettled is server-set: the only site that sets it is the server's own settle-stop dispatch, which wraps the dispatch in Effect.catchCause and logs the refusal, so it never reaches a client surface.",
           });
         }
       }

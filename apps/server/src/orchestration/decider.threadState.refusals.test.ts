@@ -2,6 +2,7 @@ import {
   CommandId,
   EventId,
   MessageId,
+  ProjectId,
   ThreadId,
   TurnId,
   type OrchestrationCommand,
@@ -385,6 +386,149 @@ it.layer(NodeServices.layer)("thread-state refusals", (it) => {
       // own for an inbound channel message to land in.
       expect(refusal).toBe("channel-delivery-unavailable");
       expect(detail).toContain("cannot receive channel messages");
+    }),
+  );
+
+  // ------------------------------- plan source and misplaced mentions (4)
+
+  /** A turn-start whose plan comes from a thread this model may or may not hold. */
+  const turnStartFromPlan = (
+    suffix: string,
+    sourceThreadId: ThreadId,
+    planId: string,
+    readModel: OrchestrationReadModel,
+  ) =>
+    decide(
+      {
+        type: "thread.turn.start",
+        commandId: CommandId.make(`cmd-turn-start-${suffix}`),
+        threadId: THREAD_ID,
+        message: {
+          messageId: MESSAGE_ID,
+          role: "user",
+          text: "Build the plan",
+          attachments: [],
+        },
+        sourceProposedPlan: { threadId: sourceThreadId, planId },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        createdAt: NOW,
+      },
+      readModel,
+    );
+
+  it.effect("codes a turn start whose proposed plan is gone as a stale view", () =>
+    Effect.gen(function* () {
+      // The plan is named on this thread, which holds none: the client accepted
+      // a plan the server has already dropped, so a refresh is the remedy.
+      const error = yield* turnStartFromPlan(
+        "plan-gone",
+        THREAD_ID,
+        "plan-gone",
+        makeReadModel(null),
+      );
+
+      const { refusal, detail } = refusalOf(error);
+
+      expect(refusal).toBe("stale-view");
+      expect(detail).toContain("does not exist on thread");
+    }),
+  );
+
+  it.effect("codes a turn start whose plan belongs to another project as a stale view", () =>
+    Effect.gen(function* () {
+      const sourceThreadId = ThreadId.make("thread-source");
+      const base = makeReadModel(null);
+      const target = base.threads[0]!;
+
+      // The source thread holds the plan, but under a different project, so the
+      // accepted plan cannot be started here — again a view the server has left.
+      const readModel: OrchestrationReadModel = {
+        ...base,
+        threads: [
+          target,
+          {
+            ...target,
+            id: sourceThreadId,
+            projectId: ProjectId.make("project-other"),
+            proposedPlans: [
+              {
+                id: "plan-1",
+                turnId: null,
+                planMarkdown: "# Plan",
+                implementedAt: null,
+                implementationThreadId: null,
+                createdAt: NOW,
+                updatedAt: NOW,
+              },
+            ],
+          },
+        ],
+      };
+
+      const error = yield* turnStartFromPlan(
+        "plan-other-project",
+        sourceThreadId,
+        "plan-1",
+        readModel,
+      );
+
+      const { refusal, detail } = refusalOf(error);
+
+      expect(refusal).toBe("stale-view");
+      expect(detail).toContain("different project");
+    }),
+  );
+
+  it.effect("codes bot mentions on a chat that is not a space chat", () =>
+    Effect.gen(function* () {
+      // A composer's addressing state can outlive the space chat it was set in,
+      // so the chat is fine and the mention is misplaced: remove it and resend.
+      const error = yield* decide(
+        {
+          type: "thread.turn.start",
+          commandId: CommandId.make("cmd-turn-start-mentions"),
+          threadId: THREAD_ID,
+          message: {
+            messageId: MESSAGE_ID,
+            role: "user",
+            text: "Ask both of you",
+            attachments: [],
+          },
+          addressing: { kind: "auto" },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          createdAt: NOW,
+        },
+        makeReadModel(null),
+      );
+
+      const { refusal, detail } = refusalOf(error);
+
+      expect(refusal).toBe("thread-does-not-take-mentions");
+      expect(detail).toContain("group-owned thread");
+    }),
+  );
+
+  it.effect("codes a reaction on a message the chat no longer holds as a stale view", () =>
+    Effect.gen(function* () {
+      const error = yield* decide(
+        {
+          type: "thread.message.reaction.set",
+          commandId: CommandId.make("cmd-reaction-gone"),
+          threadId: THREAD_ID,
+          messageId: MessageId.make("message-gone"),
+          emoji: "thumbs-up",
+          present: true,
+          updatedAt: NOW,
+        },
+        makeReadModel(null),
+      );
+
+      const { refusal, detail } = refusalOf(error);
+
+      expect(refusal).toBe("stale-view");
+      expect(detail).toContain("is not visible in thread");
     }),
   );
 });

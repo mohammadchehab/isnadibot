@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
+import { useI18n } from "../../i18n";
 import { DEFAULT_INTERACTION_MODE } from "../../types";
 import { newMessageId, newThreadId } from "../../lib/utils";
 import { resolveAppModelSelectionState } from "../../modelSelection";
@@ -77,6 +78,7 @@ function readChatSelection(botId: string): string {
 }
 
 export function useBotThreadRuntime(botId: string, effectiveModelSelection: ModelSelection | null) {
+  const { t } = useI18n();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverBots = useAtomValue(environmentBotsAtom(primaryEnvironmentId ?? NO_ENVIRONMENT));
@@ -263,13 +265,13 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
     setResuming(false);
 
     if (Predicate.isTagged(result, "Failure")) {
-      setError(commandFailure(result));
+      setError(commandFailure(result, t));
 
       return false;
     }
 
     return true;
-  }, [canResume, linkedThreadRef, resumeTurnCommand, resuming]);
+  }, [canResume, linkedThreadRef, resumeTurnCommand, resuming, t]);
 
   const createBotChat = useCallback(
     async (title: string): Promise<ScopedThreadRef | null> => {
@@ -469,7 +471,7 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
             });
 
             if (Predicate.isTagged(modeResult, "Failure")) {
-              setError(commandFailure(modeResult));
+              setError(commandFailure(modeResult, t));
 
               return false;
             }
@@ -497,7 +499,7 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
           });
 
           if (Predicate.isTagged(startResult, "Failure")) {
-            setError(commandFailure(startResult));
+            setError(commandFailure(startResult, t));
 
             return false;
           }
@@ -591,6 +593,7 @@ export function useBotThreadRuntime(botId: string, effectiveModelSelection: Mode
       pendingUserInputs,
       startTurn,
       updateMetadata,
+      t,
     ],
   );
 

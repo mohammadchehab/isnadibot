@@ -39,12 +39,38 @@ export class OrchestrationCommandInvariantError extends Schema.TaggedErrorClass<
     detail: Schema.String,
     /** Why the command was refused, when a client has a dedicated path for it. */
     refusal: Schema.optional(CommandRefusal),
+    /**
+     * Why an invariant is internal — no shipped client can reach it — so it
+     * carries no refusal code. Written at the throw by `internalInvariantError`.
+     * Never crosses the wire: `toDispatchCommandError` copies only `message` and
+     * `refusal`, so this stays server-side for the log and for a test.
+     */
+    internalReason: Schema.optional(Schema.String),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {
     return `Orchestration command invariant failed (${this.commandType}): ${this.detail}`;
   }
+}
+
+/**
+ * An invariant no shipped client can reach: a server bug rather than a user
+ * situation, so there is no sentence to show and no refusal code to carry.
+ * `reason` is required so every excluded row says, at the throw, which client
+ * path cannot produce it — a later reader never has to re-derive the
+ * reachability call or wonder whether the missing code was an oversight.
+ */
+export function internalInvariantError(input: {
+  readonly commandType: string;
+  readonly detail: string;
+  readonly reason: string;
+}): OrchestrationCommandInvariantError {
+  return new OrchestrationCommandInvariantError({
+    commandType: input.commandType,
+    detail: input.detail,
+    internalReason: input.reason,
+  });
 }
 
 export class OrchestrationCommandPreviouslyRejectedError extends Schema.TaggedErrorClass<OrchestrationCommandPreviouslyRejectedError>()(

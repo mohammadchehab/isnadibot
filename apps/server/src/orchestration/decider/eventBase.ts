@@ -19,7 +19,7 @@ import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
 import { requireActiveGroupMember, requireBotNotArchived } from "../commandInvariants.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 
@@ -314,9 +314,11 @@ export const resolveAssistantMessageBot = Effect.fn("resolveAssistantMessageBot"
     if (botId === undefined) return input.fallback;
 
     if (input.thread.groupId === null && input.thread.botId !== botId) {
-      return yield* new OrchestrationCommandInvariantError({
+      return yield* internalInvariantError({
         commandType: input.command.type,
         detail: `Bot '${botId}' cannot post in thread '${input.thread.id}'.`,
+        reason:
+          "Reached only from the three assistant message paths, where respondingBotId is the provider's own bot; a mismatch with the bot thread's botId means the provider reported the wrong bot, which is a server bug.",
       });
     }
 
