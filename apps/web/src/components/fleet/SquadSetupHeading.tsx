@@ -18,7 +18,10 @@ export function SquadSetupHeading({ templateName }: { readonly templateName: str
 
   return (
     <div className="space-y-1">
-      <h1 className="text-xl font-semibold">
+      {/* Balanced, so a name too long for one line at phone width splits into two
+          even lines instead of leaving "squad" alone on the second. A no-op for
+          the names that already fit on one line. */}
+      <h1 className="text-xl font-semibold text-balance">
         {t("Set up your {template} squad", { template: name })}
       </h1>
       <p className="text-sm text-muted-foreground">
