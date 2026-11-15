@@ -40,6 +40,8 @@ import {
   OrchestrationCommandPreviouslyRejectedError,
   type OrchestrationDispatchError,
   type OrchestrationProjectorDecodeError,
+  internalInvariantError,
+  pendingRefusalInvariantError,
 } from "../Errors.ts";
 import { decideOrchestrationCommand } from "../decider.ts";
 import { createEmptyReadModel, projectEvent } from "../projector.ts";
@@ -365,9 +367,11 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           Effect.mapError((cause) =>
             isOrchestrationCommandInvariantError(cause)
               ? cause
-              : new OrchestrationCommandInvariantError({
+              : internalInvariantError({
                   commandType: envelope.command.type,
                   detail: "Failed to generate an event identifier.",
+                  reason:
+                    "The engine could not mint an event id, which is a server fault with no user action behind it; the cause is attached for the log.",
                   cause,
                 }),
           ),
@@ -403,9 +407,11 @@ const makeOrchestrationEngine = Effect.gen(function* () {
               const lastSavedEvent = committedEvents.at(-1) ?? null;
 
               if (lastSavedEvent === null) {
-                return yield* new OrchestrationCommandInvariantError({
+                return yield* internalInvariantError({
                   commandType: envelope.command.type,
                   detail: COMMAND_PRODUCED_NO_EVENTS,
+                  reason:
+                    "A command the decider accepted produced no events, so the engine has nothing to persist; that is a decider bug, not a user situation.",
                 });
               }
 
@@ -638,9 +644,12 @@ const makeOrchestrationEngine = Effect.gen(function* () {
             : undefined;
 
         if (admission === null) {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* pendingRefusalInvariantError({
             commandType: command.type,
             detail: "The server is installing an update. Try again in a moment.",
+            reason:
+              "The turn-start admission gate is closed because the server is mid-update; the remedy is to retry once it finishes, and no existing code names a maintenance window. TASK-335 mints it.",
+            ticket: "TASK-335",
           });
         }
 

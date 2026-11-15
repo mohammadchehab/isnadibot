@@ -19,20 +19,21 @@ import type {
 import { normalizeProjectPathForComparison } from "@isnadi/shared/path";
 import * as Effect from "effect/Effect";
 
-import { OrchestrationCommandInvariantError } from "./Errors.ts";
+import { type OrchestrationCommandInvariantError, refusedInvariantError } from "./Errors.ts";
 import { findProjectedThread } from "./projector.ts";
 import type { OrchestrationDispatchActor } from "./Services/OrchestrationEngine.ts";
 
+/**
+ * A refusal with the code the user's surface has a sentence for. The code is
+ * required: an uncoded throw has to say which exclusion it belongs to through
+ * one of `Errors.ts`'s other constructors instead.
+ */
 function invariantError(
   commandType: string,
   detail: string,
-  refusal?: CommandRefusal,
+  refusal: CommandRefusal,
 ): OrchestrationCommandInvariantError {
-  return new OrchestrationCommandInvariantError({
-    commandType,
-    detail,
-    ...(refusal === undefined ? {} : { refusal }),
-  });
+  return refusedInvariantError({ commandType, detail, refusal });
 }
 
 export function findThreadById(

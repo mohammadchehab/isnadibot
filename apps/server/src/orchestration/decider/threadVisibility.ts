@@ -6,7 +6,7 @@ import {
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, refusedInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireThreadNotArchived } from "../commandInvariants.ts";
 import {
@@ -44,7 +44,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       // or raced client must not settle a thread whose session is coming
       // alive or working.
       if (thread.session?.status === "starting" || thread.session?.status === "running") {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has an active session and cannot be settled`,
@@ -55,7 +55,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       // raced or stale client must not park them behind a settled override
       // that would surface only after the request resolves.
       if (hasOpenBlockingRequest(thread)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a pending approval or user-input request and cannot be settled`,
@@ -66,7 +66,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
 
       // Settling inside the adoption window would hide just-requested work.
       if (threadHasQueuedTurnStart(thread, occurredAt)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a queued turn start and cannot be settled`,
@@ -181,7 +181,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       // structurally just a string): NaN fails every comparison, and an
       // unparseable snoozedUntil must never persist.
       if (!(Date.parse(command.snoozedUntil) > Date.parse(occurredAt))) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-state-invalid",
           detail: `thread ${command.threadId} snooze wake time ${command.snoozedUntil} is not in the future`,
@@ -193,7 +193,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       // defeats the request. (A running session IS snoozable — snooze only
       // affects visibility, never the agent.)
       if (hasOpenBlockingRequest(thread)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a pending approval or user-input request and cannot be snoozed`,
@@ -205,7 +205,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       // that window would hide a just-requested turn exactly the way settle
       // would.
       if (threadHasQueuedTurnStart(thread, occurredAt)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a queued turn start and cannot be snoozed`,

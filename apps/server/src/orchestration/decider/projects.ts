@@ -2,7 +2,10 @@ import { type OrchestrationCommand, type OrchestrationReadModel } from "@isnadi/
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError } from "../Errors.ts";
+import {
+  type OrchestrationCommandInvariantError,
+  noShippedSurfaceInvariantError,
+} from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import {
   listThreadsByProjectId,
@@ -125,9 +128,11 @@ export const decideProjects = Effect.fn("decideProjects")(function* ({
       );
 
       if (activeThreads.length > 0 && command.force !== true) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* noShippedSurfaceInvariantError({
           commandType: command.type,
           detail: `Project '${command.projectId}' is not empty and cannot be deleted without force=true.`,
+          reason:
+            "`project.delete` is in the client command union, but no shipped web, desktop or mobile screen dispatches it, and the one that would has to send `force` or offer the choice; TASK-337 owns that surface and mints the code with it.",
         });
       }
 

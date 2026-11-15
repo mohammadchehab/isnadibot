@@ -7,7 +7,7 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
 import { deleteExpiredArchivedBots } from "./archivedBotRetention.ts";
-import { OrchestrationCommandInvariantError } from "./orchestration/Errors.ts";
+import { refusedInvariantError } from "./orchestration/Errors.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 
@@ -99,9 +99,10 @@ it.effect("keeps sweeping after one bot fails to delete", () => {
         attempted.push(command.botId);
 
         if (command.botId === "boss") {
-          return yield* new OrchestrationCommandInvariantError({
+          return yield* refusedInvariantError({
             commandType: command.type,
             detail: "Set a new boss before deleting it.",
+            refusal: "bot-is-group-boss",
           });
         }
 

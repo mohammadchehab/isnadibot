@@ -44,7 +44,7 @@ import * as ServerConfig from "./config.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
-import { OrchestrationCommandInvariantError } from "./orchestration/Errors.ts";
+import { toDispatchCommandError } from "./orchestration/dispatchCommandError.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor.ts";
 import { OrchestrationCommandReceiptRepository } from "./persistence/Services/OrchestrationCommandReceipts.ts";
@@ -544,22 +544,6 @@ export const createWsServices = (
         authorizeEffect(requiredScopeForRpcMethod(method), effect),
         traceAttributes,
       );
-
-    const isCommandInvariantError = Schema.is(OrchestrationCommandInvariantError);
-
-    // Every client command path funnels its failure through here, so this is the
-    // one place a refusal code has to be carried from the invariant onto the wire.
-    const toDispatchCommandError = (cause: unknown, fallbackMessage: string) => {
-      if (isOrchestrationDispatchCommandError(cause)) return cause;
-
-      const refusal = isCommandInvariantError(cause) ? cause.refusal : undefined;
-
-      return new OrchestrationDispatchCommandError({
-        message: cause instanceof Error ? cause.message : fallbackMessage,
-        cause,
-        ...(refusal === undefined ? {} : { refusal }),
-      });
-    };
 
     const randomUUID = crypto.randomUUIDv4.pipe(
       Effect.mapError((cause) =>

@@ -12,7 +12,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
-import { OrchestrationCommandInvariantError } from "./orchestration/Errors.ts";
+import { internalInvariantError } from "./orchestration/Errors.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import { ProviderSessionDirectoryPersistenceError } from "./provider/Errors.ts";
@@ -299,9 +299,11 @@ it.effect("retries failed projections and continues after a persistent failure",
   const attempted: ThreadId[] = [];
   let transientAttempts = 0;
 
-  const failure = new OrchestrationCommandInvariantError({
+  const failure = internalInvariantError({
     commandType: "thread.session.set",
     detail: "simulated startup reconciliation failure",
+    reason:
+      "Test fixture: the test injects this failure to exercise the startup retry path, so no user situation produces it.",
   });
 
   return runReconciliation({

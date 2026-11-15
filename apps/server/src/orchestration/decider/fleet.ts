@@ -12,7 +12,11 @@ import { planFleetHire } from "@isnadi/shared/fleet";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError, internalInvariantError } from "../Errors.ts";
+import {
+  OrchestrationCommandInvariantError,
+  internalInvariantError,
+  refusedInvariantError,
+} from "../Errors.ts";
 import { requireEnvironmentManageRights } from "../commandInvariants.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import type { DecideCommandSequence, DecideOrchestrationCommandResult } from "./eventBase.ts";
@@ -72,7 +76,7 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
       const template = FLEET_TEMPLATES[command.templateIndex];
 
       if (template === undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `No fleet template at index ${command.templateIndex}.`,
           // Same reason-kind as an unknown id: the client asked for a template
@@ -84,7 +88,7 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
       const bossRoleId = command.bossRoleId ?? template.bossRoleId;
 
       if (!template.roleIds.includes(bossRoleId)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Role '${bossRoleId}' is not part of template '${template.id}'.`,
           // The client named a boss role its own copy of the template has and
@@ -104,7 +108,7 @@ export const decideFleet = Effect.fn("decideFleet")(function* ({
       const firstBlocker = plan.blockers[0];
 
       if (firstBlocker !== undefined) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `The hire is blocked: ${plan.blockers
             .map((blocker) => (blocker.kind === "duplicate-name" ? blocker.kind : blocker.roleId))

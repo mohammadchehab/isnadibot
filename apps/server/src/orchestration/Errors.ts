@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as SchemaIssue from "effect/SchemaIssue";
 import * as Schema from "effect/Schema";
 
@@ -53,26 +54,110 @@ export const InvariantExclusion = Schema.Struct({
   reason: Schema.String,
 });
 
+export type InvariantExclusion = typeof InvariantExclusion.Type;
+
+/** A user situation with a dedicated code. Travels to the client. */
+const RefusedFailure = Schema.TaggedStruct("refused", { refusal: CommandRefusal });
+
+/** Nothing a user can reach, so no code is possible. Server-side only. */
+const ExcludedFailure = Schema.TaggedStruct("excluded", { exclusion: InvariantExclusion });
+
+/**
+ * Reachable, and the code it needs has not been minted yet. `ticket` names the
+ * card that will mint it, so the debt says who pays it; the count is pinned by
+ * `commandInvariants.refusalRatchet.test.ts` and the arm is deleted when it
+ * reaches zero.
+ */
+const PendingRefusalFailure = Schema.TaggedStruct("pending-refusal", {
+  reason: Schema.String,
+  ticket: Schema.String,
+});
+
+/**
+ * Why a command was refused. Exactly one arm, always present, so a throw with
+ * nothing to say cannot be written. It sits on the error's own `failure`
+ * parameter rather than on the error class because `Schema.TaggedErrorClass`
+ * takes a struct, never a union — `BotMemoryError` ships the same shape.
+ */
+export const InvariantFailure = Schema.Union([
+  RefusedFailure,
+  ExcludedFailure,
+  PendingRefusalFailure,
+]);
+
+export type InvariantFailure = typeof InvariantFailure.Type;
+
 export class OrchestrationCommandInvariantError extends Schema.TaggedErrorClass<OrchestrationCommandInvariantError>()(
   "OrchestrationCommandInvariantError",
   {
     commandType: Schema.String,
     detail: Schema.String,
-    /** Why the command was refused, when a client has a dedicated path for it. */
-    refusal: Schema.optional(CommandRefusal),
-    /**
-     * Why this throw carries no refusal code, written at the throw by
-     * `internalInvariantError` or `noShippedSurfaceInvariantError`. Never crosses
-     * the wire: `toDispatchCommandError` copies only `message` and `refusal`, so
-     * this stays server-side for the log and for a test.
-     */
-    exclusion: Schema.optional(InvariantExclusion),
+    /** Why the command was refused, as exactly one of the three arms above. */
+    failure: InvariantFailure,
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
+  /**
+   * The code a client has a sentence for, when there is one. A getter, not a
+   * field, so it stays derived from `failure` and cannot disagree with it.
+   */
+  get refusal(): CommandRefusal | undefined {
+    return Predicate.isTagged(this.failure, "refused") ? this.failure.refusal : undefined;
+  }
+
+  /**
+   * Why this throw carries no refusal code, when it carries none. Never crosses
+   * the wire: `toDispatchCommandError` copies only `message` and `refusal`, so
+   * this stays server-side for the log and for a test.
+   */
+  get exclusion(): InvariantExclusion | undefined {
+    return Predicate.isTagged(this.failure, "excluded") ? this.failure.exclusion : undefined;
+  }
+
   override get message(): string {
     return `Orchestration command invariant failed (${this.commandType}): ${this.detail}`;
   }
+}
+
+/**
+ * A user situation with a dedicated code: the arm almost every throw wants.
+ * `commandInvariants.ts`'s `invariantError` and `workItems.ts`'s `reject` are
+ * thin aliases over this, so the union lives on the error rather than on either
+ * helper.
+ */
+export function refusedInvariantError(input: {
+  readonly commandType: string;
+  readonly detail: string;
+  readonly refusal: CommandRefusal;
+  readonly cause?: unknown;
+}): OrchestrationCommandInvariantError {
+  return new OrchestrationCommandInvariantError({
+    commandType: input.commandType,
+    detail: input.detail,
+    failure: RefusedFailure.make({ refusal: input.refusal }),
+    ...(input.cause === undefined ? {} : { cause: input.cause }),
+  });
+}
+
+/**
+ * A reachable user situation whose code has not been minted yet. `reason` says
+ * what the situation is and `ticket` names the card that will mint the code, so
+ * the debt is registered at the throw instead of hidden under an exclusion that
+ * is not true.
+ */
+export function pendingRefusalInvariantError(input: {
+  readonly commandType: string;
+  readonly detail: string;
+  readonly reason: string;
+  readonly ticket: string;
+  readonly cause?: unknown;
+}): OrchestrationCommandInvariantError {
+  return new OrchestrationCommandInvariantError({
+    commandType: input.commandType,
+    detail: input.detail,
+    failure: PendingRefusalFailure.make({ reason: input.reason, ticket: input.ticket }),
+    ...(input.cause === undefined ? {} : { cause: input.cause }),
+  });
 }
 
 /**
@@ -87,11 +172,15 @@ export function internalInvariantError(input: {
   readonly commandType: string;
   readonly detail: string;
   readonly reason: string;
+  readonly cause?: unknown;
 }): OrchestrationCommandInvariantError {
   return new OrchestrationCommandInvariantError({
     commandType: input.commandType,
     detail: input.detail,
-    exclusion: { kind: "internal-command", reason: input.reason },
+    failure: ExcludedFailure.make({
+      exclusion: { kind: "internal-command", reason: input.reason },
+    }),
+    ...(input.cause === undefined ? {} : { cause: input.cause }),
   });
 }
 
@@ -106,11 +195,15 @@ export function noShippedSurfaceInvariantError(input: {
   readonly commandType: string;
   readonly detail: string;
   readonly reason: string;
+  readonly cause?: unknown;
 }): OrchestrationCommandInvariantError {
   return new OrchestrationCommandInvariantError({
     commandType: input.commandType,
     detail: input.detail,
-    exclusion: { kind: "no-shipped-surface", reason: input.reason },
+    failure: ExcludedFailure.make({
+      exclusion: { kind: "no-shipped-surface", reason: input.reason },
+    }),
+    ...(input.cause === undefined ? {} : { cause: input.cause }),
   });
 }
 

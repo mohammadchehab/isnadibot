@@ -17,6 +17,7 @@ import type * as PlatformError from "effect/PlatformError";
 import {
   OrchestrationCommandInvariantError,
   internalInvariantError,
+  refusedInvariantError,
   noShippedSurfaceInvariantError,
 } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
@@ -118,7 +119,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       }
 
       if (delegation.ancestorBotIds.includes(delegation.childBotId)) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Delegation '${delegation.delegationId}' would create a bot cycle.`,
           refusal: "delegation-would-cycle",
@@ -132,7 +133,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       ).length;
 
       if (activeDelegationCount >= ISNADI_DELEGATION_MAX_CONCURRENCY) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Bot '${delegation.parentBotId}' already has ${activeDelegationCount} active delegations.`,
           refusal: "delegation-limit-reached",
@@ -355,7 +356,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
           (candidate) => candidate.retryOfDelegationId === original.delegationId,
         )
       ) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: "This bot work was already retried. Use the newer card instead.",
           // The record itself is unchanged — a terminal phase never moves. What
@@ -377,7 +378,7 @@ export const decideDelegations = Effect.fn("decideDelegations")(function* ({
       ).length;
 
       if (activeDelegationCount >= ISNADI_DELEGATION_MAX_CONCURRENCY) {
-        return yield* new OrchestrationCommandInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `This bot already has ${activeDelegationCount} bot work items running. Wait for one to finish, then retry.`,
           // Same reason-kind as the create-time cap above: this bot has too many
