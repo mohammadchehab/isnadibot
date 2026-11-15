@@ -1,7 +1,7 @@
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
-import type { Browser, Page } from "playwright-core";
+import { type Browser, type Locator, type Page } from "playwright-core";
 import { expect } from "vite-plus/test";
 
 import { launchBrowser } from "./journey.ts";
@@ -27,31 +27,37 @@ export async function createBot(page: Page, name: string, first: boolean) {
 }
 
 /**
- * Creates a group of the given bots. The first bot picked leads the group.
- *
- * A space starts on its own screen, so "New space" lands on the fleet picker and the
- * empty space is behind "Start empty" there. The dialog pre-selects the first two
- * offerable bots, so a box that is already checked must be left alone.
+ * Opens the blank-space dialog. The roster's New space control is a route now, not a
+ * dialog: it lands on the fleet picker, whose Start empty button raises the dialog.
  */
-export async function createGroup(page: Page, name: string, bots: ReadonlyArray<string>) {
+export async function openBlankSpaceDialog(page: Page) {
   await page.getByTestId("roster-new-bot").click();
   await page.getByRole("menuitem", { name: "New space" }).click();
   await page.getByRole("button", { name: "Start empty" }).click();
+}
+
+/**
+ * Ticks the given bots in the open group dialog. The dialog opens with the first two
+ * offerable bots already selected, so each box is set rather than toggled: a blind
+ * click would untick a bot that is already in.
+ */
+export async function pickBots(dialog: Locator, bots: ReadonlyArray<string>) {
+  for (const bot of bots) {
+    const box = dialog.getByRole("checkbox", { name: bot });
+
+    if (!(await box.isChecked())) await box.click();
+    expect(await box.isChecked()).toBe(true);
+  }
+}
+
+/** Creates a group of the given bots. The first bot picked leads the group. */
+export async function createGroup(page: Page, name: string, bots: ReadonlyArray<string>) {
+  await openBlankSpaceDialog(page);
 
   const dialog = page.getByRole("dialog");
 
   await dialog.getByLabel("Group name").fill(name);
-
-  for (const bot of bots) {
-    const box = dialog.getByRole("checkbox", { name: bot });
-
-    // The dialog pre-selects the first two offerable bots, so pressing Space on an
-    // already-checked box would uncheck it and leave "Create group" disabled.
-    if (await box.isChecked()) continue;
-
-    await box.focus();
-    await box.press("Space");
-  }
+  await pickBots(dialog, bots);
 
   await dialog.getByRole("button", { name: "Create group" }).click();
   await dialog.waitFor({ state: "hidden" });

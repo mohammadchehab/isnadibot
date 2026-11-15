@@ -31,7 +31,9 @@ vp run test:e2e:web
 
 The run starts `vp run dev` against a throwaway home, pairs a fresh Chrome through the startup pairing URL, and tears everything down afterwards. It never touches `~/.isnadi`. A small stub OpenAI-compatible endpoint stands in for a model, wired in as a Custom API provider instance, so no subscription or network is needed. Chrome must be installed; set `E2E_BROWSER_CHANNEL` to use another Playwright channel and `E2E_HEADED=1` to watch. A failing step writes a screenshot to `E2E_ARTIFACTS_DIR` (default: the OS temp directory) and prints its path.
 
-Current coverage, in `journeys/chat.e2e.ts`: pairing and the empty roster, creating a bot, sending a message and seeing the reply, and the conversation surviving a reload. The journeys are not part of CI or `vp run -r test`; the script is named `e2e`, not `test`.
+`journeys/` covers pairing and the empty roster, chat, spaces and the people in them, routing between spaces, speaker attribution, decisions and delegated approvals, and the Arabic interface.
+
+A journey drives the labels a user actually sees, so a user-visible rename updates the journeys that name it in the same PR. Nothing else reports a stale selector: the journeys are not part of CI or `vp run -r test`, and the script is named `e2e`, not `test`.
 
 ## Data
 

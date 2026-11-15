@@ -2,6 +2,7 @@ import { type Browser, type BrowserContext, type Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 import { watchPage } from "../support/diagnostics.ts";
+import { openBlankSpaceDialog, pickBots } from "../support/groupChat.ts";
 import { journeyReport, launchBrowser } from "../support/journey.ts";
 import { startStack, type Stack } from "../support/stack.ts";
 
@@ -49,20 +50,12 @@ describe("group people", () => {
     await owner.getByRole("dialog").waitFor({ state: "hidden" });
     await createBot("Beta");
 
-    await owner.getByTestId("roster-new-bot").click();
-    await owner.getByRole("menuitem", { name: "New group" }).click();
+    await openBlankSpaceDialog(owner);
 
     const dialog = owner.getByRole("dialog");
 
     await dialog.getByLabel("Group name").fill("Ops");
-
-    for (const name of ["Alpha", "Beta"]) {
-      const box = dialog.getByRole("checkbox", { name });
-
-      await box.focus();
-      await box.press("Space");
-      expect(await box.isChecked()).toBe(true);
-    }
+    await pickBots(dialog, ["Alpha", "Beta"]);
 
     await dialog.getByRole("button", { name: "Create group" }).click();
     await owner.getByRole("dialog").waitFor({ state: "hidden" });
