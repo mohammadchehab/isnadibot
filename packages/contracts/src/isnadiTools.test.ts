@@ -520,6 +520,12 @@ describe("Shell command intent outside the modelled subset", () => {
     ["a delimiter the shell expands", "cat > f <<$DELIM"],
     // A trailing backslash continues the line, so the next line is not a command.
     ["a continued line", "echo one \\"],
+    // An array assignment: the shell rejects the `<<` inside `(…)` as a syntax
+    // error, keeps going, and runs the next line.
+    ["an array assignment a=(…)", "a=(<<EOF)"],
+    // An extglob pattern: `@(…)`, and `+(…)`, `!(…)`, `?(…)`, `*(…)` with it,
+    // are pattern lists where a `<<` is not an operator.
+    ["an extglob case pattern @(…)", "case x in @(<<EOF)) ;; esac"],
   ] as const;
 
   it("strips nothing when it meets a construct it does not model", () => {

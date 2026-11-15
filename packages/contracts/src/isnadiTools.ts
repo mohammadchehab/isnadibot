@@ -162,9 +162,10 @@ const scanBracketArithmetic = (line: string, at: number, startingDepth: number):
  * `null` means the line leaves the subset this scanner models, and the caller
  * must strip nothing at all: `${…}`, `$'…'`, `$"…"` and `$(…)` are regions whose
  * text this scanner does not read, a backtick is command substitution it does
- * not track, a line continued by a trailing backslash is not a whole line, and a
- * `<<` whose delimiter is not a literal word has no terminator this scanner can
- * find. In every one of those, a `<<` may or may not be an operator, and reading
+ * not track, a `(` outside the arithmetic regions is a subshell, group, array
+ * assignment or extglob pattern it cannot bound, a line continued by a trailing
+ * backslash is not a whole line, and a `<<` whose delimiter is not a literal
+ * word has no terminator this scanner can find. In every one of those, a `<<` may or may not be an operator, and reading
  * it as one deletes text the shell would run. Enumerating the regions instead
  * loses this one construct per review round; refusing to guess does not.
  */
@@ -285,6 +286,15 @@ const scanHeredocOpener = (
 
       continue;
     }
+
+    // Every `(` that is not one of the arithmetic regions read above opens a
+    // region this scanner does not read: a subshell, a command group, an array
+    // assignment `a=(…)`, or an extglob pattern `@(…)`, `+(…)`, `!(…)`, `?(…)`,
+    // `*(…)`. A `<<` inside one is not an operator the shell reads — `a=(<<EOF)`
+    // is a syntax error the shell reports and then runs past — so reading it as
+    // an opener deletes the command that follows as its body. Where that region
+    // ends is not something this scanner can prove, so it strips nothing.
+    if (char === "(") return null;
 
     if (char === "$") {
       const next = line[at + 1] ?? "";

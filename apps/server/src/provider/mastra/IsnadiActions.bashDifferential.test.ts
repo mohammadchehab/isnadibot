@@ -30,6 +30,12 @@ const hiddenBehindARegion = [
   ["backtick substitution", lines("echo `cat <<EOF`", PAYLOAD, "EOF")],
   ['locale quoting $"…"', lines('echo $"see <<EOF"', PAYLOAD, "EOF")],
   ["a quoted string", lines('echo "see <<EOF"', PAYLOAD, "EOF")],
+  // The shell reports a syntax error inside the parens, then runs the next line.
+  ["an array assignment a=(…)", lines("a=(<<EOF)", PAYLOAD, "EOF")],
+  [
+    "an extglob case pattern @(…)",
+    lines("shopt -s extglob", "case x in @(<<EOF)) ;; esac", PAYLOAD, "EOF"),
+  ],
 ] as const;
 
 /** Shapes where the payload really is body, which the shell writes and never runs. */
