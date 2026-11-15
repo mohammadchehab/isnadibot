@@ -1,4 +1,5 @@
 import type { RuntimeThreadFixture } from "../test-support/fixtures";
+import { createTranslator } from "@isnadi/client-runtime/i18n";
 import { ApprovalRequestId, EnvironmentId, ThreadId } from "@isnadi/contracts";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -44,6 +45,13 @@ vi.mock("react/compiler-runtime", async () => {
 });
 
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => [] }));
+
+// The hook translates its refusals, so it reads useI18n. The real English
+// catalog is what the repo's hook tests use, which keeps a sentence assertion
+// meaningful instead of comparing against keys.
+vi.mock("../../i18n", () => ({
+  useI18n: () => ({ t: createTranslator("en").translate }),
+}));
 
 vi.mock("../../hooks/useSettings", () => ({ usePrimarySettings: () => ({}) }));
 
