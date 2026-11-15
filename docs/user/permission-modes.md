@@ -27,6 +27,9 @@ Isnadi's runtime always asks before an action that sends data, pays, deletes, ch
 production, publishes, exposes secrets, signs, refunds, or changes an account. Unknown mutating
 actions also ask. Each approval applies only to the pending action.
 
+A shell command on your computer can run in your project folder or any folder inside it. A folder
+outside your workspace is refused with a reason before any approval card appears.
+
 Installed MCP tools ask unless the server marks the tool read-only. Provider adapters can add their
 own approval rules.
 

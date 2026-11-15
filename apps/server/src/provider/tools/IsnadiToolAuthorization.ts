@@ -42,22 +42,44 @@ export function canonicalInput<Value>(value: Value): string {
   return JSON.stringify(value) ?? "undefined";
 }
 
-export function ensureWorkspaceCwd<Input>(toolId: IsnadiToolId, input: Input): void {
-  if (toolId !== "Shell" && toolId !== "ExternalShell") return;
+/**
+ * Validates a shell tool's `cwd` and returns the input to run. `Shell` stays
+ * relative to the bot box. `ExternalShell` may also name an absolute folder, as
+ * the user's brief does, when it lies inside `userRoot`; it is rewritten
+ * relative to that root. Anything else throws, and callers must do so before an
+ * approval is requested.
+ */
+export function scopeShellCwd<Input>(
+  toolId: IsnadiToolId,
+  input: Input,
+  userRoot: string | undefined,
+): Input {
+  if (toolId !== "Shell" && toolId !== "ExternalShell") return input;
   const cwd = field(input, "cwd");
 
-  if (cwd === undefined) return;
+  if (cwd === undefined) return input;
 
   if (!Predicate.isString(cwd)) throw new Error(`Tool '${toolId}' cwd must be a relative path.`);
+  const outside = () => new Error(`Tool '${toolId}' cwd must stay inside its workspace.`);
+  const isAbsolute = cwd.startsWith("/") || cwd.startsWith("\\") || /^[A-Za-z]:/.test(cwd);
 
-  if (
-    cwd.startsWith("/") ||
-    cwd.startsWith("\\") ||
-    /^[A-Za-z]:/.test(cwd) ||
-    cwd.split(/[\\/]+/).includes("..")
-  ) {
-    throw new Error(`Tool '${toolId}' cwd must stay inside its workspace.`);
+  if (isAbsolute) {
+    if (toolId !== "ExternalShell" || userRoot === undefined) throw outside();
+    const relative = NodePath.relative(userRoot, NodePath.resolve(cwd));
+
+    if (relative.startsWith("..") || NodePath.isAbsolute(relative)) {
+      throw new Error(
+        `Tool 'ExternalShell' cwd '${cwd}' is outside the user's workspace '${userRoot}'.`,
+      );
+    }
+
+    // SAFETY: shell inputs are plain objects; only cwd is replaced.
+    return { ...(input as object), cwd: relative === "" ? "." : relative } as Input;
   }
+
+  if (cwd.split(/[\\/]+/).includes("..")) throw outside();
+
+  return input;
 }
 
 export const APPROVAL_RANK = [

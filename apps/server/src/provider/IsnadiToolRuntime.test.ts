@@ -5,6 +5,7 @@ import { createWorkspaceTools } from "@mastra/core/workspace";
 import { PNG } from "pngjs";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import { BotId, ThreadId, type IsnadiToolReceipt } from "@isnadi/contracts";
+import { createIsnadiMastraTools } from "./IsnadiMastraTools.ts";
 import { createIsnadiToolRuntime } from "./IsnadiToolRuntime.ts";
 import { makeIsnadiToolRuntimeTestSupport } from "./test-support/IsnadiToolRuntime.ts";
 
@@ -108,9 +109,65 @@ describe("IsnadiToolRuntime", () => {
         };
 
         if (toolId === "Shell") runtime.grantApproval(execution);
-        await expect(runtime.execute(execution)).rejects.toThrow("must stay inside its workspace");
+        await expect(runtime.execute(execution)).rejects.toThrow(
+          toolId === "ExternalShell" && cwd === "/"
+            ? "outside the user's workspace"
+            : "must stay inside its workspace",
+        );
       }
     }
+  });
+
+  it("runs ExternalShell in an absolute folder inside the user's workspace", async () => {
+    const runtime = createIsnadiToolRuntime();
+    const user = workspace("abs-user");
+    const nested = NodePath.join(workspaceRoot(user), "nested");
+    NodeFS.mkdirSync(nested);
+    runtime.registerSession("thread-1", {
+      runtimeMode: "full-access",
+      workspaceType: "local",
+      workspace: workspace("abs-bot"),
+      userComputerWorkspace: user,
+    });
+
+    await expect(
+      runtime.execute({
+        threadId: "thread-1",
+        toolId: "ExternalShell",
+        toolCallId: "tool-abs-external",
+        input: { command: "pwd", cwd: nested },
+        approvalMode: "require-grant",
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("refuses an absolute ExternalShell folder outside the user's workspace before asking for approval", async () => {
+    const runtime = createIsnadiToolRuntime();
+    const user = workspace("abs-out-user");
+    runtime.registerSession("thread-1", {
+      runtimeMode: "approval-required",
+      workspaceType: "local",
+      workspace: workspace("abs-out-bot"),
+      userComputerWorkspace: user,
+    });
+    const outside = NodePath.dirname(workspaceRoot(user));
+
+    await expect(
+      runtime.requiresApproval("thread-1", "ExternalShell", { command: "pwd", cwd: outside }),
+    ).rejects.toThrow("outside the user's workspace");
+
+    const tools = createIsnadiMastraTools("thread-1", runtime);
+
+    const shell = tools.ExternalShell;
+
+    const needsApproval =
+      shell !== undefined && "needsApprovalFn" in shell ? shell.needsApprovalFn : undefined;
+
+    expect(needsApproval).toBeDefined();
+
+    await expect(Promise.resolve(needsApproval?.({ command: "pwd", cwd: outside }))).resolves.toBe(
+      false,
+    );
   });
 
   it("copies files only when both boundaries are registered", async () => {

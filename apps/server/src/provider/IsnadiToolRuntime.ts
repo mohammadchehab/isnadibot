@@ -3,6 +3,7 @@ import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
 import { decodeIsnadiRuntimeToolInput } from "./tools/IsnadiToolInputs.ts";
 import { RequestContext } from "@mastra/core/request-context";
+import { LocalFilesystem } from "@mastra/core/workspace";
 import {
   BotId,
   ISNADI_TOOL_CATALOG,
@@ -30,7 +31,7 @@ import {
   type IsnadiToolExecution,
 } from "./tools/IsnadiToolTypes.ts";
 import {
-  ensureWorkspaceCwd,
+  scopeShellCwd,
   approvalCeilingRefusal,
   delegationPreApprovesRead,
   canonicalInput,
@@ -277,6 +278,13 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
     return resolve(target);
   };
 
+  /** The folder the user's-computer workspace is rooted at, when it has one. */
+  const userRootOf = (session: IsnadiToolSession) => {
+    const filesystem = session.userComputerWorkspace?.filesystem;
+
+    return filesystem instanceof LocalFilesystem ? filesystem.basePath : undefined;
+  };
+
   const requiresApproval = async (
     session: IsnadiToolSession,
     tool: IsnadiRuntimeToolDefinition,
@@ -286,7 +294,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
     const isnadiTool = ISNADI_TOOL_CATALOG.find((candidate) => candidate.id === tool.id);
 
     if (!isnadiTool) throw new Error(`Tool '${tool.id}' has no definition.`);
-    ensureWorkspaceCwd(isnadiTool.id, input);
+    scopeShellCwd(isnadiTool.id, input, userRootOf(session));
 
     const refusal = approvalCeilingRefusal({
       tool: isnadiTool,
@@ -663,7 +671,7 @@ export function createIsnadiToolRuntime(options?: IsnadiToolRuntimeOptions): Isn
           const backendInput =
             input.toolId === "AwaitShell" || input.toolId === "AwaitExternalShell"
               ? { pid: requiredString(decoded, "handleId"), wait: true }
-              : decoded;
+              : scopeShellCwd(input.toolId, decoded, userRootOf(session));
 
           failureCode = "internal";
           result = await backend.execute(backendInput, {

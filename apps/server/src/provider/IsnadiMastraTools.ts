@@ -28,8 +28,16 @@ export function createIsnadiMastraTools(threadId: string, runtime: IsnadiToolRun
       const schema = inputSchema(definition.id);
       const standardSchema = Schema.toStandardJSONSchemaV1(schema);
 
-      const approval: NonNullable<Tool["needsApprovalFn"]> = (input) =>
-        runtime.requiresApproval(threadId, definition.id, omitNullValues(input));
+      // Mastra reads a throw here as "approval required", which would show the
+      // card for a call that can never run. A refusal returns false instead, so
+      // execute raises the same error and the reason reaches the boss unasked.
+      const approval: NonNullable<Tool["needsApprovalFn"]> = async (input) => {
+        try {
+          return await runtime.requiresApproval(threadId, definition.id, omitNullValues(input));
+        } catch {
+          return false;
+        }
+      };
 
       const tool = createTool({
         id: definition.id,
