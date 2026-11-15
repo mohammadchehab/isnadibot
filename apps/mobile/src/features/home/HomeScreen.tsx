@@ -445,7 +445,7 @@ export function HomeScreen(props: HomeScreenProps) {
           <Text className="mt-6 text-center text-[22px] font-t3-bold text-foreground">
             {emptyState.title}
           </Text>
-          <Text className="mt-2 max-w-[430px] text-center font-sans text-base leading-normal text-foreground-muted">
+          <Text className="mt-2 max-w-107.5 text-center font-sans text-base leading-normal text-foreground-muted">
             {emptyState.detail}
           </Text>
           {emptyState.loading ? (
@@ -465,7 +465,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 shadowRadius: 14,
               })}
             >
-              <Text className="text-[16px] font-t3-bold text-foreground">{emptyAction.label}</Text>
+              <Text className="text-base font-t3-bold text-foreground">{emptyAction.label}</Text>
             </Pressable>
           )}
         </View>

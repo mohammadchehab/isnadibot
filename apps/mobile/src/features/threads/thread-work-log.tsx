@@ -230,7 +230,7 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
                 className="rounded-md px-0.5 py-0"
               >
                 <View className="min-h-8 flex-row items-center gap-1.5">
-                  <View className="h-[18px] w-5 shrink-0 items-center justify-center">
+                  <View className="h-4.5 w-5 shrink-0 items-center justify-center">
                     <SymbolView
                       name={workRowSymbolName(row.icon)}
                       size={13}
@@ -363,7 +363,7 @@ export function ThreadWorkGroupToggle(props: {
         })}
         className="min-h-8 flex-row items-center gap-1.5 rounded-md px-0.5 py-0"
       >
-        <View className="h-[18px] w-5 items-center justify-center">
+        <View className="h-4.5 w-5 items-center justify-center">
           <SymbolView
             name={
               props.expanded

@@ -246,7 +246,7 @@ export function renderFeedEntry(
             }}
           >
             {message.channelOrigin ? (
-              <NativeText className="font-t3-medium text-[11px] text-channel-detail">
+              <NativeText className="font-t3-medium text-3xs text-channel-detail">
                 {channelOriginLabel(message.channelOrigin, message.authorDisplayName)}
               </NativeText>
             ) : null}
@@ -423,7 +423,7 @@ export function renderFeedEntry(
               return delivery ? (
                 <NativeText
                   className={cn(
-                    "mt-1 text-[11px]",
+                    "mt-1 text-3xs",
                     Match.value(delivery.tone).pipe(
                       Match.when("error", () => "text-red-600 dark:text-red-400"),
                       Match.when("warning", () => "text-amber-700 dark:text-amber-400"),
@@ -586,7 +586,7 @@ export function ThreadFeedPlaceholder(props: {
         paddingHorizontal: props.horizontalPadding + 24,
       }}
     >
-      <View className="max-w-[320px] items-center gap-2">
+      <View className="max-w-80 items-center gap-2">
         <Text className="text-center font-t3-bold text-lg text-foreground">{props.title}</Text>
         <Text className="text-center text-sm leading-normal text-foreground-secondary">
           {props.detail}

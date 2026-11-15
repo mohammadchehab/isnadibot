@@ -158,7 +158,7 @@ function UsageCoverageNotice(props: {
   }
 
   return (
-    <View className="gap-1 rounded-[16px] border-continuous bg-card px-4 py-3">
+    <View className="gap-1 rounded-2xl border-continuous bg-card px-4 py-3">
       {props.isPartial ? (
         <Text className="text-sm text-foreground-muted">
           Some environments are still reporting.

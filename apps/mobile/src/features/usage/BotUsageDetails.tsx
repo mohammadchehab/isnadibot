@@ -44,7 +44,7 @@ export function BotUsageDetails(props: { readonly botName: string; readonly view
 
   if (props.view.kind === "error") {
     return (
-      <View className="gap-1 rounded-[24px] border-continuous bg-card px-4 py-3">
+      <View className="gap-1 rounded-3xl border-continuous bg-card px-4 py-3">
         <Text className="text-base text-foreground">{props.view.message}</Text>
         <Text className="text-sm text-foreground-muted">Pull down to try again.</Text>
       </View>
@@ -53,7 +53,7 @@ export function BotUsageDetails(props: { readonly botName: string; readonly view
 
   if (props.view.kind === "empty") {
     return (
-      <View className="gap-1 rounded-[24px] border-continuous bg-card px-4 py-3">
+      <View className="gap-1 rounded-3xl border-continuous bg-card px-4 py-3">
         <Text className="text-base text-foreground">{props.view.message}</Text>
         <Text className="text-sm text-foreground-muted">
           This bot has not recorded any usage yet.
@@ -70,7 +70,7 @@ export function BotUsageDetails(props: { readonly botName: string; readonly view
         ))}
       </SettingsSection>
       {props.view.partialNotice === null ? null : (
-        <View className="rounded-[24px] border-continuous bg-card px-4 py-3">
+        <View className="rounded-3xl border-continuous bg-card px-4 py-3">
           <Text className="text-sm text-foreground-muted">{props.view.partialNotice}</Text>
         </View>
       )}

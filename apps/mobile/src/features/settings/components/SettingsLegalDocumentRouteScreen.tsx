@@ -108,7 +108,7 @@ export function SettingsLegalDocumentRouteScreen({
             {loadError}
           </Text>
         </View>
-        <View className="w-full max-w-[320px] gap-2">
+        <View className="w-full max-w-80 gap-2">
           <Pressable
             accessibilityRole="button"
             onPress={() => {

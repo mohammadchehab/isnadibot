@@ -81,7 +81,7 @@ export const ComposerConnectionStatusPill = memo(function ComposerConnectionStat
           <View className="h-2 w-2 rounded-full bg-red-500" />
         )}
         <Text
-          className="max-w-[260px] text-sm font-t3-bold leading-snug text-foreground"
+          className="max-w-65 text-sm font-t3-bold leading-snug text-foreground"
           numberOfLines={1}
         >
           {props.status.label}

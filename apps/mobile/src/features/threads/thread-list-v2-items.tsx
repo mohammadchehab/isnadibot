@@ -549,8 +549,8 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           </Text>
           {/* A title-derived identity already shows the title; skip the duplicate chip. */}
           {displayThreadTitle !== botName ? (
-            <View className="min-w-0 shrink-[2] rounded-lg bg-subtle px-2 py-[3px]">
-              <Text className={cn("text-[13px] font-t3-medium", metaMutedClass)} numberOfLines={1}>
+            <View className="min-w-0 shrink-[2] rounded-lg bg-subtle px-2 py-0.75">
+              <Text className={cn("text-xs font-t3-medium", metaMutedClass)} numberOfLines={1}>
                 {displayThreadTitle}
               </Text>
             </View>
@@ -561,7 +561,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           ) : null}
           <Text
             className={cn(
-              "text-[13px] tabular-nums",
+              "text-xs tabular-nums",
               selected
                 ? "text-user-bubble-foreground-muted"
                 : (statusLabel?.className ?? "text-foreground-tertiary"),
@@ -573,7 +573,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         {previewText ? (
           <Text
             className={cn(
-              "mt-0.5 text-[14px]",
+              "mt-0.5 text-sm",
               sessionFailure
                 ? selected
                   ? "text-user-bubble-foreground-muted"
@@ -663,7 +663,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         {/* Settled history recedes: muted title. */}
         <View
           className={cn(
-            "min-h-[44px] flex-row items-center gap-2.5 py-2",
+            "min-h-11 flex-row items-center gap-2.5 py-2",
             sidebarPane ? "px-3" : "px-5",
           )}
         >

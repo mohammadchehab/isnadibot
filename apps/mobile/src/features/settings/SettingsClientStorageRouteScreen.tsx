@@ -85,7 +85,7 @@ export function SettingsClientStorageRouteScreen() {
         contentInset={{ bottom: Math.max(insets.bottom, 18) }}
         showsVerticalScrollIndicator={false}
         className="flex-1"
-        contentContainerClassName="gap-6 px-5 pt-4 pb-[18px]"
+        contentContainerClassName="gap-6 px-5 pt-4 pb-4.5"
       >
         <SettingsSection title={t("Environment caches")}>
           {AsyncResult.isFailure(summaryResult) ? (

@@ -594,7 +594,7 @@ function ThreadBotHeader(props: {
               />
             )}
             <View className="min-w-0 shrink">
-              <AppText className="text-[16px] font-t3-bold text-foreground" numberOfLines={1}>
+              <AppText className="text-base font-t3-bold text-foreground" numberOfLines={1}>
                 {props.botName}
               </AppText>
               {props.subtitle ? (

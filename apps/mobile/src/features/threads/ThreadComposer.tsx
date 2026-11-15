@@ -585,7 +585,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
             <Pressable
               accessibilityLabel="Model and reasoning settings"
               accessibilityRole="button"
-              className="mr-1 max-w-[112px] flex-row items-center gap-1.5 rounded-full bg-subtle px-2.5 py-2"
+              className="mr-1 max-w-28 flex-row items-center gap-1.5 rounded-full bg-subtle px-2.5 py-2"
               onPress={openSettings}
               style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
             >
@@ -643,13 +643,13 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                 <Pressable key={image.id} onPress={() => onPressImage(image.previewUri)}>
                   <Image
                     source={{ uri: image.previewUri }}
-                    className="size-[30px] rounded-lg bg-subtle"
+                    className="size-7.5 rounded-lg bg-subtle"
                     resizeMode="cover"
                   />
                 </Pressable>
               ))}
               {props.draftAttachments.length > 3 ? (
-                <View className="size-[30px] items-center justify-center rounded-lg bg-subtle-strong">
+                <View className="size-7.5 items-center justify-center rounded-lg bg-subtle-strong">
                   <Text className="text-foreground-muted text-2xs font-t3-bold">
                     +{props.draftAttachments.length - 3}
                   </Text>

@@ -209,7 +209,7 @@ export function HomeHeader(props: {
           paddingTop: Math.max(insets.top, 12) + 4,
         }}
       >
-        <View className="w-full max-w-[720px] self-center">
+        <View className="w-full max-w-180 self-center">
           <View className="flex-row items-center gap-3">
             <ControlPillMenu
               actions={menuActions}
@@ -285,7 +285,7 @@ export function HomeHeader(props: {
                 accessibilityLabel={t("Search chats")}
                 autoCapitalize="none"
                 autoCorrect={false}
-                className="h-full flex-1 font-sans text-[16px] text-foreground"
+                className="h-full flex-1 font-sans text-base text-foreground"
                 onChangeText={props.onSearchQueryChange}
                 placeholder={t("Search")}
                 placeholderTextColorClassName="accent-placeholder"

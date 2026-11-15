@@ -90,7 +90,7 @@ export function ArchivedThreadRow(props: {
             borderBottomWidth: props.isLast ? 0 : 1,
           }}
         >
-          <View className="h-[34px] w-[34px] items-center justify-center rounded-[11px] bg-subtle">
+          <View className="h-8.5 w-8.5 items-center justify-center rounded-[11px] bg-subtle">
             <SymbolView name="archivebox.fill" size={15} tintColor={iconColor} type="monochrome" />
           </View>
 
@@ -102,7 +102,7 @@ export function ArchivedThreadRow(props: {
               >
                 {props.thread.title}
               </Text>
-              <Text className="min-w-[30px] text-right text-xs tabular-nums text-foreground-tertiary">
+              <Text className="min-w-7.5 text-right text-xs tabular-nums text-foreground-tertiary">
                 {timestamp}
               </Text>
             </View>
