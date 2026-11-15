@@ -1,6 +1,7 @@
 import { createSessionContext } from "./SessionContext.ts";
 import { createSessionCatalogHandlers } from "./CatalogToolHandlers.ts";
 import type { SessionLifecycleDependencies } from "./SessionLifecycleDependencies.ts";
+import { isSameSpaceHandoffInSnapshot } from "../../delegation/IsnadiDelegationPolicy.ts";
 import { ProviderDriverKind } from "@isnadi/contracts";
 
 import {
@@ -8,6 +9,7 @@ import {
   BALANCED_BOT_PERSONALITY_TONE,
   DEFAULT_BOT_SANDBOX_BROWSER_SHARING,
   ISNADI_PRODUCT_FEEDBACK_TOOL_NAME,
+  type BotId,
   type IsnadiDelegationAccessGrant,
 } from "@isnadi/contracts";
 
@@ -474,6 +476,21 @@ export function createSessionLifecycle(deps: SessionLifecycleDependencies) {
 
     const toolSession: IsnadiToolSession = {
       ...(botId ? { botId } : {}),
+      ...(botId && deps.wired().pluginRuntimeOptions
+        ? {
+            sameSpaceTarget: async (targetBotId: BotId) => {
+              const snapshot = await deps.wired().pluginRuntimeOptions?.readSnapshot();
+
+              if (!snapshot) return false;
+
+              return isSameSpaceHandoffInSnapshot(snapshot, {
+                threadId,
+                actingBotId: botId,
+                targetBotId,
+              });
+            },
+          }
+        : {}),
       ...(input.botName ? { botName: input.botName } : {}),
       runtimeMode: access.runtimeMode,
       workspaceType,

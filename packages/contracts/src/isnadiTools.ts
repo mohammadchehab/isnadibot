@@ -128,12 +128,32 @@ export function isnadiToolRequiresApproval(
   tool: IsnadiToolDefinition,
   context: Pick<IsnadiToolAvailabilityContext, "localFullAccess"> & {
     readonly workspaceType?: IsnadiToolWorkspaceType;
+    /**
+     * True when a bot-to-bot handoff's target shares a space with the calling
+     * bot, for both `SendToAgent` and `MessageAgent`. The caller resolves it
+     * because only the caller holds the session and so the environment: neither
+     * bot is visible from here, and the ids in `input` mean nothing without a
+     * read model to look them up in.
+     */
+    readonly sameSpaceTarget?: boolean;
   },
   input?: Parameters<typeof decodeIsnadiToolInput>[1],
 ): boolean {
   const approval = isnadiToolApprovalForInput(tool, input, context);
 
   if (tool.id === "Shell" && context.workspaceType === "local") return true;
+
+  // A handoff between two bots in one space crosses nothing the user has not
+  // already agreed to: they hired both bots and made one of them the boss. The
+  // delegation record is its audit trail, so it is recorded rather than
+  // approved. Anything that leaves the space keeps the approval it had.
+  //
+  // Same-space handoff is keyed on the shared home, not on who created the bot:
+  // the boundary is the space the user made, so a bot another bot spawned inside
+  // that space is inside it. Gating a bot that makes bots belongs on CreateAgent,
+  // not on the delegation.
+  if ((tool.id === "SendToAgent" || tool.id === "MessageAgent") && context.sameSpaceTarget === true)
+    return false;
 
   if (
     Array.from(ISNADI_PROTECTED_APPROVAL_CLASSES).some(
