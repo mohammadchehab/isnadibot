@@ -43,6 +43,15 @@ export const emitXAiAskUserQuestion = process.env.T3_ACP_EMIT_XAI_ASK_USER_QUEST
 export const emitXAiPromptCompleteThenHang =
   process.env.T3_ACP_EMIT_XAI_PROMPT_COMPLETE_THEN_HANG === "1";
 
+/**
+ * How long the mock waits, after announcing `prompt_complete`, before writing the chunk that
+ * trails it. A real provider finishes generating before its last tokens have crossed the pipe, so
+ * a delayed trailing chunk is what the transport looks like when the reader has not caught up —
+ * it makes "the turn settled while content was still in flight" reproducible instead of a race
+ * that only shows up on a loaded CI runner.
+ */
+export const trailingChunkDelayMs = Number(process.env.T3_ACP_TRAILING_CHUNK_DELAY_MS ?? "0");
+
 export const emitForeignSessionUpdates = process.env.T3_ACP_EMIT_FOREIGN_SESSION_UPDATES === "1";
 
 export const hangPromptForever = process.env.T3_ACP_HANG_PROMPT_FOREVER === "1";

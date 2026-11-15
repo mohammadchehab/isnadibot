@@ -20,6 +20,7 @@ import {
   selectGrokPermissionOptionId,
 } from "./GrokAdapter.ts";
 import {
+  awaitReceipt,
   decodeGrokSettings,
   makeMockGrokWrapper,
   grokAdapterTestLayer,
@@ -279,6 +280,7 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
 
       const runtimeEvents: ProviderRuntimeEvent[] = [];
       const turnCompleted = yield* Deferred.make<void>();
+      const trailingChunk = yield* Deferred.make<void>();
 
       const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
         Effect.sync(() => {
@@ -287,7 +289,9 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
           Effect.andThen(
             event.type === "turn.completed"
               ? Deferred.succeed(turnCompleted, undefined)
-              : Effect.void,
+              : event.type === "content.delta" && event.payload.delta === "mock"
+                ? Deferred.succeed(trailingChunk, undefined)
+                : Effect.void,
           ),
         ),
       ).pipe(Effect.forkChild);
@@ -308,9 +312,13 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
 
       yield* Deferred.await(turnCompleted);
 
-      for (let yieldAttempt = 0; yieldAttempt < 8; yieldAttempt += 1) {
-        yield* Effect.yieldNow;
-      }
+      // Wait for the trailing chunk the provider writes after `prompt_complete` rather than betting
+      // on a fixed number of yields: the count guesses how many ticks the stream needs, and on a
+      // loaded runner the guess is what makes the tail look missing.
+      assert.isTrue(
+        yield* awaitReceipt(trailingChunk),
+        "the trailing 'mock' content delta never arrived after turn.completed",
+      );
 
       const readySessions = yield* adapter.listSessions();
       const readySession = readySessions.find((session) => session.threadId === threadId);
@@ -352,18 +360,36 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         event.type === "item.updated" && event.payload.title ? [event.payload.title] : [],
       );
 
-      assert.equal(sendTurnResult.threadId, threadId);
-      assert.include(eventTypes, "turn.completed");
-      assert.equal(content, "hello from mock");
-      assert.isAtLeast(terminalIndex, 0);
-      assert.deepEqual(outputAfterTerminal, []);
-      assert.notInclude(toolTitles, "Child-only tool");
-      assert.equal(turnCompletedEvent?.payload.stopReason, "end_turn");
-      assert.equal(readySession?.status, "ready");
-      assert.isUndefined(readySession?.activeTurnId);
+      // Teardown has to survive a failing assertion: the event-stream fiber never ends on its own,
+      // so a bare sequence would leave the scope open and a failed receipt would surface as
+      // vitest's 120s timeout instead of the deadline that names what went missing.
+      yield* Effect.sync(() => {
+        assert.equal(sendTurnResult.threadId, threadId);
+        assert.include(eventTypes, "turn.completed");
+        assert.equal(content, "hello from mock");
+        assert.isAtLeast(terminalIndex, 0);
 
-      yield* Fiber.interrupt(runtimeEventsFiber);
-      yield* adapter.stopSession(threadId);
+        // The trailing chunk may land after the terminal: once `prompt_complete` has arrived, a
+        // chunk the provider has not written yet cannot be waited for without inventing a
+        // quiescence timeout, so the adapter guarantees delivery, not order. What must never
+        // appear after the terminal is a different turn output.
+        const nonTrailingOutputAfterTerminal = outputAfterTerminal.filter(
+          (event) => !(event.type === "content.delta" && event.payload.delta === "mock"),
+        );
+
+        assert.deepEqual(nonTrailingOutputAfterTerminal, []);
+        assert.notInclude(toolTitles, "Child-only tool");
+        assert.equal(turnCompletedEvent?.payload.stopReason, "end_turn");
+        assert.equal(readySession?.status, "ready");
+        assert.isUndefined(readySession?.activeTurnId);
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            yield* Fiber.interrupt(runtimeEventsFiber);
+            yield* adapter.stopSession(threadId).pipe(Effect.orDie);
+          }),
+        ),
+      );
     }),
   );
 });

@@ -3,6 +3,8 @@ import * as NodeOS from "node:os";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeURL from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Clock from "effect/Clock";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -76,6 +78,29 @@ export async function readJsonLines(filePath: string) {
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line) as Schema.JsonObject);
 }
+
+/**
+ * Waits for `deferred` on the real clock and answers whether it landed before `timeoutMs`.
+ *
+ * A fixed number of yields is a bet on how many ticks the event stream needs, and on a loaded
+ * runner it is the wrong bet. This waits on the receipt itself, bounded by a real deadline, so a
+ * failing assertion can name what went missing instead of reporting a short string.
+ *
+ * `it.effect` runs on the TestClock, whose sleep waits for the test to advance it and so never
+ * fires on its own. The deadline is only a deadline if it is real time, so this branch alone runs
+ * on the runtime's default clock.
+ */
+export const awaitReceipt = <A>(
+  deferred: Deferred.Deferred<A>,
+  timeoutMs = 5_000,
+): Effect.Effect<boolean> =>
+  Effect.race(
+    Deferred.await(deferred).pipe(Effect.as(true)),
+    Effect.sleep(`${timeoutMs} millis`).pipe(
+      Effect.as(false),
+      Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
+    ),
+  );
 
 export const grokAdapterTestLayer = ServerConfig.layerTest(process.cwd(), {
   prefix: "t3code-grok-adapter-test-",

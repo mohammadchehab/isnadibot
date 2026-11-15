@@ -45,6 +45,15 @@ export interface GrokSessionContext {
   turns: Array<{ id: TurnId; items: Array<unknown> }>;
   lastPlanFingerprint: string | undefined;
   activeTurnId: TurnId | undefined;
+  /**
+   * The turn that settled most recently, kept after `activeTurnId` is cleared.
+   *
+   * A provider can finish generating before its last chunk has crossed the pipe, so a
+   * `session/update` may arrive once the turn is already settled. Without this the notification
+   * resolves to no turn and is dropped, and the tail of the reply is lost for good. Interrupted
+   * turns still check out through `interruptedTurnIds`, so this never resurrects a cancelled turn.
+   */
+  lastSettledTurnId: TurnId | undefined;
   /** Turns already interrupted; late prompt RPCs must not resurrect them. */
   interruptedTurnIds: Set<TurnId>;
   /** Number of sendTurn prompts currently in flight or being prepared.
