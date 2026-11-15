@@ -3,6 +3,7 @@ import { isTransportConnectionErrorMessage } from "@isnadi/client-runtime/errors
 import type { EnvironmentShellStatus } from "@isnadi/client-runtime/state/shell";
 import {
   CommandId,
+  CommandRefusal,
   EnvironmentId,
   GroupAddressing,
   IsoDateTime,
@@ -12,6 +13,7 @@ import {
   ProviderInteractionMode,
   RuntimeMode,
   ThreadId,
+  type CommandRefusal as CommandRefusalType,
   type GroupAddressing as GroupAddressingType,
   type ModelSelection as ModelSelectionType,
   type ProjectId as ProjectIdType,
@@ -24,7 +26,7 @@ import { DraftComposerImageAttachmentSchema } from "../lib/composer-image-schema
 import type { DraftComposerImageAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 
-const THREAD_OUTBOX_SCHEMA_VERSION = 3;
+const THREAD_OUTBOX_SCHEMA_VERSION = 4;
 
 const THREAD_OUTBOX_MAX_RETRY_DELAY_MS = 16_000;
 
@@ -40,8 +42,22 @@ const QueuedThreadCreationSchema = Schema.Struct({
   startFromOrigin: Schema.optional(Schema.Boolean),
 });
 
+/**
+ * Why a queued message was not delivered, kept on the message itself so the
+ * item stays in the outbox and the reason survives a restart. `action` records
+ * the decision the drain made, because a code this client cannot name has no
+ * meaning on its own: only the decision says whether trying again could work.
+ */
+export const QueuedThreadFailureSchema = Schema.Struct({
+  refusal: Schema.Union([CommandRefusal, Schema.Literal("unknown")]),
+  action: Schema.Literals(["block", "discard"]),
+  at: IsoDateTime,
+});
+
+export type QueuedThreadFailure = typeof QueuedThreadFailureSchema.Type;
+
 export const QueuedThreadMessageSchema = Schema.Struct({
-  schemaVersion: Schema.Literals([1, 2, THREAD_OUTBOX_SCHEMA_VERSION]),
+  schemaVersion: Schema.Literals([1, 2, 3, THREAD_OUTBOX_SCHEMA_VERSION]),
   environmentId: EnvironmentId,
   threadId: ThreadId,
   messageId: MessageId,
@@ -56,6 +72,10 @@ export const QueuedThreadMessageSchema = Schema.Struct({
   // Present when the queued item creates a brand-new thread (pending task)
   // instead of appending a turn to an existing one.
   creation: Schema.optional(QueuedThreadCreationSchema),
+  // Present once a delivery failure stopped the item. The item stays queued so
+  // the text is not lost, and the reason has to survive a restart to be worth
+  // anything.
+  failure: Schema.optional(QueuedThreadFailureSchema),
   createdAt: IsoDateTime,
 });
 
@@ -85,6 +105,7 @@ export interface QueuedThreadMessage {
   readonly interactionMode?: ProviderInteractionModeType;
   readonly addressing?: GroupAddressingType;
   readonly creation?: QueuedThreadCreation;
+  readonly failure?: QueuedThreadFailure;
   readonly createdAt: string;
 }
 
@@ -256,20 +277,71 @@ export function threadOutboxHydrationRetryDelayMs(attempt: number): number | nul
 
 export type ThreadOutboxCommandStage = "settings-sync" | "start-turn";
 
-export type ThreadOutboxFailureAction = "retry" | "discard";
+const isCommandRefusal = Schema.is(CommandRefusal);
+
+/**
+ * Refusals whose condition clears without anyone changing anything, so the
+ * queued item can keep using the normal backoff. Written down rather than
+ * inferred from a code's name: a code added later is not in this set, so it
+ * blocks — the user is told and nothing is lost, rather than retried forever.
+ */
+export const SELF_CLEARING_THREAD_OUTBOX_REFUSALS: ReadonlySet<CommandRefusalType> = new Set([
+  "thread-is-busy",
+]);
+
+/**
+ * The refusal code a squashed error carries, or null when it carries none.
+ * Deliberately narrower than `classifyCommandFailure`, which folds "no code at
+ * all" and "a code this client does not know" into one `unknown`: the drain
+ * treats those differently, so the difference has to survive here.
+ */
+function readRefusal(error: unknown): CommandRefusalType | "unknown" | null {
+  const raw = Predicate.isObjectOrArray(error) && "refusal" in error ? error.refusal : undefined;
+
+  if (!Predicate.isString(raw)) {
+    return null;
+  }
+
+  return isCommandRefusal(raw) ? raw : "unknown";
+}
+
+/** An auth refusal carries no refusal code, but needs a person just the same. */
+function isAuthorizationFailure(error: unknown): boolean {
+  return Predicate.isTagged(error, "EnvironmentAuthorizationError");
+}
+
+export type ThreadOutboxFailureAction = "retry" | "block" | "discard";
+
+export type ThreadOutboxFailureDecision =
+  | { readonly action: "retry" }
+  | {
+      readonly action: "block" | "discard";
+      readonly refusal: CommandRefusalType | "unknown";
+    };
 
 export function resolveThreadOutboxFailureAction(input: {
   readonly stage: ThreadOutboxCommandStage;
   readonly error: unknown;
   readonly interrupted: boolean;
-}): ThreadOutboxFailureAction {
+}): ThreadOutboxFailureDecision {
+  const refusal = readRefusal(input.error);
+
   if (
     input.stage === "settings-sync" ||
     input.interrupted ||
-    shouldRetryThreadOutboxDelivery(input.error)
+    shouldRetryThreadOutboxDelivery(input.error) ||
+    (refusal !== null && refusal !== "unknown" && SELF_CLEARING_THREAD_OUTBOX_REFUSALS.has(refusal))
   ) {
-    return "retry";
+    return { action: "retry" };
   }
 
-  return "discard";
+  if (isAuthorizationFailure(input.error)) {
+    return { action: "block", refusal: "environment-rights" };
+  }
+
+  if (refusal !== null) {
+    return { action: "block", refusal };
+  }
+
+  return { action: "discard", refusal: "unknown" };
 }

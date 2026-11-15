@@ -21,10 +21,12 @@ import { toUploadChatImageAttachments } from "../lib/composerImages";
 import { randomHex } from "../lib/uuid";
 import { appAtomRegistry } from "./atom-registry";
 import { useProjects, useThreadShells } from "./entities";
+import { persistQueuedThreadFailure } from "./thread-outbox-failure";
 import {
   confirmThreadOutboxMessageQueued,
   ensureThreadOutboxLoaded,
   removeThreadOutboxMessage,
+  updateThreadOutboxMessage,
 } from "./thread-outbox";
 import {
   isQueuedThreadCreationSendable,
@@ -37,6 +39,7 @@ import {
   type QueuedThreadCreation,
   type QueuedThreadMessage,
   type ThreadOutboxCommandStage,
+  type ThreadOutboxFailureAction,
 } from "./thread-outbox-model";
 import { threadEnvironment } from "./threads";
 import { useAtomCommand } from "./use-atom-command";
@@ -157,38 +160,66 @@ export function useThreadOutboxDrain(): void {
   }, [connectedEnvironmentKey]);
 
   const makeDeliveryHelpers = useCallback((queuedMessage: QueuedThreadMessage) => {
-    const reportFailure = (
+    const reportFailure = async (
       commandResult: AtomCommandResult<unknown, unknown>,
       stage: ThreadOutboxCommandStage,
-    ): boolean => {
+    ): Promise<ThreadOutboxFailureAction | null> => {
       if (!AsyncResult.isFailure(commandResult)) {
-        return false;
+        return null;
       }
 
-      const action = resolveThreadOutboxFailureAction({
+      const decision = resolveThreadOutboxFailureAction({
         stage,
         error: Cause.squash(commandResult.cause),
         interrupted: Cause.hasInterruptsOnly(commandResult.cause),
       });
 
-      const retry = action === "retry";
       console.warn("[thread-outbox] queued message delivery failed", {
         environmentId: queuedMessage.environmentId,
         threadId: queuedMessage.threadId,
         messageId: queuedMessage.messageId,
         stage,
         cause: commandResult.cause,
-        retry,
+        action: decision.action,
       });
 
-      return retry;
+      if (decision.action === "retry") {
+        return "retry";
+      }
+
+      // The item stays in the outbox carrying its reason, so the user still has
+      // the text and can read why it did not send. Recording the failure is also
+      // what stops the drain from picking the item up again. If the write
+      // itself fails the item stays unfailed and retries later; either way it is
+      // never removed on a decided failure.
+      try {
+        await persistQueuedThreadFailure({
+          message: queuedMessage,
+          failure: decision,
+          now: new Date().toISOString(),
+          update: updateThreadOutboxMessage,
+        });
+      } catch (error) {
+        console.warn("[thread-outbox] failed to record a queued message failure", {
+          environmentId: queuedMessage.environmentId,
+          threadId: queuedMessage.threadId,
+          messageId: queuedMessage.messageId,
+          error,
+        });
+      }
+
+      return decision.action;
     };
 
     const completeDelivery = async (
       deliveryResult: AtomCommandResult<unknown, unknown>,
     ): Promise<boolean> => {
-      if (reportFailure(deliveryResult, "start-turn")) {
-        return false;
+      const failure = await reportFailure(deliveryResult, "start-turn");
+
+      // Only a delivered message is removed. A retryable failure keeps the
+      // existing backoff; a blocked or discarded one is terminal and stops it.
+      if (failure !== null) {
+        return failure !== "retry";
       }
 
       try {
@@ -226,7 +257,7 @@ export function useThreadOutboxDrain(): void {
         });
 
         if (AsyncResult.isFailure(updateResult)) {
-          reportFailure(updateResult, "settings-sync");
+          await reportFailure(updateResult, "settings-sync");
 
           return false;
         }
@@ -244,7 +275,7 @@ export function useThreadOutboxDrain(): void {
         });
 
         if (AsyncResult.isFailure(runtimeResult)) {
-          reportFailure(runtimeResult, "settings-sync");
+          await reportFailure(runtimeResult, "settings-sync");
 
           return false;
         }
@@ -262,7 +293,7 @@ export function useThreadOutboxDrain(): void {
         });
 
         if (AsyncResult.isFailure(interactionResult)) {
-          reportFailure(interactionResult, "settings-sync");
+          await reportFailure(interactionResult, "settings-sync");
 
           return false;
         }
@@ -348,6 +379,15 @@ export function useThreadOutboxDrain(): void {
       const nextQueuedMessage = queuedMessages[0];
 
       if (!nextQueuedMessage) {
+        continue;
+      }
+
+      // An item that already carries a failure waits for the user: the drain
+      // recorded it precisely so it would not send itself later. Both terminal
+      // actions are skipped — a message written at 09:00 must not land at 17:00
+      // because someone finally fixed the roster. The queue is ordered, so this
+      // thread waits with it.
+      if (nextQueuedMessage.failure !== undefined) {
         continue;
       }
 
