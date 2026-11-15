@@ -420,6 +420,7 @@ export function createGrokSessionLifecycle(deps: {
           turns: [],
           lastPlanFingerprint: undefined,
           activeTurnId: undefined,
+          lastSettledTurnId: undefined,
           interruptedTurnIds: new Set(),
           promptsInFlight: 0,
           promptEpoch: 0,
@@ -451,7 +452,11 @@ export function createGrokSessionLifecycle(deps: {
                 return;
               }
 
-              const notificationTurnId = resolveNotificationTurnId(ctx);
+              // A chunk can arrive after its turn settled, because a provider finishes generating
+              // before its last token has crossed the pipe. Falling back to the turn that just
+              // settled keeps that tail instead of dropping it; an interrupted turn still fails
+              // the check below, so a cancelled turn is never resurrected.
+              const notificationTurnId = resolveNotificationTurnId(ctx) ?? ctx.lastSettledTurnId;
 
               if (
                 notificationTurnId === undefined ||

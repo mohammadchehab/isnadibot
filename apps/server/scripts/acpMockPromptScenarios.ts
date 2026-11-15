@@ -18,6 +18,7 @@ import {
   failPrompt,
   promptResponseText,
   promptDelayMs,
+  trailingChunkDelayMs,
   permissionOptionIds,
   sessionId,
   cancelledSessions,
@@ -151,6 +152,10 @@ export const createPromptScenario =
               content: { type: "text", text: "child after completion" },
             },
           });
+        }
+
+        if (Number.isFinite(trailingChunkDelayMs) && trailingChunkDelayMs > 0) {
+          yield* Effect.sleep(`${trailingChunkDelayMs} millis`);
         }
 
         writeJsonRpcNotification("session/update", {

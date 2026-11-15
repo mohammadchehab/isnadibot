@@ -113,6 +113,7 @@ export function createGrokTurnLifecycle(deps: {
               const updatedAt = yield* deps.nowIso;
               const { activeTurnId: _activeTurnId, ...readySession } = liveCtx.session;
               liveCtx.activeTurnId = undefined;
+              liveCtx.lastSettledTurnId = turnId;
               liveCtx.session = {
                 ...readySession,
                 status: "ready",
@@ -162,6 +163,7 @@ export function createGrokTurnLifecycle(deps: {
 
         const { activeTurnId: _activeTurnId, ...readySession } = liveCtx.session;
         liveCtx.activeTurnId = undefined;
+        liveCtx.lastSettledTurnId = settleTurnId;
         liveCtx.pendingTurnCompletion = undefined;
         liveCtx.session = {
           ...readySession,
@@ -218,6 +220,7 @@ export function createGrokTurnLifecycle(deps: {
 
       const { activeTurnId: _activeTurnId, ...readySession } = liveCtx.session;
       liveCtx.activeTurnId = undefined;
+      liveCtx.lastSettledTurnId = settleTurnId;
       liveCtx.session = {
         ...readySession,
         status: "ready",
