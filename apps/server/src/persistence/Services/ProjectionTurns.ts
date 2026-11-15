@@ -49,6 +49,12 @@ export const ProjectionTurn = Schema.Struct({
   requestedAt: IsoDateTime,
   startedAt: Schema.NullOr(IsoDateTime),
   completedAt: Schema.NullOr(IsoDateTime),
+  /**
+   * The last time this turn's provider produced output before going quiet. Set by the silence
+   * watchdog's `turn.silent` report and cleared by `turn.silent.cleared`, so a running turn
+   * carries it only while nothing is coming out of the provider.
+   */
+  silentAt: Schema.NullOr(IsoDateTime),
   checkpointTurnCount: Schema.NullOr(NonNegativeInt),
   checkpointRef: Schema.NullOr(CheckpointRef),
   checkpointStatus: Schema.NullOr(OrchestrationCheckpointStatus),
@@ -70,6 +76,7 @@ export const ProjectionTurnById = Schema.Struct({
   requestedAt: IsoDateTime,
   startedAt: Schema.NullOr(IsoDateTime),
   completedAt: Schema.NullOr(IsoDateTime),
+  silentAt: Schema.NullOr(IsoDateTime),
   checkpointTurnCount: Schema.NullOr(NonNegativeInt),
   checkpointRef: Schema.NullOr(CheckpointRef),
   checkpointStatus: Schema.NullOr(OrchestrationCheckpointStatus),

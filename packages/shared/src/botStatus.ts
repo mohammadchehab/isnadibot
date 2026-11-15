@@ -1,5 +1,7 @@
 import {
   isIsnadiDelegationTerminal,
+  isOpenTurn,
+  isSilentTurn,
   type BotId,
   type IsnadiDelegationRecord,
   type IsoDateTime,
@@ -157,9 +159,11 @@ function ownedChats(input: BotStatusInput): ReadonlyArray<BotStatusChat> {
  * - held: the bot owns an item in state `blocked`, or its running turn is
  *   waiting on a delegated child that has not finished. It is not free to take
  *   more work, and it is not working either.
- * - busy: a turn is running, a session is still starting or running for one of
- *   its chats, or it owns an item in `assigned` or `in-progress` — the bot has
- *   been given work and has not finished it.
+ * - busy: a turn is running and producing output, a session is still starting
+ *   or running for one of its chats, or it owns an item in `assigned` or
+ *   `in-progress` — the bot has been given work and has not finished it. A turn
+ *   that has gone silent does not count as either a running turn or a live
+ *   session: the provider stopped answering, and the chat says so.
  * - idle: none of the above.
  *
  * Only chats that are not archived or deleted count; a deleted chat is not in
@@ -171,15 +175,24 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
   if (chats.some((chat) => chat.hasPendingApprovals === true || chat.hasPendingUserInput === true))
     return "asking";
 
+  // Open is the one list of what counts as a turn still in flight: a turn that
+  // ended, or that went silent and never came back, is not work. See
+  // `@isnadi/contracts` turnState.
+  const working = chats.filter((chat) => isOpenTurn(chat.latestTurn));
+
+  // Held is the exception that reads every running turn, silent or not: a parent
+  // waiting on a delegated child produces no output either, and it is not free.
   const running = chats.filter((chat) => chat.latestTurn?.state === "running");
 
   // A bot with a turn in flight is working, not stuck at a login screen.
-  if (running.length === 0 && chats.some(needsSignIn)) return "sign-in-required";
+  if (working.length === 0 && chats.some(needsSignIn)) return "sign-in-required";
 
   const blockedItem = input.workItems.some(
     (item) => item.ownerBotId === input.botId && item.state === "blocked",
   );
 
+  // Held is checked over every running turn, silent or not: a parent waiting on
+  // a delegated child produces no output either, and it is not free.
   const waitingOnChildren = running.some((chat) =>
     input.delegations.some(
       (delegation) =>
@@ -195,11 +208,16 @@ export function deriveBotStatus(input: BotStatusInput): BotStatus {
       (item.state === "assigned" || item.state === "in-progress"),
   );
 
+  // A silent chat's session is still "running" at the provider, so it cannot
+  // count as live work either — that is the same claim in another field.
   const liveSession = chats.some(
-    (chat) => chat.session !== null && isLiveSessionStatus(chat.session.status),
+    (chat) =>
+      !isSilentTurn(chat.latestTurn) &&
+      chat.session !== null &&
+      isLiveSessionStatus(chat.session.status),
   );
 
-  return running.length > 0 || workingItem || liveSession ? "busy" : "idle";
+  return working.length > 0 || workingItem || liveSession ? "busy" : "idle";
 }
 
 /**

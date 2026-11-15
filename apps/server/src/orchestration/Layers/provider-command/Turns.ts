@@ -1,4 +1,9 @@
-import { IsnadiUsageReservationId, type ChatAttachment, ThreadId } from "@isnadi/contracts";
+import {
+  isSilentTurn,
+  IsnadiUsageReservationId,
+  type ChatAttachment,
+  ThreadId,
+} from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -226,6 +231,21 @@ export function createTurns({
             );
 
     if (!reserved) return;
+
+    // A turn that has gone silent may never answer again, and a send would steer
+    // into it instead of starting one: the message would land nowhere and the
+    // user would have to press Stop first. End it here so this turn starts fresh.
+    if (isSilentTurn(thread.latestTurn)) {
+      yield* agentController.interruptTurn({ threadId: thread.id }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("provider turn start could not end a silent turn", {
+            threadId: thread.id,
+            turnId: thread.latestTurn?.turnId,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      );
+    }
 
     const sendTurnRequest = yield* buildSendTurnRequestForThread({
       threadId: event.payload.threadId,

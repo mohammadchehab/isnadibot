@@ -407,4 +407,224 @@ describe("orchestration projector", () => {
       expect(afterUpdate.threads[0]?.updatedAt).toBe(updatedAt);
     }),
   );
+
+  it.effect("a silent report ends the turn for the decider, and a clear reopens it", () =>
+    Effect.gen(function* () {
+      const createdAt = "2026-11-15T05:29:00.000Z";
+      const runningAt = "2026-11-15T05:29:05.000Z";
+      const silentAt = "2026-11-15T05:30:00.000Z";
+      const clearedAt = "2026-11-15T05:33:00.000Z";
+
+      const afterCreate = yield* projectEvent(
+        createEmptyReadModel(createdAt),
+        makeEvent({
+          sequence: 1,
+          type: "thread.created",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: createdAt,
+          commandId: "cmd-create",
+          payload: {
+            threadId: "thread-1",
+            projectId: "project-1",
+            title: "demo",
+            modelSelection: {
+              provider: ProviderDriverKind.make("claude"),
+              model: "claude-sonnet-5-5",
+            },
+            runtimeMode: "full-access",
+            branch: null,
+            worktreePath: null,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        }),
+      );
+
+      const running = yield* projectEvent(
+        afterCreate,
+        makeEvent({
+          sequence: 2,
+          type: "thread.session-set",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: runningAt,
+          commandId: "cmd-running",
+          payload: {
+            threadId: "thread-1",
+            session: {
+              threadId: "thread-1",
+              status: "running",
+              providerName: "claude",
+              runtimeMode: "full-access",
+              activeTurnId: "turn-1",
+              lastError: null,
+              updatedAt: runningAt,
+            },
+          },
+        }),
+      );
+
+      expect(running.threads[0]?.latestTurn?.state).toBe("running");
+
+      const silent = yield* projectEvent(
+        running,
+        makeEvent({
+          sequence: 3,
+          type: "thread.activity-appended",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: silentAt,
+          commandId: "cmd-silent",
+          payload: {
+            threadId: "thread-1",
+            activity: {
+              id: "silence-watchdog:silent:thread-1:turn-1",
+              tone: "error",
+              kind: "turn.silent",
+              summary: "No response from Claude",
+              payload: { provider: "claude", lastActivityAt: silentAt },
+              turnId: "turn-1",
+              createdAt: silentAt,
+            },
+          },
+        }),
+      );
+
+      expect(silent.threads[0]?.latestTurn?.silentAt).toBe(silentAt);
+
+      const cleared = yield* projectEvent(
+        silent,
+        makeEvent({
+          sequence: 4,
+          type: "thread.activity-appended",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: clearedAt,
+          commandId: "cmd-cleared",
+          payload: {
+            threadId: "thread-1",
+            activity: {
+              id: "silence-watchdog:cleared:thread-1:turn-1",
+              tone: "info",
+              kind: "turn.silent.cleared",
+              summary: "Claude responded",
+              payload: { provider: "claude" },
+              turnId: "turn-1",
+              createdAt: clearedAt,
+            },
+          },
+        }),
+      );
+
+      expect(cleared.threads[0]?.latestTurn?.silentAt).toBeNull();
+    }),
+  );
+
+  it.effect("an activity for another turn leaves the latest turn's silence alone", () =>
+    Effect.gen(function* () {
+      const at = "2026-11-15T05:29:00.000Z";
+      const silentAt = "2026-11-15T05:30:00.000Z";
+
+      const afterCreate = yield* projectEvent(
+        createEmptyReadModel(at),
+        makeEvent({
+          sequence: 1,
+          type: "thread.created",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: at,
+          commandId: "cmd-create",
+          payload: {
+            threadId: "thread-1",
+            projectId: "project-1",
+            title: "demo",
+            modelSelection: {
+              provider: ProviderDriverKind.make("claude"),
+              model: "claude-sonnet-5-5",
+            },
+            runtimeMode: "full-access",
+            branch: null,
+            worktreePath: null,
+            createdAt: at,
+            updatedAt: at,
+          },
+        }),
+      );
+
+      const running = yield* projectEvent(
+        afterCreate,
+        makeEvent({
+          sequence: 2,
+          type: "thread.session-set",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: at,
+          commandId: "cmd-running",
+          payload: {
+            threadId: "thread-1",
+            session: {
+              threadId: "thread-1",
+              status: "running",
+              providerName: "claude",
+              runtimeMode: "full-access",
+              activeTurnId: "turn-1",
+              lastError: null,
+              updatedAt: at,
+            },
+          },
+        }),
+      );
+
+      const silent = yield* projectEvent(
+        running,
+        makeEvent({
+          sequence: 3,
+          type: "thread.activity-appended",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: silentAt,
+          commandId: "cmd-silent",
+          payload: {
+            threadId: "thread-1",
+            activity: {
+              id: "silence-watchdog:silent:thread-1:turn-1",
+              tone: "error",
+              kind: "turn.silent",
+              summary: "No response from Claude",
+              payload: { provider: "claude", lastActivityAt: silentAt },
+              turnId: "turn-1",
+              createdAt: silentAt,
+            },
+          },
+        }),
+      );
+
+      const otherTurn = yield* projectEvent(
+        silent,
+        makeEvent({
+          sequence: 4,
+          type: "thread.activity-appended",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: silentAt,
+          commandId: "cmd-other",
+          payload: {
+            threadId: "thread-1",
+            activity: {
+              id: "silence-watchdog:cleared:thread-1:turn-0",
+              tone: "info",
+              kind: "turn.silent.cleared",
+              summary: "Claude responded",
+              payload: { provider: "claude" },
+              turnId: "turn-0",
+              createdAt: silentAt,
+            },
+          },
+        }),
+      );
+
+      expect(otherTurn.threads[0]?.latestTurn?.silentAt).toBe(silentAt);
+    }),
+  );
 });

@@ -1,9 +1,13 @@
 import {
+  isTurnEndingActivityKind,
   OrchestrationCheckpointSummary,
   OrchestrationSession,
+  THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND,
+  ThreadSilentRunActivityPayload,
   ThreadTurnResumeRequestedPayload,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import {
   ThreadActivityAppendedPayload,
   ThreadRevertedPayload,
@@ -27,6 +31,9 @@ import {
   compareThreadActivities,
   MAX_THREAD_ACTIVITIES,
 } from "./Updates.ts";
+
+/** The watchdog writes this payload on every silent window; anything else is not a silence. */
+const isSilentRunPayload = Schema.is(ThreadSilentRunActivityPayload);
 
 export function projectThreadHistory(
   nextBase: OrchestrationReadModel,
@@ -124,6 +131,12 @@ export function projectThreadHistory(
                         ? thread.latestTurn.assistantMessageId
                         : null,
                     respondingBotId: thread.respondingBotId ?? null,
+                    // A session refresh says nothing about output: the same turn keeps the
+                    // silence it reported until the provider speaks again.
+                    ...(thread.latestTurn?.turnId === session.activeTurnId &&
+                    thread.latestTurn.silentAt != null
+                      ? { silentAt: thread.latestTurn.silentAt }
+                      : {}),
                     ...(session.lastError ? { errorMessage: session.lastError } : {}),
                     ...(session.unavailability ? { unavailability: session.unavailability } : {}),
                   }
@@ -317,10 +330,27 @@ export function projectThreadHistory(
               ? sortedActivities.slice(-MAX_THREAD_ACTIVITIES)
               : sortedActivities;
 
+          // A turn-ending activity ends the turn without the provider ever replying, so it
+          // travels on `latestTurn` and every surface reads it from there. Its cleared report is
+          // the reverse state: the provider spoke again, so the same turn is open once more.
+          const activity = payload.activity;
+
+          const latestTurn =
+            thread.latestTurn == null ||
+            activity.turnId === null ||
+            activity.turnId !== thread.latestTurn.turnId
+              ? thread.latestTurn
+              : activity.kind === THREAD_SILENT_RUN_CLEARED_ACTIVITY_KIND
+                ? { ...thread.latestTurn, silentAt: null }
+                : isTurnEndingActivityKind(activity.kind) && isSilentRunPayload(activity.payload)
+                  ? { ...thread.latestTurn, silentAt: activity.payload.lastActivityAt }
+                  : thread.latestTurn;
+
           return {
             ...nextBase,
             threads: updateThread(nextBase.threads, payload.threadId, {
               activities,
+              latestTurn,
               updatedAt: event.occurredAt,
             }),
           };

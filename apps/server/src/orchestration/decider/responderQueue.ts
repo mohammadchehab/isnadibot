@@ -1,5 +1,7 @@
 import {
   GROUP_HOP_BUDGET_DEFAULT,
+  isOpenTurn,
+  isSilentTurn,
   ProviderInstanceId,
   type CommandId,
   type OrchestrationCommand,
@@ -87,7 +89,12 @@ export const responderQueueSetEvent = Effect.fn("responderQueueSetEvent")(functi
  * request, with no newer turn, means the started turn ended without ever appearing.
  */
 const startedTurnInFlight = (thread: OrchestrationThread, queue: ResponderQueue): boolean => {
-  if (thread.latestTurn?.state === "running" || thread.session?.status === "running") return true;
+  // A silent turn is not in flight (`isOpenTurn`): the provider stopped answering and the chat
+  // says so, so the next message starts a turn instead of queueing behind one that may never
+  // end. Its session is still marked running, which is the same claim in another field.
+  if (isOpenTurn(thread.latestTurn)) return true;
+
+  if (thread.session?.status === "running" && !isSilentTurn(thread.latestTurn)) return true;
 
   if (queue.reason !== "addressed" && queue.reason !== "turn-started") return false;
 

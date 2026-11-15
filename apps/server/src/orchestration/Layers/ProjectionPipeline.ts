@@ -240,6 +240,9 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           "thread.turn-interrupt-requested",
           "thread.turn-diff-completed",
           "thread.reverted",
+          // A turn-ending activity is a turn event: the silence the watchdog reports travels on
+          // the turn row, and this allowlist is a second place the set is enumerated.
+          "thread.activity-appended",
         ]),
         apply: applyThreadTurnsProjection,
       },

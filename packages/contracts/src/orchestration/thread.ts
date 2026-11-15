@@ -313,6 +313,14 @@ export const OrchestrationLatestTurn = Schema.Struct({
    * the session's: the turn is decoded inside a snapshot every client reads as one object.
    */
   unavailability: Schema.optional(TrimmedNonEmptyString),
+  /**
+   * When this turn's provider last went quiet: the `lastActivityAt` of its latest
+   * `turn.silent` activity, cleared when output resumes. A running turn with a
+   * `silentAt` is not evidence of work — the chat says "No response from
+   * <provider>" — so a bot whose turn is silent reads as free, and a new turn
+   * supersedes it. Optional so a snapshot from before it existed decodes.
+   */
+  silentAt: Schema.optional(Schema.NullOr(IsoDateTime)),
 });
 
 export type OrchestrationLatestTurn = typeof OrchestrationLatestTurn.Type;

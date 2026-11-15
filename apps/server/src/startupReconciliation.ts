@@ -1,7 +1,12 @@
 import * as Data from "effect/Data";
 
 import * as Predicate from "effect/Predicate";
-import { type IsnadiDelegationRecord, CommandId } from "@isnadi/contracts";
+import {
+  type IsnadiDelegationRecord,
+  CommandId,
+  DEFAULT_RUNTIME_MODE,
+  isOpenTurn,
+} from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -14,6 +19,15 @@ import * as ProviderSessionDirectory from "./provider/Services/ProviderSessionDi
 
 export const ORPHANED_PROVIDER_SESSION_ERROR =
   "Provider session did not survive a server restart. Send a new message to continue.";
+
+/**
+ * The typed reason for a turn that was still open when the server stopped and whose provider
+ * session is gone. A chat in this state never gets another provider event for that turn, so
+ * without this the turn stays open forever: the bot reads busy and the next message queues
+ * behind work that no longer exists.
+ */
+export const ORPHANED_PROVIDER_TURN_ERROR =
+  "This chat's turn did not survive a server restart. Send a new message to continue.";
 
 export const reconcileProviderSessions = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
@@ -28,21 +42,22 @@ export const reconcileProviderSessions = Effect.gen(function* () {
 
   const { threads } = yield* query.getCommandReadModel();
 
+  // Two things can outlive the restart: a session that still claims to be running, and a turn
+  // that is still open. The second is the safety net for the invariant "a turn is open iff
+  // nothing terminal happened to it": when no adapter emitted a terminal event, the turn would
+  // otherwise stay open forever. `isOpenTurn` is the same predicate every other surface reads.
   const orphanedThreads = threads.filter(
     (thread) =>
-      thread.session !== null &&
-      (thread.session.status === "starting" ||
-        thread.session.status === "running" ||
-        thread.session.activeTurnId !== null) &&
-      !liveThreadIds.has(thread.id),
+      !liveThreadIds.has(thread.id) &&
+      (isOpenTurn(thread.latestTurn) ||
+        (thread.session !== null &&
+          (thread.session.status === "starting" ||
+            thread.session.status === "running" ||
+            thread.session.activeTurnId !== null))),
   );
 
   for (const thread of orphanedThreads) {
     const session = thread.session;
-
-    if (session === null) {
-      continue;
-    }
 
     yield* Effect.gen(function* () {
       const binding = yield* directory.getBinding(thread.id);
@@ -67,17 +82,35 @@ export const reconcileProviderSessions = Effect.gen(function* () {
 
     yield* Effect.gen(function* () {
       const reconciledAt = DateTime.formatIso(yield* DateTime.now);
+
+      // The session leaving "running" is what settles its turn (the projector maps that to a
+      // terminal turn state), so a chat with no session row gets the smallest one that carries
+      // the typed reason. Without it an open turn would have nothing to end it.
+      const settledSession = {
+        threadId: thread.id,
+        status: "error" as const,
+        providerName: session?.providerName ?? null,
+        runtimeMode: session?.runtimeMode ?? DEFAULT_RUNTIME_MODE,
+        activeTurnId: null,
+        lastError:
+          session === null ? ORPHANED_PROVIDER_TURN_ERROR : ORPHANED_PROVIDER_SESSION_ERROR,
+        updatedAt: reconciledAt,
+      };
+
       yield* orchestrationEngine.dispatch({
         type: "thread.session.set",
         commandId: CommandId.make(yield* crypto.randomUUIDv4),
         threadId: thread.id,
-        session: {
-          ...session,
-          status: "error",
-          activeTurnId: null,
-          lastError: ORPHANED_PROVIDER_SESSION_ERROR,
-          updatedAt: reconciledAt,
-        },
+        session:
+          session === null
+            ? settledSession
+            : {
+                ...session,
+                status: "error",
+                activeTurnId: null,
+                lastError: ORPHANED_PROVIDER_SESSION_ERROR,
+                updatedAt: reconciledAt,
+              },
         createdAt: reconciledAt,
       });
     }).pipe(

@@ -454,6 +454,7 @@ export function createThreadRows({ sql }: Pick<ProjectionSnapshotDependencies, "
           turns.requested_at AS "requestedAt",
           turns.started_at AS "startedAt",
           turns.completed_at AS "completedAt",
+          turns.silent_at AS "silentAt",
           turns.assistant_message_id AS "assistantMessageId",
           turns.pending_message_id AS "pendingMessageId",
           turns.responding_bot_id AS "respondingBotId",

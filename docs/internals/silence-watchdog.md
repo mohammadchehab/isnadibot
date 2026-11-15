@@ -19,6 +19,30 @@ The timer itself is `startSilenceWatchdog` in `apps/server/src/orchestration/Sil
 
 Silent and cleared reports run on a drainable worker inside ingestion, so the ingestion `drain` covers them and tests can wait on it instead of sleeping.
 
+## What a silent turn means
+
+A silent turn is not work in progress. The provider stopped answering, and nothing says it will start again, so every surface that asks "is this chat working?" must read it as no.
+
+`turn.silent` is projected onto the turn row as `silentAt` (migration `085_ProjectionTurnSilentAt`), so the answer travels with the turn instead of needing the activity stream. Both projectors carry it: the SQL projection in `Layers/projection/Turns.ts` and the in-memory one in `projector/ThreadHistory.ts`, which is the decider's read model. The `threadTurns` projector subscribes to `thread.activity-appended` for exactly this, and its `eventTypes` allowlist in `ProjectionPipeline.ts` is a second place the set is enumerated — a new turn-ending activity needs the entry there too.
+
+The predicate lives in one named place, `packages/contracts/src/orchestration/turnState.ts`:
+
+- `TERMINAL_TURN_STATES` — `completed`, `interrupted`, `error`.
+- `TURN_ENDING_ACTIVITY_KINDS` — the activities that end a turn with no provider reply. `turn.silent` is the first.
+- `isOpenTurn` — a turn is open iff it is not terminal and not silent. Every caller asks this: bot status, the responder queue, and the provider turn start.
+
+Three behaviors follow:
+
+1. **Bot status.** `packages/shared/src/botStatus.ts` computes `working` from open turns, so a bot whose only running turn went silent reads Idle, not Busy. `held` still reads every running turn, because a silent parent waiting on a delegated child is held rather than idle.
+2. **The responder queue advances.** A queued item behind a silent turn is no longer stuck behind a turn that will never answer.
+3. **A new message takes over.** Before sending, the turn start interrupts a silent turn, so the message starts a fresh turn instead of steering into the dead one. That is why the user no longer has to press Stop first.
+
+Silence is a **reversible mark on a running turn**, not a terminal state. `turn.silent.cleared` removes `silentAt` and the same turn is open again. This is deliberate: a literal terminal state would strand a turn that resumes after a long tool run.
+
+## Startup reconciliation
+
+The silence report only exists if the watchdog got to run. `startupReconciliation` covers the rest: an open turn whose provider session did not survive the restart is settled into a terminal state with a typed reason, `ORPHANED_PROVIDER_TURN_ERROR`. A thread with no session row gets a synthesized error session so the projector settles its turn. Without this the invariant is only as good as every adapter's error path.
+
 ## Inbox deduplication
 
 The incident key is `silence:<threadId>:<turnId>`, so a turn has at most one inbox item. `BotInboxService.ensureOpen` reopens the existing item for this kind even after an automatic resolve, as long as nobody acknowledged it. Repeated silent windows in one turn therefore bump `occurrenceCount` on the same item instead of adding rows. A chat with no bot records the silent-run state but opens no inbox item.

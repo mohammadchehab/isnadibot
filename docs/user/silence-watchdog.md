@@ -4,8 +4,10 @@ Sometimes a provider stops sending anything while a bot is still working. After 
 
 The bot also gets one item in the inbox, labeled "Bot stopped responding". Isnadi does not stop the turn for you.
 
-- If the provider starts responding again, the notice goes away and the inbox item resolves on its own.
-- If you would rather not wait, stop the turn from the composer and send your message again.
+While the notice is up, the bot shows as idle rather than busy. Nothing is running that will answer.
+
+- **Just send your next message.** You do not need to press Stop first: sending ends the quiet turn and starts a new one.
+- If the provider starts responding again, the notice goes away, the turn carries on, and the inbox item resolves on its own.
 - If the same turn goes quiet more than once, the same inbox item comes back instead of a new one.
 - When the turn finishes or you stop it, the inbox item resolves.
 

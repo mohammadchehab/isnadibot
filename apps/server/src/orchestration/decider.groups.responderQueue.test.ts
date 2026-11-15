@@ -50,6 +50,8 @@ const readModel = (input: {
   readonly reason?: ResponderQueueReason;
   readonly queueUpdatedAt?: string;
   readonly budgetExhausted?: boolean;
+  /** The watchdog's report on the latest turn: set means it stopped answering. */
+  readonly silentAt?: string;
 }) => {
   const thread = makeGroupThread();
   const turn = input.turn ?? "completed";
@@ -111,6 +113,7 @@ const readModel = (input: {
                 startedAt: QUEUED_AT,
                 completedAt: turn === "running" ? null : AFTER_QUEUED,
                 assistantMessageId: null,
+                ...(input.silentAt === undefined ? {} : { silentAt: input.silentAt }),
               },
             }),
         ...(input.session === undefined
@@ -228,6 +231,37 @@ it.layer(NodeServices.layer)("group responder queue decider", (it) => {
         instanceId: "specialist-provider",
         model: "specialist-model",
       });
+    }),
+  );
+
+  // The defect: a turn the watchdog reported silent stays "running" forever, so the queue read it
+  // as in flight and the user's next message started nothing at all. A silent turn is not work.
+  it.effect("starts the next responder when the turn it is waiting on went silent", () =>
+    Effect.gen(function* () {
+      const events = yield* advance(
+        readModel({
+          queue: [entry(SPECIALIST_ID)],
+          turn: "running",
+          silentAt: AFTER_QUEUED,
+          session: { status: "running", updatedAt: AFTER_QUEUED },
+        }),
+      );
+
+      expect(startedBots(events)).toEqual([SPECIALIST_ID]);
+    }),
+  );
+
+  it.effect("still waits while the turn it started is running and answering", () =>
+    Effect.gen(function* () {
+      const events = yield* advance(
+        readModel({
+          queue: [entry(SPECIALIST_ID)],
+          turn: "running",
+          session: { status: "running", updatedAt: AFTER_QUEUED },
+        }),
+      );
+
+      expect(events).toEqual([]);
     }),
   );
 

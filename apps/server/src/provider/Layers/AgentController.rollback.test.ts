@@ -93,6 +93,7 @@ describe("AgentControllerLive", () => {
         requestedAt: createdAt,
         startedAt: createdAt,
         completedAt: createdAt,
+        silentAt: null,
         checkpointTurnCount: count,
         checkpointRef: null,
         checkpointStatus: null,

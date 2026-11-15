@@ -102,6 +102,13 @@ const ERRORED: OrchestrationLatestTurn = {
 /** A turn that died because the provider's login is gone, which only the user can fix. */
 const EXPIRED_TURN: OrchestrationLatestTurn = { ...ERRORED, unavailability: "expired-login" };
 
+/**
+ * A turn the silence watchdog reported and nothing cleared: still running at the provider, but
+ * "No response from Claude" for over a minute. The chat says the provider stopped answering, so
+ * the bot is not working and a new message starts a turn instead of queueing behind this one.
+ */
+const SILENT: OrchestrationLatestTurn = { ...RUNNING, silentAt: NOW };
+
 /** A session that never got a turn off the ground because its login is gone. */
 const SESSION_SIGNED_OUT: ChatSession = chatSession({
   status: "error",
@@ -191,6 +198,35 @@ describe("deriveBotStatus", () => {
     for (const latestTurn of [COMPLETED, INTERRUPTED, ERRORED]) {
       expect(status({ chats: [chat({ latestTurn })] })).toBe("idle");
     }
+  });
+
+  it("is idle for a turn the watchdog reported silent, not busy forever", () => {
+    expect(status({ chats: [chat({ latestTurn: SILENT })] })).toBe("idle");
+  });
+
+  it("is idle for a silent turn even though its session still reads running", () => {
+    expect(
+      status({
+        chats: [chat({ latestTurn: SILENT, session: chatSession({ status: "running" }) })],
+      }),
+    ).toBe("idle");
+  });
+
+  it("is busy again once output resumes and the silence is cleared", () => {
+    expect(status({ chats: [chat({ latestTurn: { ...SILENT, silentAt: null } })] })).toBe("busy");
+  });
+
+  it("is held, not idle, while a silent turn waits on a delegated child", () => {
+    expect(
+      status({
+        chats: [chat({ id: ThreadId.make("parent"), latestTurn: SILENT })],
+        delegations: [{ parentThreadId: ThreadId.make("parent"), phase: CHILD_RUNNING }],
+      }),
+    ).toBe("held");
+  });
+
+  it("ignores a silent mark on a turn that already ended", () => {
+    expect(status({ chats: [chat({ latestTurn: { ...COMPLETED, silentAt: NOW } })] })).toBe("idle");
   });
 
   it("is asking for a pending approval or a pending question", () => {
