@@ -293,10 +293,7 @@ describe("DesktopBackendConfiguration", () => {
       assert.isDefined(error);
       assert.equal(error.settingsPath, settingsPath);
       assert.equal(error.cause, cause);
-      assert.equal(
-        error.message,
-        `Failed to read persisted backend observability settings at ${settingsPath}.`,
-      );
+      assert.equal(error.message, "Failed to read persisted backend observability settings.");
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
