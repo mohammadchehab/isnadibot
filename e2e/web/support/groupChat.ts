@@ -25,10 +25,17 @@ export async function createBot(page: Page, name: string, first: boolean) {
   await page.getByRole("dialog").waitFor({ state: "hidden" });
 }
 
-/** Creates a group of the given bots. The first bot picked leads the group. */
+/**
+ * Creates a group of the given bots. The first bot picked leads the group.
+ *
+ * A space starts on its own screen, so "New space" lands on the fleet picker and the
+ * empty space is behind "Start empty" there. The dialog pre-selects the first two
+ * offerable bots, so a box that is already checked must be left alone.
+ */
 export async function createGroup(page: Page, name: string, bots: ReadonlyArray<string>) {
   await page.getByTestId("roster-new-bot").click();
-  await page.getByRole("menuitem", { name: "New group" }).click();
+  await page.getByRole("menuitem", { name: "New space" }).click();
+  await page.getByRole("button", { name: "Start empty" }).click();
 
   const dialog = page.getByRole("dialog");
 
@@ -36,6 +43,10 @@ export async function createGroup(page: Page, name: string, bots: ReadonlyArray<
 
   for (const bot of bots) {
     const box = dialog.getByRole("checkbox", { name: bot });
+
+    // The dialog pre-selects the first two offerable bots, so pressing Space on an
+    // already-checked box would uncheck it and leave "Create group" disabled.
+    if (await box.isChecked()) continue;
 
     await box.focus();
     await box.press("Space");
