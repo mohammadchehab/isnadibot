@@ -74,6 +74,67 @@ describe("IsnadiToolRuntime", () => {
     expect(send).toHaveBeenCalledOnce();
   });
 
+  it("refuses a call above the delegation ceiling, and runs an approved one within it", async () => {
+    const runtime = createIsnadiToolRuntime();
+
+    const register = (threadId: string, approvalCeiling: "user-computer" | "delete") => {
+      runtime.registerSession(threadId, {
+        runtimeMode: "approval-required",
+        workspaceType: "local",
+        userComputerWorkspace: workspace(threadId),
+        catalogHandlers: { ExternalShell: async () => ({ ran: true }) },
+        delegation: {
+          depth: 0,
+          activeDelegations: 0,
+          access: {
+            allowedToolIds: ["ExternalShell"],
+            memoryScopes: [],
+            sandbox: "local",
+            runtimeMode: "approval-required",
+            hasUserComputer: true,
+            enabledMcpServerIds: [],
+            disabledMcpServerIds: [],
+            approvalCeiling,
+          },
+          send: vi.fn(),
+        },
+      });
+    };
+
+    register("thread-ceiling-low", "user-computer");
+    register("thread-ceiling-high", "delete");
+
+    const execution = (threadId: string) => ({
+      threadId,
+      toolId: "ExternalShell" as const,
+      toolCallId: `tool-${threadId}`,
+      input: { command: "rm -rf dist" },
+      approvalMode: "require-grant" as const,
+    });
+
+    // The ceiling refuses the call itself, so a grant cannot lift it: this is why
+    // asking the user first would only waste their answer.
+    await expect(
+      runtime.requiresApproval("thread-ceiling-low", "ExternalShell", { command: "rm -rf dist" }),
+    ).rejects.toThrow(
+      "Tool 'ExternalShell' is a 'delete' action, and this chat's approval ceiling is 'user-computer', so approving it here would not run it.",
+    );
+    runtime.grantApproval(execution("thread-ceiling-low"));
+    await expect(runtime.execute(execution("thread-ceiling-low"))).rejects.toThrow(
+      "approval ceiling is 'user-computer'",
+    );
+
+    // The same call within the ceiling waits for its grant, and then runs.
+    await expect(
+      runtime.requiresApproval("thread-ceiling-high", "ExternalShell", { command: "rm -rf dist" }),
+    ).resolves.toBe(true);
+    await expect(runtime.execute(execution("thread-ceiling-high"))).rejects.toThrow(
+      "requires approval",
+    );
+    runtime.grantApproval(execution("thread-ceiling-high"));
+    await expect(runtime.execute(execution("thread-ceiling-high"))).resolves.toEqual({ ran: true });
+  });
+
   it("lets a same-space MessageAgent through and keeps the approval across spaces", async () => {
     const send = vi.fn(async () => ({ delivered: true }));
     const runtime = createIsnadiToolRuntime();

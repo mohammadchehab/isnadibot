@@ -2,8 +2,12 @@ import * as Predicate from "effect/Predicate";
 import {
   type IsnadiDelegationAccessGrant,
   type IsnadiMemoryTargetScope,
+  type IsnadiToolApprovalClass,
+  type IsnadiToolDefinition,
+  type IsnadiToolWorkspaceType,
   IsnadiToolInputSchemas,
   type IsnadiToolId,
+  isnadiToolApprovalForInput,
 } from "@isnadi/contracts";
 
 export function field<Value>(value: Value, key: string) {
@@ -70,6 +74,45 @@ export const RUNTIME_RANK = [
   "auto",
   "full-access",
 ] as const;
+
+/**
+ * The refusal a chat with nobody to ask gives. Shared, so a worker's MCP tool
+ * and a catalog tool under a `none` ceiling are told the same thing.
+ */
+export const approvalUnavailableRefusal = (toolName: string) =>
+  `Tool '${toolName}' needs approval, and this chat cannot ask anyone for it. Finish without it or report the blocker.`;
+
+/**
+ * Why a call above its delegation's approval ceiling is refused, or null when
+ * the call is within it. Two places ask, and they must never disagree: the
+ * runtime refuses the call, and the controller refuses to show an approval card
+ * whose answer the runtime would then ignore. `none` is a ceiling nobody can
+ * answer, so its sentence says that rather than naming a ceiling to raise.
+ */
+export function approvalCeilingRefusal(input: {
+  readonly tool: IsnadiToolDefinition | undefined;
+  readonly input: unknown;
+  readonly workspaceType: IsnadiToolWorkspaceType | undefined;
+  readonly approvalCeiling: IsnadiToolApprovalClass | undefined;
+}): string | null {
+  const { tool, approvalCeiling } = input;
+
+  // No definition is a tool the ceiling does not classify: memory and MCP tools
+  // never reach it, so they keep whatever gate they had.
+  if (!tool || !approvalCeiling) return null;
+
+  const action = isnadiToolApprovalForInput(
+    tool,
+    input.input,
+    input.workspaceType === undefined ? {} : { workspaceType: input.workspaceType },
+  );
+
+  if (APPROVAL_RANK.indexOf(action) <= APPROVAL_RANK.indexOf(approvalCeiling)) return null;
+
+  if (approvalCeiling === "none") return approvalUnavailableRefusal(tool.id);
+
+  return `Tool '${tool.id}' is a '${action}' action, and this chat's approval ceiling is '${approvalCeiling}', so approving it here would not run it. Do the work another way, or ask your user to run it.`;
+}
 
 export function requestedSubset<T>(
   requested: ReadonlyArray<T> | undefined,
