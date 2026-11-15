@@ -1,6 +1,5 @@
 import { FLEET_TEMPLATES, type FleetTemplate } from "@isnadi/contracts";
-import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
-import { commandRefusalMessage } from "@isnadi/client-runtime/state/runtime";
+import { commandRefusalMessage, type Translate } from "@isnadi/client-runtime/state/runtime";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
@@ -13,26 +12,40 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { SidebarInset } from "../ui/sidebar";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { HireMemberRow, SQUAD_CELL, SQUAD_COLUMNS } from "./HireMemberRow";
+import {
+  SquadSetupHardBlockBand,
+  squadSetupCaptionBlocker,
+  squadSetupHardBlock,
+  type SquadSetupCaptionBlocker,
+  type SquadSetupHardBlock,
+} from "./SquadSetupHardBlock";
 import { SquadSetupHeading } from "./SquadSetupHeading";
 import { useSquadSetupReadOnly } from "./useSquadSetupAccess";
 import { useCreateSquad } from "./useCreateSquad";
 import { useHireDraft } from "./useHireDraft";
 
 /**
- * Why Create is off, in the words the user can act on. The first blocker is
- * the one the footer names; the rest stay in the list behind it.
+ * Why Create is off, for the reasons the user clears on this screen itself. A
+ * hard block is not one of them: it is drawn as the band above the squad.
  */
-function BlockerNotice({ blocker }: { readonly blocker: FleetHireBlocker }) {
+function BlockerNotice({ blocker }: { readonly blocker: SquadSetupCaptionBlocker }) {
   const { t } = useI18n();
 
   switch (blocker.kind) {
-    case "no-provider":
-      return t("No provider can run this bot yet.");
     case "empty-name":
       return t("Every bot needs a name.");
     case "duplicate-name":
       return t("Two bots share that name");
   }
+}
+
+/** The sentence the band carries, or null when nothing hard-blocks the screen. */
+function hardBlockMessage(hardBlock: SquadSetupHardBlock | null, t: Translate): string | null {
+  if (hardBlock === "no-provider") return t("No provider can run this bot yet.");
+
+  if (hardBlock === "environment-rights") return commandRefusalMessage("environment-rights", t);
+
+  return null;
 }
 
 /**
@@ -96,6 +109,8 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
   const less = stepHopBudget(draft.hopBudget, -1);
   const more = stepHopBudget(draft.hopBudget, 1);
   const blocker = blockers[0];
+  const hardBlock = squadSetupHardBlock(readOnly, blocker);
+  const captionBlocker = squadSetupCaptionBlocker(blockers);
 
   // Picking a boss other than the template's is its own state: the heading names
   // the change and the note says what happens to the bot that had the role.
@@ -119,6 +134,9 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
             <SquadSetupHeading templateName={template.name} />
+            {/* A refusal this client cannot clear by editing the squad is drawn as
+                the frame's band, so it is read before the squad it blocks. */}
+            <SquadSetupHardBlockBand message={hardBlockMessage(hardBlock, t)} />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{t("Boss")}</p>
@@ -222,12 +240,8 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
           <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
             {locked ? (
               t("Checking what happened…")
-            ) : readOnly ? (
-              // The server refuses every hire this client sends, so the screen
-              // says why here rather than after a press that cannot work.
-              commandRefusalMessage("environment-rights", t)
-            ) : blocker ? (
-              <BlockerNotice blocker={blocker} />
+            ) : captionBlocker ? (
+              <BlockerNotice blocker={captionBlocker} />
             ) : null}
           </p>
           <Button
