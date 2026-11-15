@@ -40,6 +40,7 @@ const bot = (id: BotId, groupId: GroupId | null) => ({
   voiceEnabled: false,
   channelBindings: [],
   groupId,
+  createdByBotId: null,
   archivedAt: null,
   createdAt: now,
   updatedAt: now,
@@ -61,6 +62,7 @@ const snapshot: OrchestrationReadModel = {
       fleetTemplateId: null,
       createdAt: now,
       updatedAt: now,
+      createdByBotId: null,
     },
   ],
   delegations: [],
@@ -128,6 +130,9 @@ describe("IsnadiChannelRuntime", () => {
         groupId: "channel-1",
         name: "Research",
         bossBotId,
+        // The space a bot makes must join the bot's creator chain. Without this the
+        // decider records every bot-made space as person-made.
+        createdByBotId: bossBotId,
       }),
     );
   });

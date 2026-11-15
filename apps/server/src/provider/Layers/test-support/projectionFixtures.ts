@@ -39,6 +39,7 @@ export function providerBotFixture(
     createdAt: now,
     updatedAt: now,
     ...input,
+    createdByBotId: input.createdByBotId ?? null,
   };
 }
 

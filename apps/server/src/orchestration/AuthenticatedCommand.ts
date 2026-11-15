@@ -52,9 +52,17 @@ export function applyAuthenticatedCommandActor(
   actor: AuthenticatedCommandActor,
 ): OrchestrationCommand {
   switch (command.type) {
+    // A bot's creation origin is server-set, and a client is always a person: whatever a client
+    // sent is overwritten here so no client can claim a bot origin (dodging or inflating the
+    // creation ceiling) or launder one. Only a bot's own dispatch, which carries no actor, sets a
+    // real id. The decider refuses the combination anyway; this is the layer that makes it
+    // unreachable from a client at all.
+    case "bot.create":
+      return { ...command, createdByBotId: null };
     case "group.create":
       return {
         ...command,
+        createdByBotId: null,
         creator: {
           kind: "person",
           personId: actor.personId,

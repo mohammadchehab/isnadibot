@@ -46,7 +46,7 @@ const makeProjectionBotRepository = Effect.gen(function* () {
         bot_id, name, title, label, description, disabled_mcp_server_ids_json,
         skills_json, skill_registry_access, avatar_json, engine_json, sandbox, runtime_mode, image_provider,
         voice_enabled, personality_tone, channel_bindings_json,
-        group_id, archived_at, created_at, updated_at
+        group_id, created_by_bot_id, archived_at, created_at, updated_at
       ) VALUES (
         ${row.botId}, ${row.name}, ${row.title}, ${row.label}, ${row.description},
         ${JSON.stringify(row.disabledMcpServerIds)}, ${JSON.stringify(row.skills)},
@@ -55,7 +55,7 @@ const makeProjectionBotRepository = Effect.gen(function* () {
         ${row.runtimeMode}, ${row.imageProvider},
         ${row.voiceEnabled ? 1 : 0}, ${row.personalityTone ?? 50},
         ${JSON.stringify(row.channelBindings ?? [])}, ${row.groupId},
-        ${row.archivedAt}, ${row.createdAt},
+        ${row.createdByBotId}, ${row.archivedAt}, ${row.createdAt},
         ${row.updatedAt}
       )
       ON CONFLICT (bot_id) DO UPDATE SET
@@ -75,6 +75,7 @@ const makeProjectionBotRepository = Effect.gen(function* () {
         personality_tone = excluded.personality_tone,
         channel_bindings_json = excluded.channel_bindings_json,
         group_id = excluded.group_id,
+        created_by_bot_id = excluded.created_by_bot_id,
         archived_at = excluded.archived_at,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
@@ -93,6 +94,7 @@ const makeProjectionBotRepository = Effect.gen(function* () {
         image_provider AS "imageProvider", voice_enabled AS "voiceEnabled",
         personality_tone AS "personalityTone",
         channel_bindings_json AS "channelBindings", group_id AS "groupId",
+        created_by_bot_id AS "createdByBotId",
         archived_at AS "archivedAt", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_bots
       WHERE bot_id = ${botId}
@@ -111,6 +113,7 @@ const makeProjectionBotRepository = Effect.gen(function* () {
         image_provider AS "imageProvider", voice_enabled AS "voiceEnabled",
         personality_tone AS "personalityTone",
         channel_bindings_json AS "channelBindings", group_id AS "groupId",
+        created_by_bot_id AS "createdByBotId",
         archived_at AS "archivedAt", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_bots
       ORDER BY created_at ASC, bot_id ASC

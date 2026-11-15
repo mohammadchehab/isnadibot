@@ -82,6 +82,10 @@ export function createIsnadiDelegationControls(
       imageProvider: null,
       voiceEnabled: false,
       groupId: parentThread.groupId ?? null,
+      // A bot made this one, and the decider needs to know: it counts bot-made bots per creator
+      // chain and bounds the chain's depth. The command is dispatched here with no actor, which is
+      // what makes a real origin legitimate; a client's command is forced back to null.
+      createdByBotId: parent.botId,
       createdAt: now(),
     });
 

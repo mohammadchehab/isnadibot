@@ -48,6 +48,7 @@ export function projectBotsAndGroups(
             voiceEnabled: payload.voiceEnabled,
             channelBindings: payload.channelBindings,
             groupId: payload.groupId,
+            createdByBotId: payload.createdByBotId,
             archivedAt: null,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
@@ -136,6 +137,7 @@ export function projectBotsAndGroups(
             ...(payload.hopBudget === undefined ? {} : { hopBudget: payload.hopBudget }),
             keepBusy: payload.keepBusy,
             fleetTemplateId: payload.fleetTemplateId,
+            createdByBotId: payload.createdByBotId,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
           };

@@ -520,6 +520,7 @@ export function mapBotRow(
     voiceEnabled: row.voiceEnabled === 1,
     channelBindings: row.channelBindings ?? [],
     groupId: row.groupId,
+    createdByBotId: row.createdByBotId,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -537,6 +538,7 @@ export function mapGroupRow(
     ...(row.hopBudget === null ? {} : { hopBudget: row.hopBudget }),
     keepBusy: row.keepBusy === 1,
     fleetTemplateId: row.fleetTemplateId,
+    createdByBotId: row.createdByBotId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

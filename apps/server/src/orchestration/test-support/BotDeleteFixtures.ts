@@ -45,6 +45,7 @@ export function makeBot(input: {
     voiceEnabled: false,
     channelBindings: [],
     groupId: null,
+    createdByBotId: null,
     archivedAt: input.archivedAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -94,6 +95,7 @@ export function makeGroup(
       { kind: "bot", botId: OTHER_BOT_ID, role: "specialist" },
     ],
     fleetTemplateId: null,
+    createdByBotId: null,
     createdAt: NOW,
     updatedAt: NOW,
   };

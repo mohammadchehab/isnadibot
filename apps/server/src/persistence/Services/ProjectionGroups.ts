@@ -7,7 +7,7 @@ import {
   IsoDateTime,
 } from "@isnadi/contracts";
 import * as Context from "effect/Context";
-import type * as Effect from "effect/Effect";
+import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -21,6 +21,8 @@ export const ProjectionGroup = Schema.Struct({
   hopBudget: Schema.NullOr(GroupHopBudget),
   keepBusy: Schema.Boolean,
   fleetTemplateId: Schema.NullOr(FleetTemplateId),
+  /** The bot that created this space; null when a person did. Absent reads as null. */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

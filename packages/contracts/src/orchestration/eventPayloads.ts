@@ -222,6 +222,11 @@ export const BotCreatedPayload = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   groupId: Schema.NullOr(GroupId),
+  /**
+   * The bot that created this one; null when a person did. Defaults to null so every
+   * `bot.created` written before this field existed still replays as a person-made bot.
+   */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -276,6 +281,8 @@ export const GroupCreatedPayload = Schema.Struct({
   fleetTemplateId: Schema.NullOr(FleetTemplateId).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  /** The bot that created this space; null when a person did. Defaults so old events replay. */
+  createdByBotId: Schema.NullOr(BotId).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

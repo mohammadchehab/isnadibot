@@ -210,6 +210,29 @@ export const CommandRefusalCodes = [
    * is alive and the provider simply stopped. Same remedy (try again), different diagnosis.
    */
   "turn-went-silent",
+  /**
+   * A bot has already made as many bots as it may, counting every bot made under
+   * the same creator chain. The refusal is a ceiling on multiplicity, not on
+   * rights: the caller may be a boss with full access to its space, so advising
+   * it to ask for access would be false. Its remedy is the user — a person
+   * creating the bot is not counted against the bot's allowance.
+   */
+  "bot-creation-limit-reached",
+  /**
+   * The creator chain is already as deep as it may be: this bot was itself made
+   * by a bot that was made by a bot. Separate from `bot-creation-limit-reached`
+   * above because the remedy differs — breadth is relieved by a person creating
+   * the bot, depth only by creating it nearer the top of the chain.
+   */
+  "bot-creation-chain-too-deep",
+  /**
+   * A command carried a bot origin and an acting person at once, which no client
+   * can legitimately produce: the dispatch layer forces a client's origin to
+   * null, so only a server-internal dispatch may name a creator bot. It is not a
+   * business rule the user can satisfy differently — the command was malformed —
+   * and it exists so a client cannot claim or launder a bot origin.
+   */
+  "bot-origin-forbidden",
 ] as const;
 
 /**

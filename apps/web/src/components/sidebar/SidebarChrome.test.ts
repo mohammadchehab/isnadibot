@@ -78,6 +78,7 @@ describe("sidebar footer", () => {
           voiceEnabled: false,
           channelBindings: [],
           groupId: null,
+          createdByBotId: null,
           disabledMcpServerIds: [],
           skills: [],
           skillRegistryAccess: false,

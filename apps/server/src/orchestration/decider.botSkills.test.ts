@@ -79,6 +79,7 @@ it.layer(NodeServices.layer)("bot skills decisions", (it) => {
             voiceEnabled: true,
             channelBindings: [],
             groupId: null,
+            createdByBotId: null,
             archivedAt: null,
             createdAt: NOW,
             updatedAt: NOW,

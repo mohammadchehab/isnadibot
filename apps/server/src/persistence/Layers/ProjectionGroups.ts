@@ -34,10 +34,10 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
     execute: (row) => sql`
       INSERT INTO projection_groups (
         group_id, name, boss_bot_id, members_json, hop_budget, keep_busy, fleet_template_id,
-        created_at, updated_at
+        created_by_bot_id, created_at, updated_at
       )
       VALUES (
-        ${row.groupId}, ${row.name}, ${row.bossBotId ?? null}, ${JSON.stringify(row.members)}, ${row.hopBudget ?? null}, ${row.keepBusy ? 1 : 0}, ${row.fleetTemplateId}, ${row.createdAt}, ${row.updatedAt}
+        ${row.groupId}, ${row.name}, ${row.bossBotId ?? null}, ${JSON.stringify(row.members)}, ${row.hopBudget ?? null}, ${row.keepBusy ? 1 : 0}, ${row.fleetTemplateId}, ${row.createdByBotId}, ${row.createdAt}, ${row.updatedAt}
       )
       ON CONFLICT (group_id) DO UPDATE SET
         name = excluded.name,
@@ -46,6 +46,7 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
         hop_budget = excluded.hop_budget,
         keep_busy = excluded.keep_busy,
         fleet_template_id = excluded.fleet_template_id,
+        created_by_bot_id = excluded.created_by_bot_id,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
     `,
@@ -58,7 +59,8 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
         hop_budget AS "hopBudget", keep_busy AS "keepBusy",
-        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt", updated_at AS "updatedAt"
+        fleet_template_id AS "fleetTemplateId",
+        created_by_bot_id AS "createdByBotId", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_groups
       WHERE group_id = ${groupId}
     `,
@@ -71,7 +73,8 @@ const makeProjectionGroupRepository = Effect.gen(function* () {
       SELECT
         group_id AS "groupId", name, boss_bot_id AS "bossBotId", members_json AS "members",
         hop_budget AS "hopBudget", keep_busy AS "keepBusy",
-        fleet_template_id AS "fleetTemplateId", created_at AS "createdAt", updated_at AS "updatedAt"
+        fleet_template_id AS "fleetTemplateId",
+        created_by_bot_id AS "createdByBotId", created_at AS "createdAt", updated_at AS "updatedAt"
       FROM projection_groups
       ORDER BY created_at ASC, group_id ASC
     `,

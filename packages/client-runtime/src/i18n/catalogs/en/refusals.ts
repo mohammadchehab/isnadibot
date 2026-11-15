@@ -48,5 +48,11 @@ export const refusalsCatalog = {
     "Bot mentions only work in a space chat. Remove the mention and send again.",
   "This turn stopped responding, so it was closed. Try again.":
     "This turn stopped responding, so it was closed. Try again.",
+  "This bot has already made as many bots as it can. Create the bot yourself to go further.":
+    "This bot has already made as many bots as it can. Create the bot yourself to go further.",
+  "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.":
+    "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.",
+  "This change could not be applied. Update the app, then try again.":
+    "This change could not be applied. Update the app, then try again.",
   "The command failed.": "The command failed.",
 } as const;

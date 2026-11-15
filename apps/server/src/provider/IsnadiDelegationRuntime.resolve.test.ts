@@ -113,6 +113,7 @@ describe("SendToAgent target resolution", () => {
             fleetTemplateId: null,
             createdAt: NOW,
             updatedAt: NOW,
+            createdByBotId: null,
           },
         ],
         threads: [thread(PARENT_THREAD_ID, null, { groupId, respondingBotId: PARENT_BOT_ID })],

@@ -18,6 +18,7 @@ export function createGroups({
             hopBudget: event.payload.hopBudget ?? null,
             keepBusy: event.payload.keepBusy,
             fleetTemplateId: event.payload.fleetTemplateId,
+            createdByBotId: event.payload.createdByBotId,
             createdAt: event.payload.createdAt,
             updatedAt: event.payload.updatedAt,
           });

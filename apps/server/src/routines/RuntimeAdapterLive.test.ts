@@ -101,6 +101,7 @@ const bot = (botId: string, name: string, provider: string): ProjectionBot => ({
   name,
   engine: { provider, model: "model-1", fallbacks: [] },
   archivedAt: null,
+  createdByBotId: null,
 });
 
 /**

@@ -98,6 +98,7 @@ import Migration0083 from "./Migrations/083_ProjectionGroupFleetTemplate.ts";
 import Migration0084 from "./Migrations/084_ProjectionThreadSessionUnavailability.ts";
 import Migration0085 from "./Migrations/085_ProjectionTurnSilentAt.ts";
 import Migration0086 from "./Migrations/086_ProjectionThreadSessionLastErrorCode.ts";
+import Migration0087 from "./Migrations/087_ProjectionRosterCreatedByBot.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -195,6 +196,7 @@ export const migrationEntries = [
   [84, "ProjectionThreadSessionUnavailability", Migration0084],
   [85, "ProjectionTurnSilentAt", Migration0085],
   [86, "ProjectionThreadSessionLastErrorCode", Migration0086],
+  [87, "ProjectionRosterCreatedByBot", Migration0087],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

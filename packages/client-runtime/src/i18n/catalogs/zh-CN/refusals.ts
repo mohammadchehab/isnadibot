@@ -46,5 +46,11 @@ export const refusalsCatalog = {
     "机器人提及仅在空间聊天中有效。请移除提及后重新发送。",
   "This turn stopped responding, so it was closed. Try again.":
     "此轮已停止响应，因此已关闭。请重试。",
+  "This bot has already made as many bots as it can. Create the bot yourself to go further.":
+    "此机器人已创建了它所能创建的机器人数量上限。如需继续，请自行创建机器人。",
+  "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.":
+    "此机器人由机器人创建的机器人创建。如需更深层级，请自行创建机器人。",
+  "This change could not be applied. Update the app, then try again.":
+    "无法应用此更改。请更新应用后重试。",
   "The command failed.": "命令失败。",
 } as const;

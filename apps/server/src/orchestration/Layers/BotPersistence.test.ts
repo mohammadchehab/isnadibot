@@ -182,6 +182,7 @@ it.layer(TestLayer)("bot persistence", (it) => {
         archivedAt: null,
         createdAt,
         updatedAt: restoredBot!.updatedAt,
+        createdByBotId: null,
       });
       assert.deepEqual(restored.groups, [
         {
@@ -196,6 +197,7 @@ it.layer(TestLayer)("bot persistence", (it) => {
           fleetTemplateId: null,
           createdAt,
           updatedAt: restored.groups[0]!.updatedAt,
+          createdByBotId: null,
         },
       ]);
 

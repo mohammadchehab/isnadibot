@@ -80,6 +80,7 @@ export function bot(id: BotId, overrides: Partial<OrchestrationBot> = {}): Orche
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
+    createdByBotId: overrides.createdByBotId ?? null,
   };
 }
 

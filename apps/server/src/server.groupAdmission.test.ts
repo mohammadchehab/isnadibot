@@ -170,6 +170,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                     hopBudget: null,
                     keepBusy: false,
                     fleetTemplateId: null,
+                    createdByBotId: null,
                     createdAt: "2026-01-01T00:00:00.000Z",
                     updatedAt: "2026-01-01T00:00:00.000Z",
                   }),

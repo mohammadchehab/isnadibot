@@ -47,6 +47,7 @@ function makeBot(archivedAt: string | null = null): OrchestrationBot {
     archivedAt,
     createdAt: NOW,
     updatedAt: NOW,
+    createdByBotId: null,
   };
 }
 
@@ -106,6 +107,7 @@ function makeReadModel(options?: ReadModelOptions): OrchestrationReadModel {
             bossBotId: BOT_ID,
             members: [{ kind: "bot", botId: BOT_ID, role: "boss" }],
             fleetTemplateId: null,
+            createdByBotId: null,
             createdAt: NOW,
             updatedAt: NOW,
           },

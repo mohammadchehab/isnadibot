@@ -27,6 +27,7 @@ export function createBots({
             voiceEnabled: event.payload.voiceEnabled,
             channelBindings: event.payload.channelBindings,
             groupId: event.payload.groupId,
+            createdByBotId: event.payload.createdByBotId,
             archivedAt: null,
             createdAt: event.payload.createdAt,
             updatedAt: event.payload.updatedAt,
