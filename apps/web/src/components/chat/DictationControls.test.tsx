@@ -1,4 +1,3 @@
-import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 import { visitElements } from "../../test/reactElementTree";
@@ -59,6 +58,11 @@ interface PointerInput {
 
 interface TestButtonProps {
   type?: string;
+  className?: string;
+  /** The design-system look the control asks for, when it is a `Button`. */
+  variant?: string;
+  /** A string on the Button, a number on a bare input; the test only reads it. */
+  size?: string | number;
   "aria-label"?: string;
   "aria-disabled"?: boolean | "true" | "false";
   "aria-pressed"?: boolean | "true" | "false";
@@ -83,8 +87,8 @@ function render(props: DictationControlsProps) {
   return {
     button: button.props as TestButtonProps,
     cancel: cancel?.props as TestButtonProps | undefined,
-    /** The control element itself, for the look it asks the design system for. */
-    control: button as ReactElement<TestButtonProps & { variant?: string; size?: string }>,
+    /** The control's type and props, for the look it asks the design system for. */
+    control: { type: button.type, props: button.props as TestButtonProps },
     status: status.props,
   };
 }
