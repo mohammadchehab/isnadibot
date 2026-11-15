@@ -1,5 +1,6 @@
 import { IsnadiMemoryOperationError } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
+import { CommandRefusalCodes } from "@isnadi/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { arCatalog } from "../i18n/catalogs/ar/index.ts";
@@ -508,5 +509,65 @@ describe("commandFailureMessage", () => {
     expect(commandFailureMessage(failed(rightsRefusal), { t })).toBe(
       "translated: Changing this environment needs permission. Ask the person who runs it.",
     );
+  });
+});
+
+/**
+ * Every refusal code the shared vocabulary held when this branch was rebased
+ * onto main, plus the ones this branch adds.
+ *
+ * Pinned rather than derived on purpose. `refusalParity` walks whatever
+ * `CommandRefusalCodes` happens to hold, so a code that a merge or a rebase
+ * dropped takes its sentence with it and every surface that switches on it goes
+ * quiet — the app stops naming a reason without anything failing. This list is
+ * what notices the drop: it is written down, so a rebase that loses an entry
+ * fails here instead of shipping a vocabulary that quietly shrank.
+ */
+const SHIPPED_REFUSAL_CODES = [
+  "open-work-items",
+  "environment-rights",
+  "bot-is-group-boss",
+  "group-would-be-undersized",
+  "delegation-limit-reached",
+  "delegation-would-cycle",
+  "actor-not-a-group-member",
+  "leave-only-as-yourself",
+  "bot-not-a-group-member",
+  "bot-in-another-group",
+  "group-requires-boss",
+  "group-already-has-boss",
+  "boss-cannot-be-replaced-and-removed",
+  "group-has-no-responder",
+  "thread-is-busy",
+  "thread-state-invalid",
+  "channel-delivery-unavailable",
+  "stale-view",
+  "already-exists",
+  "entity-archived",
+  "workspace-root-in-use",
+  "unknown-fleet-template",
+  "unknown-fleet-role",
+  "fleet-role-has-no-provider",
+  "fleet-role-needs-name",
+  "fleet-roles-share-name",
+  "thread-does-not-take-mentions",
+  "turn-went-silent",
+  "bot-creation-limit-reached",
+  "bot-creation-chain-too-deep",
+  "bot-origin-forbidden",
+] as const;
+
+/** The codes this branch adds on top of the list above. */
+const ADDED_REFUSAL_CODES = ["work-item-state-invalid", "work-item-limit-reached"] as const;
+
+describe("the refusal vocabulary", () => {
+  it("still carries every code it shipped with, plus the ones this branch adds", () => {
+    for (const code of [...SHIPPED_REFUSAL_CODES, ...ADDED_REFUSAL_CODES]) {
+      expect(CommandRefusalCodes).toContain(code);
+    }
+  });
+
+  it("is a strict superset of the list it was rebased onto", () => {
+    expect(CommandRefusalCodes.length).toBeGreaterThan(SHIPPED_REFUSAL_CODES.length);
   });
 });

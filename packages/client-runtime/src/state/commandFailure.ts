@@ -74,6 +74,10 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "bot-creation-chain-too-deep":
     "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.",
   "bot-origin-forbidden": "This change could not be applied. Update the app, then try again.",
+  "work-item-state-invalid":
+    "That action does not fit this card's current state. Pick a different action.",
+  "work-item-limit-reached":
+    "This space already has as many open cards as it can hold. Close one first.",
 };
 
 /**

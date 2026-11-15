@@ -122,10 +122,11 @@ export const CommandRefusalCodes = [
    * every one of those lookups shares this literal rather than carrying its own
    * — the user's next move is the same whichever entity went missing.
    *
-   * Deliberately NOT used for an entity that still exists in another state (an
-   * archived thread, a bot already in the group) or for an id that is taken on
-   * create: those tell the user "this is gone" about something that is right
-   * there, and each has its own remedy.
+   * Deliberately NOT used where the entity's new state is itself the user's next
+   * action — an archived thread they must unarchive, a bot already in the group,
+   * an id taken on create — because each of those has a specific remedy of its
+   * own. It IS used where the entity moved and the only thing the user can do is
+   * look again: a card already closed when they went to close it.
    */
   "stale-view",
   /**
@@ -233,6 +234,28 @@ export const CommandRefusalCodes = [
    * and it exists so a client cannot claim or launder a bot origin.
    */
   "bot-origin-forbidden",
+  /**
+   * A work-item command the card's own state does not allow: moving a finished
+   * card, blocking one that is already done, unblocking one that is not blocked,
+   * reopening one that is still open. Six sites in `workItems.ts`, one code.
+   *
+   * Separate from `thread-state-invalid` above for the reason that code exists:
+   * the sentence names the thing in front of the user, and a card is not a chat,
+   * so borrowing it would print a false noun at six sites. It also carries no
+   * refresh clause, unlike its chat sibling: at most of these sites the client's
+   * view is current and the move is illegal, so a refresh would change nothing —
+   * the same written test `entity-archived` uses.
+   */
+  "work-item-state-invalid",
+  /**
+   * A space already holds as many open cards as it may. The cards are fine and
+   * the client's view is current; the user has to finish or close one first.
+   *
+   * Not `open-work-items`, which is the delete-confirmation prompt and says the
+   * group holds work that a delete would discard — nothing is being deleted
+   * here. Not `stale-view` either, because a refresh changes nothing.
+   */
+  "work-item-limit-reached",
 ] as const;
 
 /**

@@ -54,5 +54,9 @@ export const refusalsCatalog = {
     "This bot was made by a bot that was made by a bot. Create the bot yourself to go deeper.",
   "This change could not be applied. Update the app, then try again.":
     "This change could not be applied. Update the app, then try again.",
+  "That action does not fit this card's current state. Pick a different action.":
+    "That action does not fit this card's current state. Pick a different action.",
+  "This space already has as many open cards as it can hold. Close one first.":
+    "This space already has as many open cards as it can hold. Close one first.",
   "The command failed.": "The command failed.",
 } as const;
