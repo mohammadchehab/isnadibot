@@ -63,7 +63,7 @@ export function MessageAttachmentFile(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open ${props.name}`}
-      className="flex-row items-center gap-2 rounded-[14px] bg-black/5 px-3 py-3 dark:bg-white/10"
+      className="flex-row items-center gap-2 rounded-2xl bg-black/5 px-3 py-3 dark:bg-white/10"
       disabled={uri === null}
       onPress={() => {
         if (uri) void tryOpenExternalUrl(uri, "file-preview");

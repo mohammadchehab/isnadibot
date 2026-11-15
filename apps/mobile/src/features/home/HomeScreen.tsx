@@ -442,7 +442,7 @@ export function HomeScreen(props: HomeScreenProps) {
           <View className="size-20 items-center justify-center rounded-full bg-subtle">
             <SymbolView name="text.bubble" size={30} tintColor={accentColor} type="monochrome" />
           </View>
-          <Text className="mt-6 text-center text-[22px] font-t3-bold text-foreground">
+          <Text className="mt-6 text-center text-xl font-t3-bold text-foreground">
             {emptyState.title}
           </Text>
           <Text className="mt-2 max-w-107.5 text-center font-sans text-base leading-normal text-foreground-muted">

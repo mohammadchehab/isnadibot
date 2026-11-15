@@ -129,8 +129,8 @@ function ThemeCard(props: {
       accessibilityState={{ checked: selected, disabled: props.disabled }}
       className={
         selected
-          ? "size-16.5 items-center justify-center rounded-full border-[3px] border-primary"
-          : "size-16.5 items-center justify-center rounded-full border-[3px] border-transparent"
+          ? "size-16.5 items-center justify-center rounded-full border-3 border-primary"
+          : "size-16.5 items-center justify-center rounded-full border-3 border-transparent"
       }
       disabled={props.disabled}
       onPress={() => props.onSelect(appearance)}
@@ -205,22 +205,22 @@ function PreviewPane(props: { readonly colors: MobileThemeVariables; readonly co
       >
         <View className="gap-1">
           <View
-            className="h-1.5 w-[72%] rounded-full"
-            style={{ backgroundColor: props.colors["--color-subtle-strong"] }}
+            className="h-1.5 rounded-full"
+            style={{ backgroundColor: props.colors["--color-subtle-strong"], width: "72%" }}
           />
           <View
-            className="h-1.5 w-[46%] rounded-full"
-            style={{ backgroundColor: props.colors["--color-subtle-strong"] }}
+            className="h-1.5 rounded-full"
+            style={{ backgroundColor: props.colors["--color-subtle-strong"], width: "46%" }}
           />
         </View>
         <View className="items-end gap-1 pb-2">
           <View
-            className="h-3 w-[78%] rounded-full"
-            style={{ backgroundColor: props.colors["--color-user-bubble"] }}
+            className="h-3 rounded-full"
+            style={{ backgroundColor: props.colors["--color-user-bubble"], width: "78%" }}
           />
           <View
-            className="h-1 w-[38%] rounded-full"
-            style={{ backgroundColor: props.colors["--color-foreground-muted"] }}
+            className="h-1 rounded-full"
+            style={{ backgroundColor: props.colors["--color-foreground-muted"], width: "38%" }}
           />
         </View>
       </View>
@@ -258,7 +258,7 @@ function ModePreview(props: { readonly mode: MobileThemeMode; readonly themeIds:
       className="h-24 w-14 self-center rounded-2xl p-0.75"
       style={{ backgroundColor: frameBackground, borderColor: frameColor, borderWidth: 1.5 }}
     >
-      <View className="flex-1 flex-row overflow-hidden rounded-[11px]">
+      <View className="flex-1 flex-row overflow-hidden rounded-xl">
         {props.mode === "system" ? (
           <>
             <PreviewPane colors={light} compact />

@@ -54,7 +54,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
 
   const rowContent = (
     <>
-      <Text className="text-[17px] font-t3-medium leading-snug text-foreground" numberOfLines={1}>
+      <Text className="text-lg font-t3-medium leading-snug text-foreground" numberOfLines={1}>
         {pendingTask.title}
       </Text>
       <Text className="mt-1 text-xs text-foreground-muted" numberOfLines={1}>

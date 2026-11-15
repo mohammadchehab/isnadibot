@@ -134,7 +134,7 @@ export function ThreadNavigationSidebarHeader(props: {
 
   return (
     <View
-      className="absolute inset-x-0 top-0 z-[4]"
+      className="absolute inset-x-0 top-0 z-4"
       collapsable={false}
       onLayout={props.onLayout}
       pointerEvents="auto"

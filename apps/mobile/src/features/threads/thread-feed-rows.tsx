@@ -238,7 +238,7 @@ export function renderFeedEntry(
           {...(enterAnimated ? { entering: FadeInUp.duration(220) } : {})}
         >
           <View
-            className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
+            className="min-w-0 gap-2 rounded-3xl px-3.5 py-2.5"
             style={{
               backgroundColor: userBubbleColor,
               maxWidth: props.userBubbleMaxWidth,
@@ -272,7 +272,7 @@ export function renderFeedEntry(
                   key={attachment.id}
                   environmentId={props.environmentId}
                   attachmentId={attachment.id}
-                  className="aspect-[1.3] w-full rounded-[14px] bg-white/15"
+                  className="aspect-13/10 w-full rounded-2xl bg-white/15"
                   onPressImage={props.onPressImage}
                 />
               );
@@ -411,7 +411,7 @@ export function renderFeedEntry(
               key={attachment.id}
               environmentId={props.environmentId}
               attachmentId={attachment.id}
-              className="mt-1.5 aspect-[1.3] w-full rounded-[18px] bg-neutral-200 dark:bg-neutral-800"
+              className="mt-1.5 aspect-13/10 w-full rounded-2xl bg-neutral-200 dark:bg-neutral-800"
               onPressImage={props.onPressImage}
             />
           );

@@ -18,9 +18,9 @@ export function BrandMark(props: { readonly compact?: boolean; readonly stageLab
       <BrandIcon borderRadius={compact ? 10 : 14} size={iconSize} />
       <View className="gap-1">
         <View className="flex-row items-center gap-2">
-          <Text className="text-lg font-t3-bold tracking-[-0.4px] text-foreground">IsnadiBot</Text>
+          <Text className="text-lg font-t3-bold tracking-tight text-foreground">IsnadiBot</Text>
           <View className="rounded-full bg-subtle px-2 py-1">
-            <Text className="text-3xs font-t3-bold tracking-[1.1px] uppercase text-foreground-muted">
+            <Text className="text-3xs font-t3-bold tracking-label-wide uppercase text-foreground-muted">
               {stageLabel}
             </Text>
           </View>

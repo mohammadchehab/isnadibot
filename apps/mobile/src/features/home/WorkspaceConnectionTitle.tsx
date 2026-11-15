@@ -148,7 +148,7 @@ export function WorkspaceConnectionTitle(props: {
         <Text
           className={
             size === "pageTitle"
-              ? "text-[20px] font-t3-bold text-foreground-muted"
+              ? "text-xl font-t3-bold text-foreground-muted"
               : "text-base font-t3-bold text-foreground-muted"
           }
           numberOfLines={1}

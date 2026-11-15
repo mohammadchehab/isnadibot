@@ -19,13 +19,13 @@ export function ProjectGroupLabel(props: {
   return (
     <View className="flex-row items-center gap-2.5 px-1 pb-2">
       <Text
-        className="flex-1 text-xs font-t3-medium tracking-[0.5px] uppercase text-foreground-muted"
+        className="flex-1 text-xs font-t3-medium tracking-wider uppercase text-foreground-muted"
         numberOfLines={1}
       >
         {props.project.title}
       </Text>
       {props.environmentLabel ? (
-        <Text className="max-w-[42%] text-2xs text-foreground-tertiary" numberOfLines={1}>
+        <Text className="max-w-2/5 text-2xs text-foreground-tertiary" numberOfLines={1}>
           {props.environmentLabel}
         </Text>
       ) : null}
@@ -90,7 +90,7 @@ export function ArchivedThreadRow(props: {
             borderBottomWidth: props.isLast ? 0 : 1,
           }}
         >
-          <View className="h-8.5 w-8.5 items-center justify-center rounded-[11px] bg-subtle">
+          <View className="h-8.5 w-8.5 items-center justify-center rounded-xl bg-subtle">
             <SymbolView name="archivebox.fill" size={15} tintColor={iconColor} type="monochrome" />
           </View>
 
@@ -133,7 +133,7 @@ export function ArchiveError(props: { readonly message: string; readonly onRetry
   const { t } = useMobileI18n();
 
   return (
-    <View className="rounded-[20px] border border-danger-border bg-danger p-4">
+    <View className="rounded-3xl border border-danger-border bg-danger p-4">
       <Text className="text-base font-t3-bold text-danger-foreground">
         {t("Could not load every archive")}
       </Text>

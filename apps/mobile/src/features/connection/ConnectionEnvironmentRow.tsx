@@ -144,7 +144,7 @@ export function ConnectionEnvironmentRow(props: {
           className="gap-3 px-4 pb-4"
         >
           <View className="gap-1.5">
-            <Text className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
+            <Text className="text-2xs font-t3-bold tracking-label uppercase text-foreground-muted">
               {t("Label")}
             </Text>
             <TextInput
@@ -153,12 +153,12 @@ export function ConnectionEnvironmentRow(props: {
               placeholder={t("My MacBook")}
               value={label}
               onChangeText={setLabel}
-              className="rounded-[14px] border border-input-border bg-input px-4 py-3 text-base text-foreground"
+              className="rounded-2xl border border-input-border bg-input px-4 py-3 text-base text-foreground"
             />
           </View>
 
           <View className="gap-1.5">
-            <Text className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
+            <Text className="text-2xs font-t3-bold tracking-label uppercase text-foreground-muted">
               {t("URL")}
             </Text>
             <TextInput
@@ -168,23 +168,23 @@ export function ConnectionEnvironmentRow(props: {
               placeholder="192.168.1.100:8080"
               value={url}
               onChangeText={setUrl}
-              className="rounded-[14px] border border-input-border bg-input px-4 py-3 text-base text-foreground"
+              className="rounded-2xl border border-input-border bg-input px-4 py-3 text-base text-foreground"
             />
           </View>
 
           <View className="flex-row justify-end gap-2">
             <Pressable
-              className="min-h-10.5 flex-1 flex-row items-center justify-center gap-1.5 rounded-[14px] bg-primary px-3.5 py-2.5 active:opacity-70"
+              className="min-h-10.5 flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl bg-primary px-3.5 py-2.5 active:opacity-70"
               onPress={handleSave}
             >
               <SymbolView name="checkmark" size={13} tintColor={primaryFg} type="monochrome" />
-              <Text className="text-xs font-t3-bold tracking-[0.8px] uppercase text-primary-foreground">
+              <Text className="text-xs font-t3-bold tracking-label uppercase text-primary-foreground">
                 {t("Save")}
               </Text>
             </Pressable>
 
             <Pressable
-              className="h-10.5 w-10.5 items-center justify-center rounded-[14px] border border-input-border bg-input active:opacity-70"
+              className="h-10.5 w-10.5 items-center justify-center rounded-2xl border border-input-border bg-input active:opacity-70"
               onPress={() => props.onReconnect(props.environment.environmentId)}
             >
               <SymbolView
@@ -196,7 +196,7 @@ export function ConnectionEnvironmentRow(props: {
             </Pressable>
 
             <Pressable
-              className="h-10.5 w-10.5 items-center justify-center rounded-[14px] border border-danger-border bg-danger active:opacity-70"
+              className="h-10.5 w-10.5 items-center justify-center rounded-2xl border border-danger-border bg-danger active:opacity-70"
               onPress={() => props.onRemove(props.environment.environmentId)}
             >
               <SymbolView name="trash" size={14} tintColor={dangerFg} type="monochrome" />
