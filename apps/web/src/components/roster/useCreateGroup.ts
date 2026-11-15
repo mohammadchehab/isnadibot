@@ -1,5 +1,9 @@
 import { Predicate } from "effect";
 import { BotId, GroupId } from "@isnadi/contracts";
+import {
+  classifyCommandFailure,
+  commandFailureMessage,
+} from "@isnadi/client-runtime/state/runtime";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 
@@ -54,15 +58,36 @@ export function useCreateGroup(): (input: NewGroupInput) => Promise<CreateGroupR
         },
       });
 
-      if (Predicate.isTagged(result, "Failure")) {
+      if (!Predicate.isTagged(result, "Failure")) {
+        void navigate({ to: "/groups/$groupId", params: { groupId } });
+
+        return groupId;
+      }
+
+      // Only a refusal this client can name may carry a description; anything
+      // else keeps the title-only toast rather than echoing the server's own
+      // sentence with its raw bot and group ids. `unknown` covers two cases and
+      // title-only is right for both: a throw the server has not coded yet, and
+      // a coded refusal from a newer server whose code this client lacks.
+      //
+      // INTERIM — TASK-303a codes the rest of group.create's chain; the
+      // under-two-member throw is reachable from this surface, so the gate
+      // stays until then. Removing it also restores the echo fallback for
+      // newer-server codes, which TASK-294 decides. Same gate TASK-289 put on
+      // the group editor.
+      if (classifyCommandFailure(result) === "unknown") {
         toastManager.add({ type: "error", title: t("Could not create group") });
 
         return null;
       }
 
-      void navigate({ to: "/groups/$groupId", params: { groupId } });
+      toastManager.add({
+        type: "error",
+        title: t("Could not create group"),
+        description: commandFailureMessage(result, { t }),
+      });
 
-      return groupId;
+      return null;
     },
     [createGroupCommand, environmentId, navigate, t],
   );

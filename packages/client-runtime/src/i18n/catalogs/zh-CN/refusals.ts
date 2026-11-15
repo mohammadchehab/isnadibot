@@ -15,6 +15,8 @@ export const refusalsCatalog = {
     "你不是此空间的成员。请向管理此空间的人申请访问权限。",
   "That bot is no longer in this space. Refresh to see the current team.":
     "该机器人已不在此空间中。请刷新以查看当前团队。",
+  "This bot belongs to another space. Create this space without it, then add the bot.":
+    "此机器人属于另一个空间。请在不包含它的情况下创建此空间，然后再添加该机器人。",
   "This space already has a boss. Replace the boss before making this bot the boss.":
     "此空间已有主管。请先更换主管，再将该机器人设为主管。",
   "This chat has work in flight. Wait for it to finish, or respond to it.":

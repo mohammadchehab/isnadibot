@@ -55,6 +55,7 @@ export function StartSpaceScreen() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const bots = useRosterStore((state) => state.bots);
+  const groups = useRosterStore((state) => state.groups);
   const providers = useAtomValue(primaryServerProvidersAtom);
   const createGroup = useCreateGroup();
   const [selectedId, setSelectedId] = useState<FleetTemplateId | null>(null);
@@ -135,6 +136,7 @@ export function StartSpaceScreen() {
         <NewGroupDialog
           open
           bots={bots}
+          groups={groups}
           onOpenChange={setStartEmptyOpen}
           onCreate={(input) => {
             void createGroup(input).then((groupId) => {
