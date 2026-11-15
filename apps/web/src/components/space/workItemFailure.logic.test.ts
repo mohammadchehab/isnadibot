@@ -1,3 +1,5 @@
+import * as NodeFS from "node:fs";
+
 import { commandRefusalMessage } from "@isnadi/client-runtime/state/runtime";
 import { CommandRefusalCodes } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
@@ -22,10 +24,11 @@ const serverSentence = (code: string) =>
 const INTERNAL_PROSE = /person-9f2a|group-7c1d|invariant/i;
 
 /**
- * The title each surface passes, copied from the surface itself. The three
- * surfaces are `SpaceTasks.tsx` (one dispatch path) and `TaskDialog.tsx` (save
- * and owner), which is why the titles are listed rather than shared: they are
- * the surface's own wording, and the test holds the shared half — the sentence.
+ * The title each surface passes. The three paths are `SpaceTasks.tsx` (one
+ * dispatch path) and `TaskDialog.tsx` (save and owner), which is why the titles
+ * are listed rather than shared: they are the surface's own wording, and the
+ * cases below hold the shared half — the sentence. That the surfaces really
+ * pass these titles is asserted in "surface wiring", which reads their source.
  */
 const SPACE_TASKS_TITLE = "Could not update the card";
 
@@ -124,6 +127,52 @@ describe("workItemFailureToast", () => {
   it("has a shared sentence for every code, so no code falls through to the title", () => {
     for (const code of CommandRefusalCodes) {
       expect(commandRefusalMessage(code)).not.toBeNull();
+    }
+  });
+});
+
+/**
+ * There is no DOM in this project to mount a surface into, so the wiring is
+ * asserted at the source level, on both halves of the path — the precedent is
+ * `BotZeroState.test.tsx`. The cases above prove the helper turns a code into a
+ * sentence; they cannot see a surface that stops calling it, and that surface
+ * would drop the reason again exactly as before this card. So each surface must
+ * hand its failure to the helper with the title it owns, and must raise no
+ * other toast of its own.
+ */
+describe("surface wiring", () => {
+  const sourceOf = (file: string) => NodeFS.readFileSync(new URL(file, import.meta.url), "utf8");
+
+  const SURFACES = [
+    { file: "./SpaceTasks.tsx", titles: [SPACE_TASKS_TITLE] },
+    { file: "./TaskDialog.tsx", titles: [TASK_DIALOG_SAVE_TITLE, TASK_DIALOG_OWNER_TITLE] },
+  ] as const;
+
+  for (const surface of SURFACES) {
+    it(`routes every failure in ${surface.file} through the shared helper`, () => {
+      const source = sourceOf(surface.file);
+
+      // One toast per title the surface owns, so a fourth path added without a
+      // title of its own fails here rather than silently showing a bare one.
+      expect(source.match(/toastManager\.add\(/g) ?? []).toHaveLength(surface.titles.length);
+
+      for (const title of surface.titles) {
+        // The surface's own `t` call stays on the surface, so translation
+        // coverage still discovers the string; only the sentence is shared.
+        const call = new RegExp(
+          `workItemFailureToast\\(\\{ cause: \\w+\\.cause, title: t\\("${title}"\\) \\}, t\\)`,
+        );
+
+        expect(source).toMatch(call);
+      }
+    });
+  }
+
+  it("keeps no title-only toast on either surface", () => {
+    for (const surface of SURFACES) {
+      // `toastManager.add({ title })` with no description is the shape this
+      // card removed: it tells a person the card did not save and never why.
+      expect(sourceOf(surface.file)).not.toMatch(/toastManager\.add\(\s*\{\s*title:/);
     }
   });
 });
