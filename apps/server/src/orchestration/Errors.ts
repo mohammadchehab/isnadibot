@@ -35,15 +35,20 @@ export const COMMAND_PRODUCED_NO_EVENTS = "Command produced no events.";
 /**
  * The two claims a throw without a refusal code can make. They are separate
  * labels because they expire differently: `internal-command` is closed by the
- * contract — the command that reaches it is not one a client can dispatch, or
- * its schema rejects the input — so it cannot become reachable without a
- * contract change. `no-shipped-surface` is only closed by what shipped clients
- * send today and ends the moment a surface adds a control. One label for both
- * would let the second hide under the first, and nothing re-reads a row filed
- * under the wrong one.
+ * contract — the command that reaches it is not one a client can dispatch, its
+ * schema rejects the input, or the dispatch path always supplies the argument
+ * the guard requires — so it cannot become reachable without a contract change.
+ * `no-shipped-surface` is only closed by what shipped clients send today and
+ * ends the moment a surface adds a control. One label for both would let the
+ * second hide under the first, and nothing re-reads a row filed under the wrong
+ * one.
  */
 export const InvariantExclusion = Schema.Struct({
-  /** `internal-command`: a client cannot dispatch it. `no-shipped-surface`: it can, and none does. */
+  /**
+   * `internal-command`: a client cannot dispatch it, its schema rejects the
+   * input, or the dispatch path always supplies what the guard requires.
+   * `no-shipped-surface`: it can, and none does.
+   */
   kind: Schema.Literals(["internal-command", "no-shipped-surface"]),
   reason: Schema.String,
 });
