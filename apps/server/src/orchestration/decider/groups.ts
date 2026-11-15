@@ -70,6 +70,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       ) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "unknown-fleet-template",
           detail: `Unknown fleet template '${command.fleetTemplateId}'.`,
         });
       }
@@ -77,6 +78,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (command.bossBotId === undefined) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "group-requires-boss",
           detail: "A group requires a boss bot.",
         });
       }
@@ -115,6 +117,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (memberBotIds.length < 2) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "group-would-be-undersized",
           detail: `Group '${command.groupId}' requires at least two active bots.`,
         });
       }
@@ -495,6 +498,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       } else if (actor !== undefined && command.personId !== actor.personId) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "leave-only-as-yourself",
           detail: `Person '${actor.personId}' can only leave a group as themselves.`,
         });
       }
@@ -506,6 +510,11 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (!person) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          // A person who left is usually still in the environment, so "no longer
+          // in this space" would be false; the membership is the thing that is
+          // gone, and the user's next move is the same refresh `stale-view` asks
+          // for on every other entity kind.
+          refusal: "stale-view",
           detail: `Person '${command.personId}' is not a member of group '${group.id}'.`,
         });
       }
@@ -541,6 +550,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
       if (group.bossBotId === nextBoss.id && command.unassignPreviousBoss === true) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "boss-cannot-be-replaced-and-removed",
           detail: `Bot '${nextBoss.id}' is already the boss and cannot replace and unassign itself.`,
         });
       }
@@ -554,6 +564,7 @@ export const decideGroups = Effect.fn("decideGroups")(function* ({
         if (remainingBotIds.size < 2) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: command.type,
+            refusal: "group-would-be-undersized",
             detail: `Group '${group.id}' requires at least two active bots.`,
           });
         }

@@ -3,6 +3,7 @@ import {
   AuthSessionId,
   BotId,
   CommandId,
+  FleetTemplateId,
   GroupId,
   type OrchestrationReadModel,
 } from "@isnadi/contracts";
@@ -44,6 +45,35 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("requires a boss");
+      // The client picks its copy from the code, never from the sentence, so a
+      // copyedit must not be the only thing this test covers.
+      expect(error.refusal).toBe("group-requires-boss");
+    }),
+  );
+
+  it.effect("rejects a legacy create naming a fleet template this build does not ship", () =>
+    Effect.gen(function* () {
+      const error = yield* decideOrchestrationCommand({
+        command: {
+          type: "group.create",
+          commandId: CommandId.make("cmd-group-create-unknown-template"),
+          groupId: GROUP_ID,
+          name: "Product",
+          bossBotId: BOSS_ID,
+          fleetTemplateId: FleetTemplateId.make("template-this-build-does-not-ship"),
+          createdAt: NOW,
+        },
+        readModel: makeReadModel({ bots: [makeBot({ id: BOSS_ID })] }),
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected unknown fleet template invariant error");
+      }
+
+      expect(error.detail).toContain("Unknown fleet template");
+      // Version skew, not a stale roster: no refresh can produce a template the
+      // server does not ship, so the remedy is to update the app.
+      expect(error.refusal).toBe("unknown-fleet-template");
     }),
   );
 
@@ -98,6 +128,10 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("at least two active bots");
+      // A create that names too few bots takes the same code as the archive,
+      // delete and move paths, so a client switches on one thing wherever a
+      // space would fall below its floor.
+      expect(error.refusal).toBe("group-would-be-undersized");
     }),
   );
 
@@ -443,6 +477,36 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("at least two active bots");
+      // The same code the archive, delete and move paths take, so a client has
+      // one thing to switch on wherever a space would fall below its floor.
+      expect(error.refusal).toBe("group-would-be-undersized");
+    }),
+  );
+
+  it.effect("rejects replacing the boss with itself while unassigning it", () =>
+    Effect.gen(function* () {
+      const error = yield* decideOrchestrationCommand({
+        command: {
+          type: "group.boss.set",
+          commandId: CommandId.make("cmd-boss-set-itself"),
+          groupId: GROUP_ID,
+          bossBotId: BOSS_ID,
+          unassignPreviousBoss: true,
+        },
+        readModel: makeReadModel({
+          bots: [makeBot({ id: BOSS_ID }), makeBot({ id: SPECIALIST_ID })],
+          groups: [makeGroup()],
+        }),
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected boss-replaces-itself invariant error");
+      }
+
+      expect(error.detail).toContain("already the boss");
+      // Not `group-already-has-boss`: that one fires when the bot picked is not
+      // the boss. Here the command contradicts itself, so the remedy differs.
+      expect(error.refusal).toBe("boss-cannot-be-replaced-and-removed");
     }),
   );
 
@@ -618,6 +682,40 @@ it.layer(NodeServices.layer)("group membership decider", (it) => {
       }
 
       expect(error.detail).toContain("not a member");
+      // The membership is the entity that is gone, so the remedy is the same
+      // refresh every other `stale-view` site asks for. A person who left is
+      // usually still in the environment, so "no longer in this space" would be
+      // false and gets no literal of its own.
+      expect(error.refusal).toBe("stale-view");
+    }),
+  );
+
+  it.effect("rejects a leave that names someone other than the caller", () =>
+    Effect.gen(function* () {
+      const error = yield* decideOrchestrationCommand({
+        command: {
+          type: "group.leave",
+          commandId: CommandId.make("cmd-group-leave-someone-else"),
+          groupId: GROUP_ID,
+          personId: PERSON_ID,
+        },
+        readModel: makeReadModel({
+          bots: [makeBot({ id: BOSS_ID }), makeBot({ id: SPECIALIST_ID })],
+          groups: [makeGroup()],
+        }),
+        actor: { personId: AuthSessionId.make("person-someone-else"), canManageGroups: false },
+      }).pipe(Effect.flip);
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error("Expected leave-as-yourself invariant error");
+      }
+
+      expect(error.detail).toContain("can only leave a group as themselves");
+      // Not `environment-rights`: the actor may hold every right and still
+      // cannot use `group.leave` for someone else, because the fault is the
+      // command type. Telling them they lack rights sends them to ask for
+      // something they already have.
+      expect(error.refusal).toBe("leave-only-as-yourself");
     }),
   );
 
