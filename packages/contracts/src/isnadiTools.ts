@@ -64,25 +64,87 @@ export function classifyIsnadiSensitivePath(
     : undefined;
 }
 
+/**
+ * A heredoc opener on one line, in every form the shell accepts: `<<EOF`,
+ * `<<-EOF` (tab-stripped), `<<'EOF'`, `<<"EOF"` and `<<\EOF`.
+ */
+const HEREDOC_OPENER = /<<(-?)[ \t]*(?:'([^']*)'|"([^"]*)"|\\([A-Za-z_][\w-]*)|([A-Za-z_][\w-]*))/;
+
+/**
+ * `command` with the body of every *terminated* heredoc removed, so the text a
+ * script writes or prints is not read as the command's intent. A README body
+ * that says "delete a todo" is content, not a destructive command.
+ *
+ * An unterminated heredoc is left whole on purpose. It swallows the rest of the
+ * command, so stripping what follows a stray opener would hide a real
+ * destructive command behind it; keeping it means a false protection at worst,
+ * never a missed one.
+ */
+export function stripHeredocBodies(command: string): string {
+  const lines = command.split("\n");
+  const kept: string[] = [];
+
+  for (let at = 0; at < lines.length; at += 1) {
+    const line = lines[at] ?? "";
+    kept.push(line);
+
+    const opener = HEREDOC_OPENER.exec(line);
+
+    if (!opener) continue;
+
+    const stripLeadingTabs = opener[1] === "-";
+    const delimiter = opener[2] ?? opener[3] ?? opener[4] ?? opener[5];
+
+    if (delimiter === undefined) continue;
+
+    const isTerminator = (candidate: string) => {
+      const withoutTabs = stripLeadingTabs ? candidate.replace(/^\t+/, "") : candidate;
+
+      return withoutTabs.replace(/\r$/, "") === delimiter;
+    };
+
+    // Locate the terminator before dropping anything: no terminator means the
+    // heredoc runs to the end of the command and every later line is its body.
+    let terminator = -1;
+
+    for (let cursor = at + 1; cursor < lines.length; cursor += 1) {
+      if (isTerminator(lines[cursor] ?? "")) {
+        terminator = cursor;
+        break;
+      }
+    }
+
+    if (terminator === -1) continue;
+
+    // The opener stays, the body and its terminator go, and scanning resumes
+    // after the terminator so a command on the next line is still classified.
+    at = terminator;
+  }
+
+  return kept.join("\n");
+}
+
 export function classifyIsnadiExternalCommand(
   command: string,
 ): IsnadiProtectedApprovalClass | undefined {
-  if (/\b(stripe|checkout|payment|purchase|buy)\b/i.test(command)) return "pay";
+  const intent = stripHeredocBodies(command);
 
-  if (/\b(rm|rmdir|unlink|trash|delete|drop|destroy|wipe)\b/i.test(command)) return "delete";
+  if (/\b(stripe|checkout|payment|purchase|buy)\b/i.test(intent)) return "pay";
 
-  if (/\b(secret|credential|token|password|keychain|\.env)\b/i.test(command)) return "secrets";
+  if (/\b(rm|rmdir|unlink|trash|delete|drop|destroy|wipe)\b/i.test(intent)) return "delete";
+
+  if (/\b(secret|credential|token|password|keychain|\.env)\b/i.test(intent)) return "secrets";
 
   if (
     /\b(deploy|release|publish|production|kubectl|terraform\s+apply|git\s+push|gh\s+pr\s+(?:create|merge))\b/i.test(
-      command,
+      intent,
     )
   )
     return "production";
 
   if (
     /\b(send|post|comment|message|mail|curl\b[^\n]*(?:-X\s*POST|--request\s+POST|-d\b|--data(?:-raw|-binary|-urlencode)?\b))\b/i.test(
-      command,
+      intent,
     )
   )
     return "send";

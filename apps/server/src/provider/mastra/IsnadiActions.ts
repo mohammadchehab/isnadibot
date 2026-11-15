@@ -1,4 +1,8 @@
-import { ISNADI_CREATE_ROUTINE_TOOL_NAME, classifyIsnadiSensitivePath } from "@isnadi/contracts";
+import {
+  ISNADI_CREATE_ROUTINE_TOOL_NAME,
+  classifyIsnadiSensitivePath,
+  stripHeredocBodies,
+} from "@isnadi/contracts";
 import * as Predicate from "effect/Predicate";
 import {
   ISNADI_LIST_ROUTINES_TOOL_NAME,
@@ -120,7 +124,8 @@ export function textTokens(value: string): ReadonlySet<string> {
 }
 
 export function criticalActionFromText(value: string): IsnadiCriticalAction | null {
-  const tokens = textTokens(value);
+  // Heredoc bodies are content the script writes or prints, not its intent.
+  const tokens = textTokens(stripHeredocBodies(value));
 
   if (tokens.has("restart") && tokens.has("mcp")) return "production";
 
@@ -142,13 +147,21 @@ export function criticalActionFromShellCommand(
   value: string,
   wrapperDepth = 0,
 ): IsnadiCriticalAction | null {
+  // Classify what the command runs, not what it writes: a README body naming a
+  // deploy or a script body requiring node:crypto is content, not intent. An
+  // unterminated heredoc is left whole, so a stray opener cannot hide the
+  // destructive command it swallows. A newline separates commands in the shell,
+  // so it becomes one here too: the patterns below anchor on `^` or `;&|`, and
+  // without this an `rm` on its own line would read as argument text.
+  const intent = stripHeredocBodies(value).replace(/\r?\n/g, "; ");
+
   for (const [action, pattern] of CRITICAL_SHELL_ACTIONS) {
-    if (pattern.test(value)) return action;
+    if (pattern.test(intent)) return action;
   }
 
   if (wrapperDepth < 5) {
     for (const wrapperPattern of SHELL_COMMAND_WRAPPER_PATTERNS) {
-      for (const match of value.matchAll(wrapperPattern)) {
+      for (const match of intent.matchAll(wrapperPattern)) {
         const nestedCommand = match[1] ?? match[2] ?? match[3];
 
         if (!nestedCommand) continue;
@@ -159,7 +172,7 @@ export function criticalActionFromShellCommand(
     }
   }
 
-  return criticalActionFromText(value);
+  return criticalActionFromText(intent);
 }
 
 export type IsnadiActionInspection = {

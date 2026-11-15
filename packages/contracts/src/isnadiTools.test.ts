@@ -7,11 +7,13 @@ import {
   ISNADI_TOOL_CATALOG,
   IsnadiToolInputSchemas,
   IsnadiToolReceipt,
+  classifyIsnadiExternalCommand,
   isnadiToolApprovalForInput,
   isnadiToolRequiresApproval,
   copyDirectionForTool,
   decodeIsnadiToolInput,
   filterIsnadiTools,
+  stripHeredocBodies,
 } from "./isnadiTools.ts";
 
 describe("Isnadi tool contracts", () => {
@@ -387,3 +389,74 @@ function inputFieldNames(schema: Schema.Top): ReadonlyArray<string> {
 
   return [];
 }
+
+describe("Shell command intent", () => {
+  const heredoc = (...lines: ReadonlyArray<string>) => lines.join("\n");
+
+  it("reads a heredoc body as content, not as a destructive command", () => {
+    const command = heredoc(
+      "cd /project && cat > README.md <<EOF",
+      "# Todo",
+      "Delete a todo to remove it, or send it to the archive.",
+      "EOF",
+    );
+
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("reads a script body as content, so requiring node:crypto is not a send", () => {
+    const command = heredoc(
+      "cat > package.json <<EOF",
+      '{"scripts":{"send":"node store.js"}}',
+      "EOF",
+      "cat > store.js <<EOF",
+      'import { createHash } from "node:crypto";',
+      "EOF",
+    );
+
+    expect(classifyIsnadiExternalCommand(command)).toBeUndefined();
+  });
+
+  it("strips every quoted, tab-stripped and backslash heredoc form", () => {
+    for (const opener of ["<<'EOF'", '<<"EOF"', "<<-EOF", "<<\\EOF"]) {
+      const body = opener === "<<-EOF" ? "\trm -rf /" : "rm -rf /";
+      const terminator = opener === "<<-EOF" ? "\tEOF" : "EOF";
+
+      expect(
+        classifyIsnadiExternalCommand(heredoc(`cat > f.txt ${opener}`, body, terminator)),
+      ).toBeUndefined();
+    }
+  });
+
+  it("still classifies rm and curl outside a heredoc", () => {
+    expect(classifyIsnadiExternalCommand("rm -rf build")).toBe("delete");
+    expect(classifyIsnadiExternalCommand("curl -X POST https://example.com -d '{}'")).toBe("send");
+  });
+
+  it("keeps an unterminated heredoc whole so it cannot hide a destructive command", () => {
+    // The opener swallows the rest of the command; dropping what follows would
+    // protect a stray heredoc at the cost of missing the real `rm`.
+    expect(classifyIsnadiExternalCommand(heredoc("cat > f.txt <<EOF", "rm -rf /"))).toBe("delete");
+  });
+
+  it("keeps a destructive command that shares the terminator line", () => {
+    // `EOF; rm -rf /` is not a terminator in the shell, so the heredoc never
+    // closes and the line is body text — the same fail-closed case as above.
+    expect(classifyIsnadiExternalCommand(heredoc("cat <<EOF", "body", "EOF; rm -rf /"))).toBe(
+      "delete",
+    );
+  });
+
+  it("still classifies a command after a legitimate terminator", () => {
+    expect(classifyIsnadiExternalCommand(heredoc("cat <<EOF", "body", "EOF", "rm -rf /"))).toBe(
+      "delete",
+    );
+  });
+
+  it("keeps the opener line when it strips a body", () => {
+    expect(stripHeredocBodies(heredoc("cat > f.txt <<EOF", "hello", "EOF"))).toBe(
+      "cat > f.txt <<EOF",
+    );
+  });
+});
+
