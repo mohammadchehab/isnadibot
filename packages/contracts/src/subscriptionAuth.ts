@@ -304,6 +304,12 @@ export const SubscriptionAuthAccountOrderInput = Schema.Struct({
 
 export type SubscriptionAuthAccountOrderInput = typeof SubscriptionAuthAccountOrderInput.Type;
 
+/**
+ * A failed account operation. `reason` is written copy a surface shows as-is,
+ * so a producer must never put a raw cause sentence there: the cause carries
+ * paths and internal wording. Producers log the cause and pass only the copy
+ * (`subscriptionAuthFailure` in the server does both).
+ */
 export class SubscriptionAuthError extends Schema.TaggedErrorClass<SubscriptionAuthError>()(
   "SubscriptionAuthError",
   {

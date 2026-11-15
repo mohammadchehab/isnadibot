@@ -39,7 +39,7 @@ export class VcsProjectConfigError extends Schema.TaggedErrorClass<VcsProjectCon
   },
 ) {
   override get message(): string {
-    return `Failed to ${this.operation} VCS project config at ${this.configPath}.`;
+    return `Failed to ${this.operation} VCS project config.`;
   }
 }
 

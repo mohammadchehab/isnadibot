@@ -273,6 +273,35 @@ export const ServerSettingsOperation = Schema.Literals([
 
 export type ServerSettingsOperation = typeof ServerSettingsOperation.Type;
 
+/**
+ * The sentence a settings failure shows the user, per operation. This class is
+ * in the declared error union of four RPCs, so its message reaches the settings
+ * panel directly and one line for thirteen operations would tell nobody what
+ * failed. The map is exhaustive with no fallback: a new operation must be a
+ * compile error rather than a silent downgrade to a vague line.
+ *
+ * Operations that are the same user situation share a sentence rather than each
+ * minting one. No value names a path, an instance id, an environment variable or
+ * a raw operation, and none promises a remedy the operation cannot deliver:
+ * those details stay on the error's own fields, where a log reads them and no
+ * screen prints them.
+ */
+const SERVER_SETTINGS_FAILURE_COPY: Record<ServerSettingsOperation, string> = {
+  normalize: "The server settings could not be prepared.",
+  "check-exists": "The server settings could not be prepared.",
+  "prepare-directory": "The server settings could not be prepared.",
+  "read-file": "The server settings could not be read.",
+  "read-provider-history": "The server settings could not be read.",
+  "read-secret": "A saved API key could not be read.",
+  "remove-secret": "A saved API key could not be removed.",
+  "remove-stale-secret": "A saved API key could not be removed.",
+  "rollback-secret": "A saved API key could not be restored.",
+  "remove-analytics-state": "The saved analytics data could not be cleared.",
+  "write-secret": "An API key could not be saved.",
+  "validate-sandbox": "The sandbox settings are not valid.",
+  "write-file": "The server settings could not be saved.",
+};
+
 export class ServerSettingsError extends Schema.TaggedErrorClass<ServerSettingsError>()(
   "ServerSettingsError",
   {
@@ -284,15 +313,7 @@ export class ServerSettingsError extends Schema.TaggedErrorClass<ServerSettingsE
   },
 ) {
   override get message(): string {
-    const provider =
-      this.providerInstanceId === undefined ? "" : ` for provider ${this.providerInstanceId}`;
-
-    const variable =
-      this.environmentVariable === undefined
-        ? ""
-        : ` and environment variable ${this.environmentVariable}`;
-
-    return `Server settings ${this.operation} failed${provider}${variable} at ${this.settingsPath}.`;
+    return SERVER_SETTINGS_FAILURE_COPY[this.operation];
   }
 }
 

@@ -196,6 +196,6 @@ export class KeybindingsConfigError extends Schema.TaggedErrorClass<KeybindingsC
   },
 ) {
   override get message(): string {
-    return `Unable to parse keybindings config at ${this.configPath}: ${this.detail}`;
+    return `Unable to parse keybindings config: ${this.detail}`;
   }
 }
