@@ -96,6 +96,68 @@ const ENVIRONMENT_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 /** Words the shell runs before the program, which do not change what the program is. */
 const COMMAND_WRAPPERS = new Set(["sudo", "command", "exec", "nohup", "time", "env", "xargs"]);
 
+/**
+ * A wrapper's own flags that consume the word after them, so that word is the flag's
+ * value rather than the program: `sudo -u root rm` runs `rm`, not `root`. Only the
+ * flags listed here take the next word with them — a blanket "skip the word after any
+ * flag" would break `sudo -E rm`, where `-E` takes no value and `rm` is the program.
+ * A flag carrying its value inline (`--user=root`) needs no entry.
+ */
+const WRAPPER_VALUE_FLAGS = new Map<string, ReadonlySet<string>>([
+  [
+    "sudo",
+    new Set([
+      "-u",
+      "--user",
+      "-g",
+      "--group",
+      "-p",
+      "--prompt",
+      "-C",
+      "--close-from",
+      "-h",
+      "--host",
+      "-r",
+      "--role",
+      "-t",
+      "--type",
+      "-U",
+      "--other-user",
+      "-D",
+      "--chdir",
+      "-R",
+      "--chroot",
+      "-T",
+      "--command-timeout",
+    ]),
+  ],
+  ["env", new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"])],
+  ["exec", new Set(["-a", "--argv0"])],
+  ["time", new Set(["-f", "--format", "-o", "--output"])],
+  [
+    "xargs",
+    new Set([
+      "-a",
+      "--arg-file",
+      "-d",
+      "--delimiter",
+      "-E",
+      "-e",
+      "-I",
+      "-i",
+      "-L",
+      "-l",
+      "-n",
+      "-P",
+      "-s",
+      "--max-args",
+      "--max-procs",
+      "--max-chars",
+      "--process-slot-var",
+    ]),
+  ],
+]);
+
 type Token =
   | { readonly kind: "word"; readonly word: ShellWord }
   | { readonly kind: "operator"; readonly operator: string }
@@ -383,18 +445,35 @@ export function parseShellCommands(command: string): ReadonlyArray<ShellCommand>
  */
 export function programOf(segment: ShellCommand): ShellProgram {
   const wrappers: string[] = [];
+  let wrapper: string | null = null;
+  let skipValue = false;
 
   for (let at = 0; at < segment.words.length; at += 1) {
     const word = segment.words[at];
 
     if (word === undefined || word.value.length === 0) continue;
 
+    // The word before was a wrapper flag that takes a value, so this word is that
+    // value and not the program: `sudo -u root rm` runs `rm`, never `root`.
+    if (skipValue) {
+      skipValue = false;
+
+      continue;
+    }
+
     if (!word.quoted && ENVIRONMENT_ASSIGNMENT.test(word.value)) continue;
 
-    if (!word.quoted && word.value.startsWith("-")) continue;
+    if (!word.quoted && word.value.startsWith("-")) {
+      if (wrapper !== null && WRAPPER_VALUE_FLAGS.get(wrapper)?.has(word.value) === true) {
+        skipValue = true;
+      }
+
+      continue;
+    }
 
     if (!word.quoted && COMMAND_WRAPPERS.has(word.value)) {
       wrappers.push(word.value);
+      wrapper = word.value;
 
       continue;
     }

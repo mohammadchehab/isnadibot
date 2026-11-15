@@ -96,3 +96,25 @@ describe("the program signals", () => {
     expect(signalsOf("rm build")).toEqual(["Deletes files"]);
   });
 });
+
+describe("the program signals behind a wrapper", () => {
+  it("read the program past a wrapper flag that takes a value", () => {
+    // `root` is the value of `-u`, so the program is still `rm`: reading the
+    // value as the program dropped the pill the fork point showed.
+    expect(signalsOf("sudo -u root rm -rf /p")).toEqual(["Runs as root", "Deletes files"]);
+    expect(signalsOf("sudo -u root chmod 777 /p")).toEqual(["Runs as root", "Changes permissions"]);
+    expect(signalsOf("env -u HOME rm -rf /p")).toEqual(["Deletes files"]);
+  });
+
+  it("keep the program when the wrapper flag takes no value", () => {
+    expect(signalsOf("sudo -E rm -rf /p")).toEqual(["Runs as root", "Deletes files"]);
+    expect(signalsOf("sudo rm -rf /p")).toEqual(["Runs as root", "Deletes files"]);
+    expect(signalsOf("command rm -rf /p")).toEqual(["Deletes files"]);
+    expect(signalsOf("nohup rm -rf /p")).toEqual(["Deletes files"]);
+  });
+
+  it("leave the programs that never took a wrapper value unchanged", () => {
+    expect(signalsOf("git push origin main")).toEqual(["Publishes"]);
+    expect(signalsOf("curl https://example.com")).toEqual(["Network access"]);
+  });
+});

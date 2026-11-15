@@ -108,4 +108,25 @@ describe("parseShellCommands", () => {
       wrappers: ["env", "sudo"],
     });
   });
+
+  it("reads the program past a wrapper flag that takes a value", () => {
+    // The word after a value-taking wrapper flag is that flag's value, not the
+    // program: reading it as the program hid `rm` behind `sudo -u root`.
+    expect(programsOf("sudo -u root rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("sudo --user root chmod 777 /p")).toEqual(["chmod"]);
+    expect(programsOf("env -u HOME rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("exec -a worker node index.js")).toEqual(["node"]);
+    expect(programsOf("time -f %e make")).toEqual(["make"]);
+    expect(programsOf("xargs -n 1 rm -rf")).toEqual(["rm"]);
+  });
+
+  it("keeps the program when a wrapper flag takes no value", () => {
+    // A blanket "skip the word after any flag" would swallow the program here:
+    // `-E`, `-n` and `-v` carry no value, and an inline `--user=root` has none left.
+    expect(programsOf("sudo -E rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("sudo -n rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("sudo --user=root rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("command rm -rf /p")).toEqual(["rm"]);
+    expect(programsOf("nohup rm -rf /p")).toEqual(["rm"]);
+  });
 });
