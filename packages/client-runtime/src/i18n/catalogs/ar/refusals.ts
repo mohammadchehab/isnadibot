@@ -17,5 +17,11 @@ export const refusalsCatalog = {
     "هذا البوت لم يعد في هذه المساحة. حدّث الصفحة لترى الفريق الحالي.",
   "This space already has a boss. Replace the boss before making this bot the boss.":
     "هذه المساحة لديها قائد بالفعل. استبدل القائد قبل تعيين هذا البوت قائدًا.",
+  "This chat has work in flight. Wait for it to finish, or respond to it.":
+    "هذه المحادثة لديها عمل قيد التنفيذ. انتظر انتهاءه أو ردّ عليه.",
+  "That action does not fit this chat's current state. Refresh and try again.":
+    "هذا الإجراء لا يناسب حالة هذه المحادثة الحالية. حدّث الصفحة وحاول مجددًا.",
+  "Channel delivery is not available for this chat or message.":
+    "تسليم القناة غير متاح لهذه المحادثة أو لهذه الرسالة.",
   "The command failed.": "فشل الأمر.",
 } as const;

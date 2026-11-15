@@ -17,5 +17,11 @@ export const refusalsCatalog = {
     "That bot is no longer in this space. Refresh to see the current team.",
   "This space already has a boss. Replace the boss before making this bot the boss.":
     "This space already has a boss. Replace the boss before making this bot the boss.",
+  "This chat has work in flight. Wait for it to finish, or respond to it.":
+    "This chat has work in flight. Wait for it to finish, or respond to it.",
+  "That action does not fit this chat's current state. Refresh and try again.":
+    "That action does not fit this chat's current state. Refresh and try again.",
+  "Channel delivery is not available for this chat or message.":
+    "Channel delivery is not available for this chat or message.",
   "The command failed.": "The command failed.",
 } as const;

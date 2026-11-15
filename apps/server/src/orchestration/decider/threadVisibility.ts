@@ -46,6 +46,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (thread.session?.status === "starting" || thread.session?.status === "running") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has an active session and cannot be settled`,
         });
       }
@@ -56,6 +57,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (hasOpenBlockingRequest(thread)) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a pending approval or user-input request and cannot be settled`,
         });
       }
@@ -66,6 +68,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (threadHasQueuedTurnStart(thread, occurredAt)) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a queued turn start and cannot be settled`,
         });
       }
@@ -180,6 +183,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (!(Date.parse(command.snoozedUntil) > Date.parse(occurredAt))) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `thread ${command.threadId} snooze wake time ${command.snoozedUntil} is not in the future`,
         });
       }
@@ -191,6 +195,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (hasOpenBlockingRequest(thread)) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a pending approval or user-input request and cannot be snoozed`,
         });
       }
@@ -202,6 +207,7 @@ export const decideThreadVisibility = Effect.fn("decideThreadVisibility")(functi
       if (threadHasQueuedTurnStart(thread, occurredAt)) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-is-busy",
           detail: `thread ${command.threadId} has a queued turn start and cannot be snoozed`,
         });
       }

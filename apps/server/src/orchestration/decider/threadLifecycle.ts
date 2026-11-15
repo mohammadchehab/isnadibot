@@ -303,6 +303,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       if (thread.pinnedAt == null) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `thread ${command.threadId} is not pinned and cannot be reordered`,
         });
       }
@@ -466,6 +467,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       if (thread.groupId === null || thread.groupId === undefined) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `Thread '${command.threadId}' is not a group chat, so it has no hop budget.`,
         });
       }
@@ -502,6 +504,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       if (message && message.role !== "assistant") {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "channel-delivery-unavailable",
           detail: `Channel delivery can only mark an assistant message in thread '${command.threadId}'.`,
         });
       }
@@ -676,6 +679,7 @@ export const decideThreadLifecycle = Effect.fn("decideThreadLifecycle")(function
       if (events.length === 0) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
+          refusal: "thread-state-invalid",
           detail: `Thread '${command.threadId}' history already matches the restore command.`,
         });
       }
