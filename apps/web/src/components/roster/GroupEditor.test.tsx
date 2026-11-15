@@ -324,7 +324,7 @@ describe("GroupEditor member change refusals", () => {
     );
   });
 
-  it("keeps the server sentence for a code this client does not know", async () => {
+  it("keeps the title-only toast for a code this client does not know", async () => {
     mocks.assignMember.mockResolvedValue({
       _tag: "Failure",
       cause: refusal("quota-exceeded", "Quota reached."),
@@ -332,9 +332,39 @@ describe("GroupEditor member change refusals", () => {
 
     await clickAdd();
 
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "Quota reached." }),
-    );
+    expect(mocks.toast).toHaveBeenCalledWith({ type: "error", title: "Could not add bot" });
+    expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
+  });
+
+  it("keeps the title-only toast when the group is gone, so no stale id is shown", async () => {
+    mocks.assignMember.mockResolvedValue({
+      _tag: "Failure",
+      cause: Cause.fail(
+        new Error("Group 'group-1' does not exist for command 'group.member.assign'."),
+      ),
+    });
+
+    await clickAdd();
+
+    expect(mocks.toast).toHaveBeenCalledWith({ type: "error", title: "Could not add bot" });
+    expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
+  });
+
+  it("keeps the title-only toast when the bot is gone, so no stale id is shown", async () => {
+    mocks.unassignMember.mockResolvedValue({
+      _tag: "Failure",
+      cause: Cause.fail(
+        new Error("Bot 'bot-scout' does not exist for command 'group.member.unassign'."),
+      ),
+    });
+
+    await click(findByLabel(editor(), "Remove Scout from Ops"));
+
+    expect(mocks.toast).toHaveBeenCalledWith({
+      type: "error",
+      title: "Could not remove Scout",
+    });
+    expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
   });
 
   it("leaves rename on its title-only toast, because its refusals are still uncoded", async () => {
