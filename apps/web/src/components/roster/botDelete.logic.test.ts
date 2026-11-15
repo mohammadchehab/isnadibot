@@ -27,6 +27,7 @@ function group(id: string, overrides: Partial<OrchestrationGroup> = {}): Orchest
     bossBotId: null,
     members: [],
     fleetTemplateId: null,
+    createdByBotId: null,
     createdAt: "2026-11-14T08:00:00.000Z",
     updatedAt: "2026-11-14T08:00:00.000Z",
     ...overrides,
