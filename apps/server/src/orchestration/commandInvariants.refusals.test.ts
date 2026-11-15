@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   BotId,
   CommandId,
+  CommandRefusalCodes,
   DelegationId,
   GroupId,
   McpServerId,
@@ -314,17 +315,133 @@ const refusalOf = (effect: Effect.Effect<unknown, OrchestrationCommandInvariantE
     onSuccess: () => Effect.die(new Error("expected the command to be refused")),
   });
 
+/**
+ * `source` with comments and string/template literals blanked to spaces, so a
+ * parenthesis inside either cannot shift the depth count. Length is preserved,
+ * so an offset in the mask is the same offset in the source. Comments have to
+ * be handled here too: an apostrophe in one (`thread's`) would otherwise open a
+ * "string" that blanks real code.
+ */
+const maskNonCode = (source: string): string => {
+  const chars = source.split("");
+  let quote = "";
+  let state: "code" | "line" | "block" | "quote" = "code";
+
+  for (let at = 0; at < chars.length; at += 1) {
+    const char = chars[at];
+    const next = chars[at + 1] ?? "";
+
+    if (state === "code") {
+      if (char === "/" && next === "/") state = "line";
+      else if (char === "/" && next === "*") state = "block";
+      else if (char === "'" || char === '"' || char === "`") {
+        state = "quote";
+        quote = char;
+      } else continue;
+
+      chars[at] = " ";
+
+      continue;
+    }
+
+    if (state === "line") {
+      if (char === "\n") state = "code";
+      else chars[at] = " ";
+
+      continue;
+    }
+
+    if (state === "block") {
+      if (char === "*" && next === "/") {
+        chars[at] = " ";
+        chars[at + 1] = " ";
+        state = "code";
+        at += 1;
+      } else if (char !== "\n") {
+        chars[at] = " ";
+      }
+
+      continue;
+    }
+
+    if (char === "\\") {
+      chars[at] = " ";
+
+      if (at + 1 < chars.length) chars[at + 1] = " ";
+
+      at += 1;
+    } else if (char === quote) {
+      chars[at] = " ";
+      state = "code";
+    } else if (char !== "\n") {
+      chars[at] = " ";
+    }
+  }
+
+  return chars.join("");
+};
+
+/** The argument text of every `invariantError(...)` call, excluding the helper's own definition. */
+const callArguments = (source: string): ReadonlyArray<string> => {
+  const calls: string[] = [];
+  const masked = maskNonCode(source);
+  const needle = "invariantError(";
+
+  for (
+    let at = masked.indexOf(needle);
+    at !== -1;
+    at = masked.indexOf(needle, at + needle.length)
+  ) {
+    if (masked.slice(0, at).trimEnd().endsWith("function")) continue;
+
+    const start = at + needle.length;
+    let depth = 1;
+    let cursor = start;
+
+    while (cursor < masked.length && depth > 0) {
+      const char = masked[cursor];
+
+      if (char === "(") depth += 1;
+      else if (char === ")") depth -= 1;
+
+      cursor += 1;
+    }
+
+    calls.push(source.slice(start, cursor - 1));
+  }
+
+  return calls;
+};
+
 describe("commandInvariants refusals", () => {
   it("leaves no throw in the file uncoded", () => {
-    // Read the source rather than trusting a number: a new uncoded throw has to
-    // break this test, or the family quietly reopens.
+    // TEMPORARY. TASK-304 makes the invariant failure a discriminated union, so an
+    // uncoded throw stops compiling; delete this test when that lands, or the two
+    // will disagree about what "coded" means.
+    //
+    // Until then, read the source and assert the property, never a count: a count
+    // fails the first time someone legitimately adds a coded site, and the next
+    // person silences the test instead of widening it. The check is per call, not
+    // a file-wide tally — a tally can be offset by a stray code literal elsewhere,
+    // which would hide exactly the throw this exists to find.
     const source = NodeFS.readFileSync(new URL("./commandInvariants.ts", import.meta.url), "utf8");
-    const callSites = source.match(/^\s+(?:return yield\* )?invariantError\($/gm) ?? [];
-    const codedSites = source.match(/^\s*"[a-z-]+",$/gm) ?? [];
+    const codes = new Set<string>(CommandRefusalCodes);
+
+    const calls = callArguments(source);
+
+    const codedCalls = calls.filter((args) =>
+      [...codes].some((code) => args.includes(`"${code}"`) || args.includes(`'${code}'`)),
+    );
+
     const cases = casesByCode.reduce((sum, group) => sum + group.cases.length, 0);
 
-    expect(callSites.length).toBe(cases + ALREADY_CODED_SITES);
-    expect(codedSites.length).toBe(callSites.length);
+    // The property is that no call lacks a code. The counts ride along in the
+    // message so a sweep can still read them without the test pinning a number.
+    expect(
+      calls.length - codedCalls.length,
+      `${calls.length} invariantError calls: ${cases} in the table above, ` +
+        `${ALREADY_CODED_SITES} coded before this card, ${codedCalls.length} carrying a refusal`,
+    ).toBe(0);
   });
 
   for (const { code, cases } of casesByCode) {
