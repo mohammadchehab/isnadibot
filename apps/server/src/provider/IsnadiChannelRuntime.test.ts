@@ -130,6 +130,9 @@ describe("IsnadiChannelRuntime", () => {
         groupId: "channel-1",
         name: "Research",
         bossBotId,
+        // The space a bot makes must join the bot's creator chain. Without this the
+        // decider records every bot-made space as person-made.
+        createdByBotId: bossBotId,
       }),
     );
   });

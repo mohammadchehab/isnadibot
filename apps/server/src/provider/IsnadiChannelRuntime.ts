@@ -45,6 +45,10 @@ export function createIsnadiChannelRuntime(options: IsnadiChannelRuntimeOptions)
       groupId: channelId,
       name: input.name,
       bossBotId,
+      // The boss is the bot making this space, so the space joins the same creator
+      // chain the bot belongs to. Omitting it would record every bot-made space as
+      // person-made and let a bot build spaces outside its allowance.
+      createdByBotId: bossBotId,
       specialistBotIds: input.specialistBotIds,
       createdAt: now(),
     });
