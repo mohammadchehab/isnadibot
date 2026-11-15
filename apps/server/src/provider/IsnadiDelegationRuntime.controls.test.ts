@@ -21,6 +21,7 @@ import {
   PARENT_THREAD_ID,
   PARENT_TURN_ID,
   bot,
+  defaultSandbox,
   delegation,
   harness,
   parent,
@@ -39,6 +40,7 @@ describe("IsnadiDelegationRuntime", () => {
       const test = harness();
 
       const runtime = createIsnadiDelegationRuntime({
+        defaultSandbox,
         readSnapshot: async () => test.state,
         dispatch: async (command) => {
           await test.dispatch(command);
@@ -150,6 +152,7 @@ describe("IsnadiDelegationRuntime", () => {
     const watchErrors: unknown[] = [];
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state,
       dispatch: test.dispatch,
       awaitChild: () => child.promise,
@@ -190,6 +193,7 @@ describe("IsnadiDelegationRuntime", () => {
     );
 
     const runtime = createIsnadiDelegationRuntime({
+      defaultSandbox,
       readSnapshot: async () => test.state as OrchestrationReadModel,
       dispatch: test.dispatch,
       awaitChild: async () => ({ state: "completed", turnId: CHILD_TURN_ID, summary: "Done." }),

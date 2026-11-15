@@ -29,6 +29,9 @@ import {
 
 export const NOW = "2026-08-31T12:00:00.000Z";
 
+/** The environment's sandbox default in tests: the settings schema's own default, Local. */
+export const defaultSandbox = async () => "local" as const;
+
 export const PROJECT_ID = ProjectId.make("project-1");
 
 export const PARENT_BOT_ID = BotId.make("bot-parent");
@@ -255,6 +258,7 @@ export function harness(
 
   const runtime = createIsnadiDelegationRuntime({
     readSnapshot: async () => state as OrchestrationReadModel,
+    defaultSandbox,
     dispatch,
     awaitChild: async () => outcome,
     interruptChild: async (threadId, turnId) => {

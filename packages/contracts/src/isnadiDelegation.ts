@@ -72,6 +72,26 @@ export const IsnadiDelegationAccessGrant = Schema.Struct({
 
 export type IsnadiDelegationAccessGrant = typeof IsnadiDelegationAccessGrant.Type;
 
+/** A bot's effective sandbox, and the user-computer access that follows from it. */
+export interface ResolvedBotSandbox {
+  readonly sandbox: BotSandbox;
+  readonly hasUserComputer: boolean;
+}
+
+/**
+ * A bot with no sandbox of its own uses the environment's default, and only a
+ * local sandbox reaches the user's computer. Every path that needs a bot's
+ * sandbox asks this, so the stored value is never interpreted twice.
+ */
+export function resolveBotSandbox(
+  stored: BotSandbox | null,
+  defaultProvider: BotSandbox,
+): ResolvedBotSandbox {
+  const sandbox = stored ?? defaultProvider;
+
+  return { sandbox, hasUserComputer: sandbox === "local" };
+}
+
 export const IsnadiDelegationFailureCode = Schema.Literals([
   "timeout",
   "denied",

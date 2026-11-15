@@ -5,6 +5,7 @@ import * as NodeCrypto from "node:crypto";
 import {
   CommandId,
   type BotId,
+  type BotSandbox,
   type ProviderRuntimeEvent,
   ThreadId,
   type IsnadiDelegationAccessGrant,
@@ -55,6 +56,7 @@ export function createDelegation(deps: {
   readonly legacyProviderBridge: LegacyProviderBridge["Service"];
   readonly publish: (event: ProviderRuntimeEvent) => void;
   readonly failureDetail: (cause: unknown) => string;
+  readonly defaultSandbox: () => Promise<BotSandbox>;
 }) {
   const delegationFor = (input: {
     readonly threadId: ThreadId;
@@ -104,6 +106,7 @@ export function createDelegation(deps: {
   }) =>
     createIsnadiDelegationRuntime({
       ...input,
+      defaultSandbox: deps.defaultSandbox,
       dispatch: async (command) => {
         await input.dispatch(command);
       },
