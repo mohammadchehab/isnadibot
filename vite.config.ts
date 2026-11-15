@@ -321,52 +321,20 @@ export default defineConfig({
         },
       },
       {
-        // The design-system rules stopped at apps/web/src, so mobile's NativeWind classes
-        // shipped unchecked: TASK-350's palette drift was invisible to CI. Both rules below
-        // measured zero violations across apps/mobile/src when they were turned on, so they
-        // lock the ratchet without needing a fix alongside them. no-restyle's policy names
-        // web primitives and is a no-op on mobile today; revisit it if mobile grows
-        // primitives with variants.
+        // The design-system rules stopped at apps/web/src, so mobile's uniwind classes shipped
+        // unchecked: TASK-350's palette drift was invisible to CI. TASK-360 closed the gap and
+        // TASK-372 resolved the last off-scale values with a designer ruling per location, so
+        // these three rules now cover every file rather than a widening set of globs.
+        // no-unknown-classes stays web-only: it resolves class names against web's theme, so
+        // on mobile it reports 14 false positives on tokens mobile really defines
+        // (bg-screen x12, bg-border x2, both in global.css). Pointing it at the mobile
+        // stylesheet is its own change. no-restyle's policy names web primitives and is a
+        // no-op on mobile today; revisit it if mobile grows primitives with variants.
         files: ["apps/mobile/src/**/*.{ts,tsx}"],
         rules: {
           "shadcn/no-restyle": ["error", NO_RESTYLE],
-          "shadcn/require-static-classes": "error",
-        },
-      },
-      {
-        // no-arbitrary-values comes on only where apps/mobile/src is already clean, the way
-        // the RTL utilities above are widened. These globs were computed from a lint run
-        // after the mechanical fixes in this change, not from arithmetic. What is left out,
-        // counted so the omission is visible rather than an oversight: components/ 4,
-        // features/archive/ 4, features/connection/ 14, features/home/ 3, features/layout/ 1,
-        // features/settings/ 2, features/settings/appearance/components/ 1,
-        // features/settings/appearance/sections/ 8, features/settings/components/ 2,
-        // features/threads/ 16 - 55 locations. Every one needs a decision rather than a
-        // rewrite: 27 are off-by-2px radius or type rounding where the nearest token changes
-        // what is rendered, and 31 have no on-scale equivalent at all (letter spacing,
-        // percent widths, opacity, aspect ratios). TASK-372 owns all 55, with a per-location
-        // designer ruling. Widen these globs as its buckets land.
-        files: [
-          "apps/mobile/src/*.{ts,tsx}",
-          "apps/mobile/src/connection/**/*.{ts,tsx}",
-          "apps/mobile/src/features/agent-awareness/**/*.{ts,tsx}",
-          "apps/mobile/src/features/computer/**/*.{ts,tsx}",
-          "apps/mobile/src/features/keyboard/**/*.{ts,tsx}",
-          "apps/mobile/src/features/replyPlayback/**/*.{ts,tsx}",
-          "apps/mobile/src/features/settings/lib/**/*.{ts,tsx}",
-          "apps/mobile/src/features/sharing/**/*.{ts,tsx}",
-          "apps/mobile/src/features/shortcuts/**/*.{ts,tsx}",
-          "apps/mobile/src/features/showcase/**/*.{ts,tsx}",
-          "apps/mobile/src/features/updates/**/*.{ts,tsx}",
-          "apps/mobile/src/features/usage/**/*.{ts,tsx}",
-          "apps/mobile/src/lib/**/*.{ts,tsx}",
-          "apps/mobile/src/native/**/*.{ts,tsx}",
-          "apps/mobile/src/persistence/**/*.{ts,tsx}",
-          "apps/mobile/src/state/**/*.{ts,tsx}",
-          "apps/mobile/src/widgets/**/*.{ts,tsx}",
-        ],
-        rules: {
           "shadcn/no-arbitrary-values": "error",
+          "shadcn/require-static-classes": "error",
         },
       },
     ],

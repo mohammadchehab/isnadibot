@@ -154,7 +154,7 @@ function ThemeCard(props: {
   );
 
   return (
-    <View className="min-w-36 flex-1 basis-[47%] gap-3 rounded-3xl border border-border bg-card px-2 py-4">
+    <View className="min-w-36 flex-1 basis-2/5 gap-3 rounded-3xl border border-border bg-card px-2 py-4">
       <Pressable
         accessibilityHint={t("Sets both light and dark appearances")}
         accessibilityLabel={t("{theme} theme", { theme: props.label })}
