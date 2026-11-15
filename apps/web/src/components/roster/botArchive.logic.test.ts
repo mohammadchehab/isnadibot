@@ -2,6 +2,7 @@ import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import { botArchiveFailureToast, classifyBotArchiveFailure } from "./botArchive.logic";
+import { botDeleteFailureToast } from "./botDelete.logic";
 
 /**
  * A translator that marks every key it sees, so a caller that forgets to pass
@@ -48,6 +49,82 @@ describe("classifyBotArchiveFailure", () => {
 });
 
 describe("botArchiveFailureToast", () => {
+  it("names the boss refusal in words, with no bot id or group id", () => {
+    // The live defect: archiving a team lead fell through to the invariant
+    // sentence, two internal ids on the roster's most-used menu.
+    const invariant =
+      "Orchestration command invariant failed (bot.archive): Bot '35db651c-1a2b' is the boss of group 'b5542e55-9c3d'.";
+
+    const toast = botArchiveFailureToast({
+      refusal: "bot-is-group-boss",
+      message: invariant,
+      botName: "Ada",
+      bossSpaceName: "Bookkeeping",
+    });
+
+    expect(toast).toEqual({
+      title: "Boss of Bookkeeping",
+      description: "Pick a new boss, or delete the space.",
+    });
+    expect(toast.title).not.toContain("35db651c");
+    expect(toast.description).not.toContain("b5542e55");
+    expect(toast.description).not.toContain("invariant");
+  });
+
+  it("names the action when the space is not on screen yet", () => {
+    expect(
+      botArchiveFailureToast({
+        refusal: "bot-is-group-boss",
+        message: "",
+        botName: "Ada",
+        bossSpaceName: null,
+      }),
+    ).toEqual({
+      title: "Could not archive Ada",
+      description: "Pick a new boss, or delete the space.",
+    });
+  });
+
+  it("reads the same sentence as the delete toast for the same refusal", () => {
+    // Delete carried this branch and archive did not, so the two siblings drifted
+    // and only delete spoke in words. The title still names the action while the
+    // space is unknown; the reason is one sentence in both.
+    const invariant = "Orchestration command invariant failed: Bot 'b1' is the boss of group 'g1'.";
+
+    for (const bossSpaceName of ["Bookkeeping", null]) {
+      const archived = botArchiveFailureToast({
+        refusal: "bot-is-group-boss",
+        message: invariant,
+        botName: "Ada",
+        bossSpaceName,
+      });
+
+      const deleted = botDeleteFailureToast({
+        refusal: "bot-is-group-boss",
+        message: invariant,
+        botName: "Ada",
+        bossSpaceName,
+      });
+
+      expect(archived.description).toBe(deleted.description);
+    }
+  });
+
+  it("shows the boss refusal in the caller's language, not English", () => {
+    const toast = botArchiveFailureToast(
+      {
+        refusal: "bot-is-group-boss",
+        message: "",
+        botName: "Ada",
+        bossSpaceName: "Bookkeeping",
+      },
+      arabicTranslate,
+    );
+
+    expect(toast.title).toBe("ar:Boss of {space}");
+    expect(toast.description).toBe("ar:Pick a new boss, or delete the space.");
+  });
+
   it("names the two-bot floor instead of the invariant sentence", () => {
     // Archiving one of two bots in a space is refused by the decider. The old
     // toast printed that sentence verbatim, group id included.
@@ -56,6 +133,7 @@ describe("botArchiveFailureToast", () => {
       message:
         "Orchestration command invariant failed (bot.archive): Group 'grp-9f2' requires at least two active bots.",
       botName: "Ada",
+      bossSpaceName: null,
     });
 
     expect(toast).toEqual({
@@ -73,6 +151,7 @@ describe("botArchiveFailureToast", () => {
       refusal: "group-would-be-undersized",
       message: invariant,
       botName: "Ada",
+      bossSpaceName: null,
     });
 
     expect(toast.title).not.toContain("grp-9f2");
@@ -88,6 +167,7 @@ describe("botArchiveFailureToast", () => {
         refusal: "group-would-be-undersized",
         message: "",
         botName: "Ada",
+        bossSpaceName: null,
       },
       arabicTranslate,
     );
@@ -106,6 +186,7 @@ describe("botArchiveFailureToast", () => {
         refusal: "unknown",
         message: "This bot still answers a call.",
         botName: "Ada",
+        bossSpaceName: null,
       }),
     ).toEqual({
       title: "Could not archive Ada",
@@ -117,6 +198,7 @@ describe("botArchiveFailureToast", () => {
         refusal: "unknown",
         message: "  ",
         botName: "Ada",
+        bossSpaceName: null,
       }).description,
     ).toBe("The command failed.");
   });

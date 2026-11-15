@@ -41,22 +41,36 @@ export interface BotArchiveFailureToast {
 /**
  * The copy a refused archive shows, chosen by the refusal the server sent.
  *
- * Archiving one of two bots in a space is refused by the decider. That refusal
- * used to reach the toast as the invariant sentence, group id included; the code
- * lets the client say the floor in words instead. Every other code the client
- * knows takes the shared sentence, so the authorization refusals that name a
- * person id and a group id no longer print them here either. A code this client
- * does not know keeps the server's own sentence, so a newer server's refusal
- * still says something true.
+ * Two refusals reach this toast as the invariant sentence, ids included: a space
+ * left too small, and a bot that leads one. The code lets the client say each in
+ * words instead. Every other code the client knows takes the shared sentence, so
+ * the authorization refusals that name a person id and a group id no longer
+ * print them here either. A code this client does not know keeps the server's
+ * own sentence, the same fallback delete and group delete use, so a newer
+ * server's refusal still says something true.
  */
 export function botArchiveFailureToast(
   input: {
     readonly refusal: BotArchiveRefusal;
     readonly message: string;
     readonly botName: string;
+    readonly bossSpaceName: string | null;
   },
   t: Translate = englishTranslate,
 ): BotArchiveFailureToast {
+  if (input.refusal === "bot-is-group-boss") {
+    // Delete hits the same wall, so it reads the same: same title, same
+    // sentence. The test holds the two equal, which is what keeps archive from
+    // falling through to the invariant sentence again.
+    return {
+      title:
+        input.bossSpaceName === null
+          ? t("Could not archive {name}", { name: input.botName })
+          : t("Boss of {space}", { space: input.bossSpaceName }),
+      description: t("Pick a new boss, or delete the space."),
+    };
+  }
+
   if (input.refusal === "group-would-be-undersized") {
     return {
       // The space is the subject, not the bot: nothing about this one bot
