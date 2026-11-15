@@ -24,7 +24,7 @@ The exclusion and the failure classification stay server-side. Nothing in this d
 
 These are not invented here. They were established ruling by ruling as codes were minted, and they are what keeps the 28 codes from drifting into 60.
 
-**The noun rule.** A code includes, in front of the user, the noun the situation is about. `bot-is-group-boss` says *bot* and *group*. A code that says only "this is not allowed" cannot be translated into a sentence that names the thing, and the surfaces share codes across settings, roster and chat, so the sentence has to carry its own subject.
+**The noun rule.** A code includes, in front of the user, the noun the situation is about. `bot-is-group-boss` says _bot_ and _group_. A code that says only "this is not allowed" cannot be translated into a sentence that names the thing, and the surfaces share codes across settings, roster and chat, so the sentence has to carry its own subject.
 
 **The two-condition test.** Two conditions share one code if and only if the same sentence would be true for both **and** the remedy is the same. Different remedy, different code, even when the sentence would read the same. `group-requires-boss` and `group-already-has-boss` pass the sentence half and fail the remedy half, which is why both exist.
 
@@ -179,23 +179,23 @@ TASK-305 is **not** the same shape as TASK-304. TASK-304 is mechanism: one type,
 
 `apps/server/src/orchestration/decider/routines.ts` holds 15 throws, none coded, at `a9c23dcdd`. The reachability letter comes from `ClientRoutineCommand` versus `InternalRoutineCommand` (`packages/contracts/src/routines.ts:342-351`, `:413-421`).
 
-| line | command | detail | letter | first candidate |
-| --- | --- | --- | --- | --- |
-| 50 | `routine.create-approved` | routine already exists | **R** | `excluded/internal-command` |
-| 101 | `routine.draft` | routine is deleted | refused | needs a code |
-| 112 | `routine.draft` | procedure version changed | refused | needs a code |
-| 169 | `routine.approve` | cannot approve version N | refused | needs a code |
-| 205 | `routine.enable` | requires approval before enable | refused | needs a code |
-| 242 | `routine.pause` | routine does not exist | refused | `stale-view`? judge |
-| 275 | `routine.run`, `routine.run.scheduled` | routine does not exist | refused | `stale-view`? judge |
-| 282 | same case | routine is not enabled | refused | needs a code |
-| 289 | same case | procedure approval is stale | refused | needs a code |
-| 296 | same case | run already exists | refused | `already-exists` |
-| 357 | `routine.run.start/block/fail/complete/cancel` | run does not exist | **R** | `excluded/internal-command` |
-| 371 | same case | run already ended | **R** | `excluded/internal-command` |
-| 481 | `routine.delete` | routine does not exist | refused | `stale-view`? judge |
-| 514 | `routine.skill.assign` | assignment already exists | refused | `already-exists` |
-| 548 | `routine.skill.unassign` | assignment does not exist | **U** | `excluded/no-shipped-surface` |
+| line | command                                        | detail                          | letter  | first candidate               |
+| ---- | ---------------------------------------------- | ------------------------------- | ------- | ----------------------------- |
+| 50   | `routine.create-approved`                      | routine already exists          | **R**   | `excluded/internal-command`   |
+| 101  | `routine.draft`                                | routine is deleted              | refused | needs a code                  |
+| 112  | `routine.draft`                                | procedure version changed       | refused | needs a code                  |
+| 169  | `routine.approve`                              | cannot approve version N        | refused | needs a code                  |
+| 205  | `routine.enable`                               | requires approval before enable | refused | needs a code                  |
+| 242  | `routine.pause`                                | routine does not exist          | refused | `stale-view`? judge           |
+| 275  | `routine.run`, `routine.run.scheduled`         | routine does not exist          | refused | `stale-view`? judge           |
+| 282  | same case                                      | routine is not enabled          | refused | needs a code                  |
+| 289  | same case                                      | procedure approval is stale     | refused | needs a code                  |
+| 296  | same case                                      | run already exists              | refused | `already-exists`              |
+| 357  | `routine.run.start/block/fail/complete/cancel` | run does not exist              | **R**   | `excluded/internal-command`   |
+| 371  | same case                                      | run already ended               | **R**   | `excluded/internal-command`   |
+| 481  | `routine.delete`                               | routine does not exist          | refused | `stale-view`? judge           |
+| 514  | `routine.skill.assign`                         | assignment already exists       | refused | `already-exists`              |
+| 548  | `routine.skill.unassign`                       | assignment does not exist       | **U**   | `excluded/no-shipped-surface` |
 
 Three rows are R (no client can send those commands). One row is U: `routine.skill.unassign` is wired into the shared environment atoms (`packages/client-runtime/src/state/routines.ts:58`) and no shipped screen calls it, while `assignSkill` is called by web (`apps/web/src/routes/_chat.bots.$botId.tsx:55`). That row expires the day mobile grows an unassign control, which is the reason it is a U and not an R.
 
