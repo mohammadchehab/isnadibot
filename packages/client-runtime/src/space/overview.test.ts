@@ -5,6 +5,7 @@ import type { Decision } from "../decisions.ts";
 import {
   spaceActivity,
   spaceDecisions,
+  spaceDelegations,
   spaceMembers,
   spaceRoutines,
   spaceUpdatedAt,
@@ -41,6 +42,13 @@ const shell = (id: string, updatedAt: string, owner: { botId?: string; groupId?:
   updatedAt,
   archivedAt: null,
   ...owner,
+});
+
+/** Only the two fields `spaceDelegations` reads; the record's phase is not its concern. */
+const delegation = (delegationId: string, parentThreadId: string, updatedAt: string) => ({
+  delegationId,
+  parentThreadId,
+  updatedAt,
 });
 
 describe("space overview", () => {
@@ -92,6 +100,53 @@ describe("space overview", () => {
     expect(result).toHaveLength(20);
     expect(result[0]?.id).toBe("t0");
     expect(result[1]?.id).toBe("t29");
+  });
+
+  it("lists a delegation whose parent chat belongs to the space", () => {
+    const chats = [shell("t1", "2026-11-06T10:00:00.000Z", { groupId: "g1" })];
+    const delegations = [delegation("d1", "t1", "2026-11-06T11:00:00.000Z")];
+
+    expect(spaceDelegations(delegations, chats, group)).toEqual(delegations);
+  });
+
+  it("drops a delegation started from another space's chat", () => {
+    const chats = [shell("t1", "2026-11-06T10:00:00.000Z", { groupId: "g2" })];
+    const delegations = [delegation("d1", "t1", "2026-11-06T11:00:00.000Z")];
+
+    expect(spaceDelegations(delegations, chats, group)).toEqual([]);
+  });
+
+  it("drops a delegation whose parent chat the client does not hold", () => {
+    // The shell snapshot prunes finished chats, so the parent can be gone while the
+    // delegation record survives. There is no space to attribute it to.
+    const delegations = [delegation("d1", "gone", "2026-11-06T11:00:00.000Z")];
+
+    expect(spaceDelegations(delegations, [], group)).toEqual([]);
+  });
+
+  it("orders delegations by their own stamp, newest first", () => {
+    const chats = [shell("t1", "2026-11-06T10:00:00.000Z", { groupId: "g1" })];
+
+    const delegations = [
+      delegation("old", "t1", "2026-11-06T10:30:00.000Z"),
+      delegation("new", "t1", "2026-11-06T12:00:00.000Z"),
+      delegation("mid", "t1", "2026-11-06T11:00:00.000Z"),
+    ];
+
+    expect(spaceDelegations(delegations, chats, group).map((entry) => entry.delegationId)).toEqual([
+      "new",
+      "mid",
+      "old",
+    ]);
+  });
+
+  it("caps delegations at the activity limit", () => {
+    const chats = [shell("t1", "2026-11-06T10:00:00.000Z", { groupId: "g1" })];
+    const stamp = (i: number) => `2026-11-06T10:${String(i).padStart(2, "0")}:00.000Z`;
+
+    const delegations = Array.from({ length: 30 }, (_, i) => delegation(`d${i}`, "t1", stamp(i)));
+
+    expect(spaceDelegations(delegations, chats, group)).toHaveLength(20);
   });
 
   it("takes the newest stamp from the group, a decision, or a chat", () => {

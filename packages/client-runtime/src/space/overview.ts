@@ -113,6 +113,32 @@ export function spaceActivity<
 }
 
 /**
+ * The space's delegations, newest first, capped. A delegation belongs to the space when the chat
+ * that started it does, so work a bot ran for a space chat counts, and so does the nested work
+ * under it. The record carries the phase, so a row reads its state without opening the child.
+ */
+export function spaceDelegations<
+  T extends { readonly parentThreadId: string; readonly updatedAt: string },
+>(
+  delegations: ReadonlyArray<T>,
+  chats: ReadonlyArray<SpaceOwned & { readonly id: string }>,
+  group: SpaceGroup,
+  limit: number = SPACE_ACTIVITY_LIMIT,
+): ReadonlyArray<T> {
+  const members = spaceMembers(group);
+  const byId = new Map(chats.map((chat) => [chat.id, chat]));
+
+  return delegations
+    .filter((delegation) => {
+      const parent = byId.get(delegation.parentThreadId);
+
+      return parent !== undefined && inSpace(parent, group, members);
+    })
+    .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .slice(0, limit);
+}
+
+/**
  * When the space last moved: the group's own stamp or the newest decision or chat on it,
  * whichever is later.
  */

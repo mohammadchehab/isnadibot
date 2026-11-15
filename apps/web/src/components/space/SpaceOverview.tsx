@@ -1,9 +1,12 @@
 import type { Decision } from "@isnadi/client-runtime/decisions";
-import type { OrchestrationThreadShell } from "@isnadi/contracts";
+import { presentDelegation } from "@isnadi/client-runtime/delegation-presentation";
+import type { IsnadiDelegationRecord, OrchestrationThreadShell } from "@isnadi/contracts";
 import { relativeRunTime, routineDateLabel } from "@isnadi/client-runtime/routines";
 import {
+  SPACE_ACTIVITY_LIMIT,
   spaceActivity,
   spaceDecisions,
+  spaceDelegations,
   spaceMembers,
   spaceRoutines,
   spaceUpdatedAt,
@@ -21,6 +24,7 @@ import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
 import { useOpenChat } from "../chat/useOpenChat";
 import { BotAvatarView } from "../roster/BotAvatarView";
+import { delegationStateLabel } from "../roster/DelegationDetail";
 import type { Bot, Group } from "../roster/types";
 import { useLocalDay } from "../roster/useLocalDay";
 import { useRosterStore } from "../roster/rosterStore";
@@ -31,6 +35,8 @@ import { SpaceTile } from "./SpaceTile";
 const NO_ROUTINES: ReadonlyArray<SpaceRoutine> = [];
 
 const NO_THREADS: ReadonlyArray<OrchestrationThreadShell> = [];
+
+const NO_DELEGATIONS: ReadonlyArray<IsnadiDelegationRecord> = [];
 
 /**
  * The space's dashboard. Everything is derived from data the client already holds (the
@@ -55,6 +61,33 @@ export function SpaceOverview({ group }: { group: Group }) {
   // The environment's own chat list, not the sidebar's. The sidebar lists top-level chats
   // only, so reading it here hid every delegation a bot ran for this space.
   const activity = spaceActivity(snapshot?.threads ?? NO_THREADS, group, new Set(waiting.keys()));
+
+  // A delegation and its child chat are the same work, and only the delegation carries the
+  // state, so the child chat gives way to the row that says what happened to it.
+  const delegations = spaceDelegations(
+    snapshot?.delegations ?? NO_DELEGATIONS,
+    snapshot?.threads ?? NO_THREADS,
+    group,
+  );
+
+  const childThreadIds = new Set(
+    delegations
+      .map((delegation) => presentDelegation(delegation).childThreadId)
+      .filter((id) => id !== null),
+  );
+
+  const rows = [
+    ...activity
+      .filter((shell) => !childThreadIds.has(shell.id))
+      .map((shell) => ({ kind: "chat" as const, at: shell.updatedAt, shell })),
+    ...delegations.map((delegation) => ({
+      kind: "delegation" as const,
+      at: delegation.updatedAt,
+      delegation,
+    })),
+  ]
+    .toSorted((left, right) => right.at.localeCompare(left.at))
+    .slice(0, SPACE_ACTIVITY_LIMIT);
 
   const memberIds = useMemo(() => [...spaceMembers(group)].sort(), [group]);
 
@@ -139,11 +172,56 @@ export function SpaceOverview({ group }: { group: Group }) {
         </SpaceTile>
       </div>
       <SpaceTile title={t("Activity")}>
-        {activity.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="text-sm">{t("Nothing here yet")}</p>
         ) : (
           <ul className="flex flex-col divide-y divide-border/60">
-            {activity.map((shell) => {
+            {rows.map((row) => {
+              if (row.kind === "delegation") {
+                const presentation = presentDelegation(row.delegation);
+                const bot = botsById.get(row.delegation.childBotId);
+                const childThreadId = presentation.childThreadId;
+
+                return (
+                  <li
+                    key={`delegation-${row.delegation.delegationId}`}
+                    className="flex items-center gap-2 py-2"
+                  >
+                    {bot ? (
+                      <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
+                    ) : null}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      {bot ? (
+                        <span className="truncate text-xs text-muted-foreground">
+                          <bdi>{bot.name}</bdi>
+                        </span>
+                      ) : null}
+                      <bdi className="truncate text-sm">{row.delegation.task}</bdi>
+                      {/* The state and the time share the meta line under the task, so
+                          neither takes width from the task the row exists to show. */}
+                      <span className="truncate text-xs text-muted-foreground">
+                        {[
+                          delegationStateLabel(presentation.state, t),
+                          relativeRunTime(row.at, Date.now(), i18n),
+                        ].join(" · ")}
+                      </span>
+                    </div>
+                    {/* Queued delegations have no child yet, and there is no chat to open
+                        without a connected environment. */}
+                    {childThreadId === null || environmentId === null ? null : (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => open({ environmentId, threadId: childThreadId })}
+                      >
+                        {t("Open")}
+                      </Button>
+                    )}
+                  </li>
+                );
+              }
+
+              const shell = row.shell;
               const bot = botOf(shell);
               const decision = waiting.get(shell.id);
 
