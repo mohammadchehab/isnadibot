@@ -174,6 +174,7 @@ export function threadWorkLogPropsEqual(
 export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogProps) {
   const { t } = useMobileI18n();
   const pressedBackground = useThemeColor("--color-subtle");
+  const destructiveIconColor = useThemeColor("--color-danger-foreground");
 
   const rows = visibleWorkLogActivities(props.activities).map((activity) => ({
     ...activity,
@@ -235,7 +236,7 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
                       name={workRowSymbolName(row.icon)}
                       size={13}
                       weight="medium"
-                      tintColor={iconIsDestructive ? "#e11d48" : props.iconSubtleColor}
+                      tintColor={iconIsDestructive ? destructiveIconColor : props.iconSubtleColor}
                       type="monochrome"
                     />
                   </View>
@@ -244,7 +245,7 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
                     <Text
                       className={cn(
                         "font-t3-medium text-foreground",
-                        iconIsDestructive && "text-rose-600 dark:text-rose-400",
+                        iconIsDestructive && "text-danger-foreground",
                       )}
                     >
                       {row.summary}
@@ -256,7 +257,7 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
 
                   <View className="shrink-0 flex-row items-center gap-px">
                     {props.copiedRowId === row.id ? (
-                      <Text className="pr-1 font-t3-medium text-3xs text-emerald-600 dark:text-emerald-400">
+                      <Text className="pr-1 font-t3-medium text-3xs text-success-foreground">
                         {t("Copied")}
                       </Text>
                     ) : null}
@@ -289,7 +290,9 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
                             Match.orElse(() => ({ ios: "minus", android: "remove" }) as const),
                           )}
                           size={11}
-                          tintColor={row.status === "failure" ? "#e11d48" : props.iconSubtleColor}
+                          tintColor={
+                            row.status === "failure" ? destructiveIconColor : props.iconSubtleColor
+                          }
                           type="monochrome"
                         />
                       ) : null}
@@ -299,7 +302,7 @@ export const ThreadWorkLog = memo(function ThreadWorkLog(props: ThreadWorkLogPro
               </Pressable>
 
               {fullDetail ? (
-                <View className="ml-7 border-l border-neutral-300/60 pb-1 pl-3 pt-0.5 dark:border-white/[0.12]">
+                <View className="ml-7 border-l border-border pb-1 pl-3 pt-0.5">
                   <ScrollView
                     nestedScrollEnabled
                     directionalLockEnabled

@@ -284,6 +284,7 @@ export function createMobileThemeVariables(
   appearance: MobileThemeAppearance,
 ): MobileThemeVariables {
   const c = nativeColors(colors);
+  const defaults = DEFAULT_MOBILE_THEME_VARIABLES[appearance];
 
   return {
     "--color-screen": c.canvas,
@@ -321,6 +322,17 @@ export function createMobileThemeVariables(
     "--color-danger": c.errorSurface,
     "--color-danger-border": withAlpha(c.error, 0.32),
     "--color-danger-foreground": c.errorForeground,
+    "--color-warning": c.warningSurface,
+    "--color-warning-border": withAlpha(c.warning, 0.32),
+    "--color-warning-foreground": c.warningForeground,
+    // The shared palettes carry no success or info roles, so these two families
+    // keep the app's own measured pair rather than borrowing another theme's hue.
+    "--color-success": defaults["--color-success"],
+    "--color-success-border": defaults["--color-success-border"],
+    "--color-success-foreground": defaults["--color-success-foreground"],
+    "--color-info": defaults["--color-info"],
+    "--color-info-border": defaults["--color-info-border"],
+    "--color-info-foreground": defaults["--color-info-foreground"],
     "--color-input": c.surfaceRaised,
     "--color-input-border": c.input,
     "--color-sidebar-search": c.sidebarControlSurface,

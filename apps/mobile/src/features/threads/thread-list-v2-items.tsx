@@ -43,16 +43,16 @@ export {
 
 export { ThreadListV2PendingRow } from "./thread-list-v2-pending-row";
 
-// Status hues follow the system-wide convention set by sidebar v1 and the
-// Live Activity/widgets (amber approval, indigo input, sky working) so a
-// thread reads the same color everywhere it surfaces.
+// Only a state the user must act on gets a hue, as on web's
+// botStatusPresentation: approval warns, input informs, failure is danger, and
+// plain working stays in the foreground colour.
 const STATUS_LABEL_BY_STATUS: Partial<
   Record<ThreadListV2Status, { label: string; className: string }>
 > = {
-  approval: { label: "Approval", className: "text-amber-700 dark:text-amber-300" },
-  input: { label: "Input", className: "text-indigo-600 dark:text-indigo-300" },
-  working: { label: "Working", className: "text-sky-600 dark:text-sky-400" },
-  failed: { label: "Failed", className: "text-red-700 dark:text-red-300" },
+  approval: { label: "Approval", className: "text-warning-foreground" },
+  input: { label: "Input", className: "text-info-foreground" },
+  working: { label: "Working", className: "text-foreground" },
+  failed: { label: "Failed", className: "text-danger-foreground" },
 };
 
 // Menus keep lifecycle and title regeneration together. Archive keeps its
@@ -533,7 +533,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           <BotAvatarView avatar={botAvatar} size={46} state={avatarState} />
         )}
         {online ? (
-          <View className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-screen bg-green-500" />
+          <View className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-screen bg-success-foreground" />
         ) : null}
       </View>
       <View className="min-w-0 flex-1">
@@ -577,7 +577,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
               sessionFailure
                 ? selected
                   ? "text-user-bubble-foreground-muted"
-                  : "text-red-600/80 dark:text-red-400/80"
+                  : "text-danger-foreground"
                 : metaMutedClass,
             )}
             numberOfLines={1}
@@ -691,7 +691,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
               selected
                 ? "text-user-bubble-foreground-muted"
                 : snoozedRow
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "text-info-foreground"
                   : "text-foreground-tertiary",
             )}
             style={{ fontFamily: MONO_FONT }}

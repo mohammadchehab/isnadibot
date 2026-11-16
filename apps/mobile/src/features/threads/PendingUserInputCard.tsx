@@ -94,6 +94,9 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
   const iconSubtle = useThemeColor("--color-icon-subtle");
   const questionCount = props.pendingUserInput.questions.length;
 
+  const submitDisabled =
+    props.answers === null || props.respondingUserInputId === props.pendingUserInput.requestId;
+
   const cardCoverage = props.cardCoverage;
   const barHeightRef = useRef(0);
   const cardHeightRef = useRef(0);
@@ -179,7 +182,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
       pointerEvents={props.collapsed ? "auto" : "none"}
       accessibilityElementsHidden={!props.collapsed}
       importantForAccessibility={props.collapsed ? "auto" : "no-hide-descendants"}
-      className="flex-row items-center gap-2 rounded-full border border-neutral-200 bg-neutral-100 py-1.5 pl-4 pr-1.5 dark:border-white/6 dark:bg-neutral-900"
+      className="flex-row items-center gap-2 rounded-full border border-border bg-card-alt py-1.5 pl-4 pr-1.5"
     >
       <Pressable
         accessibilityRole="button"
@@ -190,10 +193,10 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
         onPress={props.onToggleCollapsed}
         className="min-h-10 flex-1 flex-row items-center gap-2 active:opacity-70"
       >
-        <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-sky-700 dark:text-sky-300">
+        <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-info-foreground">
           {t("User input needed")}
         </Text>
-        <Text className="font-sans text-xs text-neutral-500 dark:text-neutral-400">
+        <Text className="font-sans text-xs text-foreground-muted">
           {plural(questionCount, { one: "{count} question", other: "{count} questions" })}
         </Text>
         <View className="flex-1" />
@@ -231,7 +234,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
           : FadeOutDown.duration(USER_INPUT_TOGGLE_DURATION_MS).easing(Easing.out(Easing.cubic))
       }
       layout={CARD_LAYOUT_TRANSITION}
-      className="overflow-hidden gap-2.5 rounded-3xl border border-neutral-200 bg-neutral-100 p-4 dark:border-white/6 dark:bg-neutral-900"
+      className="overflow-hidden gap-2.5 rounded-3xl border border-border bg-card-alt p-4"
       style={
         EXPANDED_CARD_IS_OVERLAY
           ? [{ maxHeight: props.maxHeight }, cardAnimatedStyle]
@@ -245,14 +248,14 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
         className="flex-row items-start gap-2"
       >
         <View className="flex-1 gap-2.5">
-          <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-sky-700 dark:text-sky-300">
+          <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-info-foreground">
             {t("User input needed")}
           </Text>
-          <Text className="font-t3-bold text-lg text-neutral-950 dark:text-neutral-50">
+          <Text className="font-t3-bold text-lg text-foreground">
             {t("Fill in the pending answers")}
           </Text>
         </View>
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-neutral-200/70 dark:bg-white/8">
+        <View className="h-8 w-8 items-center justify-center rounded-full bg-subtle-strong">
           <SymbolView name="chevron.down" size={13} tintColor={iconSubtle} type="monochrome" />
         </View>
       </Pressable>
@@ -270,10 +273,10 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
 
           return (
             <View key={question.id} className="gap-2 pt-1">
-              <Text className="font-t3-bold text-xs uppercase tracking-label-wide text-neutral-500 dark:text-neutral-500">
+              <Text className="font-t3-bold text-xs uppercase tracking-label-wide text-foreground-muted">
                 {question.header}
               </Text>
-              <Text className="font-sans text-base leading-snug text-neutral-950 dark:text-neutral-50">
+              <Text className="font-sans text-base leading-snug text-foreground">
                 {question.question}
               </Text>
               <View className="gap-2">
@@ -288,9 +291,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                       key={option.label}
                       className={cn(
                         "min-h-12 w-full rounded-2xl border px-3.5 py-3",
-                        selected
-                          ? "border-blue-300/50 bg-blue-50 dark:border-blue-400/28 dark:bg-blue-400/14"
-                          : "border-neutral-200 bg-white dark:border-white/6 dark:bg-neutral-950/70",
+                        selected ? "border-info-border bg-info" : "border-border bg-card",
                       )}
                       onPress={() =>
                         props.onSelectOption(
@@ -304,15 +305,13 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                         <Text
                           className={cn(
                             "font-t3-bold text-sm",
-                            selected
-                              ? "text-sky-700 dark:text-sky-300"
-                              : "text-neutral-700 dark:text-neutral-200",
+                            selected ? "text-info-foreground" : "text-foreground-secondary",
                           )}
                         >
                           {option.label}
                         </Text>
                         {description ? (
-                          <Text className="font-sans text-sm leading-5 text-neutral-500 dark:text-neutral-400">
+                          <Text className="font-sans text-sm leading-5 text-foreground-muted">
                             {description}
                           </Text>
                         ) : null}
@@ -329,7 +328,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                 onFocus={() => props.onInputFocusChange?.(true)}
                 onBlur={() => props.onInputFocusChange?.(false)}
                 placeholder={t("Or type a custom answer")}
-                className="min-h-13.5 rounded-2xl border border-neutral-200 bg-white px-3.5 py-3 font-sans text-base text-neutral-950 dark:border-white/8 dark:bg-neutral-950/70 dark:text-neutral-50"
+                className="min-h-13.5 rounded-2xl border border-border bg-card px-3.5 py-3 font-sans text-base text-foreground"
               />
             </View>
           );
@@ -338,14 +337,19 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
       <Pressable
         className={cn(
           "items-center justify-center rounded-2xl px-4 py-3.5",
-          props.answers ? "bg-blue-500" : "bg-neutral-200 dark:bg-neutral-700/60",
+          submitDisabled ? "bg-subtle-strong" : "bg-primary",
         )}
-        disabled={
-          props.answers === null || props.respondingUserInputId === props.pendingUserInput.requestId
-        }
+        disabled={submitDisabled}
         onPress={() => void props.onSubmit()}
       >
-        <Text className="font-t3-extrabold text-sm text-white">{t("Submit answers")}</Text>
+        <Text
+          className={cn(
+            "font-t3-extrabold text-sm",
+            submitDisabled ? "text-foreground-muted" : "text-primary-foreground",
+          )}
+        >
+          {t("Submit answers")}
+        </Text>
       </Pressable>
     </Animated.View>
   ) : null;

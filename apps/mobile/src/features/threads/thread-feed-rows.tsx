@@ -272,14 +272,14 @@ export function renderFeedEntry(
                   key={attachment.id}
                   environmentId={props.environmentId}
                   attachmentId={attachment.id}
-                  className="aspect-13/10 w-full rounded-2xl bg-white/15"
+                  className="aspect-13/10 w-full rounded-2xl bg-user-bubble-foreground/15"
                   onPressImage={props.onPressImage}
                 />
               );
             })}
           </View>
           <View className="mt-1 flex-row items-center justify-end gap-1 pr-0.5">
-            <Text className="font-t3-medium text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+            <Text className="font-t3-medium text-xs tabular-nums text-foreground-secondary">
               {timestampLabel}
             </Text>
             {message.text.trim().length > 0 ? (
@@ -411,7 +411,7 @@ export function renderFeedEntry(
               key={attachment.id}
               environmentId={props.environmentId}
               attachmentId={attachment.id}
-              className="mt-1.5 aspect-13/10 w-full rounded-2xl bg-neutral-200 dark:bg-neutral-800"
+              className="mt-1.5 aspect-13/10 w-full rounded-2xl bg-subtle-strong"
               onPressImage={props.onPressImage}
             />
           );
@@ -425,9 +425,9 @@ export function renderFeedEntry(
                   className={cn(
                     "mt-1 text-3xs",
                     Match.value(delivery.tone).pipe(
-                      Match.when("error", () => "text-red-600 dark:text-red-400"),
-                      Match.when("warning", () => "text-amber-700 dark:text-amber-400"),
-                      Match.orElse(() => "text-neutral-600 dark:text-neutral-400"),
+                      Match.when("error", () => "text-danger-foreground"),
+                      Match.when("warning", () => "text-warning-foreground"),
+                      Match.orElse(() => "text-foreground-secondary"),
                     ),
                   )}
                 >
@@ -446,7 +446,7 @@ export function renderFeedEntry(
                 buttonSize={28}
                 iconSize={13}
               />
-              <Text className="font-t3-medium text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+              <Text className="font-t3-medium text-xs tabular-nums text-foreground-secondary">
                 {timestampLabel}
               </Text>
             </View>
@@ -517,11 +517,11 @@ const WorkingTimelineRow = memo(function WorkingTimelineRow(props: {
   return (
     <View className="mb-4 flex-row items-center gap-2 px-1.5 py-1">
       <View className="flex-row items-center gap-1">
-        <View className="h-1 w-1 rounded-full bg-neutral-400 dark:bg-neutral-500" />
-        <View className="h-1 w-1 rounded-full bg-neutral-400/80 dark:bg-neutral-500/80" />
-        <View className="h-1 w-1 rounded-full bg-neutral-400/60 dark:bg-neutral-500/60" />
+        <View className="h-1 w-1 rounded-full bg-foreground-muted" />
+        <View className="h-1 w-1 rounded-full bg-foreground-muted/80" />
+        <View className="h-1 w-1 rounded-full bg-foreground-muted/60" />
       </View>
-      <Text className="font-t3-medium text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+      <Text className="font-t3-medium text-xs tabular-nums text-foreground-secondary">
         {props.silentRun
           ? t("No response from {provider} for {duration}", {
               provider: props.silentRun.providerName,

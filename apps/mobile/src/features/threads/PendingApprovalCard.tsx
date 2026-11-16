@@ -46,11 +46,11 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   // Opaque for the same reason as PendingUserInputCard: nothing blurs the feed
   // behind this card, so a translucent surface bleeds messages through it.
   return (
-    <View className="gap-2.5 rounded-3xl border border-neutral-200 bg-neutral-100 p-4 dark:border-white/6 dark:bg-neutral-900">
-      <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-sky-700 dark:text-sky-300">
+    <View className="gap-2.5 rounded-3xl border border-border bg-card-alt p-4">
+      <Text className="font-t3-bold text-2xs uppercase tracking-label-wide text-info-foreground">
         {t("Approval needed")}
       </Text>
-      <Text className="font-t3-bold text-lg text-neutral-950 dark:text-neutral-50">
+      <Text className="font-t3-bold text-lg text-foreground">
         {isProductFeedback
           ? t("Product feedback")
           : routine
@@ -59,22 +59,18 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
       </Text>
       {routine ? (
         <View className="gap-1">
-          <Text className="font-t3-bold text-base text-neutral-950 dark:text-neutral-50">
-            {routine.name}
-          </Text>
+          <Text className="font-t3-bold text-base text-foreground">{routine.name}</Text>
           {routine.schedule ? (
-            <Text className="font-sans text-sm text-neutral-600 dark:text-neutral-400">
-              {routine.schedule}
-            </Text>
+            <Text className="font-sans text-sm text-foreground-secondary">{routine.schedule}</Text>
           ) : null}
           {routine.instructions ? (
-            <Text className="font-sans text-sm leading-normal text-neutral-600 dark:text-neutral-400">
+            <Text className="font-sans text-sm leading-normal text-foreground-secondary">
               {routine.instructions}
             </Text>
           ) : null}
         </View>
       ) : props.approval.detail ? (
-        <Text className="font-sans text-sm leading-normal text-neutral-600 dark:text-neutral-400">
+        <Text className="font-sans text-sm leading-normal text-foreground-secondary">
           {isProductFeedback
             ? t("Open IsnadiBot on web or desktop to review this feedback draft.")
             : props.approval.detail}
@@ -87,18 +83,18 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
             className={`items-center justify-center rounded-2xl px-3.5 py-3 ${Match.value(
               option.decision,
             ).pipe(
-              Match.when("accept", () => "bg-blue-500"),
-              Match.when("decline", () => "bg-rose-100 dark:bg-rose-500/18"),
-              Match.orElse(() => "bg-neutral-200 dark:bg-neutral-800"),
+              Match.when("accept", () => "bg-primary"),
+              Match.when("decline", () => "bg-danger"),
+              Match.orElse(() => "bg-subtle-strong"),
             )}`}
             disabled={props.respondingApprovalId === props.approval.requestId}
             onPress={() => void props.onRespond(props.approval.requestId, option.decision)}
           >
             <Text
               className={`text-sm ${Match.value(option.decision).pipe(
-                Match.when("accept", () => "font-t3-extrabold text-white"),
-                Match.when("decline", () => "font-t3-bold text-rose-700 dark:text-rose-300"),
-                Match.orElse(() => "font-t3-bold text-neutral-950 dark:text-neutral-50"),
+                Match.when("accept", () => "font-t3-extrabold text-primary-foreground"),
+                Match.when("decline", () => "font-t3-bold text-danger-foreground"),
+                Match.orElse(() => "font-t3-bold text-foreground"),
               )}`}
             >
               {option.label}
