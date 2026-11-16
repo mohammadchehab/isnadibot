@@ -1,10 +1,12 @@
-import { RefreshCwIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronLeftIcon, RefreshCwIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { DailyTotals, HourlyTotals } from "@isnadi/shared/usageMerge";
+import { useCanGoBack, useNavigate } from "@tanstack/react-router";
 
 import { isElectron } from "../../env";
 import { useClientSettings } from "../../hooks/useSettings";
+import { useI18n } from "../../i18n";
 import { useUsage } from "../../state/usage";
 import { enumerateDays, enumerateHourStarts, makeWindow } from "@isnadi/shared/usageFormat";
 import { Button } from "../ui/button";
@@ -12,11 +14,6 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SidebarInset } from "../ui/sidebar";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
-import {
-  WorkspaceBreadcrumb,
-  WorkspaceBreadcrumbItem,
-  WorkspaceBreadcrumbSeparator,
-} from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { PLAN_PROVIDER_ORDER } from "./UsageCharts";
@@ -37,12 +34,16 @@ import {
   UsageCoverageNotice,
   UsageDeviceStrip,
   UsageLimitsOverview,
+  UsageProviderRow,
   UsageSkeleton,
 } from "./UsagePageSections";
 import { useUsageFormat } from "./useUsageFormat";
 
 export function UsagePage() {
   const fmt = useUsageFormat();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const canGoBack = useCanGoBack();
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
 
   const [windowSelection, setWindowSelection] = useState(() => ({
@@ -111,7 +112,20 @@ export function UsagePage() {
   // cell on the page says so, rather than the headline saying "unknown" above a
   // column of `$0.00`. Cache savings is a separate claim and keeps its figure.
   const costLabel = (usd: number) => (entirelyUnpriced ? "—" : fmt.usd(usd));
-  const timeValueColumnWidth = `${60 / (activeProviders.length + 2)}%`;
+
+  // Opened from the sidebar footer, Usage is a page you come back from, so the
+  // top bar carries a way out. A deep link has no history to pop, and lands on
+  // the workspace instead.
+  const navigateBack = useCallback(() => {
+    if (canGoBack) {
+      // `window` in this scope is the usage window, so reach the browser's.
+      globalThis.history.back();
+
+      return;
+    }
+
+    void navigate({ to: "/" });
+  }, [canGoBack, navigate]);
 
   const selectWindow = (days: number) => {
     if (!isUsageWindowDays(days)) return;
@@ -151,26 +165,18 @@ export function UsagePage() {
     }
   };
 
-  const windowLabel =
-    isPast24Hours && window.sinceTime !== undefined && window.untilTime !== undefined
-      ? `${fmt.dateTimeShort(window.sinceTime, window.timeZone)} to ${fmt.dateTimeShort(window.untilTime, window.timeZone)}`
-      : `${fmt.dayShort(window.sinceDay)} to ${fmt.dayShort(window.untilDay)}`;
-
   const topbarContent = (
-    <div className="flex w-full min-w-0 items-center gap-3">
-      <WorkspaceBreadcrumb ariaLabel="Usage breadcrumb" className="min-w-0">
-        <WorkspaceBreadcrumbItem current>
-          <h1>Usage</h1>
-        </WorkspaceBreadcrumbItem>
-        {showingLimits ? null : (
-          <>
-            <WorkspaceBreadcrumbSeparator className="hidden md:flex" />
-            <WorkspaceBreadcrumbItem className="hidden min-w-0 shrink md:flex">
-              <span className="truncate">{windowLabel}</span>
-            </WorkspaceBreadcrumbItem>
-          </>
-        )}
-      </WorkspaceBreadcrumb>
+    <div className="flex w-full min-w-0 items-center gap-2">
+      <Button
+        onClick={navigateBack}
+        aria-label="Back"
+        size="icon-sm"
+        variant="ghost"
+        className="-ms-1.5"
+      >
+        <ChevronLeftIcon aria-hidden className="size-4 rtl:-scale-x-100" />
+      </Button>
+      <h1 className="min-w-0 truncate text-base font-semibold text-foreground">Usage</h1>
       <div className="ms-auto hidden min-w-0 items-center justify-end gap-2 lg:flex">
         <ToggleGroup
           aria-label="Usage metric"
@@ -257,6 +263,7 @@ export function UsagePage() {
                 environments={environments}
                 duplicateSources={merged.duplicateSources}
                 staleEnvironments={merged.staleEnvironments}
+                onRetry={refresh}
               />
             ) : merged.connectedProviders.length === 0 ? (
               <div className="rounded-xl border border-border/70 px-5 py-6">
@@ -305,85 +312,72 @@ export function UsagePage() {
 
                       const providerSessions = totals?.sessions ?? 0;
 
-                      const sessionLabel = `${fmt.count(providerSessions)} ${
-                        providerSessions === 1 ? "session" : "sessions"
-                      }`;
-
                       return (
-                        <div key={provider} className="flex flex-col gap-1">
-                          <div className="flex items-baseline justify-between gap-4">
-                            <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-                              <span
-                                aria-hidden
-                                className="size-2 shrink-0 rounded-full bg-(--provider-color)"
-                                style={{
-                                  "--provider-color": PROVIDER_PRESENTATION[provider].color,
-                                }}
-                              />
-                              <ProviderMark provider={provider} className="size-4" />
-                              <span className="flex min-w-0 items-baseline gap-1.5">
-                                <span className="truncate">
-                                  {PROVIDER_PRESENTATION[provider].label}
-                                </span>
-                                <span className="shrink-0 whitespace-nowrap text-11px text-muted-foreground tabular-nums">
-                                  {sessionLabel}
-                                </span>
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-sm font-medium text-foreground tabular-nums">
-                              {metric === "cost"
-                                ? costLabel(totals?.costUsd ?? 0)
-                                : fmt.tokens(totals?.totalTokens ?? 0)}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {metric === "cost"
+                        <UsageProviderRow
+                          key={provider}
+                          provider={provider}
+                          sessions={`${fmt.count(providerSessions)} ${
+                            providerSessions === 1 ? "session" : "sessions"
+                          }`}
+                          value={
+                            metric === "cost"
+                              ? costLabel(totals?.costUsd ?? 0)
+                              : fmt.tokens(totals?.totalTokens ?? 0)
+                          }
+                          share={fmt.percent(share)}
+                          detail={
+                            metric === "cost"
                               ? `${fmt.percent(share)} of cost · ${fmt.tokens(totals?.totalTokens ?? 0)} tokens`
-                              : `${fmt.percent(share)} of tokens · ${costLabel(totals?.costUsd ?? 0)}`}
-                          </span>
-                        </div>
+                              : `${fmt.percent(share)} of tokens · ${costLabel(totals?.costUsd ?? 0)}`
+                          }
+                        />
                       );
                     })}
+
+                    {metric === "cost" ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("Estimated from reported model usage; this is not subscription spend.")}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex min-w-0 flex-col gap-3">
-                    {/* The period only shapes the time series and the breakdown
-                        below it, so it sits with them instead of competing with
-                        the metric control in the top bar. */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h2 className="text-sm font-medium text-foreground">
-                        {isPast24Hours ? "Hourly" : "Daily"}{" "}
-                        {metric === "tokens" ? "processed tokens" : "cost"}
-                      </h2>
-                      <ToggleGroup
-                        aria-label="Usage period"
-                        variant="segmented"
-                        value={[String(windowDays)]}
-                        onValueChange={(next) => {
-                          const value = next[0];
-
-                          if (value) selectWindow(Number(value));
-                        }}
+                    {/* The period only shapes the series and the breakdown below
+                        it, so it sits with them instead of competing with the
+                        metric control in the top bar. */}
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={String(windowDays)}
+                        onValueChange={(value) => selectWindow(Number(value))}
                       >
-                        {WINDOW_OPTIONS.map((option) => (
-                          <Toggle key={option.days} value={String(option.days)}>
-                            {option.label}
-                          </Toggle>
-                        ))}
-                      </ToggleGroup>
+                        <SelectTrigger aria-label="Usage period" size="compact" className="w-35">
+                          <SelectValue>
+                            {WINDOW_OPTIONS.find((option) => option.days === windowDays)?.label}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectPopup>
+                          {WINDOW_OPTIONS.map((option) => (
+                            <SelectItem key={option.days} value={String(option.days)}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectPopup>
+                      </Select>
                     </div>
-                    <UsageProviderChart
-                      providers={activeProviders}
-                      days={days}
-                      daily={merged.daily}
-                      hours={hours}
-                      hourly={merged.hourly}
-                      metric={metric}
-                      referenceTime={window.untilTime}
-                      resolution={isPast24Hours ? "hour" : "day"}
-                      timeZone={window.timeZone}
-                      unpriced={entirelyUnpriced}
-                    />
+                    <div className="rounded-xl border border-border p-2">
+                      <UsageProviderChart
+                        providers={activeProviders}
+                        days={days}
+                        daily={merged.daily}
+                        hours={hours}
+                        hourly={merged.hourly}
+                        metric={metric}
+                        referenceTime={window.untilTime}
+                        resolution={isPast24Hours ? "hour" : "day"}
+                        timeZone={window.timeZone}
+                        unpriced={entirelyUnpriced}
+                      />
+                    </div>
                   </div>
                 </section>
 
@@ -401,9 +395,11 @@ export function UsagePage() {
                   </div>
                 </section>
 
-                <section className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-medium text-foreground">Breakdown</h2>
+                <section className="rounded-xl border border-border">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <h2 className="text-sm font-medium text-foreground">
+                      {breakdown === "model" ? "By model" : "By time"}
+                    </h2>
                     <ToggleGroup
                       aria-label="Usage breakdown"
                       variant="segmented"
@@ -414,16 +410,8 @@ export function UsagePage() {
                         if (value === "model" || value === "time") setBreakdown(value);
                       }}
                     >
-                      {(
-                        [
-                          { value: "model", label: "Model" },
-                          { value: "time", label: isPast24Hours ? "Hour" : "Day" },
-                        ] as const
-                      ).map((option) => (
-                        <Toggle key={option.value} value={option.value}>
-                          {option.label}
-                        </Toggle>
-                      ))}
+                      <Toggle value="model">By model</Toggle>
+                      <Toggle value="time">By time</Toggle>
                     </ToggleGroup>
                   </div>
 
@@ -431,7 +419,7 @@ export function UsagePage() {
                     // Model names and five numeric columns stop fitting well
                     // before the narrowest supported width, so the table keeps a
                     // readable minimum and scrolls rather than crushing columns.
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto border-t border-border">
                       <table className="w-full min-w-136 table-fixed text-sm">
                         <colgroup>
                           <col className="w-2/5" />
@@ -440,17 +428,20 @@ export function UsagePage() {
                           <col className="w-1/5" />
                         </colgroup>
                         <thead>
-                          <tr className="border-b border-border text-start text-xs text-muted-foreground">
-                            <th className="py-2 font-normal">Model</th>
-                            <th className="py-2 text-end font-normal">Cost</th>
-                            <th className="py-2 text-end font-normal">Share</th>
-                            <th className="py-2 text-end font-normal">Tokens</th>
+                          <tr className="border-b border-border text-start text-11px text-muted-foreground">
+                            <th className="h-9 px-4 text-start font-normal">Model</th>
+                            <th className="h-9 px-4 text-end font-normal">Cost</th>
+                            <th className="h-9 px-4 text-end font-normal">Share</th>
+                            <th className="h-9 px-4 text-end font-normal">Tokens</th>
                           </tr>
                         </thead>
                         <tbody>
                           {breakdownModels.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                              <td
+                                colSpan={4}
+                                className="px-4 py-6 text-center text-muted-foreground"
+                              >
                                 No activity in this window.
                               </td>
                             </tr>
@@ -458,21 +449,21 @@ export function UsagePage() {
                             breakdownModels.map((model) => (
                               <tr
                                 key={`${model.provider}:${model.model}`}
-                                className="border-b border-border/50 transition-colors hover:bg-muted/50"
+                                className="h-10 border-b border-border/50 transition-colors last:border-b-0 hover:bg-muted/50"
                               >
-                                <td className="py-2 text-foreground">
+                                <td className="px-4 text-foreground">
                                   <span className="flex items-center gap-2">
                                     <ProviderMark provider={model.provider} className="size-3.5" />
                                     {PROVIDER_PRESENTATION[model.provider].label} · {model.model}
                                   </span>
                                 </td>
-                                <td className="py-2 text-end text-foreground tabular-nums">
+                                <td className="px-4 text-end text-foreground tabular-nums">
                                   {costLabel(model.costUsd)}
                                 </td>
-                                <td className="py-2 text-end text-muted-foreground tabular-nums">
+                                <td className="px-4 text-end text-muted-foreground tabular-nums">
                                   {fmt.percent(model.costShare)}
                                 </td>
-                                <td className="py-2 text-end text-muted-foreground tabular-nums">
+                                <td className="px-4 text-end text-muted-foreground tabular-nums">
                                   {fmt.tokens(model.totalTokens)}
                                 </td>
                               </tr>
@@ -482,44 +473,26 @@ export function UsagePage() {
                       </table>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-160 table-fixed text-sm">
+                    <div className="overflow-x-auto border-t border-border">
+                      <table className="w-full min-w-136 table-fixed text-sm">
                         <colgroup>
-                          <col className="w-2/5" />
-                          {activeProviders.map((provider) => (
-                            <col
-                              key={provider}
-                              className="w-(--col-width)"
-                              style={{ "--col-width": timeValueColumnWidth }}
-                            />
-                          ))}
-                          <col
-                            className="w-(--col-width)"
-                            style={{ "--col-width": timeValueColumnWidth }}
-                          />
-                          <col
-                            className="w-(--col-width)"
-                            style={{ "--col-width": timeValueColumnWidth }}
-                          />
+                          <col />
+                          <col className="w-28" />
+                          <col className="w-28" />
                         </colgroup>
                         <thead>
-                          <tr className="border-b border-border text-start text-xs text-muted-foreground">
-                            <th className="py-2 font-normal">{isPast24Hours ? "Hour" : "Day"}</th>
-                            {activeProviders.map((provider) => (
-                              <th key={provider} className="py-2 text-end font-normal">
-                                {PROVIDER_PRESENTATION[provider].label}
-                              </th>
-                            ))}
-                            <th className="py-2 text-end font-normal">Total</th>
-                            <th className="py-2 text-end font-normal">Tokens</th>
+                          <tr className="border-b border-border text-start text-11px text-muted-foreground">
+                            <th className="h-9 px-4 text-start font-normal">Period</th>
+                            <th className="h-9 px-4 text-end font-normal">Cost</th>
+                            <th className="h-9 px-4 text-end font-normal">Tokens</th>
                           </tr>
                         </thead>
                         <tbody>
                           {breakdownPeriods.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={activeProviders.length + 3}
-                                className="py-6 text-center text-muted-foreground"
+                                colSpan={3}
+                                className="px-4 py-6 text-center text-muted-foreground"
                               >
                                 No activity in this window.
                               </td>
@@ -528,25 +501,17 @@ export function UsagePage() {
                             breakdownPeriods.map((period) => (
                               <tr
                                 key={"hourStart" in period ? period.hourStart : period.day}
-                                className="border-b border-border/50 transition-colors hover:bg-muted/50"
+                                className="h-10 border-b border-border/50 transition-colors last:border-b-0 hover:bg-muted/50"
                               >
-                                <td className="py-2 text-foreground">
+                                <td className="px-4 text-foreground">
                                   {"hourStart" in period
                                     ? fmt.hourShort(period.hourStart, window.timeZone)
                                     : fmt.dayShort(period.day)}
                                 </td>
-                                {activeProviders.map((provider) => (
-                                  <td
-                                    key={provider}
-                                    className="py-2 text-end text-muted-foreground tabular-nums"
-                                  >
-                                    {costLabel(period.byProvider.get(provider)?.costUsd ?? 0)}
-                                  </td>
-                                ))}
-                                <td className="py-2 text-end text-foreground tabular-nums">
+                                <td className="px-4 text-end text-foreground tabular-nums">
                                   {costLabel(period.costUsd)}
                                 </td>
-                                <td className="py-2 text-end text-muted-foreground tabular-nums">
+                                <td className="px-4 text-end text-muted-foreground tabular-nums">
                                   {fmt.tokens(period.totalTokens)}
                                 </td>
                               </tr>

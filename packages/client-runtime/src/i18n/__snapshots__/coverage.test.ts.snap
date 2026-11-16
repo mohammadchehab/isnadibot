@@ -638,6 +638,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/ui/sidebarRail.tsx",
     "apps/web/src/components/ui/toast.tsx",
     "apps/web/src/components/usage/UsageCharts.tsx",
+    "apps/web/src/components/usage/UsagePage.tsx",
     "apps/web/src/components/usage/UsageProviderChart.tsx",
     "apps/web/src/components/usage/useUsageFormat.ts",
     "apps/web/src/hooks/useChatActions.ts",

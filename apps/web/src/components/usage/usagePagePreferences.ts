@@ -44,11 +44,12 @@ export const METRIC_OPTIONS = [
   { value: "limits", label: "Limits" },
 ] as const satisfies readonly { value: UsageMetric; label: string }[];
 
+/** One shape for every window, because the select shows the chosen label alone. */
 export const WINDOW_OPTIONS = [
-  { days: 1, label: "Past 24h" },
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
+  { days: 1, label: "Past 24 hours" },
+  { days: 7, label: "Past 7 days" },
+  { days: 30, label: "Past 30 days" },
+  { days: 90, label: "Past 90 days" },
 ] as const;
 
 export function isUsageMetric(value: string | null | undefined): value is UsageMetric {

@@ -3,6 +3,7 @@ import { CheckIcon, XIcon } from "lucide-react";
 
 import { cn } from "../../lib/utils";
 import type { EnvironmentUsageStatus } from "@isnadi/client-runtime/usage";
+import { Button } from "../ui/button";
 import { Skeleton } from "../ui/skeleton";
 import { UsagePlanMeters } from "./UsageCharts";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
@@ -62,19 +63,81 @@ export function Metric({ label, value }: { readonly label: string; readonly valu
 }
 
 /**
+ * One provider's share of the window: who it is and how many sessions it ran on
+ * the left, what it cost and how much of the window that was on the right.
+ *
+ * Below `sm` the row collapses to the frame's single line, `Claude · $6.02 ·
+ * 47%`, because two stacked lines per provider would push the chart off a phone.
+ */
+export function UsageProviderRow({
+  provider,
+  sessions,
+  value,
+  detail,
+  share,
+}: {
+  readonly provider: UsageProviderKind;
+  readonly sessions: string;
+  readonly value: string;
+  readonly detail: string;
+  readonly share: string;
+}) {
+  const { color, label } = PROVIDER_PRESENTATION[provider];
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5 text-sm sm:hidden">
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full bg-(--provider-color)"
+          style={{ "--provider-color": color }}
+        />
+        <span className="truncate text-foreground">{label}</span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">
+          · {value} · {share}
+        </span>
+      </div>
+
+      <div className="hidden items-start justify-between gap-4 sm:flex">
+        <div className="flex min-w-0 items-start gap-2">
+          <span
+            aria-hidden
+            className="mt-1.5 size-2 shrink-0 rounded-full bg-(--provider-color)"
+            style={{ "--provider-color": color }}
+          />
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm text-foreground">{label}</span>
+            <span className="text-11px text-muted-foreground tabular-nums">{sessions}</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end">
+          <span className="text-sm font-medium text-foreground tabular-nums">{value}</span>
+          <span className="text-11px text-muted-foreground tabular-nums">{detail}</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
  * Says plainly when the totals are incomplete: an environment that failed, or
  * one whose transcripts another environment already reported. Environments
  * that are still answering never reach this notice; the page shows the
  * loading skeleton until every one is terminal.
+ *
+ * A failed environment gets the frame's red row and a retry, because that is
+ * the one case where asking again is what fixes it.
  */
 export function UsageCoverageNotice({
   environments,
   duplicateSources,
   staleEnvironments,
+  onRetry,
 }: {
   readonly environments: readonly EnvironmentUsageStatus[];
   readonly duplicateSources: readonly string[];
   readonly staleEnvironments: readonly string[];
+  readonly onRetry?: (() => void) | undefined;
 }) {
   const failed = environments.filter((environment) => environment.error !== null);
 
@@ -89,7 +152,14 @@ export function UsageCoverageNotice({
   return (
     <div className="flex flex-col gap-1 border border-border px-3 py-2 text-xs text-muted-foreground">
       {failed.map((environment) => (
-        <span key={environment.label}>{environment.label} could not report usage.</span>
+        <div key={environment.label} className="flex items-center justify-between gap-2">
+          <span className="text-destructive">{environment.label} could not report usage.</span>
+          {onRetry === undefined ? null : (
+            <Button type="button" size="xs" variant="secondary" onClick={onRetry}>
+              Retry
+            </Button>
+          )}
+        </div>
       ))}
       {stale.map((environment) => (
         <span key={environment.label}>
@@ -166,8 +236,9 @@ export function UsageDeviceStrip({
 }
 
 /**
- * Stand-in with the loaded page's shape, using the shared `Skeleton` bars so it
- * remains static like other long-lived loading states.
+ * Stand-in with the loaded page's shape. The blocks hold still (`shimmer={false}`)
+ * rather than sweeping: this one stays up for a whole page load, and a loop that
+ * never settles reads as a page that is stuck.
  * Blocks fill in exactly once when the last device answers.
  */
 export function UsageSkeleton() {
@@ -176,29 +247,32 @@ export function UsageSkeleton() {
       <section className="grid gap-6 lg:grid-cols-18rem-1fr">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1">
-            <Skeleton className="h-10 w-36" />
-            <Skeleton className="h-4 w-32" />
+            <Skeleton shimmer={false} className="h-9 w-36" />
+            <Skeleton shimmer={false} className="h-4 w-40" />
           </div>
           {PROVIDER_ORDER.map((provider) => (
-            <div key={provider} className="flex flex-col gap-1">
-              <div className="flex min-h-5 items-center justify-between gap-4">
-                <span className="flex items-center gap-2">
-                  <Skeleton className="size-2 shrink-0 rounded-full" />
-                  <Skeleton className="size-4 shrink-0 rounded-full" />
-                  <Skeleton className="h-3.5 w-20" />
-                </span>
-                <Skeleton className="h-3.5 w-14" />
+            <div key={provider} className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-2">
+                <Skeleton shimmer={false} className="mt-1.5 size-2 shrink-0 rounded-full" />
+                <div className="flex flex-col gap-1">
+                  <Skeleton shimmer={false} className="h-3.5 w-20" />
+                  <Skeleton shimmer={false} className="h-2.5 w-16" />
+                </div>
               </div>
-              <Skeleton className="h-4 w-36" />
+              <div className="flex flex-col items-end gap-1">
+                <Skeleton shimmer={false} className="h-3.5 w-14" />
+                <Skeleton shimmer={false} className="h-2.5 w-24" />
+              </div>
             </div>
           ))}
+          <Skeleton shimmer={false} className="h-3 w-56" />
         </div>
 
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-5 w-24" />
-          <div className="flex flex-col gap-1">
-            <Skeleton tone="faint" className="ms-16 h-56" />
-            <Skeleton tone="faint" className="ms-16 h-4" />
+          <Skeleton shimmer={false} className="h-7 w-35 rounded-lg" />
+          <div className="rounded-xl border border-border p-2">
+            <Skeleton shimmer={false} tone="faint" className="h-48" />
+            <Skeleton shimmer={false} className="mt-1 h-3 w-full" />
           </div>
         </div>
       </section>
@@ -210,19 +284,23 @@ export function UsageSkeleton() {
             (label) => (
               <div key={label} className="flex flex-col gap-0.5">
                 <span className="text-xs text-muted-foreground">{label}</span>
-                <Skeleton className="h-6 w-16" />
+                <Skeleton shimmer={false} className="h-6 w-16" />
               </div>
             ),
           )}
         </div>
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section className="rounded-xl border border-border p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-foreground">Breakdown</h2>
-          <Skeleton className="h-7 w-28 rounded-lg" />
+          <Skeleton shimmer={false} className="h-4 w-20" />
+          <Skeleton shimmer={false} className="h-6 w-35 rounded-lg" />
         </div>
-        <Skeleton tone="faint" className="h-44" />
+        <div className="mt-3 flex flex-col gap-2">
+          {[0, 1, 2].map((row) => (
+            <Skeleton key={row} shimmer={false} tone="faint" className="h-8" />
+          ))}
+        </div>
       </section>
     </>
   );

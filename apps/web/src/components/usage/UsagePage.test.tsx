@@ -12,6 +12,11 @@ vi.mock("../../state/usage", () => ({ useUsage: testState.useUsage }));
 
 vi.mock("../ui/button", () => ({ Button: "button" }));
 
+vi.mock("@tanstack/react-router", () => ({
+  useCanGoBack: () => false,
+  useNavigate: () => vi.fn(),
+}));
+
 vi.mock("../ui/dialog", () => ({
   DialogHeader: "header",
   DialogPanel: "div",
