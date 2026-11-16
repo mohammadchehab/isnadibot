@@ -7,17 +7,24 @@ import { Match } from "effect";
  *
  * @module features/threads/ThreadDelegationFeedCard
  */
+import { useAtomValue } from "@effect/atom-react";
 import type { IsnadiDelegationRecord, EnvironmentId, OrchestrationBot } from "@isnadi/contracts";
-import type { DelegationAction } from "@isnadi/client-runtime/delegation-presentation";
+import {
+  descendantDelegations,
+  presentDelegation,
+  type DelegationAction,
+} from "@isnadi/client-runtime/delegation-presentation";
 import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { useCallback, useMemo } from "react";
-import { Alert } from "react-native";
+import { Alert, View } from "react-native";
 
 import { useMobileI18n } from "../../lib/i18n";
+import { environmentDelegationsAtom } from "../../state/delegations";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { delegationChildThreadRef } from "./childThreadApproval";
 import { ThreadDelegationCard } from "./ThreadDelegationCard";
+import { ThreadDelegationDescendantApproval } from "./ThreadDelegationDescendantApproval";
 import { useChildThreadApproval } from "./useChildThreadApproval";
 
 export function ThreadDelegationFeedCard(props: {
@@ -26,6 +33,8 @@ export function ThreadDelegationFeedCard(props: {
   readonly actions: ReadonlyArray<DelegationAction>;
   readonly childBot: OrchestrationBot | null;
   readonly parentBot: OrchestrationBot | null;
+  /** Bots by id, so a nested approval can name the bot that is asking. */
+  readonly botsById?: ReadonlyMap<string, OrchestrationBot>;
 }) {
   const { t } = useMobileI18n();
   const { environmentId } = props;
@@ -39,6 +48,18 @@ export function ThreadDelegationFeedCard(props: {
   );
 
   const childApproval = useChildThreadApproval(childThreadRef);
+
+  // The chat this card's delegation started can start its own delegations. They
+  // are two levels down, so only this card can answer their approvals.
+  const environmentDelegations = useAtomValue(environmentDelegationsAtom(environmentId));
+
+  const descendants = useMemo(() => {
+    const childThreadId = presentDelegation(props.delegation).childThreadId;
+
+    return childThreadId === null
+      ? []
+      : descendantDelegations(environmentDelegations, childThreadId);
+  }, [environmentDelegations, props.delegation]);
 
   const cancelDelegation = useAtomCommand(orchestrationEnvironment.cancelDelegation, {
     reportFailure: false,
@@ -72,7 +93,7 @@ export function ThreadDelegationFeedCard(props: {
     [cancelDelegation, delegationId, environmentId, retryDelegation, t],
   );
 
-  return (
+  const card = (
     <ThreadDelegationCard
       delegation={props.delegation}
       childBot={props.childBot}
@@ -83,5 +104,23 @@ export function ThreadDelegationFeedCard(props: {
       respondingApprovalId={childApproval.respondingApprovalId}
       onRespondToChildApproval={childApproval.respond}
     />
+  );
+
+  if (descendants.length === 0) return card;
+
+  const botsById = props.botsById;
+
+  return (
+    <View>
+      {card}
+      {descendants.map((delegation) => (
+        <ThreadDelegationDescendantApproval
+          key={delegation.delegationId}
+          environmentId={environmentId}
+          delegation={delegation}
+          askerBot={botsById?.get(delegation.childBotId) ?? null}
+        />
+      ))}
+    </View>
   );
 }
