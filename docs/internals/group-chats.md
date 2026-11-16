@@ -216,6 +216,10 @@ Mastra instructions resolver runs per call, `IsnadiMastraHarness.ts`):
 - the rules: "You are <name>. Answer only as yourself. Messages from other members appear as
   `<group-message from=…>`. A message with no @mention goes to the boss. To hand work to a member,
   use its bot id."
+- a role line. The boss is told to delegate implementation, design and review to the fitting
+  specialist, not to write product files itself, and to ask the reviewers before reporting done. A
+  specialist is told to do the handed work and report to the boss. This is prompt-level: the boss
+  keeps its tools.
 
 Build the roster per turn, not at session start, so adding or removing a member takes effect on
 the next turn without a restart. Direct chats get no group section.
