@@ -100,7 +100,8 @@ export function selectDecisions(
     });
   }
 
-  return [...byRoot.values()].toSorted(
+  // .sort() on a copy, not .toSorted(): Hermes lacks ES2023 change-by-copy.
+  return [...byRoot.values()].sort(
     (left, right) =>
       right.updatedAt.localeCompare(left.updatedAt) || left.threadId.localeCompare(right.threadId),
   );

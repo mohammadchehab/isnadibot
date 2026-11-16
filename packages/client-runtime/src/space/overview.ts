@@ -102,9 +102,10 @@ export function spaceActivity<
 ): ReadonlyArray<T> {
   const members = spaceMembers(group);
 
+  // .sort() on a copy, not .toSorted(): Hermes lacks ES2023 change-by-copy.
   return shells
     .filter((shell) => shell.archivedAt === null && inSpace(shell, group, members))
-    .toSorted((a, b) => {
+    .sort((a, b) => {
       const waiting = Number(waitingThreadIds.has(b.id)) - Number(waitingThreadIds.has(a.id));
 
       return waiting !== 0 ? waiting : b.updatedAt.localeCompare(a.updatedAt);
@@ -134,7 +135,7 @@ export function spaceDelegations<
 
       return parent !== undefined && inSpace(parent, group, members);
     })
-    .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, limit);
 }
 

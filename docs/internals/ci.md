@@ -124,10 +124,13 @@ CI runs as parallel jobs, so a run takes as long as its slowest job instead of t
   `orchestrationEngine.integration.test.ts` until the executor stack restores its test adapter and
   stops the fixture from calling OpenAI with a test credential.
 - **Resource monitor.** Checks formatting and tests the Rust crate.
+- **Mobile tests.** Runs the `@isnadi/mobile` suite. It needs its own job because the desktop job's
+  package filter excludes `@isnadi/mobile`; before this job existed no CI run executed the mobile
+  tests, so a red mobile suite could not fail the build.
 - **Repository checks.** A small final job that depends on all the others. It fails when any job fails or
   is cancelled, or when a code change skipped a job it should have run. For a docs-only pull request it
   passes when the heavy jobs were skipped. Branch protection requires only this one status, so adding
-  or splitting jobs never changes the ruleset. The three heavy jobs share the setup in
+  or splitting jobs never changes the ruleset. The build and test jobs share the setup in
   [`.github/actions/install`](../../.github/actions/install/action.yml).
 
 The repository ruleset requires the `Repository checks` result before a pull request can
@@ -143,9 +146,9 @@ CI against the exact pull request head SHA; empty-only changesets do not dispatc
 
 [`.github/workflows/mobile-bundle.yml`](../../.github/workflows/mobile-bundle.yml) runs
 `expo export --platform ios` when mobile code, shared packages, or the lockfile change, on pull requests and
-on `main`. Repository checks exclude `@isnadi/mobile`, so this is the only job that resolves the Metro
-graph; a missing import or asset fails it. It is a separate status and is not part of the
-`Repository checks` result.
+on `main`. It is the only job that resolves the Metro graph; a missing import or asset fails it. The
+mobile tests run under `Repository checks` but do not build a bundle, so a Metro-only failure still
+reports here. It is a separate status and is not part of the `Repository checks` result.
 
 [`.github/workflows/installer-tests.yml`](../../.github/workflows/installer-tests.yml) runs focused
 Windows PowerShell 5.1 tests when the Windows installer changes. It checks checksum rejection,

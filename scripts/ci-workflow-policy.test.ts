@@ -94,6 +94,7 @@ describe("CI workflow budget", () => {
       "desktop",
       "server",
       "native",
+      "mobile",
       "check",
     ]);
 
@@ -102,14 +103,14 @@ describe("CI workflow budget", () => {
 
     expect(ci.jobs.changes?.if).toBe(draftGuard);
 
-    for (const name of ["static", "desktop", "server", "native"]) {
+    for (const name of ["static", "desktop", "server", "native", "mobile"]) {
       expect(ci.jobs[name]?.needs).toBe("changes");
     }
 
     // Light jobs stay on GitHub-hosted runners. Heavy jobs take the runner that `changes` picked:
     // the self-hosted hetzner runners for the repository's own branches, GitHub-hosted for fork
     // pull requests, so fork code never runs on our machine.
-    for (const name of ["static", "native"]) {
+    for (const name of ["static", "native", "mobile"]) {
       expect(ci.jobs[name]?.["runs-on"]).toBe("ubuntu-24.04");
     }
 
@@ -126,14 +127,14 @@ describe("CI workflow budget", () => {
 
     // Docs-only pull requests skip the heavy jobs, never the required check.
 
-    for (const name of ["desktop", "server", "native"]) {
+    for (const name of ["desktop", "server", "native", "mobile"]) {
       expect(ci.jobs[name]?.if).toBe("${{ needs.changes.outputs.code == 'true' }}");
     }
 
     // The aggregator is the only required status: it must run when others fail or skip, but not on drafts.
     const check = ci.jobs.check;
     expect(check?.name).toBe("Repository checks");
-    expect(check?.needs).toEqual(["changes", "static", "desktop", "server", "native"]);
+    expect(check?.needs).toEqual(["changes", "static", "desktop", "server", "native", "mobile"]);
     expect(check?.if).toBe(`\${{ always() && (${draftGuard.slice(4, -3)}) }}`);
 
     const gate =
@@ -145,6 +146,7 @@ describe("CI workflow budget", () => {
     expect(gate).toContain('check desktop "$expected_heavy"');
     expect(gate).toContain('check server "$expected_heavy"');
     expect(gate).toContain('check native "$expected_heavy"');
+    expect(gate).toContain('check mobile "$expected_heavy"');
     expect(gate).toContain("expected_heavy=skipped");
     expect(gate).toContain("expected_heavy=success");
     expect(
