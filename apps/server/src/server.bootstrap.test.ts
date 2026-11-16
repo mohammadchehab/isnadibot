@@ -280,6 +280,10 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         ).pipe(Effect.flip);
 
         assert.include(String(error.message), "installing an update");
+        // The client renders the refusal from its own catalog by this code, so
+        // the bootstrap site carries it too rather than a bare message.
+        assert.ok(Predicate.isTagged(error, "OrchestrationDispatchCommandError"));
+        assert.equal(error.refusal, "server-is-updating");
         assert.deepEqual(dispatchedCommands, []);
         assert.equal(createWorktree.mock.calls.length, 1);
       } finally {

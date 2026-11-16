@@ -58,5 +58,7 @@ export const refusalsCatalog = {
     "That action does not fit this card's current state. Pick a different action.",
   "This space already has as many open cards as it can hold. Close one first.":
     "This space already has as many open cards as it can hold. Close one first.",
+  "The server is installing an update. Try again in a moment.":
+    "The server is installing an update. Try again in a moment.",
   "The command failed.": "The command failed.",
 } as const;

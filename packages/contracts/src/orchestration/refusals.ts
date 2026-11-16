@@ -256,6 +256,16 @@ export const CommandRefusalCodes = [
    * here. Not `stale-view` either, because a refresh changes nothing.
    */
   "work-item-limit-reached",
+  /**
+   * The server is installing an update and will not admit a new turn, so the
+   * start is refused before anything is committed. Separate from
+   * `thread-is-busy`: nothing is in flight in this chat, and waiting on the
+   * chat would not help — the wait is on the server and ends on its own.
+   *
+   * Both admission sites raise it: the engine's dispatch gate, and the
+   * bootstrap turn start that admits before it creates a thread or worktree.
+   */
+  "server-is-updating",
 ] as const;
 
 /**

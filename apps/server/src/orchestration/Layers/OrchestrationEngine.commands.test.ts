@@ -8,10 +8,12 @@ import {
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
+import { Predicate } from "effect";
 import { it as effectIt } from "@effect/vitest";
 import { describe, expect, it } from "vite-plus/test";
 import { OrchestrationCommandReceiptRepositoryLive } from "../../persistence/Layers/OrchestrationCommandReceipts.ts";
@@ -89,11 +91,47 @@ describe("OrchestrationEngine", () => {
       createdAt,
     };
 
+    // The two command types the gate admits, so a refusal on either one proves
+    // the population rather than the single path the first test happened to use.
+    const turnResume = {
+      type: "thread.turn.resume" as const,
+      commandId: CommandId.make("cmd-turn-resume-maintenance"),
+      threadId: ThreadId.make("thread-maintenance"),
+      createdAt,
+    };
+
+    /** Dispatch one command while the gate is closed and return the refusal it raised. */
+    const refusedByGate = async (command: Parameters<typeof engine.dispatch>[0]) => {
+      const outcome = await system.run(Effect.result(engine.dispatch(command)));
+
+      if (!Result.isFailure(outcome)) {
+        throw new Error(`expected the update gate to refuse ${command.type}`);
+      }
+
+      const error = outcome.failure;
+
+      if (!Predicate.isTagged(error, "OrchestrationCommandInvariantError")) {
+        throw new Error(`expected an invariant error, got ${error._tag}`);
+      }
+
+      return error;
+    };
+
     expect(tryBeginMaintenance()).toBe(true);
 
     try {
       const sequenceBefore = await system.run(engine.latestSequence);
-      await expect(system.run(engine.dispatch(turnStart))).rejects.toThrow(/installing an update/);
+
+      // Every admitted command type carries the code, so the client renders its
+      // own sentence instead of the invariant wrapper the detail sits inside.
+      for (const command of [turnStart, turnResume]) {
+        const error = await refusedByGate(command);
+
+        expect(error.refusal).toBe("server-is-updating");
+        // The sentence stays on the error for a client that predates the code.
+        expect(error.message).toContain("installing an update");
+      }
+
       expect(await system.run(engine.latestSequence)).toBe(sequenceBefore);
       // Other commands keep flowing during maintenance.
       await system.run(

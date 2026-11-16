@@ -45,7 +45,7 @@ const ERRORS_FILE = NodePath.join(ORCHESTRATION_DIR, "Errors.ts");
  * left uncoded, and the answer is a ticket on the board and a card to drain it,
  * not a bigger number here.
  */
-const PENDING_REFUSAL_COUNT = 6;
+const PENDING_REFUSAL_COUNT = 5;
 
 /** Every TypeScript file under `apps/server/src`, tests included unless excluded. */
 function sourceFiles(options: { readonly includeTests: boolean }): ReadonlyArray<string> {
