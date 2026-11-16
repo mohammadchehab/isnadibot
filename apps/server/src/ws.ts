@@ -8,7 +8,7 @@ import {
   HttpServerRespondable,
   HttpServerResponse,
 } from "effect/unstable/http";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { RpcServer } from "effect/unstable/rpc";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import * as ProviderMaintenanceRunner from "./provider/providerMaintenanceRunner.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
@@ -19,6 +19,7 @@ import * as SessionStore from "./auth/SessionStore.ts";
 import { failEnvironmentAuthInvalid, failEnvironmentInternal } from "./auth/http.ts";
 
 import { createWsConnection } from "./wsConnection.ts";
+import { safeWsRpcSerializationLayer } from "./wsDefectRedaction.ts";
 import { createWsOrchestrationHandlers } from "./wsOrchestrationHandlers.ts";
 import { createWsOrchestrationSubscriptions } from "./wsOrchestrationSubscriptions.ts";
 import { createWsServerHandlers } from "./wsServerHandlers.ts";
@@ -116,7 +117,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               voiceCalls,
               providerRefreshes,
             ).pipe(
-              Layer.provideMerge(RpcSerialization.layerJson),
+              Layer.provideMerge(safeWsRpcSerializationLayer),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(Layer.succeed(ServerSelfUpdate.ServerSelfUpdate, serverSelfUpdate)),
             ),
