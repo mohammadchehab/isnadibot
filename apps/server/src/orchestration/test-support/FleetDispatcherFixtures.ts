@@ -15,6 +15,7 @@ import {
   type OrchestrationEvent,
   type OrchestrationGroup,
   type OrchestrationLatestTurnState,
+  type OrchestrationProject,
   type OrchestrationReadModel,
   type OrchestrationThread,
   type OrchestrationThreadShell,
@@ -189,9 +190,27 @@ export const keepBusyGroup = (
   } = {},
 ): OrchestrationGroup => ({ ...makeGroup(input), keepBusy: true });
 
+/** The project every fixture chat already belongs to, so a created chat has one to join. */
+export const PROJECT_ID = ProjectId.make("project-1");
+
+/** A project a chat created by the dispatcher can be filed under. */
+export const makeProject = (
+  input: { readonly id?: ProjectId; readonly deletedAt?: string | null } = {},
+): OrchestrationProject => ({
+  id: input.id ?? PROJECT_ID,
+  title: "Project",
+  workspaceRoot: "/tmp/project",
+  defaultModelSelection: { instanceId: ProviderInstanceId.make("default"), model: "default-model" },
+  scripts: [],
+  createdAt: NOW,
+  updatedAt: NOW,
+  deletedAt: input.deletedAt ?? null,
+});
+
 /** One idle specialist in a keep-busy group, with its own chat and nothing queued. */
 export const idleTeamModel = (items: ReadonlyArray<WorkItem> = []): OrchestrationReadModel => ({
   ...makeReadModel({
+    projects: [makeProject()],
     bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
     groups: [keepBusyGroup()],
     threads: [botThread(SPECIALIST_ID, "thread-bot-specialist")],
@@ -314,10 +333,12 @@ export const workItemCreated = (sequence: number, item: WorkItem) =>
     payload: { workItem: item },
   }) satisfies OrchestrationEvent;
 
-/** The chat that makes a chatless member dispatchable: a bot's own chat has no groupId. */
+/**
+ * A chat appearing. A bot's own chat has no groupId; a chat in the space has the group and no bot.
+ */
 export const threadCreated = (
   sequence: number,
-  input: { readonly threadId: ThreadId; readonly botId: BotId; readonly groupId?: GroupId },
+  input: { readonly threadId: ThreadId; readonly botId: BotId | null; readonly groupId?: GroupId },
 ) =>
   ({
     ...base(sequence, "thread.created"),
@@ -380,6 +401,27 @@ export const workItemAssigned = (sequence: number, item: WorkItem) =>
     type: "work-item.assigned",
     payload: { workItem: item },
   }) satisfies OrchestrationEvent;
+
+/**
+ * The projector's effect for a created chat. The fake engine records the command but projects
+ * nothing, and the dispatcher re-reads the read model to find the chat it just made — so without
+ * this the create reads back as a failure. The thread the command names appears in the model.
+ */
+export const projectCreatedChats =
+  (h: Effect.Success<typeof harness>): OnCommand =>
+  (command, outcome) =>
+    Effect.gen(function* () {
+      if (command.type !== "thread.create" || outcome !== "accepted") return;
+
+      const botId = command.botId;
+
+      if (botId === null || botId === undefined) return;
+
+      yield* Ref.update(h.model, (model) => ({
+        ...model,
+        threads: [...model.threads, botThread(botId, command.threadId)],
+      }));
+    });
 
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];

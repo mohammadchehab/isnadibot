@@ -12,6 +12,7 @@ import {
   type OrchestrationBot,
   type OrchestrationCommand,
   type OrchestrationGroup,
+  type OrchestrationProject,
   type OrchestrationReadModel,
   type OrchestrationThread,
 } from "@isnadi/contracts";
@@ -144,12 +145,14 @@ export function makeGroupThread(): OrchestrationThread {
 }
 
 export function makeReadModel(input: {
+  readonly projects?: ReadonlyArray<OrchestrationProject>;
   readonly bots?: ReadonlyArray<OrchestrationBot>;
   readonly groups?: ReadonlyArray<OrchestrationGroup>;
   readonly threads?: ReadonlyArray<OrchestrationThread>;
 }): OrchestrationReadModel {
   return {
     ...createEmptyReadModel(NOW),
+    projects: input.projects ?? [],
     bots: input.bots ?? [],
     groups: input.groups ?? [],
     threads: input.threads ?? [],
