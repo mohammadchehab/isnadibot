@@ -11,6 +11,7 @@ import {
   type OrchestrationReadModel,
   type WorkItem,
   type WorkItemClaimCommand,
+  type WorkItemDispatcherFailedCommand,
 } from "@isnadi/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -32,7 +33,10 @@ type WorkItemActor =
   | { readonly kind: "user"; readonly dispatch: OrchestrationDispatchActor | undefined }
   | { readonly kind: "bot"; readonly botId: BotId };
 
-type WorkItemCommand = ClientWorkItemCommand | WorkItemClaimCommand;
+type WorkItemCommand =
+  | ClientWorkItemCommand
+  | WorkItemClaimCommand
+  | WorkItemDispatcherFailedCommand;
 
 /** A member bot may only move its own item forward; everything else is the boss's call. */
 const MEMBER_BOT_COMMANDS: ReadonlySet<WorkItemCommand["type"]> = new Set([
@@ -141,8 +145,15 @@ function requireActorAllowed(input: {
   }
 
   // A claim is a bot taking an item nobody owns yet, so ownership cannot gate it;
-  // the claim branch decides whether the item is still takeable.
-  if (input.command.type === "work-item.claim") return Effect.void;
+  // the claim branch decides whether the item is still takeable. A dispatcher
+  // failure is the mirror image — the turn that owned the item is over and the
+  // item is still assigned — so it too carries its own guard, and the actor is
+  // the bot that held the claim rather than the boss.
+  if (
+    input.command.type === "work-item.claim" ||
+    input.command.type === "work-item.dispatcher-failed"
+  )
+    return Effect.void;
 
   if (botId === input.group.bossBotId) return Effect.void;
 
@@ -183,10 +194,19 @@ function requireActorAllowed(input: {
   return Effect.void;
 }
 
-/** The item's carried-over fields; each transition decides which of owner, block and finish data survive. */
+/**
+ * The item's carried-over fields; each transition decides which of owner, block, finish and
+ * failure-count data survive. `attempts` counts consecutive dispatcher deaths, so every transition
+ * that means the bot got somewhere — its own progress, or a person assigning it again — resets it.
+ */
 function carry(
   item: WorkItem,
-  drop: { readonly owner?: boolean; readonly block?: boolean; readonly finish?: boolean },
+  drop: {
+    readonly owner?: boolean;
+    readonly block?: boolean;
+    readonly finish?: boolean;
+    readonly attempts?: boolean;
+  },
 ): Omit<WorkItem, "state" | "updatedAt"> {
   return {
     id: item.id,
@@ -207,6 +227,7 @@ function carry(
     ...(!drop.block && item.blockedFrom !== undefined ? { blockedFrom: item.blockedFrom } : {}),
     ...(!drop.finish && item.doneAt !== undefined ? { doneAt: item.doneAt } : {}),
     ...(!drop.finish && item.closedAt !== undefined ? { closedAt: item.closedAt } : {}),
+    ...(!drop.attempts && item.attempts !== undefined ? { attempts: item.attempts } : {}),
   };
 }
 
@@ -399,13 +420,89 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
         );
       }
 
-      // The bot took the item itself, so no `assignedByBotId` is recorded.
+      // The bot took the item itself, so no `assignedByBotId` is recorded. `attempts` survives on
+      // purpose: a claim is how the item comes back off the queue after a death, so resetting it
+      // here would stop a second consecutive death from ever blocking the item.
       return yield* changed("work-item.assigned", {
         ...carry(item, { owner: true, block: true }),
         ownerBotId: command.botId,
         state: "assigned",
         ...touch,
       });
+    }
+
+    case "work-item.dispatcher-failed": {
+      // This guard reads only the item's own fields, deliberately. This decider's read model is
+      // replayed through the legacy projector, which drops a turn's trigger, so it cannot tell a
+      // live dispatcher turn from a settled one — the same limitation `work-item.claim` documents.
+      // Worse, the dispatcher has already stopped retrying this turn, so a plan refused on a
+      // skewed model would strand the item forever. Only the item decides: the bot that reported
+      // the death must still hold it, and it must still be assigned.
+      if (item.state !== "assigned" || item.ownerBotId !== command.botId) return [];
+
+      const attempts = item.attempts ?? 0;
+      // A person taking the bot back is not the bot failing, so only a second consecutive death
+      // blocks the item; an interrupt always requeues and counts nothing.
+      const diedTwice = command.cause === "dead" && attempts >= 1;
+
+      if (diedTwice) {
+        const reason = command.detail ?? "no progress reported";
+        const note = `Two dispatcher turns failed in a row: ${reason}`;
+
+        return yield* changed("work-item.blocked", {
+          ...carry(item, { attempts: true }),
+          state: "blocked",
+          blockedFrom: "assigned",
+          blockedOn: {
+            by: "bot",
+            botId: command.botId,
+            note: note.length > 200 ? `${note.slice(0, 199)}…` : note,
+          },
+          attempts: attempts + 1,
+          ...touch,
+        });
+      }
+
+      const assigned = yield* changed("work-item.assigned", {
+        ...carry(item, { owner: true, block: true }),
+        state: "queued",
+        attempts: command.cause === "dead" ? attempts + 1 : attempts,
+        ...touch,
+      });
+
+      const thread = readModel.threads.find((candidate) => candidate.id === command.threadId);
+
+      if (thread === undefined || thread.deletedAt !== null) return assigned;
+
+      const botName = readModel.bots.find((bot) => bot.id === command.botId)?.name ?? command.botId;
+
+      const how = command.cause === "interrupted" ? "was interrupted" : "died";
+
+      return [
+        ...assigned,
+        {
+          ...(yield* withEventBase({
+            aggregateKind: "thread",
+            aggregateId: thread.id,
+            occurredAt,
+            commandId,
+          })),
+          type: "thread.message-sent",
+          payload: {
+            threadId: thread.id,
+            // Keyed by the turn, not the attempt count: a turn id is unique per reap and still
+            // deterministic, so a retried command cannot post the line twice and a second
+            // interrupt cannot reuse the first one's id.
+            messageId: MessageId.make(`work-item-dispatch-failed:${item.id}:${command.turnId}`),
+            role: "system",
+            text: `${botName}'s turn on "${item.title}" ${how}, so it is back in the queue.`,
+            turnId: null,
+            streaming: false,
+            createdAt: occurredAt,
+            updatedAt: occurredAt,
+          },
+        },
+      ];
     }
 
     case "work-item.assign": {
@@ -416,7 +513,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
           "work-item-state-invalid",
         );
 
-      const cleared = carry(item, { owner: true, block: true });
+      const cleared = carry(item, { owner: true, block: true, attempts: true });
 
       if (command.ownerBotId === null) {
         return yield* changed("work-item.assigned", { ...cleared, state: "queued", ...touch });
@@ -458,7 +555,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
         );
       }
 
-      const moved = carry(item, { block: command.state !== undefined });
+      const moved = carry(item, { block: command.state !== undefined, attempts: true });
 
       return yield* changed("work-item.updated", {
         ...moved,
@@ -480,7 +577,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
         );
 
       return yield* changed("work-item.blocked", {
-        ...item,
+        ...carry(item, { attempts: true }),
         state: "blocked",
         blockedFrom: item.state,
         blockedOn: command.blockedOn,
@@ -509,7 +606,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       // move is to look again, which is exactly `stale-view`.
       if (!isOpen(item))
         return yield* reject(command, `The item is already ${item.state}.`, "stale-view");
-      const open = carry(item, { block: true });
+      const open = carry(item, { block: true, attempts: true });
 
       return yield* changed(
         "work-item.closed",
@@ -540,7 +637,7 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
       }
 
       return yield* changed("work-item.reopened", {
-        ...carry(item, { finish: true }),
+        ...carry(item, { finish: true, attempts: true }),
         state: item.ownerBotId !== undefined ? "assigned" : "queued",
         ...touch,
       });

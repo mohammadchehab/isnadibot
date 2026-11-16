@@ -11,6 +11,7 @@ import {
   PositiveInt,
   ThreadId,
   TrimmedNonEmptyString,
+  TurnId,
 } from "../baseSchemas.ts";
 
 export const WorkItemId = TrimmedNonEmptyString.pipe(Schema.brand("WorkItemId"));
@@ -104,6 +105,12 @@ export const WorkItem = Schema.Struct({
   blockedOn: Schema.optional(WorkItemBlockedOn),
   /** The state to return to on unblock. Set only while the item is blocked. */
   blockedFrom: Schema.optional(WorkItemState),
+  /**
+   * Dispatcher turns that died on this item since it last left `assigned`. One death sends the
+   * item back to the queue; a second in a row blocks it with the reason on the item. Optional so
+   * a row written before the counter existed decodes; absent reads as none.
+   */
+  attempts: Schema.optional(NonNegativeInt),
   trackerLink: Schema.optional(TrackerLink),
   threadId: Schema.optional(ThreadId),
   prUrl: Schema.optional(TrimmedNonEmptyString),
@@ -232,6 +239,38 @@ export const WorkItemClaimCommand = Schema.Struct({
 });
 
 export type WorkItemClaimCommand = typeof WorkItemClaimCommand.Type;
+
+/**
+ * Why a dispatcher's turn stopped working an item. A person taking the bot back with Interrupt or
+ * Clear is `interrupted`, and is not a failure; everything else — an error, a turn that completed
+ * without the bot reporting progress, a provider session that never came back — is `dead`.
+ */
+export const WorkItemDispatcherFailedCause = Schema.Literals(["interrupted", "dead"]);
+
+export type WorkItemDispatcherFailedCause = typeof WorkItemDispatcherFailedCause.Type;
+
+/**
+ * Server-internal: the turn the dispatcher started for an item is over and the item is still
+ * `assigned`, so nobody is working it. The plan sends it back to the queue, or blocks it once a
+ * second consecutive turn has died, with the reason on the item.
+ *
+ * `botId`, `threadId` and `turnId` are the claim and the chat the turn ran in; the server stamps
+ * all three and no client sends them. `detail` is the provider's own words for the death, when the
+ * read model has them, so the block's note can say why.
+ */
+export const WorkItemDispatcherFailedCommand = Schema.Struct({
+  type: Schema.Literal("work-item.dispatcher-failed"),
+  commandId: CommandId,
+  botId: BotId,
+  workItemId: WorkItemId,
+  threadId: ThreadId,
+  turnId: TurnId,
+  cause: WorkItemDispatcherFailedCause,
+  detail: Schema.optional(TrimmedNonEmptyString),
+  createdAt: IsoDateTime,
+});
+
+export type WorkItemDispatcherFailedCommand = typeof WorkItemDispatcherFailedCommand.Type;
 
 /**
  * Server-internal: a bot runs one work-item command. The server resolves

@@ -76,6 +76,7 @@ export const FleetDispatchDecidedReceipt = Schema.Struct({
   reason: Schema.optional(
     Schema.Literals([
       "queue-empty",
+      "retry-pending",
       "no-idle-member",
       "no-chat",
       "claim-lost",

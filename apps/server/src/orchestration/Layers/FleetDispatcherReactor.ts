@@ -10,6 +10,7 @@ import {
   type OrchestrationBot,
   type OrchestrationEvent,
   type OrchestrationGroup,
+  type OrchestrationLatestTurn,
   type OrchestrationReadModel,
   type OrchestrationThread,
   type ThreadId,
@@ -27,6 +28,7 @@ import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
@@ -47,11 +49,32 @@ import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 /** Why a group was left exactly as it was. */
 type SkipReason =
   | "queue-empty"
+  | "retry-pending"
   | "no-idle-member"
   | "no-chat"
   | "claim-lost"
   | "turn-running"
   | "turn-start-failed";
+
+/**
+ * How long a requeued item waits before the dispatcher tries it again. A death is usually the
+ * provider being briefly unavailable, so the retry is one breath, not a spin.
+ */
+export const DISPATCH_RETRY_DELAY = Duration.seconds(30);
+
+/**
+ * A dispatcher turn that is over while its item is still assigned: the item is stranded and
+ * nobody is working it. `cause` decides what happens next — an interrupt is a person taking the
+ * bot back and requeues at once, a death requeues once and blocks on the second in a row.
+ */
+export interface DeadClaim {
+  readonly item: WorkItem;
+  readonly botId: BotId;
+  readonly threadId: ThreadId;
+  readonly turnId: TurnId;
+  readonly cause: "interrupted" | "dead";
+  readonly detail?: string;
+}
 
 /** What one pass carries across every group it decides, so a member is spent once per pass. */
 interface SweepState {
@@ -88,6 +111,18 @@ const make = Effect.gen(function* () {
   // The turn end already acted on for a thread. A turn end reaches us twice — the diff
   // completing, then the session leaving "running" — and a replay can deliver both again.
   const handledTurnEnd = new Map<ThreadId, string>();
+
+  // The dead turn already reported for an item, so a re-read of the same model cannot fail the
+  // same turn twice. Keyed by turn rather than kept forever: the item's next turn is a different
+  // id, so it reaps on its own.
+  const reapedTurn = new Map<WorkItemId, TurnId>();
+
+  // When a requeued item may be handed out again. A death is usually the provider being briefly
+  // unavailable, so the item waits one delay instead of spinning against a broken runtime.
+  const retryNotBefore = new Map<WorkItemId, IsoDateTime>();
+
+  // Where the retry sleep is forked: the layer's scope, so it dies with the reactor.
+  const scope = yield* Effect.scope;
 
   const publishDecision = (
     groupId: GroupId,
@@ -144,6 +179,79 @@ const make = Effect.gen(function* () {
             }).pipe(Effect.as(false)),
       ),
     );
+
+  // Reports that the turn the dispatcher started for an item is over and the item is still
+  // assigned. Modelled on `claim`: an invariant refusal means the item already moved on, which is
+  // exactly what a reap is trying to achieve, so it reads as "nothing to do" rather than an error.
+  const failDispatcherTurn = (dead: DeadClaim) =>
+    crypto.randomUUIDv4.pipe(
+      Effect.flatMap((uuid) =>
+        DateTime.now.pipe(
+          Effect.flatMap((now) =>
+            orchestrationEngine.dispatch({
+              type: "work-item.dispatcher-failed",
+              commandId: CommandId.make(`server:work-item.dispatcher-failed:${uuid}`),
+              botId: dead.botId,
+              workItemId: dead.item.id,
+              threadId: dead.threadId,
+              turnId: dead.turnId,
+              cause: dead.cause,
+              ...(dead.detail === undefined ? {} : { detail: dead.detail }),
+              createdAt: DateTime.formatIso(now),
+            }),
+          ),
+        ),
+      ),
+      Effect.as(true),
+      Effect.catchIf(
+        (error) => isInvariantError(error),
+        () => Effect.succeed(false),
+      ),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Effect.logWarning("fleet dispatcher could not report a dead turn", {
+              botId: dead.botId,
+              itemId: dead.item.id,
+              turnId: dead.turnId,
+              cause: Cause.pretty(cause),
+            }).pipe(Effect.as(false)),
+      ),
+    );
+
+  // Puts every stranded item in this group back in play, once per dead turn. A turn that already
+  // reported is skipped: the read model can lag behind the events this pass just emitted, and
+  // reporting the same death twice would spend the item's one retry on nothing.
+  const reapDeadClaims = (readModel: OrchestrationReadModel, group: OrchestrationGroup) =>
+    Effect.gen(function* () {
+      let reaped = 0;
+
+      for (const dead of deadDispatcherClaims(readModel, group.id)) {
+        if (reapedTurn.get(dead.item.id) === dead.turnId) continue;
+
+        // Recorded before the dispatch, not after: a refused reap means the item already moved,
+        // so retrying the same turn would spin for as long as the model takes to catch up.
+        reapedTurn.set(dead.item.id, dead.turnId);
+
+        if (!(yield* failDispatcherTurn(dead))) continue;
+
+        reaped += 1;
+
+        // Only the first death backs off. A second one blocks the item instead, so there is
+        // nothing to retry.
+        if (dead.cause === "dead" && (dead.item.attempts ?? 0) === 0) {
+          const notBefore = DateTime.addDuration(yield* DateTime.now, DISPATCH_RETRY_DELAY);
+
+          retryNotBefore.set(dead.item.id, DateTime.formatIso(notBefore));
+
+          yield* Effect.forkIn(scope)(
+            Effect.sleep(DISPATCH_RETRY_DELAY).pipe(Effect.andThen(schedule(group.id))),
+          );
+        }
+      }
+
+      return reaped;
+    });
 
   // Reports how the start went: it started, or why it did not. A refused start is not an
   // `assigned`: the caller releases the claim and tells the chat why, so no bot is left holding an
@@ -266,10 +374,33 @@ const make = Effect.gen(function* () {
     sweepState: SweepState,
   ) =>
     Effect.gen(function* () {
-      const waiting = queuedWorkItems(readModel, group.id);
+      // Reaping comes first: an item whose turn died is still `assigned` in this snapshot, so it
+      // cannot be handed out until the release it causes is projected. The wake that follows
+      // re-reads the model, so this pass never dispatches from a snapshot it just invalidated.
+      if ((yield* reapDeadClaims(readModel, group)) > 0) yield* schedule(group.id);
+
+      const now = DateTime.formatIso(yield* DateTime.now);
+      const queued = queuedWorkItems(readModel, group.id);
+
+      // A requeued item sits out its retry delay. ISO timestamps of one format sort as strings,
+      // which is the whole comparison this needs.
+      const waiting = queued.filter((item) => {
+        const notBefore = retryNotBefore.get(item.id);
+
+        if (notBefore === undefined) return true;
+
+        // The retry wakes at exactly `notBefore`, so the boundary is due, not held.
+        if (now < notBefore) return false;
+
+        retryNotBefore.delete(item.id);
+
+        return true;
+      });
 
       if (waiting.length === 0) {
-        yield* publishDecision(group.id, "skipped", { reason: "queue-empty" });
+        yield* publishDecision(group.id, "skipped", {
+          reason: queued.length === 0 ? "queue-empty" : "retry-pending",
+        });
 
         return false;
       }
@@ -418,7 +549,9 @@ const make = Effect.gen(function* () {
   const noteSeen = (sequence: number) =>
     SubscriptionRef.update(seenSequence, (seen) => Math.max(seen, sequence));
 
-  const schedule = (groupId: GroupId) =>
+  // Typed explicitly: the reap and the retry it forks both call back into the sweep, and without a
+  // written return type that loop makes every function on it infer `any`.
+  const schedule = (groupId: GroupId): Effect.Effect<void> =>
     Ref.update(pending, (groups) =>
       groups.has(groupId) ? groups : new Set([...groups, groupId]),
     ).pipe(Effect.andThen(worker.enqueue(undefined)));
@@ -637,6 +770,83 @@ export function runningDispatcherTurnItem(
   });
 
   return thread?.id;
+}
+
+/**
+ * Why a turn that is not live stopped working its item, or `undefined` when it has not stopped.
+ *
+ * A person stopping the bot is not the bot failing, so it reads as `interrupted`; everything else
+ * is `dead`. The turn's own state settles most cases. A turn still reading as running is only
+ * dead when its session has left the live statuses with no turn of its own active — the process
+ * went away without the turn ever reporting. A session that is missing or `null` is a turn that
+ * has not opened one yet, not a death.
+ */
+function deathCause(
+  thread: OrchestrationThread,
+  turn: OrchestrationLatestTurn,
+): DeadClaim["cause"] | undefined {
+  if (turn.state === "interrupted") return "interrupted";
+
+  if (turn.state === "error" || turn.state === "completed") return "dead";
+
+  const session = thread.session;
+
+  if (session === null || session === undefined) return undefined;
+
+  if (isLiveSessionStatus(session.status) || session.activeTurnId !== null) return undefined;
+
+  return "dead";
+}
+
+/**
+ * Every dispatcher turn in the group that is over while its item is still assigned.
+ *
+ * The turn is found by its trigger, not by the item's chat: `work-item.claim` never sets
+ * `threadId`, so an item the dispatcher claimed usually has no chat to key on. A chat whose latest
+ * turn is not this item's dispatcher turn has moved on, which means the bot is alive and there is
+ * nothing to reap — so a newer turn in that chat is the guard, not an oversight.
+ */
+export function deadDispatcherClaims(
+  readModel: OrchestrationReadModel,
+  groupId: GroupId,
+): ReadonlyArray<DeadClaim> {
+  const claims: DeadClaim[] = [];
+
+  for (const item of readModel.workItems ?? []) {
+    if (item.groupId !== groupId || item.state !== "assigned" || item.ownerBotId === undefined)
+      continue;
+
+    const thread = readModel.threads.find((candidate) => {
+      const trigger = candidate.latestTurn?.trigger;
+
+      return (
+        candidate.deletedAt === null &&
+        trigger?.kind === "dispatcher" &&
+        trigger.workItemId === item.id
+      );
+    });
+
+    const turn = thread?.latestTurn;
+
+    if (thread === undefined || turn === undefined || turn === null) continue;
+
+    const cause = deathCause(thread, turn);
+
+    if (cause === undefined) continue;
+
+    const detail = turn.errorMessage ?? turn.unavailability;
+
+    claims.push({
+      item,
+      botId: item.ownerBotId,
+      threadId: thread.id,
+      turnId: turn.turnId,
+      cause,
+      ...(detail === undefined ? {} : { detail }),
+    });
+  }
+
+  return claims;
 }
 
 /**
