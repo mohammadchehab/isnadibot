@@ -31,8 +31,9 @@ const buttonPresentations = {
   "plugin-action": "rounded-full px-3.5 text-xs",
   "muted-dismiss": "text-muted-foreground hover:text-foreground",
   "markdown-chrome": "chat-markdown-chrome-action",
+  // Stays visible while its popup is open, so a menu does not vanish under the pointer.
   "reveal-on-hover":
-    "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100",
+    "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 max-sm:opacity-100",
   "preview-tool": "[:hover,[data-pressed]]:bg-foreground/10",
   "screen-reveal":
     "opacity-0 transition group-focus-within/screen:opacity-100 group-hover/screen:opacity-100",

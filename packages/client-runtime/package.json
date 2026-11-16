@@ -96,6 +96,10 @@
       "types": "./src/providerSkills.ts",
       "default": "./src/providerSkills.ts"
     },
+    "./skills": {
+      "types": "./src/skills/index.ts",
+      "default": "./src/skills/index.ts"
+    },
     "./delegation-presentation": {
       "types": "./src/delegationPresentation.ts",
       "default": "./src/delegationPresentation.ts"
@@ -308,6 +312,11 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "@types/react": "~19.2.14",
+    "react": "19.2.6",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=19.2.0"
   }
 }

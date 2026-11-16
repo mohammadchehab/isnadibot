@@ -24,6 +24,7 @@ export const SETTINGS_SECTIONS = [
   "channels",
   "sandbox",
   "browser",
+  "skills",
   "image-generation",
   "diagnostics",
 ] as const;

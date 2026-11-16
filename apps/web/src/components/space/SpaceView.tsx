@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useSkillRegistry } from "@isnadi/client-runtime/skills";
 import { MoreHorizontalIcon } from "lucide-react";
 
 import { useI18n } from "../../i18n";
@@ -8,6 +9,7 @@ import { GroupMemberStack } from "../roster/GroupMemberStack";
 import { useGroupDetailsOpen } from "../roster/detailsPanelOpen";
 import { useRosterStore } from "../roster/rosterStore";
 import type { Group } from "../roster/types";
+import { SkillRegistryPage } from "../skills/SkillRegistryPage";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyHeader } from "../ui/empty";
@@ -40,6 +42,8 @@ export function SpaceView({
   const { t } = useI18n();
   const navigate = useNavigate();
   const bots = useRosterStore((state) => state.bots);
+  // No registry source means no Skills tab, the way a shipped build has no registry at all.
+  const skillsAvailable = useSkillRegistry().state !== "unavailable";
   const [detailsPanelOpen] = useGroupDetailsOpen();
   // A space a bot made says so. The creator is resolved by id so a deleted bot still
   // labels the space, falling back to the house wording the refusal copy already uses.
@@ -79,9 +83,13 @@ export function SpaceView({
           <TabsTab value="chat" variant="top-bar">
             {t("Group chat")}
           </TabsTab>
-          <TabsTab value="skills" variant="top-bar">
-            {t("Skills")}
-          </TabsTab>
+          {/* A platform with no skill registry source has no Skills tab, the way a shipped
+              build has no registry at all. */}
+          {skillsAvailable ? (
+            <TabsTab value="skills" variant="top-bar">
+              {t("Skills")}
+            </TabsTab>
+          ) : null}
           <TabsTab value="files" variant="top-bar">
             {t("Files")}
           </TabsTab>
@@ -124,11 +132,13 @@ export function SpaceView({
           <SpaceTasks group={group} />
         </TabsPanel>
         <TabsPanel value="chat">{chat}</TabsPanel>
-        <TabsPanel value="skills">
-          <Empty>
-            <EmptyHeader>{t("Skills for this space show here.")}</EmptyHeader>
-          </Empty>
-        </TabsPanel>
+        {skillsAvailable ? (
+          <TabsPanel value="skills">
+            {/* A space carries no project id yet, so the list is not narrowed to one. The
+                space→project link lands with the registry itself in phase 1. */}
+            <SkillRegistryPage className="overflow-y-auto p-4" />
+          </TabsPanel>
+        ) : null}
         <TabsPanel value="files">
           <Empty>
             <EmptyHeader>{t("Files you add to this space show here.")}</EmptyHeader>

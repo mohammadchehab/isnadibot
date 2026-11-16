@@ -15,7 +15,7 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { SidebarChromeHeader } from "../sidebar/SidebarChrome";
-import { SETTINGS_NAV_GROUPS } from "./SettingsDialog";
+import { useSettingsNavGroups } from "./SettingsDialog";
 import { isElectron } from "../../env";
 
 function useSettingsNavigation() {
@@ -38,10 +38,11 @@ function useSettingsNavigation() {
 export function SettingsPanelNav() {
   const { t } = useI18n();
   const { pathname, go } = useSettingsNavigation();
+  const navGroups = useSettingsNavGroups();
 
   return (
     <nav aria-label={t("Settings sections")} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-      {SETTINGS_NAV_GROUPS.map((group) => (
+      {navGroups.map((group) => (
         <div key={group.label} className="pb-2">
           <div className="px-2.5 pt-2 pb-1 text-xs font-medium text-sidebar-muted-foreground">
             {t(group.label)}
@@ -86,12 +87,13 @@ export function SettingsPanelNav() {
 export function SettingsSidebarNav() {
   const { t } = useI18n();
   const { pathname, go } = useSettingsNavigation();
+  const navGroups = useSettingsNavGroups();
 
   return (
     <>
       <SidebarChromeHeader isElectron={isElectron} />
       <SidebarContent className="overflow-x-hidden">
-        {SETTINGS_NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <SidebarGroup key={group.label} className="p-(--sidebar-content-inset)">
             <SidebarGroupLabel>{t(group.label)}</SidebarGroupLabel>
             <SidebarMenu>

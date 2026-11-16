@@ -21,6 +21,7 @@ export const SETTINGS_DEEP_LINK_IDS = [
   "connections",
   "bot-inbox",
   "diagnostics",
+  "skills",
 ] as const;
 
 export type SettingsDeepLinkId = (typeof SETTINGS_DEEP_LINK_IDS)[number];

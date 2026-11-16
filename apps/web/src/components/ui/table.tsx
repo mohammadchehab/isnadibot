@@ -18,13 +18,14 @@ function TableHeader({
   className,
   presentation,
   ...props
-}: React.ComponentProps<"thead"> & { presentation?: "provider-environment" }) {
+}: React.ComponentProps<"thead"> & { presentation?: "provider-environment" | "muted" }) {
   return (
     <thead
       data-slot="table-header"
       className={cn(
         "[&_tr]:border-b",
         presentation === "provider-environment" && "bg-muted/25 text-[11px] text-muted-foreground",
+        presentation === "muted" && "text-muted-foreground",
         className,
       )}
       {...props}
@@ -57,7 +58,7 @@ function TableRow({
   presentation,
   ...props
 }: React.ComponentProps<"tr"> & {
-  presentation?: "provider-environment-header" | "provider-environment";
+  presentation?: "provider-environment-header" | "provider-environment" | "flush" | "divided";
 }) {
   return (
     <tr
@@ -65,6 +66,8 @@ function TableRow({
       className={cn(
         "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
         presentation === "provider-environment-header" && "hover:bg-transparent",
+        presentation === "flush" && "hover:bg-transparent",
+        presentation === "divided" && "border-border/50",
         presentation === "provider-environment" &&
           "border-border/60 odd:bg-muted/20 even:bg-background/20",
         className,
@@ -74,12 +77,17 @@ function TableRow({
   );
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({
+  className,
+  presentation,
+  ...props
+}: React.ComponentProps<"th"> & { presentation?: "muted" }) {
   return (
     <th
       data-slot="table-head"
       className={cn(
         "h-10 px-2 text-start align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pe-0",
+        presentation === "muted" && "text-muted-foreground",
         className,
       )}
       {...props}
@@ -87,11 +95,19 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+  className,
+  presentation,
+  ...props
+}: React.ComponentProps<"td"> & { presentation?: "muted" }) {
   return (
     <td
       data-slot="table-cell"
-      className={cn("p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0", className)}
+      className={cn(
+        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
+        presentation === "muted" && "text-muted-foreground",
+        className,
+      )}
       {...props}
     />
   );
