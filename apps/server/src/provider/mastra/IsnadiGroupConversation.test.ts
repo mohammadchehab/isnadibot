@@ -133,4 +133,20 @@ describe("renderGroupRoster", () => {
     expect(roster).toContain("You are Bot2.");
     expect(roster).toContain("<group-message from=");
   });
+
+  it("tells the boss to delegate implementation and keep out of product files", () => {
+    const roster = renderGroupRoster({ ...group, respondingBotId: "bot-1" });
+
+    expect(roster).toContain("You are the boss.");
+    expect(roster).toContain("delegate every piece of implementation");
+    expect(roster).toContain("Do not write or edit product files yourself");
+    expect(roster).toContain("review the specialists' work");
+  });
+
+  it("tells a specialist to do the handed work and report to the boss", () => {
+    const roster = renderGroupRoster(group);
+
+    expect(roster).toContain("Do the work the boss hands you");
+    expect(roster).not.toContain("You are the boss.");
+  });
 });

@@ -117,5 +117,15 @@ export function renderGroupRoster(group: GroupConversationState): string {
     `You are ${responder?.name ?? "a member of this group"}. Answer only as yourself.`,
     `Messages from other members appear as <${WRAPPER} from="…">. A message with no @mention goes to the boss.`,
     "To hand work to a member, use its bot id.",
+    ...(responder?.role === "boss"
+      ? [
+          "You are the boss. Plan the work, then delegate every piece of implementation, design, and review to the specialist whose title fits it. Do not write or edit product files yourself, and do not run build or test commands to do a specialist's job; your own tool calls are for reading, planning, and checking results.",
+          "Ask the reviewers to review the specialists' work before you tell the user it is done.",
+        ]
+      : responder
+        ? [
+            "Do the work the boss hands you, in your own chat, and report the result back to the boss.",
+          ]
+        : []),
   ].join("\n");
 }
