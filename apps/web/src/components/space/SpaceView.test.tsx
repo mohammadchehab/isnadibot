@@ -1,9 +1,24 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import type { Group } from "../roster/types";
+import type { Bot, Group } from "../roster/types";
 
-vi.mock("../../i18n", () => ({ useI18n: () => ({ t: (message: string) => message }) }));
+const mocks = vi.hoisted(() => ({ bots: [] as ReadonlyArray<Bot> }));
+
+vi.mock("../../i18n", () => ({
+  useI18n: () => ({
+    t: (message: string, values?: Record<string, string>) =>
+      Object.entries(values ?? {}).reduce(
+        (text, [key, value]) => text.replaceAll(`{${key}}`, value),
+        message,
+      ),
+  }),
+}));
+
+vi.mock("../roster/rosterStore", () => ({
+  useRosterStore: (selector: (state: { bots: ReadonlyArray<Bot> }) => ReadonlyArray<Bot>) =>
+    selector({ bots: mocks.bots }),
+}));
 
 vi.mock("./SpaceOverview", () => ({ SpaceOverview: () => <p>overview-body</p> }));
 
@@ -15,6 +30,25 @@ vi.mock("../roster/GroupMemberStack", () => ({
 
 import { SpaceView, type SpaceTab } from "./SpaceView";
 
+const scout: Bot = {
+  id: "bot-1",
+  name: "Scout",
+  title: "Researcher",
+  label: null,
+  description: null,
+  disabledMcpServerIds: [],
+  avatar: { kind: "blob", shape: "circle", color: "#2E8EFF" },
+  engine: null,
+  sandbox: "local",
+  runtimeMode: "approval-required",
+  voiceEnabled: false,
+  groupId: "g1",
+  pinned: false,
+  archivedAt: null,
+  createdAt: "2026-11-06T10:00:00.000Z",
+  updatedAt: "2026-11-06T10:00:00.000Z",
+};
+
 const group: Group = {
   id: "g1",
   name: "Launch",
@@ -24,11 +58,17 @@ const group: Group = {
   updatedAt: "2026-11-06T10:00:00.000Z",
 };
 
-function render(tab: SpaceTab) {
+const botMade: Group = { ...group, createdByBotId: "bot-1" };
+
+function render(tab: SpaceTab, subject: Group = group) {
   return renderToStaticMarkup(
-    <SpaceView group={group} tab={tab} onTabChange={vi.fn()} chat={<p>chat-body</p>} />,
+    <SpaceView group={subject} tab={tab} onTabChange={vi.fn()} chat={<p>chat-body</p>} />,
   );
 }
+
+beforeEach(() => {
+  mocks.bots = [scout];
+});
 
 describe("SpaceView", () => {
   it("carries the space name and the tabs in one top bar", () => {
@@ -69,5 +109,33 @@ describe("SpaceView", () => {
   it("keeps the space name in the top bar on every tab", () => {
     for (const tab of ["overview", "tasks", "chat", "skills", "files"] as const)
       expect(render(tab)).toContain("Launch");
+  });
+
+  it("draws no made-by label on a space a person made", () => {
+    for (const tab of ["overview", "tasks", "chat", "skills", "files"] as const)
+      expect(render(tab)).not.toContain("Made by");
+  });
+
+  it("names the bot that made the space, using the Badge primitive", () => {
+    const html = render("overview", botMade);
+
+    expect(html).toContain("Made by Scout");
+    expect(html).toContain('data-slot="badge"');
+    // The label follows the space name in the identity row, not the other way round.
+    expect(html.indexOf("Launch")).toBeLessThan(html.indexOf("Made by Scout"));
+  });
+
+  it("falls back to the house wording when the creator is gone", () => {
+    mocks.bots = [];
+
+    const html = render("overview", botMade);
+
+    expect(html).toContain("Made by a bot");
+    expect(html).not.toContain("Made by Scout");
+  });
+
+  it("keeps the made-by label on every tab", () => {
+    for (const tab of ["overview", "tasks", "chat", "skills", "files"] as const)
+      expect(render(tab, botMade)).toContain("Made by Scout");
   });
 });

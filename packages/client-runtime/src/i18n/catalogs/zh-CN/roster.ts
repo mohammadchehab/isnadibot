@@ -360,6 +360,8 @@ export const rosterCatalog = {
   "Skills for this space show here.": "此空间的技能显示在这里。",
   "Files you add to this space show here.": "你添加到此空间的文件显示在这里。",
   "Group chat": "群聊",
+  "Made by {name}": "由{name}创建",
+  "Made by a bot": "由机器人创建",
   "{count} active": "{count} 个进行中",
   "this week": "本周",
   "{count} turn": "{count} 个轮次",

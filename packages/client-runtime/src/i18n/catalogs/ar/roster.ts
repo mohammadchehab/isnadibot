@@ -377,6 +377,8 @@ export const rosterCatalog = {
   "Skills for this space show here.": "تظهر هنا مهارات هذه المساحة.",
   "Files you add to this space show here.": "تظهر هنا الملفات التي تضيفها إلى هذه المساحة.",
   "Group chat": "محادثة المجموعة",
+  "Made by {name}": "أنشأه {name}",
+  "Made by a bot": "أنشأه بوت",
   "{count} active": "{count} نشط",
   "{count} active#zero": "{count} نشط",
   "{count} active#two": "نشطان ({count})",
