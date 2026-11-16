@@ -3,13 +3,13 @@ import { spaceMembers } from "@isnadi/client-runtime/space";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   BotIcon,
+  CircleDotIcon,
   Clock3Icon,
   FolderIcon,
   MessagesSquareIcon,
   PanelLeftIcon,
   PuzzleIcon,
   SettingsIcon,
-  UsersIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -133,7 +133,7 @@ export function ExperimentalSidebar() {
             isActive={onDecisions}
             onClick={() => void navigate({ to: "/decisions" })}
           >
-            <UsersIcon />
+            <CircleDotIcon />
             <span>{t("Decisions")}</span>
             {decisions.length > 0 ? (
               <SidebarMenuBadge>{decisionCount(decisions)}</SidebarMenuBadge>
