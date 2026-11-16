@@ -106,20 +106,43 @@ export function filterProvidersBySubscriptionConnection(
 }
 
 /**
+ * The saved login that applies to this provider instance. A status entry scoped
+ * to the instance wins. The unscoped entry is the driver's shared login, so it
+ * applies to the default instance only: another instance carries its own
+ * credential, and a client that never received that instance's status must not
+ * borrow the shared one's verdict.
+ */
+function savedLoginFor(
+  provider: ServerProvider,
+  subscriptionProvider: SubscriptionProviderId,
+  statuses: ReadonlyArray<SubscriptionProviderStatus> | undefined,
+): SubscriptionProviderStatus | undefined {
+  const candidates = statuses?.filter((status) => status.provider === subscriptionProvider) ?? [];
+
+  const scoped = candidates.find((status) => status.instanceId === provider.instanceId);
+
+  if (scoped !== undefined) return scoped;
+
+  if (provider.instanceId !== defaultInstanceIdForDriver(provider.driver)) return undefined;
+
+  return candidates.find((status) => status.instanceId === undefined);
+}
+
+/**
  * The provider with the login the user saved in Settings applied, read the way
  * the server's turn preflight reads it, so a client counts a provider as able to
  * run exactly when the server would.
  *
  * The snapshot alone cannot answer that. Its `unavailability` comes from the
  * provider CLI's own probe, which knows nothing about the credential saved here:
- * a saved OAuth login that was revoked leaves a provider that looks ready and
- * fails every turn. So a revoked saved login is marked here, and preflight
- * refuses it (`providerPreflight.ts`, "revoked").
+ * a saved login that was revoked leaves a provider that looks ready and fails
+ * every turn. So a revoked saved login is marked here whatever its `authMode`,
+ * and preflight refuses it (`providerPreflight.ts`, "revoked").
  *
  * An expired OAuth login is not the same case: the server lets it try a token
  * refresh at turn start, so clients must not block Send on it. Its
- * `expired-login` mark is cleared instead. API-key logins and instances that
- * configure their own credential in `providerInstances` are left as they are.
+ * `expired-login` mark is cleared instead. An expired login of any other kind
+ * cannot refresh, so it is refused like a revoked one.
  */
 export function withSavedSubscriptionLogin(
   provider: ServerProvider,
@@ -130,17 +153,15 @@ export function withSavedSubscriptionLogin(
 
   if (!subscriptionProvider) return provider;
 
-  if (provider.instanceId !== defaultInstanceIdForDriver(provider.driver)) return provider;
-
   if (
     !instanceUsesSavedCredential(subscriptionProvider, providerInstances?.[provider.instanceId])
   ) {
     return provider;
   }
 
-  const status = statuses?.find((candidate) => candidate.provider === subscriptionProvider);
+  const status = savedLoginFor(provider, subscriptionProvider, statuses);
 
-  if (status?.authMode !== "oauth") return provider;
+  if (status === undefined) return provider;
 
   if (status.health === "revoked") {
     return {
@@ -151,6 +172,19 @@ export function withSavedSubscriptionLogin(
   }
 
   if (status.health !== "expired") return provider;
+
+  // Only an OAuth login can refresh. The server refuses an expired login of any
+  // other kind, and so does this, so the two verdicts stay equal if a producer
+  // ever reports one. No producer does today: the status rule sets `expired`
+  // from an OAuth credential's expiry alone.
+  if (status.authMode !== "oauth") {
+    return {
+      ...provider,
+      unavailability: "expired-login",
+      unavailabilityDetail: "The saved provider login has expired.",
+    };
+  }
+
   const expired = provider.unavailability === "expired-login";
 
   if (!expired && provider.auth.status !== "unauthenticated") return provider;

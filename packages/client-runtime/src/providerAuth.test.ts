@@ -252,15 +252,33 @@ describe("withSavedSubscriptionLogin on a provider the snapshot calls ready", ()
     expect(expired.unavailability).toBeUndefined();
   });
 
-  it("leaves an API-key login and a custom instance alone", () => {
-    expect(
-      withSavedSubscriptionLogin(readyClaude(), [
-        { ...status, health: "revoked", authMode: "api-key" },
-      ]).unavailability,
-    ).toBeUndefined();
-    expect(
-      withSavedSubscriptionLogin(readyClaude("claude_work"), oauth("revoked")).unavailability,
-    ).toBeUndefined();
+  it("marks a revoked API-key login too, because the server's revoked rule ignores authMode", () => {
+    const revoked = withSavedSubscriptionLogin(readyClaude(), [
+      { ...status, health: "revoked", authMode: "api-key" },
+    ]);
+
+    expect(providerAvailabilityReason(revoked)).toBe("expired-login");
+    expect(revoked.unavailabilityDetail).toBe("The saved provider login was revoked.");
+  });
+
+  it("reads a non-default instance from its own status, never from the shared login", () => {
+    const scoped = withSavedSubscriptionLogin(readyClaude("claude_work"), [
+      {
+        ...status,
+        instanceId: ProviderInstanceId.make("claude_work"),
+        health: "revoked",
+        authMode: "oauth",
+      },
+    ]);
+
+    expect(providerAvailabilityReason(scoped)).toBe("expired-login");
+
+    // The unscoped entry is the driver's shared login, which the default instance
+    // owns. Another instance carries its own credential, so it must not inherit
+    // the shared login's verdict.
+    const shared = withSavedSubscriptionLogin(readyClaude("claude_work"), oauth("revoked"));
+
+    expect(shared.unavailability).toBeUndefined();
   });
 
   it("stops a role from seeding an engine on a login the server refuses", () => {
@@ -275,13 +293,17 @@ describe("withSavedSubscriptionLogin on a provider the snapshot calls ready", ()
       capabilities: null,
     };
 
-    const seeded = (health: SubscriptionProviderStatus["health"]) => {
-      const provider = withSavedSubscriptionLogin(readyClaude(), oauth(health));
+    const seeded = (
+      health: SubscriptionProviderStatus["health"],
+      authMode: SubscriptionProviderStatus["authMode"] = "oauth",
+    ) => {
+      const provider = withSavedSubscriptionLogin(readyClaude(), [{ ...status, health, authMode }]);
 
       return seedSquadMember(scout, [{ ...provider, models: [model] }]);
     };
 
     expect(seeded("revoked").engine).toBeNull();
+    expect(seeded("revoked", "api-key").engine).toBeNull();
     expect(seeded("healthy").engine?.provider).toBe("claudeAgent");
   });
 });
