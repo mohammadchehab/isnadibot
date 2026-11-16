@@ -94,22 +94,24 @@ export function ProcessActions({
 
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <button
+      <Button
         type="button"
+        variant="ghost-muted"
+        size="micro"
         disabled={isSignaling}
-        className="cursor-pointer text-10px font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
         onClick={() => onSignal(process, "SIGINT")}
       >
         INT
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost-destructive"
+        size="micro"
         disabled={isSignaling}
-        className="cursor-pointer text-10px font-semibold text-destructive hover:underline disabled:opacity-50"
         onClick={() => onSignal(process, "SIGKILL")}
       >
         KILL
-      </button>
+      </Button>
     </div>
   );
 }

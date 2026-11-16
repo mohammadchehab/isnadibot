@@ -89,14 +89,15 @@ export function ProcessSignalActions({
       <Tooltip>
         <TooltipTrigger
           render={
-            <button
+            <Button
               type="button"
+              variant="ghost-muted"
+              size="micro"
               disabled={isSignaling}
-              className="cursor-pointer text-11px font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:pointer-events-none disabled:opacity-50"
               onClick={() => onSignal(process.pid, "SIGINT")}
             >
               INT
-            </button>
+            </Button>
           }
         />
         <TooltipPopup side="top">Send SIGINT</TooltipPopup>
@@ -104,14 +105,15 @@ export function ProcessSignalActions({
       <Tooltip>
         <TooltipTrigger
           render={
-            <button
+            <Button
               type="button"
+              variant="ghost-destructive"
+              size="micro"
               disabled={isSignaling}
-              className="cursor-pointer text-11px font-medium text-destructive underline-offset-2 hover:underline disabled:pointer-events-none disabled:opacity-50"
               onClick={() => onSignal(process.pid, "SIGKILL")}
             >
               KILL
-            </button>
+            </Button>
           }
         />
         <TooltipPopup side="top">Send SIGKILL</TooltipPopup>
