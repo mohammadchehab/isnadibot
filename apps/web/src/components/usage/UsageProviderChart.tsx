@@ -26,6 +26,27 @@ interface UsageProviderChartProps {
   readonly referenceTime: string | undefined;
   readonly resolution: "day" | "hour";
   readonly timeZone: string;
+  /** No record in the window carries a price, so no dollar figure is knowable. */
+  readonly unpriced: boolean;
+}
+
+/**
+ * A window with nothing priced has no dollar figure to show, so the hover readout
+ * says so rather than printing `$0.00` under a caption that already says no price
+ * is reported. Tokens are never unpriced, so that metric is untouched.
+ *
+ * The axis keeps this out of reach on purpose: it is a scale, not a claim about
+ * what a provider charged, and a column of dashes would not tell a reader where
+ * the line sits.
+ */
+export function usageValueFormat(
+  metric: UsageChartMetric,
+  unpriced: boolean,
+  format: { readonly usd: (value: number) => string; readonly tokens: (value: number) => string },
+): (value: number) => string {
+  if (metric === "tokens") return format.tokens;
+
+  return unpriced ? () => "—" : format.usd;
 }
 
 /** One day's per-provider values, shared by the paths and the hover readout. */
@@ -212,6 +233,7 @@ export function UsageProviderChart({
   referenceTime,
   resolution,
   timeZone,
+  unpriced,
 }: UsageProviderChartProps) {
   const fmt = useUsageFormat();
   const { direction } = useI18n();
@@ -290,6 +312,7 @@ export function UsageProviderChart({
   }, [byPeriod, metric, periods, providers]);
 
   const format = metric === "tokens" ? fmt.tokens : fmt.usd;
+  const formatTooltipValue = usageValueFormat(metric, unpriced, fmt);
 
   const positionTooltip = useCallback(() => {
     const plot = plotRef.current;
@@ -476,7 +499,7 @@ export function UsageProviderChart({
                       {label}
                     </span>
                     <span className="text-foreground tabular-nums">
-                      {format(
+                      {formatTooltipValue(
                         hoveredColumn?.bands.find((band) => band.provider === provider)?.value ?? 0,
                       )}
                     </span>
@@ -486,7 +509,7 @@ export function UsageProviderChart({
               <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-1">
                 <span className="text-muted-foreground">Total</span>
                 <span className="text-foreground tabular-nums">
-                  {format(hoveredColumn?.total ?? 0)}
+                  {formatTooltipValue(hoveredColumn?.total ?? 0)}
                 </span>
               </div>
             </div>
