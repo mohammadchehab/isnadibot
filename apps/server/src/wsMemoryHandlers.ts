@@ -1,5 +1,6 @@
 import type * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import {
   IsnadiMemoryId,
   type IsnadiMemoryFailureReason,
@@ -39,6 +40,14 @@ const documentReplaceReason = (cause: unknown): IsnadiMemoryFailureReason | unde
       return undefined;
   }
 };
+
+/**
+ * The CAS loss: the fact changed under the surface, and the client has authored
+ * copy for exactly that. Without a reason the client can only match the server's
+ * sentence to recognise the case.
+ */
+const factMutationReason = (cause: unknown): IsnadiMemoryFailureReason | undefined =>
+  Predicate.isTagged(cause, "EntityMemoryConflictError") ? "memory-changed" : undefined;
 
 export const createWsMemoryHandlers = ({
   agentController,
@@ -486,7 +495,9 @@ export const createWsMemoryHandlers = ({
                           ? { kind: "deleted" as const, memoryId: mutation.memoryId }
                           : { kind: "revision" as const, revision },
                       ),
-                      Effect.mapError((cause) => memoryOperationError("facts.mutate", cause)),
+                      Effect.mapError((cause) =>
+                        memoryOperationError("facts.mutate", cause, factMutationReason(cause)),
+                      ),
                     );
                 },
               ),
