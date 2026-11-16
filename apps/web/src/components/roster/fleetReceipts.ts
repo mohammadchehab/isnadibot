@@ -1,7 +1,9 @@
 import {
   FLEET_DISPATCH_CLAIM_ACTIVITY,
   FLEET_DISPATCH_IDLE_ACTIVITY,
+  FLEET_DISPATCH_TRIAGE_ACTIVITY,
   FleetDispatchClaimPayload,
+  FleetDispatchTriagePayload,
   type OrchestrationThreadActivity,
 } from "@isnadi/contracts";
 import { Schema } from "effect";
@@ -10,6 +12,8 @@ import { createTranslator } from "@isnadi/client-runtime/i18n";
 import type { RoutineReceipt } from "./routineReceipts";
 
 const isClaimPayload = Schema.is(FleetDispatchClaimPayload);
+
+const isTriagePayload = Schema.is(FleetDispatchTriagePayload);
 
 type ReceiptTranslator = Pick<ReturnType<typeof createTranslator>, "t">;
 
@@ -53,6 +57,25 @@ export function deriveFleetReceipts(
         id: activity.id,
         createdAt: activity.createdAt,
         text: t("Everyone is idle and the board is empty."),
+        tone: "info",
+      });
+
+      continue;
+    }
+
+    if (activity.kind === FLEET_DISPATCH_TRIAGE_ACTIVITY) {
+      receipts.push({
+        id: activity.id,
+        createdAt: activity.createdAt,
+        text: isTriagePayload(activity.payload)
+          ? t(
+              "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.",
+              {
+                item: activity.payload.itemTitle,
+                role: activity.payload.role,
+              },
+            )
+          : activity.summary,
         tone: "info",
       });
     }

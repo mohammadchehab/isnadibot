@@ -41,7 +41,11 @@ import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
 import { botChat, chatModelSelection, chatProjectFor } from "./fleetDispatcherChats.ts";
-import { noteDispatchClaim, noteDispatchIdle } from "./fleetDispatchReceipts.ts";
+import {
+  noteDispatchClaim,
+  noteDispatchIdle,
+  noteDispatchTriage,
+} from "./fleetDispatchReceipts.ts";
 import { pickIdleMember, statusLookup } from "./fleetDispatcherFreeMembers.ts";
 
 /** Why a group was left exactly as it was. */
@@ -49,6 +53,7 @@ type SkipReason =
   | "queue-empty"
   | "retry-pending"
   | "no-idle-member"
+  | "no-role-holder"
   | "no-chat-project"
   | "chat-create-failed"
   | "claim-lost"
@@ -585,10 +590,26 @@ const make = Effect.gen(function* () {
           continue;
         }
 
-        const pick = pickIdleMember(readModel, group, sweepState.busied, reading);
+        const pick = pickIdleMember(readModel, group, sweepState.busied, reading, item.role);
 
         if (pick.kind === "none") {
           yield* skip({ itemId: item.id, reason: pick.reason });
+
+          // Nobody in the group was hired as the role this item names, so no other member could
+          // take it and the item behind it may name a role that is held. Saying so in the chat is
+          // the only sign the item is waiting: it stays queued, and the roster change that hires
+          // the role wakes the group, so it moves then without a restart.
+          if (pick.reason === "no-role-holder" && item.role !== undefined) {
+            yield* noteDispatchTriage(orchestrationEngine, {
+              readModel,
+              groupId: group.id,
+              item,
+              role: item.role,
+              createdAt: now,
+            });
+
+            continue;
+          }
 
           break;
         }

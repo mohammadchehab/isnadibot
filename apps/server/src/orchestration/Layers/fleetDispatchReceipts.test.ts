@@ -3,11 +3,15 @@ import {
   EventId,
   FLEET_DISPATCH_CLAIM_ACTIVITY,
   FLEET_DISPATCH_IDLE_ACTIVITY,
+  FLEET_DISPATCH_TRIAGE_ACTIVITY,
+  FleetRoleId,
+  type FleetDispatchTriagePayload,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationReadModel,
   type OrchestrationThread,
   ThreadId,
+  WorkItemId,
 } from "@isnadi/contracts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -28,6 +32,7 @@ import {
   idleAlreadyNoted,
   noteDispatchClaim,
   noteDispatchIdle,
+  noteDispatchTriage,
 } from "./fleetDispatchReceipts.ts";
 
 const BOT = makeBot({ id: BotId.make("bot-specialist"), groupId: GROUP_ID });
@@ -311,6 +316,105 @@ describe("fleet dispatch receipts", () => {
         yield* noteDispatchIdle(engine, {
           readModel: modelWith(botThread(BOT.id, "thread-bot-specialist")),
           groupId: GROUP_ID,
+          createdAt: NOW,
+        });
+
+        expect(dispatched).toEqual([]);
+      }),
+    );
+  });
+
+  describe("noteDispatchTriage", () => {
+    const ARCHITECT = FleetRoleId.make("architect");
+
+    const triageNote = (
+      payload: FleetDispatchTriagePayload,
+    ): OrchestrationThread["activities"][number] => ({
+      id: EventId.make(`triage-${payload.workItemId}`),
+      tone: "info",
+      kind: FLEET_DISPATCH_TRIAGE_ACTIVITY,
+      summary: "an earlier triage note",
+      payload,
+      turnId: null,
+      createdAt: NOW,
+    });
+
+    const triagePayload = (workItemId: string): FleetDispatchTriagePayload => ({
+      workItemId: WorkItemId.make(workItemId),
+      itemTitle: ITEM.title,
+      role: ARCHITECT,
+    });
+
+    it.effect("appends the row that names the role nobody holds", () =>
+      Effect.gen(function* () {
+        const { engine, dispatched } = recordingEngine();
+
+        yield* noteDispatchTriage(engine, {
+          readModel: modelWith(groupChat()),
+          groupId: GROUP_ID,
+          item: ITEM,
+          role: ARCHITECT,
+          createdAt: NOW,
+        });
+
+        const command = onlyAppend(dispatched);
+
+        expect(command.threadId).toBe("thread-group");
+        expect(command.activity.kind).toBe(FLEET_DISPATCH_TRIAGE_ACTIVITY);
+        expect(command.activity.payload).toEqual(triagePayload(ITEM.id));
+        expect(command.activity.summary).toBe(
+          `"${ITEM.title}" goes to the architect role, and no one here holds it. Add a member with that role to take it.`,
+        );
+      }),
+    );
+
+    it.effect("says it once per item, not again on the next pass", () =>
+      Effect.gen(function* () {
+        const { engine, dispatched } = recordingEngine();
+
+        const model = modelWith(groupChat({ activities: [triageNote(triagePayload(ITEM.id))] }));
+
+        yield* noteDispatchTriage(engine, {
+          readModel: model,
+          groupId: GROUP_ID,
+          item: ITEM,
+          role: ARCHITECT,
+          createdAt: LATER,
+        });
+
+        expect(dispatched).toEqual([]);
+      }),
+    );
+
+    it.effect("says it again for a different item waiting on the same role", () =>
+      Effect.gen(function* () {
+        const { engine, dispatched } = recordingEngine();
+
+        const model = modelWith(
+          groupChat({ activities: [triageNote(triagePayload("item-other"))] }),
+        );
+
+        yield* noteDispatchTriage(engine, {
+          readModel: model,
+          groupId: GROUP_ID,
+          item: ITEM,
+          role: ARCHITECT,
+          createdAt: LATER,
+        });
+
+        expect(appendCommands(dispatched)).toHaveLength(1);
+      }),
+    );
+
+    it.effect("writes nothing when the group has no chat", () =>
+      Effect.gen(function* () {
+        const { engine, dispatched } = recordingEngine();
+
+        yield* noteDispatchTriage(engine, {
+          readModel: modelWith(botThread(BOT.id, "thread-bot-specialist")),
+          groupId: GROUP_ID,
+          item: ITEM,
+          role: ARCHITECT,
           createdAt: NOW,
         });
 

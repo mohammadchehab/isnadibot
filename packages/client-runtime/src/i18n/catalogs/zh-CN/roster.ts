@@ -480,4 +480,6 @@ export const rosterCatalog = {
     "{name} 是负责人，从看板派发。机器人空闲时，下一张卡片就交给它。",
   "{name}, the boss, assigns cards. They move when a bot finishes a step.":
     "{name} 是负责人，负责派发卡片。机器人完成一步后卡片就会移动。",
+  "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.":
+    "「{item}」属于 {role} 角色，但这里没人担任。添加一位担任该角色的成员来接手。",
 } as const;

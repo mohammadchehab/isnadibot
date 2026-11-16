@@ -3,7 +3,10 @@ import {
   EventId,
   FLEET_DISPATCH_CLAIM_ACTIVITY,
   FLEET_DISPATCH_IDLE_ACTIVITY,
+  FLEET_DISPATCH_TRIAGE_ACTIVITY,
+  FleetDispatchTriagePayload,
   type FleetDispatchClaimPayload,
+  type FleetRoleId,
   type GroupId,
   type IsoDateTime,
   type OrchestrationBot,
@@ -11,9 +14,11 @@ import {
   type OrchestrationReadModel,
   type OrchestrationThread,
   type WorkItem,
+  type WorkItemId,
 } from "@isnadi/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import type { OrchestrationEngineShape } from "../Services/OrchestrationEngine.ts";
 
@@ -67,11 +72,30 @@ export function idleAlreadyNoted(thread: OrchestrationThread): boolean {
     .filter(
       (activity) =>
         activity.kind === FLEET_DISPATCH_CLAIM_ACTIVITY ||
-        activity.kind === FLEET_DISPATCH_IDLE_ACTIVITY,
+        activity.kind === FLEET_DISPATCH_IDLE_ACTIVITY ||
+        activity.kind === FLEET_DISPATCH_TRIAGE_ACTIVITY,
     )
     .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt));
 
   return fleetNotes.at(-1)?.kind === FLEET_DISPATCH_IDLE_ACTIVITY;
+}
+
+const isTriagePayload = Schema.is(FleetDispatchTriagePayload);
+
+/**
+ * Whether the chat already said why this item is waiting.
+ *
+ * A starved item stays queued and every later pass looks at it again, so the row
+ * is written once per item rather than once per pass. Reading the chat's own
+ * activities makes that durable, so a restart does not repeat it.
+ */
+export function triageAlreadyNoted(thread: OrchestrationThread, workItemId: WorkItemId): boolean {
+  return thread.activities.some(
+    (activity) =>
+      activity.kind === FLEET_DISPATCH_TRIAGE_ACTIVITY &&
+      isTriagePayload(activity.payload) &&
+      activity.payload.workItemId === workItemId,
+  );
 }
 
 const appendCommand = (input: {
@@ -186,6 +210,48 @@ export const noteDispatchIdle = (
       kind: FLEET_DISPATCH_IDLE_ACTIVITY,
       summary: "Everyone is idle and the board is empty.",
       payload: {},
+    }),
+  );
+};
+
+/**
+ * "A bug report goes to the architect role, and no one here holds it."
+ *
+ * An item that names a role the group does not have is never handed out, so this
+ * row is the only place the wait is visible. It names the missing role, because
+ * hiring one is what unblocks the item.
+ */
+export const noteDispatchTriage = (
+  engine: OrchestrationEngineShape,
+  input: {
+    readonly readModel: OrchestrationReadModel;
+    readonly groupId: GroupId;
+    readonly item: WorkItem;
+    readonly role: FleetRoleId;
+    readonly createdAt: IsoDateTime;
+  },
+) => {
+  const thread = groupChatThread(input.readModel, input.groupId);
+
+  if (thread === undefined || triageAlreadyNoted(thread, input.item.id)) return Effect.void;
+
+  const payload: FleetDispatchTriagePayload = {
+    workItemId: input.item.id,
+    itemTitle: input.item.title,
+    role: input.role,
+  };
+
+  return note(
+    engine,
+    appendCommand({
+      readModel: input.readModel,
+      groupId: input.groupId,
+      // One item waits for one reason, so the item alone is the receipt.
+      receiptId: `triage:${input.item.id}`,
+      kind: FLEET_DISPATCH_TRIAGE_ACTIVITY,
+      summary: `"${input.item.title}" goes to the ${input.role} role, and no one here holds it. Add a member with that role to take it.`,
+      payload,
+      createdAt: input.createdAt,
     }),
   );
 };

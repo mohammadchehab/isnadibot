@@ -78,6 +78,7 @@ export const FleetDispatchDecidedReceipt = Schema.Struct({
       "queue-empty",
       "retry-pending",
       "no-idle-member",
+      "no-role-holder",
       "no-chat-project",
       "chat-create-failed",
       "claim-lost",
