@@ -855,6 +855,7 @@ const CREDENTIAL_PATHS = [
   "adc.json",
   "service-account.json",
   "terraform.tfstate",
+  "terraform.tfstate.backup",
   ".htpasswd",
   "credentials.json",
   "secrets.yaml",

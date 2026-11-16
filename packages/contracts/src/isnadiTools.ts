@@ -72,7 +72,7 @@ const HIDDEN_PATH_SEGMENT = /^\.(?![.]?$)/;
  * is tested, so a file inside a `credentials/` folder is caught too.
  */
 const CREDENTIAL_PATH_SEGMENT =
-  /\.pem$|\.key$|\.tfstate$|^id_|credential|secret|token|keychain|^service-account|^adc\.json$/i;
+  /\.pem$|\.key$|\.tfstate(\.backup)?$|^id_|credential|secret|token|keychain|^service-account|^adc\.json$/i;
 
 /**
  * Why a read of `path` is a protected `secrets` action, or undefined when it is
