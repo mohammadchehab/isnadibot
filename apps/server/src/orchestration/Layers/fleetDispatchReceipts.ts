@@ -249,7 +249,7 @@ export const noteDispatchTriage = (
       // One item waits for one reason, so the item alone is the receipt.
       receiptId: `triage:${input.item.id}`,
       kind: FLEET_DISPATCH_TRIAGE_ACTIVITY,
-      summary: `"${input.item.title}" goes to the ${input.role} role, and no one here holds it. Add a member with that role to take it.`,
+      summary: `"${input.item.title}" goes to the ${input.role} role, and no one here holds it.`,
       payload,
       createdAt: input.createdAt,
     }),

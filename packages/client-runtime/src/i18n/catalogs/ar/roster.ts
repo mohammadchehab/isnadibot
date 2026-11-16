@@ -523,6 +523,6 @@ export const rosterCatalog = {
     "{name} هو الرئيس، يوزّع من اللوح. عندما يكون بوت خاملًا، تذهب البطاقة التالية إليه.",
   "{name}, the boss, assigns cards. They move when a bot finishes a step.":
     "{name} هو الرئيس، يوزّع البطاقات. تتحرك عندما ينهي بوت خطوة.",
-  "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.":
-    "«{item}» من نصيب دور {role}، ولا أحد هنا يتولّاه. أضف عضوًا بهذا الدور ليتولّاه.",
+  "“{item}” goes to the {role} role, and no one here holds it.":
+    "«{item}» من نصيب دور {role}، ولا أحد هنا يتولّاه.",
 } as const;

@@ -68,13 +68,10 @@ export function deriveFleetReceipts(
         id: activity.id,
         createdAt: activity.createdAt,
         text: isTriagePayload(activity.payload)
-          ? t(
-              "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.",
-              {
-                item: activity.payload.itemTitle,
-                role: activity.payload.role,
-              },
-            )
+          ? t("“{item}” goes to the {role} role, and no one here holds it.", {
+              item: activity.payload.itemTitle,
+              role: activity.payload.role,
+            })
           : activity.summary,
         tone: "info",
       });

@@ -363,7 +363,7 @@ describe("fleet dispatch receipts", () => {
         expect(command.activity.kind).toBe(FLEET_DISPATCH_TRIAGE_ACTIVITY);
         expect(command.activity.payload).toEqual(triagePayload(ITEM.id));
         expect(command.activity.summary).toBe(
-          `"${ITEM.title}" goes to the architect role, and no one here holds it. Add a member with that role to take it.`,
+          `"${ITEM.title}" goes to the architect role, and no one here holds it.`,
         );
       }),
     );

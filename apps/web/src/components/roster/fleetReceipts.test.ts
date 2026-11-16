@@ -59,7 +59,7 @@ describe("deriveFleetReceipts", () => {
     ]);
 
     expect(receipt?.text).toBe(
-      "“Fix the login” goes to the architect role, and no one here holds it. Add a member with that role to take it.",
+      "“Fix the login” goes to the architect role, and no one here holds it.",
     );
   });
 

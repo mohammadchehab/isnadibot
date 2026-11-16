@@ -502,6 +502,6 @@ export const rosterCatalog = {
     "{name}, the boss, assigns from the board. When a bot goes idle, the next card goes to it.",
   "{name}, the boss, assigns cards. They move when a bot finishes a step.":
     "{name}, the boss, assigns cards. They move when a bot finishes a step.",
-  "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.":
-    "“{item}” goes to the {role} role, and no one here holds it. Add a member with that role to take it.",
+  "“{item}” goes to the {role} role, and no one here holds it.":
+    "“{item}” goes to the {role} role, and no one here holds it.",
 } as const;
