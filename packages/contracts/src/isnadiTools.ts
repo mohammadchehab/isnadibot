@@ -69,12 +69,22 @@ const HIDDEN_PATH_SEGMENT = /^\.(?![.]?$)/;
 /**
  * A segment that names a credential store even in plain sight: `id_rsa`,
  * `server.key`, `secrets.yaml`, `token.txt`, `terraform.tfstate`, a keystore
- * such as `bundle.p12` or `vault.kdbx`, and the dotless `netrc`/`npmrc`/
- * `kubeconfig` that a rule keyed on a leading dot or a known extension misses.
- * Every segment is tested, so a file inside a `credentials/` folder is caught too.
+ * such as `bundle.p12`, `bundle.jceks` or `vault.kdbx`, a VPN or key bundle
+ * such as `client.ovpn` or `key.asc`, the build-tool files that hold registry
+ * and signing credentials (`gradle.properties`, `settings.xml`, `nuget.config`),
+ * a bare system name (`shadow`, `_netrc`), and the dotless `netrc`/`npmrc`/
+ * `pypirc`/`kubeconfig` that a rule keyed on a leading dot or a known extension
+ * misses. Every segment is tested, so a file inside a `credentials/` folder is
+ * caught too.
+ *
+ * `kubeconfig` is a suffix rather than an exact name on purpose: one context per
+ * file is the common shape (`prod.kubeconfig`, `dev.kubeconfig`), and anchoring
+ * it to the whole segment was the gap that let every prefixed variant through.
+ * The compound names stay anchored because they are exact filenames, not
+ * suffixes, so `settings.xml` matches without also refusing `mysettings.xml`.
  */
 const CREDENTIAL_PATH_SEGMENT =
-  /\.pem$|\.key$|\.tfstate(\.backup)?$|\.p12$|\.pfx$|\.jks$|\.p8$|\.ppk$|\.kdbx$|^(?:adc\.json|auth\.json|netrc|npmrc|kubeconfig)$|^id_|credential|secret|token|keychain|^service-account/i;
+  /\.pem$|\.key$|\.tfstate(\.backup)?$|\.p12$|\.pfx$|\.jks$|\.p8$|\.ppk$|\.kdbx$|\.jceks$|\.bcfks$|\.kdb$|\.keystore$|\.der$|\.ovpn$|\.gpg$|\.asc$|^(?:adc\.json|auth\.json|netrc|npmrc|pypirc|gradle\.properties|settings\.xml|nuget\.config|shadow|_netrc)$|kubeconfig$|^id_|credential|secret|token|keychain|^service-account/i;
 
 /**
  * Why a read of `path` is a protected `secrets` action, or undefined when it is
