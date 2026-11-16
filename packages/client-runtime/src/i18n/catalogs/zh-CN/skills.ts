@@ -42,4 +42,44 @@ export const skillsCatalog = {
     "自你批准 {approved} 后，在提交 {commit} 处变更 · {summary}。",
   "Connect the {connector} connector in Settings › Connections. Until then a bot cannot run this skill.":
     "在 设置 › 连接 中连接 {connector} 连接器。在此之前机器人无法运行此技能。",
+  "Add a skill": "添加技能",
+  "A skill is a folder with a SKILL.md. Pick one to add to this space.":
+    "技能是一个包含 SKILL.md 的文件夹。选择一个添加到当前空间。",
+  "Paste a GitHub link to a skill folder. Isnadi pins the commit it reads.":
+    "粘贴技能文件夹的 GitHub 链接。Isnadi 会固定它读取的提交。",
+  "Upload a .zip of a skill folder. Isnadi checks it before adding anything.":
+    "上传技能文件夹的 .zip。Isnadi 会先检查再添加任何内容。",
+  "From a provider": "来自提供方",
+  "GitHub URL": "GitHub 链接",
+  ".zip": ".zip",
+  "Where the skill comes from": "技能来源",
+  "Add to": "添加到",
+  "Travels with this space's project.": "随当前空间的项目一起移动。",
+  "Available in every space.": "在每个空间都可用。",
+  "The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.":
+    "提供方保留自己的一份。Isnadi 添加自己的副本，因此每个模型都保留该技能。",
+  "Skill URL": "技能链接",
+  "No skill found at that link. Point at the folder that holds SKILL.md, not the repository root.":
+    "该链接下未找到技能。请指向包含 SKILL.md 的文件夹，而不是仓库根目录。",
+  "Isnadi reads the ref, resolves it to a commit and fetches only that folder.":
+    "Isnadi 读取该引用，将其解析为提交，并只获取该文件夹。",
+  "A community skill needs your approval before a bot can use it. The next step shows what it does.":
+    "社区技能需要你批准后机器人才能使用。下一步会显示它的功能。",
+  "Drop a .zip here": "将 .zip 拖放到这里",
+  "Up to 5 MB and 200 files. No symlinks or executables.":
+    "最大 5 MB、200 个文件。不得包含符号链接或可执行文件。",
+  "That .zip is {size}": "该 .zip 为 {size}",
+  "The limit is 5 MB. Remove the large files and try again.": "上限为 5 MB。请移除大文件后重试。",
+  "That .zip has a link inside": "该 .zip 内含链接",
+  "Archives may hold up to 200 plain files. Remove symlinks, absolute paths and executables, then try again.":
+    "压缩包最多可包含 200 个普通文件。请移除符号链接、绝对路径和可执行文件后重试。",
+  "Choose a file": "选择文件",
+  "Choose a different file": "选择其他文件",
+  "Check the link": "检查链接",
+  "Add this skill?": "添加此技能？",
+  "Read what it does before a bot can use it.": "在机器人使用它之前，先了解它的功能。",
+  "Commit {commit} · {count} files · {size}": "提交 {commit} · {count} 个文件 · {size}",
+  "What the bot will be told": "机器人将被告知的内容",
+  "Approving pins this commit. If the folder changes, Isnadi asks again before a bot uses it.":
+    "批准会固定此提交。如果文件夹发生变化，Isnadi 会在机器人使用前再次询问。",
 } as const;

@@ -220,7 +220,12 @@ export function skillOriginLabel(origin: {
   readonly url: string;
   readonly commit: string;
 }): string {
-  return `${origin.url.replace(/^https?:\/\//, "")} at ${origin.commit}`;
+  return `${skillOriginSource(origin.url)} at ${origin.commit}`;
+}
+
+/** `github.com/acme/recruiting-skills`: where a Community skill came from, without the scheme. */
+export function skillOriginSource(url: string): string {
+  return url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
 /** "browser" reads "Browser" in a badge and in a sentence. */

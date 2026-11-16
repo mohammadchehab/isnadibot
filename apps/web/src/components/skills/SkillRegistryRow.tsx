@@ -107,6 +107,7 @@ export function SkillRegistryRow({
   bots,
   nowMs,
   removeLabel,
+  onApprove,
 }: {
   readonly skill: RegistrySkill;
   readonly attention: SkillAttention | null;
@@ -114,6 +115,8 @@ export function SkillRegistryRow({
   readonly nowMs: number;
   /** The row menu's destructive item, worded for the scope the skill was added to. */
   readonly removeLabel: string;
+  /** Opens the approval dialog; a row waiting on a connector has nothing to approve. */
+  readonly onApprove: () => void;
 }) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -155,7 +158,11 @@ export function SkillRegistryRow({
       </TableCell>
       <TableCell presentation="muted" className="w-24 px-3 py-2.5 align-top text-xs">
         {attention ? (
-          <Button size="xs" variant={attention.kind === "needs-approval" ? "default" : "outline"}>
+          <Button
+            size="xs"
+            variant={attention.kind === "needs-approval" ? "default" : "outline"}
+            onClick={attention.kind === "needs-connector" ? undefined : onApprove}
+          >
             {skillAttentionActionLabel(attention, i18n)}
           </Button>
         ) : (

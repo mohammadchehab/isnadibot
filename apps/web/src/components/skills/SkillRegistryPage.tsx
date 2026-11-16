@@ -1,9 +1,10 @@
-import type { ProjectId } from "@isnadi/contracts";
+import type { ProjectId, SkillId } from "@isnadi/contracts";
 import {
   filterRegistrySkills,
   SKILL_REGISTRY_FILTERS,
   skillAttention,
   useSkillRegistry,
+  useSkillRegistryActions,
   type RegistrySkill,
   type SkillRegistryFilter,
 } from "@isnadi/client-runtime/skills";
@@ -26,6 +27,8 @@ import {
   TableRow,
 } from "../ui/table";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { SkillAddDialog } from "./SkillAddDialog";
+import { SkillApproveDialog } from "./SkillApproveDialog";
 import { SkillRegistryRow } from "./SkillRegistryRow";
 
 const FILTER_LABELS = {
@@ -100,14 +103,22 @@ export function SkillRegistryPage({
 }) {
   const { t } = useI18n();
   const registry = useSkillRegistry();
+  const actions = useSkillRegistryActions();
   const bots = useRosterStore((state) => state.bots);
   const [filter, setFilter] = useState<SkillRegistryFilter>(defaultFilter);
+  const [adding, setAdding] = useState(false);
+  const [approvingId, setApprovingId] = useState<SkillId | null>(null);
   const nowMs = useRelativeTimeTick(30_000);
 
   const visible = useMemo(
     () => filterRegistrySkills(registry.skills, filter, projectId),
     [registry.skills, filter, projectId],
   );
+
+  // Read off the live snapshot, so the approval dialog shows the skill as it is now, and closes
+  // itself once the row it was opened for is gone.
+  const approving =
+    approvingId === null ? undefined : registry.skills.find((skill) => skill.id === approvingId);
 
   if (registry.state === "unavailable") return null;
 
@@ -142,7 +153,14 @@ export function SkillRegistryPage({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          <Button size="compact" variant="outline">
+          <Button
+            size="compact"
+            variant="outline"
+            disabled={actions === null}
+            onClick={() => {
+              setAdding(true);
+            }}
+          >
             {t("Add skill")}
           </Button>
         </div>
@@ -187,6 +205,9 @@ export function SkillRegistryPage({
                       ? t("Remove from all spaces…")
                       : t("Remove from this space…")
                   }
+                  onApprove={() => {
+                    setApprovingId(skill.id);
+                  }}
                 />
               ))}
             </TableBody>
@@ -201,6 +222,28 @@ export function SkillRegistryPage({
             </TableFooter>
           </Table>
         </div>
+      )}
+
+      {adding ? (
+        <SkillAddDialog
+          skills={registry.skills}
+          onClose={() => {
+            setAdding(false);
+          }}
+          onNeedsApproval={(skillId) => {
+            setAdding(false);
+            setApprovingId(skillId);
+          }}
+        />
+      ) : null}
+
+      {approving === undefined ? null : (
+        <SkillApproveDialog
+          skill={approving}
+          onClose={() => {
+            setApprovingId(null);
+          }}
+        />
       )}
     </div>
   );
