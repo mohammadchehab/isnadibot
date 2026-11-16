@@ -23,6 +23,7 @@ import {
   deriveBotStatus,
   idleSince,
   isLiveSessionStatus,
+  type BotStatus,
   type BotStatusInput,
 } from "@isnadi/shared/botStatus";
 import * as Cause from "effect/Cause";
@@ -519,6 +520,10 @@ const make = Effect.gen(function* () {
     sweepState: SweepState,
   ) =>
     Effect.gen(function* () {
+      // Every pick in this pass reads the same snapshot, so each member's status is derived once
+      // here rather than once per candidate per pick (TASK-242).
+      const reading = statusLookup(readModel);
+
       // Reaping comes first: an item whose turn ended is still `assigned` in this snapshot, so it
       // cannot be handed out until the release it causes is projected. The wake that follows
       // re-reads the model, so this pass never dispatches from a snapshot it just invalidated.
@@ -576,7 +581,7 @@ const make = Effect.gen(function* () {
           continue;
         }
 
-        const pick = pickIdleMember(readModel, group, sweepState.busied);
+        const pick = pickIdleMember(readModel, group, sweepState.busied, reading);
 
         if (pick.kind === "none") {
           yield* skip({ itemId: item.id, reason: pick.reason });
@@ -1094,16 +1099,44 @@ export function dispatcherTurnItemGroup(
 }
 
 /**
- * The shared status rule's input for one bot, built from the command read model. The dispatcher
- * reacts fast enough that a stale read is unlikely and harmless: the claim is what decides who
- * owns an item.
+ * One bot's reading of the shared status rule: the status the dispatcher decides from, and the
+ * idle time it ranks free members by. Both come from the same input, so both are read together.
  */
-function statusInput(readModel: OrchestrationReadModel, botId: BotId): BotStatusInput {
-  return {
-    botId,
-    chats: readModel.threads.filter((thread) => thread.deletedAt === null),
-    workItems: readModel.workItems ?? [],
-    delegations: readModel.delegations ?? [],
+export interface MemberReading {
+  readonly status: BotStatus;
+  readonly idleSince: IsoDateTime | null;
+}
+
+export type StatusLookup = (botId: BotId) => MemberReading;
+
+/**
+ * Derives each bot's reading at most once for one read model. A pass decides from a single
+ * snapshot, so no bot's status can move while it runs: asking again for the next queued item only
+ * re-filters every live chat in the environment for an answer that has not changed (TASK-242). The
+ * lookup is made for one snapshot and discarded with it, so there is no cache to go stale against
+ * the event-sourced model.
+ */
+export function statusLookup(readModel: OrchestrationReadModel): StatusLookup {
+  const chats = readModel.threads.filter((thread) => thread.deletedAt === null);
+  const workItems = readModel.workItems ?? [];
+  const delegations = readModel.delegations ?? [];
+  const readings = new Map<BotId, MemberReading>();
+
+  return (botId) => {
+    const known = readings.get(botId);
+
+    if (known !== undefined) return known;
+
+    const input: BotStatusInput = { botId, chats, workItems, delegations };
+
+    const reading: MemberReading = {
+      status: deriveBotStatus(input),
+      idleSince: idleSince(input),
+    };
+
+    readings.set(botId, reading);
+
+    return reading;
   };
 }
 
@@ -1117,7 +1150,7 @@ export function isBotIdle(readModel: OrchestrationReadModel, botId: BotId): bool
 
   if (bot === undefined || bot.archivedAt !== null) return false;
 
-  return deriveBotStatus(statusInput(readModel, botId)) === "idle";
+  return statusLookup(readModel)(botId).status === "idle";
 }
 
 /**
@@ -1129,11 +1162,6 @@ interface IdleRank {
   readonly idleSince: IsoDateTime | null;
   readonly botId: BotId;
 }
-
-const idleRank = (readModel: OrchestrationReadModel, botId: BotId): IdleRank => ({
-  idleSince: idleSince(statusInput(readModel, botId)),
-  botId,
-});
 
 function compareIdleRank(left: IdleRank, right: IdleRank): number {
   if (left.idleSince !== right.idleSince) {
@@ -1164,17 +1192,21 @@ export function pickIdleMember(
   readModel: OrchestrationReadModel,
   group: OrchestrationGroup,
   busy: ReadonlySet<BotId> = new Set(),
+  reading: StatusLookup = statusLookup(readModel),
 ): PickResult {
   const members = group.members.filter(isGroupBotMember).map((member) => member.botId);
   const specialists = members.filter((botId) => botId !== group.bossBotId);
   const candidates = specialists.length > 0 ? specialists : members;
 
   const free = candidates
-    .filter((candidate) => !busy.has(candidate) && isBotIdle(readModel, candidate))
+    .filter((candidate) => !busy.has(candidate) && reading(candidate).status === "idle")
     .flatMap((candidate) => {
       const bot = readModel.bots.find((candidateBot) => candidateBot.id === candidate);
 
-      return bot === undefined ? [] : [{ bot, rank: idleRank(readModel, candidate) }];
+      // `deriveBotStatus` knows nothing about hiring, so a fired bot still reads as idle.
+      if (bot === undefined || bot.archivedAt !== null) return [];
+
+      return [{ bot, rank: { botId: candidate, idleSince: reading(candidate).idleSince } }];
     })
     .toSorted((left, right) => compareIdleRank(left.rank, right.rank));
 
