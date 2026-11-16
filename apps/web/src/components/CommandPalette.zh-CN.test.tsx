@@ -8,6 +8,12 @@ import type { CommandPaletteGroup } from "./CommandPalette.logic";
 
 vi.mock("@effect/atom-react", () => ({ useAtomValue: () => [] }));
 
+// Rendered outside a router: no route, so no space, so no team group.
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => () => undefined,
+  useParams: ({ select }: { select: (params: Record<string, never>) => unknown }) => select({}),
+}));
+
 vi.mock("../hooks/useTheme", () => ({
   useTheme: () => ({ resolvedTheme: "dark", setAppearanceMode: () => undefined }),
 }));
@@ -25,6 +31,7 @@ vi.mock("./roster/useBotControls", () => ({
     clearAll: async () => false,
     steer: async () => false,
   }),
+  useBotControlCommands: () => ({ interruptThread: async () => true }),
 }));
 
 // Render the dialog shell and results as plain markup so the titles are visible.
