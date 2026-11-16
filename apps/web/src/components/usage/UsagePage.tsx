@@ -382,6 +382,7 @@ export function UsagePage() {
                       referenceTime={window.untilTime}
                       resolution={isPast24Hours ? "hour" : "day"}
                       timeZone={window.timeZone}
+                      unpriced={entirelyUnpriced}
                     />
                   </div>
                 </section>
