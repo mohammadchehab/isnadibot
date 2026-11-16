@@ -4,6 +4,8 @@ import {
   EventId,
   GroupId,
   MessageId,
+  PLACEHOLDER_THREAD_TITLE,
+  ThreadId,
   WorkItemId,
   isGroupBotMember,
   type IsoDateTime,
@@ -13,7 +15,6 @@ import {
   type OrchestrationLatestTurn,
   type OrchestrationReadModel,
   type OrchestrationThread,
-  type ThreadId,
   type TurnId,
   type WorkItem,
 } from "@isnadi/contracts";
@@ -45,16 +46,23 @@ import {
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { RuntimeReceiptBus } from "../Services/RuntimeReceiptBus.ts";
+import { botChat, chatModelSelection, chatProjectFor } from "./fleetDispatcherChats.ts";
 
 /** Why a group was left exactly as it was. */
 type SkipReason =
   | "queue-empty"
   | "retry-pending"
   | "no-idle-member"
-  | "no-chat"
+  | "no-chat-project"
+  | "chat-create-failed"
   | "claim-lost"
   | "turn-running"
   | "turn-start-failed";
+
+/** The chat a member will work in, or why the dispatcher could not give it one. */
+type ChatCreation =
+  | { readonly kind: "chat"; readonly thread: OrchestrationThread }
+  | { readonly kind: "none"; readonly reason: "no-chat-project" | "chat-create-failed" };
 
 /**
  * How long a requeued item waits before the dispatcher tries it again. A death is usually the
@@ -299,6 +307,92 @@ const make = Effect.gen(function* () {
       ),
     );
 
+  // A hired member has no chat until someone opens one, so the dispatcher opens it the way the
+  // client would: the same placeholder title, the bot's own engine and runtime mode, and no group,
+  // so it appears in the sidebar beside every other chat that bot owns.
+  //
+  // The command's own transaction writes the projection, so the chat is already in the read model
+  // when the dispatch resolves — re-reading here is exact, not a race to be waited out.
+  const createChatFor = (
+    readModel: OrchestrationReadModel,
+    bot: OrchestrationBot,
+    group: OrchestrationGroup,
+  ) =>
+    Effect.gen(function* () {
+      const project = chatProjectFor(readModel, group);
+
+      if (project === undefined)
+        return { kind: "none" as const, reason: "no-chat-project" as const };
+
+      const modelSelection = chatModelSelection(bot, project);
+
+      if (modelSelection === undefined) {
+        return { kind: "none" as const, reason: "chat-create-failed" as const };
+      }
+
+      const uuid = yield* crypto.randomUUIDv4;
+      const createdAt = DateTime.formatIso(yield* DateTime.now);
+
+      const created = yield* orchestrationEngine
+        .dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(`server:thread.create:${uuid}`),
+          threadId: ThreadId.make(uuid),
+          projectId: project.id,
+          botId: bot.id,
+          groupId: null,
+          title: PLACEHOLDER_THREAD_TITLE,
+          modelSelection,
+          runtimeMode: bot.runtimeMode,
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          createdAt,
+        })
+        .pipe(
+          Effect.as(true),
+          // An archived bot or a vanished project is the decider saying no, which is the same
+          // fact as a crash here: the member cannot be given a chat to work in.
+          Effect.catchIf(
+            (error) => isInvariantError(error),
+            (error) =>
+              Effect.logWarning("fleet dispatcher could not create a chat", {
+                botId: bot.id,
+                detail: error.detail,
+              }).pipe(Effect.as(false)),
+          ),
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.failCause(cause)
+              : Effect.logWarning("fleet dispatcher could not create a chat", {
+                  botId: bot.id,
+                  cause: Cause.pretty(cause),
+                }).pipe(Effect.as(false)),
+          ),
+        );
+
+      if (!created) return { kind: "none" as const, reason: "chat-create-failed" as const };
+
+      const after = yield* projectionSnapshotQuery.getCommandReadModel().pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.failCause(cause)
+            : Effect.logWarning("fleet dispatcher could not re-read a created chat", {
+                botId: bot.id,
+                cause: Cause.pretty(cause),
+              }).pipe(Effect.as(undefined)),
+        ),
+      );
+
+      const chat = after === undefined ? undefined : botChat(after, bot.id);
+
+      // The chat was created but the read model cannot show it yet: the caller gives the item
+      // back, and the next pass finds the chat rather than making a second one.
+      return chat === undefined
+        ? { kind: "none" as const, reason: "chat-create-failed" as const }
+        : { kind: "chat" as const, thread: chat };
+    });
+
   // The claim is the only thing holding the item, so releasing it is the way back: the existing
   // null-owner branch of `work-item.assign` returns the item to its group's queue, unowned.
   const releaseClaim = (item: WorkItem) =>
@@ -433,20 +527,25 @@ const make = Effect.gen(function* () {
         const pick = pickIdleMember(readModel, group, sweepState.busied);
 
         if (pick.kind === "none") {
-          yield* skip({
-            itemId: item.id,
-            reason: pick.reason,
-            ...(pick.botId === undefined ? {} : { botId: pick.botId }),
-          });
+          yield* skip({ itemId: item.id, reason: pick.reason });
 
           break;
         }
 
-        const chat = botChat(readModel, pick.bot.id);
+        const existingChat = botChat(readModel, pick.bot.id);
 
-        // The pick only names a member that has a chat; this keeps that narrowing honest.
-        if (chat === undefined) continue;
+        // A hired member has no chat, and where a new one belongs is a pure read of the model.
+        // With several projects and no chat to read, nothing in this group can be filed, so its
+        // queue waits. That is a precondition like having no free member rather than a failure,
+        // so it is answered before a claim is spent on it.
+        if (existingChat === undefined && chatProjectFor(readModel, group) === undefined) {
+          yield* skip({ itemId: item.id, botId: pick.bot.id, reason: "no-chat-project" });
 
+          break;
+        }
+
+        // The claim comes before any chat is created: a claim this pass loses must not leave
+        // behind a chat nobody asked for.
         if (!(yield* claim(pick.bot.id, item.id))) {
           yield* skip({ itemId: item.id, botId: pick.bot.id, reason: "claim-lost" });
           lostClaim = true;
@@ -455,13 +554,29 @@ const make = Effect.gen(function* () {
           continue;
         }
 
-        const start = yield* startTurn(chat, item);
+        // The chat the member would have opened for itself, so keep-busy works on a team nobody
+        // has visited yet.
+        const chat: ChatCreation =
+          existingChat === undefined
+            ? yield* createChatFor(readModel, pick.bot, group)
+            : { kind: "chat", thread: existingChat };
+
+        if (chat.kind === "none") {
+          // The chat could not be created, so the item goes back rather than staying claimed by a
+          // bot that is not working it. The reason is the group's, so the queue waits with it.
+          yield* releaseClaim(item);
+          yield* skip({ itemId: item.id, botId: pick.bot.id, reason: chat.reason });
+
+          break;
+        }
+
+        const start = yield* startTurn(chat.thread, item);
 
         if (!start.started) {
           // Nothing is running, so nothing is assigned: give the item back and say why in the
           // chat, rather than publishing an `assigned` no bot is doing.
           yield* releaseClaim(item);
-          yield* reportStartFailed(chat, item, pick.bot.id, start.detail);
+          yield* reportStartFailed(chat.thread, item, pick.bot.id, start.detail);
           yield* skip({ itemId: item.id, botId: pick.bot.id, reason: "turn-start-failed" });
 
           // The item is back in the queue and this member was not spent, so the rest of the
@@ -883,18 +998,6 @@ export function dispatcherTurnItemGroup(
   return (readModel.workItems ?? []).find((item) => item.id === trigger.workItemId)?.groupId;
 }
 
-/** The chat a bot works in: its own, most recently active one first. */
-export function botChat(
-  readModel: OrchestrationReadModel,
-  botId: BotId,
-): OrchestrationThread | undefined {
-  return readModel.threads
-    .filter(
-      (thread) => thread.botId === botId && thread.deletedAt === null && thread.archivedAt === null,
-    )
-    .toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
-}
-
 /**
  * The shared status rule's input for one bot, built from the command read model. The dispatcher
  * reacts fast enough that a stale read is unlikely and harmless: the claim is what decides who
@@ -954,17 +1057,13 @@ function compareIdleRank(left: IdleRank, right: IdleRank): number {
  * when it is the only bot in the group. Two idle members are never both woken for one item, and no
  * model is asked to choose between them.
  *
- * A member with no chat is not a candidate: there is no turn to start for it, and a fresh hire has
- * no chat until the user opens one. When every free member is chatless the result names the one
- * that ranked first, so the receipt says which bot to open a chat with.
+ * Being idle is the whole test. Whether the member already has a chat is the caller's problem: a
+ * hired member starts without one and is given the chat it would have opened for itself, so
+ * leaving it out here would leave a fresh team unable to work at all.
  */
 export type PickResult =
   | { readonly kind: "member"; readonly bot: OrchestrationBot }
-  | {
-      readonly kind: "none";
-      readonly reason: "no-idle-member" | "no-chat";
-      readonly botId?: BotId;
-    };
+  | { readonly kind: "none"; readonly reason: "no-idle-member" };
 
 export function pickIdleMember(
   readModel: OrchestrationReadModel,
@@ -984,16 +1083,11 @@ export function pickIdleMember(
     })
     .toSorted((left, right) => compareIdleRank(left.rank, right.rank));
 
-  const dispatchable = free.find(({ bot }) => botChat(readModel, bot.id) !== undefined);
+  const picked = free[0];
 
-  if (dispatchable !== undefined) return { kind: "member", bot: dispatchable.bot };
-
-  const firstFree = free[0];
-
-  // A chatless member is a state the user can fix; "everyone is busy" is not.
-  return firstFree === undefined
+  return picked === undefined
     ? { kind: "none", reason: "no-idle-member" }
-    : { kind: "none", reason: "no-chat", botId: firstFree.bot.id };
+    : { kind: "member", bot: picked.bot };
 }
 
 export const FleetDispatcherReactorLive = Layer.effect(FleetDispatcherReactor, make);

@@ -2,6 +2,8 @@ import { it } from "@effect/vitest";
 import {
   BotId,
   GroupId,
+  PLACEHOLDER_THREAD_TITLE,
+  ProjectId,
   ThreadId,
   TurnId,
   WorkItemId,
@@ -22,6 +24,7 @@ import {
   SPECIALIST_ID,
   makeBot,
   makeGroup,
+  makeGroupThread,
   makeReadModel,
 } from "../test-support/GroupDeciderFixtures.ts";
 import {
@@ -32,11 +35,14 @@ import {
   LATER,
   LATEST,
   NOW,
+  PROJECT_ID,
   botThread,
   harness,
   idleTeamModel,
   keepBusyGroup,
   keepBusySet,
+  makeProject,
+  projectCreatedChats,
   run,
   sessionSet,
   threadCreated,
@@ -47,6 +53,9 @@ import {
 
 /** A second keep-busy group, so one pass can be seen deciding two. */
 const SECOND_GROUP_ID = GroupId.make("group-second");
+
+/** A chat in the space itself: it has the group and no bot of its own. */
+const SPACE_THREAD = ThreadId.make("thread-space");
 
 /**
  * A rejection the test injects in place of the decider's own. The reactor treats
@@ -537,24 +546,21 @@ describe("FleetDispatcherReactor", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("does not let one chatless member stop the group", () =>
+  it.effect("creates the chat a hired member never opened, and starts the turn in it", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const members = [
-        { kind: "bot" as const, botId: BOT_A.id, role: "specialist" as const },
-        { kind: "bot" as const, botId: BOT_B.id, role: "specialist" as const },
-      ];
-
-      // BOT_A never opened a chat, so with no turn it ranks first; BOT_B has one and takes the item.
+      // A freshly hired group: nothing in the decider creates a chat, so none exists yet.
       yield* Ref.set(h.model, {
         ...makeReadModel({
-          bots: [BOT_A, BOT_B],
-          groups: [keepBusyGroup({ bossBotId: null, members })],
-          threads: [botThread(BOT_B.id, "thread-b")],
+          projects: [makeProject()],
+          bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
+          groups: [keepBusyGroup()],
+          threads: [],
         }),
         workItems: [workItem({ id: "item-1" })],
       });
+      yield* Ref.set(h.onCommand, projectCreatedChats(h));
 
       yield* run(h, ({ reactor, receipts }) =>
         Effect.gen(function* () {
@@ -562,16 +568,35 @@ describe("FleetDispatcherReactor", () => {
 
           expect(h.dispatched.map((command) => command.type)).toEqual([
             "work-item.claim",
+            "thread.create",
             "thread.turn.start",
           ]);
-          expect(h.dispatched[0]).toMatchObject({ botId: BOT_B.id, workItemId: "item-1" });
-          expect(h.dispatched[1]).toMatchObject({ threadId: ThreadId.make("thread-b") });
+
+          // The chat is the one the client would have opened: this bot, this project, the same
+          // placeholder title, and no group so it sits beside the bot's own chats in the sidebar.
+          expect(h.dispatched[1]).toMatchObject({
+            botId: SPECIALIST_ID,
+            projectId: PROJECT_ID,
+            groupId: null,
+            title: PLACEHOLDER_THREAD_TITLE,
+            runtimeMode: "full-access",
+          });
+
+          // The turn runs in the chat that was just created, not in some other one.
+          const model = yield* Ref.get(h.model);
+          const created = model.threads.find((thread) => thread.botId === SPECIALIST_ID);
+
+          expect(h.dispatched[2]).toMatchObject({
+            type: "thread.turn.start",
+            threadId: created?.id,
+          });
+
           expect(yield* receipts).toMatchObject([
             {
               type: "fleet.dispatch.decided",
               kind: "assigned",
               itemId: "item-1",
-              botId: BOT_B.id,
+              botId: SPECIALIST_ID,
             },
           ]);
         }),
@@ -579,13 +604,15 @@ describe("FleetDispatcherReactor", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("skips a group whose members have no chat once, and names the bot", () =>
+  it.effect("waits when no chat says which project the work belongs in", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      // A freshly hired group: nothing in the decider creates a chat, so none exists yet.
+      // Two projects, a chatless member, and no chat anywhere to read the answer from. Filing the
+      // work in the wrong workspace is worse than waiting for a chat to say where it belongs.
       yield* Ref.set(h.model, {
         ...makeReadModel({
+          projects: [makeProject(), makeProject({ id: ProjectId.make("project-2") })],
           bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
           groups: [keepBusyGroup()],
           threads: [],
@@ -597,12 +624,13 @@ describe("FleetDispatcherReactor", () => {
         Effect.gen(function* () {
           yield* reactor.drain;
 
+          // A precondition of the group, like having no free member: no claim is spent on it.
           expect(h.dispatched).toEqual([]);
           expect(yield* receipts).toEqual([
             expect.objectContaining({
               type: "fleet.dispatch.decided",
               kind: "skipped",
-              reason: "no-chat",
+              reason: "no-chat-project",
               botId: SPECIALIST_ID,
             }),
           ]);
@@ -611,12 +639,13 @@ describe("FleetDispatcherReactor", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("drains the queue when the missing chat appears", () =>
+  it.effect("files the new chat where the team already talks once a chat appears", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const chatless: OrchestrationReadModel = {
+      const waiting: OrchestrationReadModel = {
         ...makeReadModel({
+          projects: [makeProject(), makeProject({ id: ProjectId.make("project-2") })],
           bots: [makeBot({ id: SPECIALIST_ID, groupId: GROUP_ID })],
           groups: [keepBusyGroup()],
           threads: [],
@@ -624,31 +653,43 @@ describe("FleetDispatcherReactor", () => {
         workItems: [workItem({ id: "item-1" })],
       };
 
-      yield* Ref.set(h.model, chatless);
+      yield* Ref.set(h.model, waiting);
+      yield* Ref.set(h.onCommand, projectCreatedChats(h));
 
       yield* run(h, ({ reactor, receipts }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
           expect(h.dispatched).toEqual([]);
-          expect(yield* receipts).toMatchObject([{ kind: "skipped", reason: "no-chat" }]);
+          expect(yield* receipts).toMatchObject([{ kind: "skipped", reason: "no-chat-project" }]);
 
-          // The user opens the bot's chat: the thread is projected and its event arrives. That
-          // event alone is what wakes the group — no turn ends and no item is touched.
+          // Someone opens a chat in the space, in the second project. That chat says where the
+          // team works, and its event alone wakes the group: no turn ends and no item is touched.
           yield* Ref.set(h.model, {
-            ...chatless,
-            threads: [botThread(SPECIALIST_ID, "thread-bot-specialist")],
+            ...waiting,
+            threads: [
+              {
+                ...makeGroupThread(),
+                id: SPACE_THREAD,
+                projectId: ProjectId.make("project-2"),
+              },
+            ],
           });
           yield* PubSub.publish(
             h.events,
-            threadCreated(1, { threadId: BOT_THREAD, botId: SPECIALIST_ID }),
+            threadCreated(1, { threadId: SPACE_THREAD, botId: null, groupId: GROUP_ID }),
           );
           yield* reactor.drainThrough(1);
 
           expect(h.dispatched.map((command) => command.type)).toEqual([
             "work-item.claim",
+            "thread.create",
             "thread.turn.start",
           ]);
+          expect(h.dispatched[1]).toMatchObject({
+            botId: SPECIALIST_ID,
+            projectId: ProjectId.make("project-2"),
+          });
           expect(yield* receipts).toMatchObject([
             {
               type: "fleet.dispatch.decided",

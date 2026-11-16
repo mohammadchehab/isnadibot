@@ -17,8 +17,11 @@ import {
   BOT_B,
   LATEST,
   NOW,
+  PROJECT_ID,
   harness,
   keepBusyGroup,
+  makeProject,
+  projectCreatedChats,
   run,
   workItem,
 } from "../test-support/FleetDispatcherFixtures.ts";
@@ -56,6 +59,7 @@ const twoIdleBots = (
   items: ReadonlyArray<WorkItem> = [workItem({ id: "item-1" })],
 ): OrchestrationReadModel => ({
   ...makeReadModel({
+    projects: [makeProject()],
     bots: [BOT_A, BOT_B],
     groups: [keepBusyGroup({ bossBotId: null, members: MEMBERS })],
     threads,
@@ -143,13 +147,15 @@ describe("FleetDispatcherReactor pick order (AC7)", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("passes over a member with no chat for one that has one", () =>
+  it.effect("picks a chatless member that ranks first, and opens its chat", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      // BOT_A never opened a chat, so having no turn at all it ranks first; a chatless member
-      // cannot be started, and the item goes to BOT_B rather than to nobody.
+      // BOT_A never opened a chat, so having no turn at all it ranks first. Having no chat is no
+      // longer a reason to pass it over: the dispatcher opens the chat it would have opened for
+      // itself, and BOT_B's existing chat is not a reason to prefer BOT_B.
       yield* Ref.set(h.model, twoIdleBots([finished(BOT_B.id, "thread-b", LATEST)]));
+      yield* Ref.set(h.onCommand, projectCreatedChats(h));
 
       yield* run(h, ({ reactor }) =>
         Effect.gen(function* () {
@@ -157,10 +163,19 @@ describe("FleetDispatcherReactor pick order (AC7)", () => {
 
           expect(h.dispatched.map((command) => command.type)).toEqual([
             "work-item.claim",
+            "thread.create",
             "thread.turn.start",
           ]);
-          expect(h.dispatched[0]).toMatchObject({ botId: BOT_B.id, workItemId: "item-1" });
-          expect(h.dispatched[1]).toMatchObject({ threadId: ThreadId.make("thread-b") });
+          expect(h.dispatched[0]).toMatchObject({ botId: BOT_A.id, workItemId: "item-1" });
+          expect(h.dispatched[1]).toMatchObject({ botId: BOT_A.id, projectId: PROJECT_ID });
+
+          const model = yield* Ref.get(h.model);
+          const opened = model.threads.find((thread) => thread.botId === BOT_A.id);
+
+          expect(h.dispatched[2]).toMatchObject({
+            type: "thread.turn.start",
+            threadId: opened?.id,
+          });
         }),
       );
     }).pipe(Effect.scoped),
