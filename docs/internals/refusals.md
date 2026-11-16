@@ -20,6 +20,8 @@ Every client command path funnels its failure through `toDispatchCommandError` (
 
 The exclusion and the failure classification stay server-side. Nothing in this document changes that, and the tests in the last section keep it that way.
 
+What crosses and what does not is the subject of [the RPC error channel](./rpc-errors.md): a declared `Fail` cause is a wire field, and a `Defect` is scrubbed at the envelope.
+
 ## The vocabulary rules
 
 These are not invented here. They were established ruling by ruling as codes were minted, and they are what keeps the 28 codes from drifting into 60.
@@ -98,6 +100,8 @@ export class OrchestrationCommandInvariantError extends Schema.TaggedErrorClass<
 ```
 
 This is the shape `BotMemoryError` already uses (`apps/server/src/memory/BotMemoryTypes.ts:13-39`): a required union on `reason`, a `TaggedErrorClass` around it, a factory for the common case. An engineer implementing this has a working file in the repo to copy rather than a shape to invent.
+
+`cause` is a `Schema.Defect()` field on a **server-side** error and it never crosses. `OrchestrationCommandInvariantError` is not in any RPC's declared error schema; `toDispatchCommandError` copies only `message` and `refusal` onto the wire error, so this field reaches the log and no client. It must not become a wire schema field — see [the RPC error channel](./rpc-errors.md).
 
 `refusal` and `exclusion` stay readable as getters so that the wire path (`wsServices.ts:555`), the reactor checks (`Layers/FleetDispatcherReactor.ts:583`, `Layers/GroupResponderQueueReactor.ts:263`, `Layers/OrchestrationEngine.ts:60`) and every `Schema.is` site keep working untouched. Only construction changes.
 
