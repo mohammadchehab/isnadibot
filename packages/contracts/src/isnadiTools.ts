@@ -68,11 +68,13 @@ const HIDDEN_PATH_SEGMENT = /^\.(?![.]?$)/;
 
 /**
  * A segment that names a credential store even in plain sight: `id_rsa`,
- * `server.key`, `secrets.yaml`, `token.txt`, `terraform.tfstate`. Every segment
- * is tested, so a file inside a `credentials/` folder is caught too.
+ * `server.key`, `secrets.yaml`, `token.txt`, `terraform.tfstate`, a keystore
+ * such as `bundle.p12` or `vault.kdbx`, and the dotless `netrc`/`npmrc`/
+ * `kubeconfig` that a rule keyed on a leading dot or a known extension misses.
+ * Every segment is tested, so a file inside a `credentials/` folder is caught too.
  */
 const CREDENTIAL_PATH_SEGMENT =
-  /\.pem$|\.key$|\.tfstate(\.backup)?$|^id_|credential|secret|token|keychain|^service-account|^adc\.json$/i;
+  /\.pem$|\.key$|\.tfstate(\.backup)?$|\.p12$|\.pfx$|\.jks$|\.p8$|\.ppk$|\.kdbx$|^(?:adc\.json|auth\.json|netrc|npmrc|kubeconfig)$|^id_|credential|secret|token|keychain|^service-account/i;
 
 /**
  * Why a read of `path` is a protected `secrets` action, or undefined when it is

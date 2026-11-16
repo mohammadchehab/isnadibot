@@ -862,10 +862,49 @@ const CREDENTIAL_PATHS = [
   "token.txt",
 ] as const;
 
+/**
+ * Keystores and key material whose extension names no credential word (TASK-390,
+ * family 1). A `.p8` is an Apple private key and a `.kdbx` is a whole KeePass
+ * database, so one delegated read of it hands over everything it holds.
+ */
+const KEYSTORE_BASENAMES = [
+  "bundle.p12",
+  "bundle.pfx",
+  "bundle.jks",
+  "AuthKey.p8",
+  "bundle.ppk",
+  "vault.kdbx",
+  "auth.json",
+] as const;
+
+/**
+ * Credential files whose names carry no dot at all (TASK-390, family 2). The
+ * hidden-segment rule already refuses `.netrc`, `.npmrc` and `.kube/config`, so
+ * these are the same files with the dot dropped — the form that used to slip
+ * through, because nothing keys on a name that has no dot and no extension.
+ */
+const DOTLESS_CREDENTIAL_BASENAMES = ["netrc", "npmrc", "kubeconfig"] as const;
+
 describe("Sensitive path classification", () => {
   const read = ISNADI_TOOL_CATALOG.find((tool) => tool.id === "ExternalRead")!;
 
   it.each(CREDENTIAL_PATHS)("refuses a read of %s", (path) => {
+    expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
+  });
+
+  // Each basename is its own case on purpose: drop one alternative from the rule
+  // and exactly that case goes red, which is what AC3 asks for.
+  it.each(KEYSTORE_BASENAMES)("refuses a read of the keystore %s", (basename) => {
+    const path = `/home/me/project/${basename}`;
+
+    expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
+  });
+
+  it.each(DOTLESS_CREDENTIAL_BASENAMES)("refuses a read of the dotless %s", (basename) => {
+    const path = `/home/me/project/${basename}`;
+
     expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
     expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
   });
