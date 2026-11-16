@@ -22,12 +22,35 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      # A version branch commit is only mergeable once CI has finished on that
+      # exact revision. Runners here are shared and a release run waits in the
+      # queue for half an hour or more, while main moves every few minutes, so
+      # force-pushing on every push to main replaced each revision before its
+      # own checks could report: the PR never showed a verdict at all. While a
+      # run for the branch is queued or in progress, leave the head alone and
+      # let that run finish on the revision it started on. The next push to main
+      # after it lands refreshes the branch.
+      - name: Leave the version branch alone while its checks run
+        id: inflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BRANCH: changeset-release/main
+        run: |
+          busy="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=$RELEASE_BRANCH&per_page=100" \
+            --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')"
+          echo "busy=$busy" >> "$GITHUB_OUTPUT"
+          if test "$busy" != 0; then
+            echo "Leaving $RELEASE_BRANCH at its current revision: $busy run(s) queued or in progress." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Checkout
+        if: steps.inflight.outputs.busy == '0'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
       - name: Setup Vite+
+        if: steps.inflight.outputs.busy == '0'
         uses: voidzero-dev/setup-vp@8a7496fd44e8a1b0a88a7459e36213b2fefc1d15 # v1
         with:
           node-version-file: package.json
@@ -35,6 +58,7 @@ jobs:
           run-install: true
 
       - name: Enable pnpm for Changesets
+        if: steps.inflight.outputs.busy == '0'
         run: corepack enable
 
       # changesets/action finds its PR through the pulls `head` filter, which
@@ -42,6 +66,7 @@ jobs:
       # every push and never refreshed the existing one. Match on head.ref instead.
       - name: Version packages
         id: version
+        if: steps.inflight.outputs.busy == '0'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -54,7 +79,7 @@ jobs:
 
       - name: Update Version Packages PR
         id: changesets
-        if: steps.version.outputs.changed == 'true'
+        if: steps.inflight.outputs.busy == '0' && steps.version.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_BRANCH: changeset-release/main
@@ -90,7 +115,7 @@ jobs:
           echo "pullRequestNumber=$pr" >> "$GITHUB_OUTPUT"
 
       - name: Run checks for the updated version branch
-        if: steps.changesets.outputs.pullRequestNumber != ''
+        if: steps.inflight.outputs.busy == '0' && steps.changesets.outputs.pullRequestNumber != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.changesets.outputs.pullRequestNumber }}

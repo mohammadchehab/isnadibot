@@ -311,7 +311,9 @@ describe("CI workflow budget", () => {
     const version = versionJob?.steps.find((step) => step.id === "version");
     expect(version?.run).toContain("pnpm release:version");
     const changesets = versionJob?.steps.find((step) => step.id === "changesets");
-    expect(changesets?.if).toBe("steps.version.outputs.changed == 'true'");
+    expect(changesets?.if).toBe(
+      "steps.inflight.outputs.busy == '0' && steps.version.outputs.changed == 'true'",
+    );
     // The PR lookup matches head.ref, since the pulls `head` filter misses this fork's PR.
     expect(changesets?.run).toContain(".head.ref == ");
     expect(changesets?.run).toContain("gh pr edit");
@@ -321,13 +323,33 @@ describe("CI workflow budget", () => {
       (step) => step.name === "Run checks for the updated version branch",
     );
 
-    expect(dispatch?.if).toBe("steps.changesets.outputs.pullRequestNumber != ''");
+    expect(dispatch?.if).toBe(
+      "steps.inflight.outputs.busy == '0' && steps.changesets.outputs.pullRequestNumber != ''",
+    );
     expect(dispatch?.if).not.toContain("hasChangesets");
     expect(dispatch?.run).toContain(".head.sha");
     expect(dispatch?.run).toContain(".head.repo.full_name");
     expect(dispatch?.run).toContain('test "$head_ref" = changeset-release/main');
     expect(dispatch?.run).toContain('-f expected_sha="$head_sha"');
     expect(dispatch?.run).toContain('-f expected_pr_number="$PR_NUMBER"');
+  });
+
+  it("leaves the version branch alone while its checks are still queued", () => {
+    const versionJob = workflow(".github/workflows/version-packages.yml").jobs.version;
+    const steps = versionJob?.steps ?? [];
+    const guardAt = steps.findIndex((step) => step.id === "inflight");
+    const guard = steps[guardAt];
+
+    // The guard reads the branch's own runs and counts the ones that have not reported yet.
+    expect(guard?.env?.RELEASE_BRANCH).toBe("changeset-release/main");
+    expect(guard?.run).toContain("actions/runs?branch=$RELEASE_BRANCH");
+    expect(guard?.run).toContain('.status == "queued" or .status == "in_progress"');
+    expect(guard?.run).toContain('echo "busy=$busy" >> "$GITHUB_OUTPUT"');
+
+    // Every later step defers to it, so a queued revision is never replaced under its own run.
+    for (const step of steps.slice(guardAt + 1)) {
+      expect(step.if).toContain("steps.inflight.outputs.busy == '0'");
+    }
   });
 
   it("uses 4-vCPU Linux runners in the manual release smoke workflow", () => {

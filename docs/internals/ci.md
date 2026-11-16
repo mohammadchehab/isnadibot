@@ -144,6 +144,13 @@ package versions synchronized. Only the repository-owned Changesets branch and b
 request can bypass the marker check or change those stable versions. Updates to that branch dispatch
 CI against the exact pull request head SHA; empty-only changesets do not dispatch a version branch.
 
+That dispatch waits in the same queue as everything else, and a release run can sit behind other work
+for half an hour or more while `main` moves every few minutes. Force-pushing the branch on every push to
+`main` therefore replaced each revision before its own checks could report, so the Version Packages pull
+request never carried a verdict and could not be merged. The workflow now leaves the branch at its
+current revision while any run for it is queued or in progress, and refreshes it on the next push to
+`main` once that run has landed. The head a reviewer sees is the head whose checks are running.
+
 [`.github/workflows/mobile-bundle.yml`](../../.github/workflows/mobile-bundle.yml) runs
 `expo export --platform ios` when mobile code, shared packages, or the lockfile change, on pull requests and
 on `main`. It is the only job that resolves the Metro graph; a missing import or asset fails it. The
