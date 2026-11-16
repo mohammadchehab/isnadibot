@@ -1,6 +1,11 @@
 export const rosterCatalog = {
   Decisions: "Decisions",
   "Nothing waiting on you": "Nothing waiting on you",
+  "When a bot needs an approval or an answer, it shows up here.":
+    "When a bot needs an approval or an answer, it shows up here.",
+  "Loading decisions": "Loading decisions",
+  "{count} chats waiting on you": "{count} chats waiting on you",
+  "{count} chats waiting on you#one": "{count} chat waiting on you",
   "Show all ({count})": "Show all ({count})",
   "Run bots in a persistent Linux VM. Public previews are enabled by default.":
     "Run bots in a persistent Linux VM. Public previews are enabled by default.",

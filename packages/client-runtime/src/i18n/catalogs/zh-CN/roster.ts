@@ -1,6 +1,11 @@
 export const rosterCatalog = {
   Decisions: "待决事项",
   "Nothing waiting on you": "没有等你处理的事项",
+  "When a bot needs an approval or an answer, it shows up here.":
+    "当机器人需要你批准或回答时，它会出现在这里。",
+  "Loading decisions": "正在加载待决事项",
+  "{count} chats waiting on you": "{count} 个对话在等你处理",
+  "{count} chats waiting on you#one": "{count} 个对话在等你处理",
   "Show all ({count})": "显示全部（{count}）",
   "Run bots in a persistent Linux VM. Public previews are enabled by default.":
     "在持久化 Linux 虚拟机中运行机器人。默认启用公开预览。",
