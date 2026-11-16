@@ -349,11 +349,7 @@ export function ThreadMemoryScreen() {
             editing={factEdit}
             error={durableQuery.error}
             facts={durableQuery.data?.facts ?? null}
-            failure={
-              factFailure
-                ? [t(factFailure.message), factFailure.detail].filter(Boolean).join(" ")
-                : null
-            }
+            failure={factFailure ? t(factFailure.message) : null}
             isPending={durableQuery.isPending}
             policy={factPolicy}
             onCancelEdit={() => setFactEdit(null)}
