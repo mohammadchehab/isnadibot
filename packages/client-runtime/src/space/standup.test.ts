@@ -5,6 +5,7 @@ import {
   GroupId,
   ThreadId,
   WorkItemId,
+  type BotAvatar,
   type WorkItemBlockedOn,
   type WorkItemState,
 } from "@isnadi/contracts";
@@ -36,10 +37,12 @@ const group: SpaceGroup = {
   updatedAt: NOW,
 };
 
+const AVATAR = { kind: "blob", shape: "circle", color: "#2E8EFF" } satisfies BotAvatar;
+
 const ROSTER: ReadonlyArray<CapacityBot> = [
-  { id: ENGINEER, name: "Engineer", archivedAt: null },
-  { id: BOSS, name: "Boss", archivedAt: null },
-  { id: OUTSIDER, name: "Outsider", archivedAt: null },
+  { id: ENGINEER, name: "Engineer", avatar: AVATAR, archivedAt: null },
+  { id: BOSS, name: "Boss", avatar: AVATAR, archivedAt: null },
+  { id: OUTSIDER, name: "Outsider", avatar: AVATAR, archivedAt: null },
 ];
 
 function chat(overrides: Partial<StandupChat> = {}): StandupChat {

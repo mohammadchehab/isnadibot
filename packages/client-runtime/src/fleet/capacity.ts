@@ -5,7 +5,12 @@ import {
   countBotStatuses,
   deriveBotStatus,
 } from "@isnadi/shared/botStatus";
-import type { BotId, OrchestrationThreadShell, WorkItemSummary } from "@isnadi/contracts";
+import type {
+  BotAvatar,
+  BotId,
+  OrchestrationThreadShell,
+  WorkItemSummary,
+} from "@isnadi/contracts";
 
 /**
  * The capacity view's data: one row per bot in a fleet group, boss first, built
@@ -18,6 +23,7 @@ import type { BotId, OrchestrationThreadShell, WorkItemSummary } from "@isnadi/c
 export interface CapacityBot {
   readonly id: BotId;
   readonly name: string;
+  readonly avatar: BotAvatar;
   readonly archivedAt: string | null;
 }
 
@@ -57,6 +63,8 @@ export interface CapacityOpenItem {
 export interface CapacityRow {
   readonly botId: BotId;
   readonly name: string;
+  /** The bot's avatar, so a row can draw the bot rather than only name it. */
+  readonly avatar: BotAvatar;
   readonly isBoss: boolean;
   readonly status: BotStatus;
   /** Null when the bot holds no open item; the view shows an em dash for it. */
@@ -150,6 +158,7 @@ export function buildCapacity(input: CapacityInput): Capacity {
     (bot): CapacityRow => ({
       botId: bot.id,
       name: bot.name,
+      avatar: bot.avatar,
       isBoss: bot === boss,
       status: deriveBotStatus({
         botId: bot.id,

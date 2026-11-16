@@ -28,6 +28,7 @@ import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { workItemEnvironment } from "../../state/workItems";
 import { useOpenChat } from "../chat/useOpenChat";
+import { BotAvatarView } from "../roster/BotAvatarView";
 import { BOT_STATUS_LABEL } from "../roster/botStatusPresentation";
 import type { Group } from "../roster/types";
 import { Badge } from "../ui/badge";
@@ -128,23 +129,28 @@ function TeamRow({
 
   return (
     <tr className="border-t border-border/60" data-bot-id={row.botId} data-status={row.status}>
-      <th scope="row" className="py-2 pe-3 text-start align-top font-medium">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <bdi className="truncate">{row.name}</bdi>
-          {row.isBoss ? (
-            <Badge size="default" variant="secondary">
-              {t("Boss")}
-            </Badge>
-          ) : null}
+      <th scope="row" className="py-4 pe-3 text-start align-top font-medium">
+        {/* The frame's row draws the bot, not only its name: a 20px avatar, then the
+            name 8px after it (E13a `Row / Tracker`, avatar at x=397, name at 425). */}
+        <span className="flex min-w-0 items-center gap-2">
+          <BotAvatarView avatar={row.avatar} name={row.name} className="size-5" />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <bdi className="truncate">{row.name}</bdi>
+            {row.isBoss ? (
+              <Badge size="default" variant="secondary">
+                {t("Boss")}
+              </Badge>
+            ) : null}
+          </span>
         </span>
       </th>
-      <td className="py-2 pe-3 align-top">
+      <td className="py-4 pe-3 align-top">
         <Badge size="default" variant={STATUS_BADGE_VARIANT[row.status]}>
           {/* Two E13 frames name the person being asked, so the table says "Asking you". */}
           {row.status === "asking" ? t("Asking you") : t(BOT_STATUS_LABEL[row.status])}
         </Badge>
       </td>
-      <td className="min-w-0 py-2 pe-3 align-top text-sm text-muted-foreground">
+      <td className="min-w-0 py-4 pe-3 align-top text-sm text-muted-foreground">
         {item === null ? "—" : <bdi className="truncate">{item.title}</bdi>}
         {item !== null && item.extra > 0 ? (
           <span className="ms-1 tabular-nums">{`+${item.extra}`}</span>
@@ -153,7 +159,7 @@ function TeamRow({
         {blockedNote === null ? null : <span className="block text-xs">{blockedNote}</span>}
       </td>
       <td
-        className="py-2 pe-3 align-top text-sm tabular-nums text-muted-foreground"
+        className="py-4 pe-3 align-top text-sm tabular-nums text-muted-foreground"
         {...(usedPercentage === null
           ? {}
           : { title: t("Context used: {percent}%", { percent: Math.round(usedPercentage) }) })}
@@ -161,8 +167,9 @@ function TeamRow({
         {contextLabel === null ? "—" : contextLabel}
       </td>
       {/* The frame gives every row its action cell: an open on the row that is asking,
-          then the row menu's trigger. The menu itself is E13b's. */}
-      <td className="py-2 align-top">
+          then the row menu's trigger. The menu itself is E13b's. Its 28px controls
+          take 12px of padding so the row stays the frame's 53, not 61. */}
+      <td className="py-3 align-top">
         <span className="flex items-center justify-end gap-1">
           {row.status === "asking" && chatId !== null && environmentId !== null ? (
             <Button size="sm" variant="outline" onClick={openAskingChat}>
@@ -278,19 +285,19 @@ export function SpaceTeamTable({ group }: { group: Group }) {
         <table className="w-full text-start">
           <thead>
             <tr className="text-xs text-muted-foreground">
-              <th scope="col" className="pb-1 pe-3 text-start font-medium">
+              <th scope="col" className="py-3 pe-3 text-start font-medium">
                 {t("Bot")}
               </th>
-              <th scope="col" className="pb-1 pe-3 text-start font-medium">
+              <th scope="col" className="py-3 pe-3 text-start font-medium">
                 {t("Status")}
               </th>
-              <th scope="col" className="pb-1 pe-3 text-start font-medium">
+              <th scope="col" className="py-3 pe-3 text-start font-medium">
                 {t("Working on")}
               </th>
-              <th scope="col" className="pb-1 pe-3 text-start font-medium">
+              <th scope="col" className="py-3 pe-3 text-start font-medium">
                 {t("Context")}
               </th>
-              <th scope="col" className="pb-1" />
+              <th scope="col" className="py-3" />
             </tr>
           </thead>
           <tbody>

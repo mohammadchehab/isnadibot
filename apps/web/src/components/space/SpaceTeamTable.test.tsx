@@ -146,6 +146,15 @@ describe("space team table", () => {
     expect(markup).not.toContain("0k of");
   });
 
+  it("draws each bot's avatar in its Bot cell at the frame's 20px", () => {
+    const markup = render();
+
+    // The shape comes off the bot through the capacity row, so a row that has it
+    // proves the avatar reached the table.
+    expect(markup.match(/data-avatar-shape="circle"/g)).toHaveLength(2);
+    expect(markup.match(/select-none size-5/g)).toHaveLength(2);
+  });
+
   it("gives every row its action trigger, and the asking row an Open before it", () => {
     mocks.snapshot = makeShellSnapshot({
       bots: [
