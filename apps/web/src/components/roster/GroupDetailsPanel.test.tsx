@@ -19,7 +19,6 @@ describe("GroupDetailsPanel", () => {
     expect(source).toContain("botEnvironment.groups.rename");
     expect(source).toContain("botEnvironment.groups.assignMember");
     expect(source).toContain("botEnvironment.groups.unassignMember");
-    expect(source).toContain("botEnvironment.groups.setBoss");
     expect(source).toContain("botEnvironment.groups.delete");
     expect(source).toContain("input.memberCount <= 2");
     expect(source).not.toContain("Invite people");
@@ -55,15 +54,16 @@ describe("GroupDetailsPanel", () => {
     expect(source).toContain("Every bot is already in this group.");
   });
 
-  // The toggle goes through the typed command, never a raw wire string, so a
-  // rename of the command breaks the build here instead of at runtime.
-  it("turns keep-busy on and off through the group command", () => {
+  // The panel links to the page that owns the two settings (decision-90), so
+  // neither control is duplicated here and neither command is called from it.
+  it("names itself Space settings and links to the page instead of carrying the rows", () => {
     const source = readGroupDetailsSources();
 
-    expect(source).toContain("botEnvironment.groups.setKeepBusy");
-    expect(source).not.toContain("group.keep-busy");
-    expect(source).toContain("aria-busy={busy}");
-    expect(source).toContain("checked={groupKeepsBusy(group)}");
+    expect(source).toContain('t("Space settings")');
+    expect(source).toContain('t("Open space settings")');
+    expect(source).toContain('to="/groups/$groupId/settings"');
+    expect(source).not.toContain("botEnvironment.groups.setBoss");
+    expect(source).not.toContain("botEnvironment.groups.setKeepBusy");
   });
 
   it("mounts beside the group conversation", () => {

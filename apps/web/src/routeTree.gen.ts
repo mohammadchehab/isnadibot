@@ -19,6 +19,7 @@ import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
 import { Route as SettingsSplatRouteImport } from './routes/settings.$'
 import { Route as SettingsProvidersProviderIdRouteImport } from './routes/settings.providers.$providerId'
 import { Route as SettingsChannelsChannelRouteImport } from './routes/settings.channels.$channel'
+import { Route as GroupsGroupIdSettingsRouteImport } from './routes/groups.$groupId.settings'
 import { Route as BotsBotIdSettingsRouteImport } from './routes/bots.$botId.settings'
 import { Route as ChatGroupsGroupIdRouteImport } from './routes/_chat.groups.$groupId'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
@@ -77,6 +78,11 @@ const SettingsChannelsChannelRoute = SettingsChannelsChannelRouteImport.update({
   path: '/channels/$channel',
   getParentRoute: () => SettingsRoute,
 } as any)
+const GroupsGroupIdSettingsRoute = GroupsGroupIdSettingsRouteImport.update({
+  id: '/groups/$groupId/settings',
+  path: '/groups/$groupId/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BotsBotIdSettingsRoute = BotsBotIdSettingsRouteImport.update({
   id: '/bots/$botId/settings',
   path: '/bots/$botId/settings',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/groups/$groupId': typeof ChatGroupsGroupIdRoute
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
+  '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
   '/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/groups/$groupId': typeof ChatGroupsGroupIdRoute
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
+  '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
   '/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/_chat/groups/$groupId': typeof ChatGroupsGroupIdRoute
   '/bots/$botId/settings': typeof BotsBotIdSettingsRoute
+  '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/settings/channels/$channel': typeof SettingsChannelsChannelRoute
   '/settings/providers/$providerId': typeof SettingsProvidersProviderIdRoute
   '/_chat/spaces/new/$templateId': typeof ChatSpacesNewTemplateIdRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/draft/$draftId'
     | '/groups/$groupId'
     | '/bots/$botId/settings'
+    | '/groups/$groupId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
     | '/spaces/new/$templateId'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/draft/$draftId'
     | '/groups/$groupId'
     | '/bots/$botId/settings'
+    | '/groups/$groupId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
     | '/spaces/new/$templateId'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/_chat/draft/$draftId'
     | '/_chat/groups/$groupId'
     | '/bots/$botId/settings'
+    | '/groups/$groupId/settings'
     | '/settings/channels/$channel'
     | '/settings/providers/$providerId'
     | '/_chat/spaces/new/$templateId'
@@ -235,6 +247,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   UsageRoute: typeof UsageRoute
   BotsBotIdSettingsRoute: typeof BotsBotIdSettingsRoute
+  GroupsGroupIdSettingsRoute: typeof GroupsGroupIdSettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/channels/$channel'
       preLoaderRoute: typeof SettingsChannelsChannelRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/groups/$groupId/settings': {
+      id: '/groups/$groupId/settings'
+      path: '/groups/$groupId/settings'
+      fullPath: '/groups/$groupId/settings'
+      preLoaderRoute: typeof GroupsGroupIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/bots/$botId/settings': {
       id: '/bots/$botId/settings'
@@ -408,6 +428,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   UsageRoute: UsageRoute,
   BotsBotIdSettingsRoute: BotsBotIdSettingsRoute,
+  GroupsGroupIdSettingsRoute: GroupsGroupIdSettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
