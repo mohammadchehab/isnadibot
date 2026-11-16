@@ -7,7 +7,8 @@ on every push to `main`. Draft pull requests do not use a runner. A new revision
 for that pull request. Runs on `main` are never cancelled, and each push has its own concurrency group keyed by commit SHA
 (a shared group would cancel the one queued run when a newer one arrived), so every merge gets its own
 verdict and a broken `main` points at the merge that broke it. Maintainers can also dispatch the workflow manually
-for diagnostics. The heavy jobs (desktop and the server shards) run on the three self-hosted `hetzner` runners
+for diagnostics. The heavy jobs (desktop, the server shards and the web e2e journey) run on the three
+self-hosted `hetzner` runners
 for the repository's own branches, and on GitHub-hosted `ubuntu-24.04` runners for pull requests from forks, so
 fork code never runs on our box. The other jobs use GitHub-hosted `ubuntu-24.04` runners, and the issue-label
 and PR-size jobs use Tenki Linux runners.
@@ -33,11 +34,13 @@ a pull request run. The `Provide Chromium` step runs
 [the installer](../../scripts/ci/install-chromium.sh) on self-hosted runners only, then exports the
 resolved binary as `ISNADI_CHROMIUM_PATH`. Tests read it through
 `apps/server/src/browser/chromiumBinary.ts` and skip when it is unset, so a pull request from a fork
-runs on GitHub-hosted `ubuntu-24.04` without the step and stays green.
+runs on GitHub-hosted `ubuntu-24.04` without the step and stays green. The `web-e2e` job runs the
+same step without that guard: its filter answers `false` for a fork pull request, so the job only
+ever runs where a browser can be provided.
 
 The version is pinned in `CHROME_VERSION` at the top of the installer, currently `157.0.8103.78`,
-and is the Chrome for Testing `chrome-linux64` build, not the headless shell, so the same install
-can drive the web e2e suite later. `scripts/ci-workflow-policy.test.ts` fails when this page and
+and is the Chrome for Testing `chrome-linux64` build, not the headless shell, which is what lets the
+same install drive the web e2e journey. `scripts/ci-workflow-policy.test.ts` fails when this page and
 the installer disagree, so bump both together.
 
 The Playwright harness reads the same variable. `e2e/web/support/journey.ts` launches the pinned
@@ -110,7 +113,10 @@ To undo the cap, run `systemctl enable --now` for the runners you want back, the
 CI runs as parallel jobs, so a run takes as long as its slowest job instead of the sum of all steps:
 
 - **Changed files.** Decides whether a pull request changes anything besides `docs/`, `.changeset/`,
-  `.github/assets/`, and root Markdown files. Pushes to `main` and dispatches always count as code.
+  `.github/assets/`, and root Markdown files. Pushes to `main` and dispatches always count as code. It
+  answers a second, narrower question for the browser journey: whether anything it clicks through
+  changed (`apps/web/`, `apps/server/`, `packages/client-runtime/`, `packages/contracts/`, `e2e/`,
+  or `ci.yml` itself), and never asks for it on a pull request from a fork.
 - **Static checks.** Runs the guards on every pull request, docs-only ones included: it rejects
   committed PR assets, external local dependencies, stable-version changes, and a missing changeset
   decision. It also validates the plugin directory and contribution policy and checks formatting, since those read
@@ -127,6 +133,17 @@ CI runs as parallel jobs, so a run takes as long as its slowest job instead of t
 - **Mobile tests.** Runs the `@isnadi/mobile` suite. It needs its own job because the desktop job's
   package filter excludes `@isnadi/mobile`; before this job existed no CI run executed the mobile
   tests, so a red mobile suite could not fail the build.
+- **Web e2e.** Runs one Playwright journey, `e2e/web/journeys/chat.e2e.ts`, in a real browser: it
+  pairs a fresh browser, creates a bot, sends it a message answered by a stub OpenAI provider, and
+  reloads the page. The journey boots its own dev stack against a throwaway home directory, so the
+  job needs the provided browser and the workspace and nothing else. It warms Vite's dependency
+  cache first: a fresh checkout has none, and the optimize pass on the journey's first page load
+  outlasts the harness's 90-second serve budget, which reads as a broken stack rather than a slow
+  one. One journey, no sharding: the
+  suite's value is a click path executed on every pull request that can reach it, and the E13 demo
+  journey grows one merged step at a time rather than as a job that is red until the demo lands. It
+  does not cover the real provider CLIs, the Electron shell, mobile, the remote, relay and tunnel
+  connection modes, persistence across migrations, or design fidelity.
 - **Repository checks.** A small final job that depends on all the others. It fails when any job fails or
   is cancelled, or when a code change skipped a job it should have run. For a docs-only pull request it
   passes when the heavy jobs were skipped. Branch protection requires only this one status, so adding

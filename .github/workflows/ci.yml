@@ -37,26 +37,41 @@ jobs:
     outputs:
       heavy_runner: ${{ steps.runner.outputs.heavy_runner }}
       code: ${{ steps.filter.outputs.code }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       # Docs-only pull requests skip the build and test jobs. Renames count both paths. Pushes to main and dispatches always run everything.
+      # `e2e` is the narrower question the browser journey asks: did anything it clicks through change?
       - name: Detect code changes
         id: filter
         env:
           EVENT_NAME: ${{ github.event_name }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          e2e=false
           if test "$EVENT_NAME" != pull_request; then
-            echo 'code=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')"
-          test -n "$files"
-          if printf '%s\n' "$files" | grep -qvE '^(docs/|\.changeset/|\.github/assets/|[^/]+\.md$)'; then
-            echo 'code=true' >> "$GITHUB_OUTPUT"
+            code=true
+            # The journey launches the Chromium the self-hosted box provisions; a fork pull request
+            # runs on a GitHub-hosted runner that has no browser, so it skips the job rather than
+            # failing it at launch.
+            test "$IS_FORK" = "true" || e2e=true
           else
-            echo 'code=false' >> "$GITHUB_OUTPUT"
+            files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+            test -n "$files"
+            if printf '%s\n' "$files" | grep -qvE '^(docs/|\.changeset/|\.github/assets/|[^/]+\.md$)'; then
+              code=true
+            else
+              code=false
+            fi
+            # The workflow file itself counts: a change to the job that runs the journey is exactly
+            # when an unrun gate goes unnoticed, and it makes the job prove itself on its own PR.
+            if test "$IS_FORK" != "true" && printf '%s\n' "$files" | grep -qE '^(apps/web/|apps/server/|packages/client-runtime/|packages/contracts/|e2e/|\.github/workflows/ci\.yml$)'; then
+              e2e=true
+            fi
           fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
 
       - name: Pick the runner for heavy jobs
         id: runner
@@ -296,11 +311,46 @@ jobs:
       - name: Test the mobile app
         run: vp run --filter @isnadi/mobile test
 
+  # The one journey that clicks through the app before merge. It boots its own dev stack against a
+  # throwaway home dir, so it needs nothing but a browser and the workspace. `changes` decides
+  # whether the pull request touched anything the journey clicks through, and answers false on a
+  # fork pull request, whose GitHub-hosted runner has no browser to launch.
+  web-e2e:
+    name: Web e2e
+    needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
+    runs-on: ${{ needs.changes.outputs.heavy_runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.expected_sha || github.sha }}
+
+      - name: Install workspace
+        uses: ./.github/actions/install
+
+      # Vite optimizes the web app's dependencies on the first page load. A fresh checkout has no
+      # cache, and the optimize pass alone outlasts the harness's 90s serve budget, which reads as a
+      # broken stack. Warming ahead of the journey is the same step worktree setup runs.
+      - name: Warm the web dependency cache
+        run: node apps/web/scripts/warm-dep-cache.ts
+
+      - name: Provide Chromium
+        run: |
+          binary="$(scripts/ci/install-chromium.sh /opt/chrome-for-testing)"
+          "${binary}" --version
+          echo "ISNADI_CHROMIUM_PATH=${binary}" >> "$GITHUB_ENV"
+
+      - name: Run the chat journey
+        working-directory: e2e/web
+        run: vp test run journeys/chat.e2e.ts
+
   # The only job the repository ruleset requires. It stays green when docs-only pull requests skip the
   # heavy jobs, and fails when any job fails, is cancelled, or is skipped when it should have run.
   check:
     name: Repository checks
-    needs: [changes, static, desktop, server, native, mobile]
+    needs: [changes, static, desktop, server, native, mobile, web-e2e]
     if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -310,8 +360,11 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           code="$(printf '%s' "$NEEDS" | jq -r '.changes.outputs.code')"
+          e2e="$(printf '%s' "$NEEDS" | jq -r '.changes.outputs.e2e')"
           expected_heavy=skipped
+          expected_e2e=skipped
           test "$code" = true && expected_heavy=success
+          test "$code" = true && test "$e2e" = true && expected_e2e=success
           status=0
           check() {
             actual="$(printf '%s' "$NEEDS" | jq -r ".\"$1\".result")"
@@ -326,4 +379,5 @@ jobs:
           check server "$expected_heavy"
           check native "$expected_heavy"
           check mobile "$expected_heavy"
+          check web-e2e "$expected_e2e"
           exit "$status"

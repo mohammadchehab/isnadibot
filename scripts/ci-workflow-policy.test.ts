@@ -12,6 +12,7 @@ type Step = {
   readonly env?: Readonly<Record<string, string>>;
   readonly uses?: string;
   readonly with?: Readonly<Record<string, string | boolean>>;
+  readonly "working-directory"?: string;
 };
 
 type Job = {
@@ -19,6 +20,7 @@ type Job = {
   readonly needs?: string | ReadonlyArray<string>;
   readonly name?: string;
   readonly "runs-on": string;
+  readonly "timeout-minutes"?: number;
   readonly outputs?: Readonly<Record<string, string>>;
   readonly strategy?: {
     readonly "fail-fast"?: boolean;
@@ -95,6 +97,7 @@ describe("CI workflow budget", () => {
       "server",
       "native",
       "mobile",
+      "web-e2e",
       "check",
     ]);
 
@@ -103,7 +106,7 @@ describe("CI workflow budget", () => {
 
     expect(ci.jobs.changes?.if).toBe(draftGuard);
 
-    for (const name of ["static", "desktop", "server", "native", "mobile"]) {
+    for (const name of ["static", "desktop", "server", "native", "mobile", "web-e2e"]) {
       expect(ci.jobs[name]?.needs).toBe("changes");
     }
 
@@ -114,7 +117,7 @@ describe("CI workflow budget", () => {
       expect(ci.jobs[name]?.["runs-on"]).toBe("ubuntu-24.04");
     }
 
-    for (const name of ["desktop", "server"]) {
+    for (const name of ["desktop", "server", "web-e2e"]) {
       expect(ci.jobs[name]?.["runs-on"]).toBe("${{ needs.changes.outputs.heavy_runner }}");
     }
 
@@ -131,10 +134,76 @@ describe("CI workflow budget", () => {
       expect(ci.jobs[name]?.if).toBe("${{ needs.changes.outputs.code == 'true' }}");
     }
 
+    // The web e2e job runs one journey that clicks through the app, and only when the pull request
+    // touched something the journey clicks through. The journey boots its own dev stack against a
+    // throwaway home dir, so the job needs a browser and nothing else.
+    const webE2e = ci.jobs["web-e2e"];
+
+    expect(webE2e?.name).toBe("Web e2e");
+    expect(webE2e?.if).toBe("${{ needs.changes.outputs.e2e == 'true' }}");
+    expect(webE2e?.["timeout-minutes"]).toBe(20);
+    expect(ci.jobs.changes?.outputs?.e2e).toBe("${{ steps.filter.outputs.e2e }}");
+
+    const e2eFilter = ci.jobs.changes?.steps?.find((step) => step.id === "filter");
+
+    // A fork pull request runs on a GitHub-hosted runner with no browser, so the journey is asked
+    // for only where the runner can launch one.
+    expect(e2eFilter?.env?.IS_FORK).toBe("${{ github.event.pull_request.head.repo.fork }}");
+    expect(e2eFilter?.run).toContain('test "$IS_FORK" = "true" || e2e=true');
+    expect(e2eFilter?.run).toContain('echo "e2e=$e2e" >> "$GITHUB_OUTPUT"');
+
+    // Every path prefix the journey clicks through, so a change to any of them runs it. The workflow
+    // file itself is one of them: a change to the job is when an unrun gate goes unnoticed. Its dots
+    // are escaped in the filter's regex, so they are escaped here too.
+    for (const prefix of [
+      "apps/web/",
+      "apps/server/",
+      "packages/client-runtime/",
+      "packages/contracts/",
+      "e2e/",
+      "\\.github/workflows/ci\\.yml",
+    ]) {
+      expect(e2eFilter?.run).toContain(prefix);
+    }
+
+    const e2eChromium = webE2e?.steps?.find((step) => step.name === "Provide Chromium");
+
+    // Unguarded on purpose: the job runs only where a browser can be provided.
+    expect(e2eChromium?.if).toBeUndefined();
+    expect(e2eChromium?.run).toContain("scripts/ci/install-chromium.sh");
+    expect(e2eChromium?.run).toContain('echo "ISNADI_CHROMIUM_PATH=${binary}" >> "$GITHUB_ENV"');
+
+    const journey = webE2e?.steps?.find((step) => step.name === "Run the chat journey");
+
+    expect(journey?.["working-directory"]).toBe("e2e/web");
+    expect(journey?.run).toBe("vp test run journeys/chat.e2e.ts");
+    expect(webE2e?.steps?.find((step) => step.name === "Checkout")?.with?.ref).toBe(
+      "${{ inputs.expected_sha || github.sha }}",
+    );
+
+    // A fresh checkout has no Vite dependency cache, and the optimize pass on the journey's first
+    // page load outlasts the harness's serve budget. The warm step must therefore precede it.
+    const e2eSteps = (webE2e?.steps ?? []).map((step) => step.name ?? "");
+
+    expect(webE2e?.steps?.find((step) => step.name === "Warm the web dependency cache")?.run).toBe(
+      "node apps/web/scripts/warm-dep-cache.ts",
+    );
+    expect(e2eSteps.indexOf("Warm the web dependency cache")).toBeLessThan(
+      e2eSteps.indexOf("Run the chat journey"),
+    );
+
     // The aggregator is the only required status: it must run when others fail or skip, but not on drafts.
     const check = ci.jobs.check;
     expect(check?.name).toBe("Repository checks");
-    expect(check?.needs).toEqual(["changes", "static", "desktop", "server", "native", "mobile"]);
+    expect(check?.needs).toEqual([
+      "changes",
+      "static",
+      "desktop",
+      "server",
+      "native",
+      "mobile",
+      "web-e2e",
+    ]);
     expect(check?.if).toBe(`\${{ always() && (${draftGuard.slice(4, -3)}) }}`);
 
     const gate =
@@ -149,6 +218,11 @@ describe("CI workflow budget", () => {
     expect(gate).toContain('check mobile "$expected_heavy"');
     expect(gate).toContain("expected_heavy=skipped");
     expect(gate).toContain("expected_heavy=success");
+
+    // The e2e job's own expectation: skipped unless the filter asked for it.
+    expect(gate).toContain("expected_e2e=skipped");
+    expect(gate).toContain("expected_e2e=success");
+    expect(gate).toContain('check web-e2e "$expected_e2e"');
     expect(
       Object.entries(ci.jobs).filter(([, job]) => job.name === "Repository checks"),
     ).toHaveLength(1);
@@ -232,6 +306,8 @@ describe("CI workflow budget", () => {
       "cargo fmt --manifest-path native/resource-monitor/Cargo.toml -- --check",
       "cargo test --locked --manifest-path native/resource-monitor/Cargo.toml",
       "vp run release:smoke",
+      "journeys/chat.e2e.ts",
+      "apps/web/scripts/warm-dep-cache.ts",
     ]) {
       expect(commands.some((candidate) => candidate.includes(command))).toBe(true);
     }
