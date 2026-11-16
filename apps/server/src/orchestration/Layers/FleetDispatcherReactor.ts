@@ -423,6 +423,10 @@ const make = Effect.gen(function* () {
       groups.has(groupId) ? groups : new Set([...groups, groupId]),
     ).pipe(Effect.andThen(worker.enqueue(undefined)));
 
+  // A bot's group, for the events that name a bot rather than a group or a thread.
+  const groupOfBot = (readModel: OrchestrationReadModel, botId: BotId): GroupId | undefined =>
+    readModel.bots.find((bot) => bot.id === botId)?.groupId ?? undefined;
+
   // A thread's group: its own for a group chat, or the group of the bot that owns the chat.
   const groupOfThread = (
     readModel: OrchestrationReadModel,
@@ -440,7 +444,7 @@ const make = Effect.gen(function* () {
 
     if (botId === null || botId === undefined) return undefined;
 
-    return readModel.bots.find((bot) => bot.id === botId)?.groupId ?? undefined;
+    return groupOfBot(readModel, botId);
   };
 
   // The event names a thread, but only the read model says which groups are worth a look — and the
@@ -513,6 +517,19 @@ const make = Effect.gen(function* () {
       // chat only removes dispatchability, so thread.deleted and thread.archived wake nobody.
       case "thread.created":
         return scheduleAfterRead(event.payload.groupId ?? undefined, event.payload.threadId);
+
+      // A roster change decides who the pick can choose from, so an item that had no free member
+      // may have one now: a join adds a candidate, a departure frees the pick, and a boss change
+      // moves the specialist/boss split. None of them touches an item, so nothing else wakes it.
+      case "group.member-assigned":
+      case "group.member-unassigned":
+      case "group.boss-set":
+        return schedule(event.payload.groupId);
+
+      // Restoring a bot makes it idle and dispatchable again. Archiving only removes
+      // dispatchability, so bot.archived wakes nobody, the way thread.deleted does not.
+      case "bot.restored":
+        return scheduleGroupsAfterRead((readModel) => [groupOfBot(readModel, event.payload.botId)]);
 
       case "group.keep-busy-set":
         return event.payload.keepBusy ? schedule(event.payload.groupId) : Effect.void;
