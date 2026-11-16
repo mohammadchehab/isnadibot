@@ -83,6 +83,85 @@ beforeEach(() => {
   });
 });
 
+/** One record for one connected provider, priced or not, so the headline has something to say. */
+function costSummary(bucket: {
+  costSource: "providerReported" | "modelPriced" | "unpriced";
+  costUsd: number;
+  unpricedRecords: number;
+}) {
+  return {
+    contractVersion: USAGE_CONTRACT_VERSION,
+    readAt: "2026-09-13T00:00:00.000Z",
+    timeZone: "UTC",
+    sinceDay: UsageDay.make("2026-08-15"),
+    untilDay: UsageDay.make("2026-09-13"),
+    buckets: [
+      {
+        day: UsageDay.make("2026-09-13"),
+        provider: "codex" as const,
+        model: "gpt-5.6-sol",
+        totals: {
+          uncachedInputTokens: 1_000,
+          cachedInputTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 100,
+          reasoningTokens: 0,
+        },
+        costUsd: bucket.costUsd,
+        cacheSavingsUsd: 0,
+        costSource: bucket.costSource,
+        records: 1,
+        unpricedRecords: bucket.unpricedRecords,
+        sessions: 1,
+      },
+    ],
+    sources: [
+      {
+        fingerprint: {
+          hostId: "test-machine",
+          provider: "codex" as const,
+          resolvedHomePath: "/home/test/.codex/sessions",
+          volumeId: "1:1",
+        },
+        status: "ok" as const,
+        scannedFiles: 1,
+        skippedFiles: 0,
+        malformedRecords: 0,
+        distinctSessions: 1,
+        message: null,
+      },
+    ],
+    planLimits: [],
+    connectedProviders: ["openai-codex" as const],
+    pricing: { status: "fresh" as const, source: "litellm", fetchedAt: null, knownModels: 1 },
+    scanDurationMs: 1,
+  };
+}
+
+/** Renders the page on a cost metric over one environment carrying `summary`. */
+function renderCostPage(summary: ReturnType<typeof costSummary>) {
+  testState.useUsage.mockReturnValue({
+    merged: mergeUsage(
+      [{ environmentId: EnvironmentId.make("env-1"), label: "This Mac", summary }],
+      USAGE_CONTRACT_VERSION,
+    ),
+    environments: [
+      {
+        environmentId: "env-1",
+        label: "This Mac",
+        isPending: false,
+        error: null,
+        summary,
+      },
+    ],
+    isPending: false,
+    isPartial: false,
+    refresh: vi.fn(),
+  });
+
+  return renderToStaticMarkup(<UsagePage />);
+}
+
 describe("UsagePage", () => {
   it("shows remaining plan for connected providers only", () => {
     const markup = renderToStaticMarkup(<UsagePage />);
@@ -357,5 +436,30 @@ describe("UsagePage", () => {
 
     expect(markup).toContain("This Mac runs an older server version");
     expect(markup).not.toContain("Connect a provider in Settings");
+  });
+
+  it("says a price is unknown instead of printing $0.00 for a wholly unpriced window", () => {
+    saveUsagePagePreferences({ metric: "cost", windowDays: 30 });
+
+    const markup = renderCostPage(
+      costSummary({ costSource: "unpriced", costUsd: 0, unpricedRecords: 1 }),
+    );
+
+    expect(markup).toContain("No provider reports a price for this period.");
+    expect(markup).toContain('tabular-nums">—</span>');
+    // Cache savings keeps its own figure: it is a separate claim from what the window cost,
+    // so the single remaining `$0.00` is that metric and no dollar cell claims a price.
+    expect(markup.match(/\$0\.00/g) ?? []).toHaveLength(1);
+  });
+
+  it("still prints $0.00 when a price is known and genuinely zero", () => {
+    saveUsagePagePreferences({ metric: "cost", windowDays: 30 });
+
+    const markup = renderCostPage(
+      costSummary({ costSource: "modelPriced", costUsd: 0, unpricedRecords: 0 }),
+    );
+
+    expect(markup).toContain('tabular-nums">$0.00</span>');
+    expect(markup).not.toContain("No provider reports a price");
   });
 });

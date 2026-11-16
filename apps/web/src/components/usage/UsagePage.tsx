@@ -103,6 +103,14 @@ export function UsagePage() {
   );
 
   const activeProviders = useMemo(() => providersWithUsage(merged.providers), [merged.providers]);
+  // Every record unpriced is not the same claim as "spent nothing", so the
+  // headline refuses to print `$0.00` for it. `unpricedShare` is 0 for an empty
+  // window, which the empty state already covers.
+  const entirelyUnpriced = merged.costQuality.unpricedShare === 1;
+  // One window, one answer. When nothing in it carries a price, every dollar
+  // cell on the page says so, rather than the headline saying "unknown" above a
+  // column of `$0.00`. Cache savings is a separate claim and keeps its figure.
+  const costLabel = (usd: number) => (entirelyUnpriced ? "—" : fmt.usd(usd));
   const timeValueColumnWidth = `${60 / (activeProviders.length + 2)}%`;
 
   const selectWindow = (days: number) => {
@@ -273,14 +281,18 @@ export function UsagePage() {
                     <div className="flex flex-col gap-1">
                       <span className="text-4xl font-semibold text-foreground tabular-nums">
                         {metric === "cost"
-                          ? fmt.usd(merged.costUsd)
+                          ? entirelyUnpriced
+                            ? "—"
+                            : fmt.usd(merged.costUsd)
                           : fmt.tokens(merged.totalTokens)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {metric === "cost"
-                          ? merged.costQuality.unpricedShare > 0
-                            ? `${fmt.count(merged.sessions)} sessions · estimate excludes ${fmt.percent(merged.costQuality.unpricedShare)} unpriced records`
-                            : `${fmt.count(merged.sessions)} sessions · API estimate`
+                          ? entirelyUnpriced
+                            ? "No provider reports a price for this period."
+                            : merged.costQuality.unpricedShare > 0
+                              ? `${fmt.count(merged.sessions)} sessions · estimate excludes ${fmt.percent(merged.costQuality.unpricedShare)} unpriced records`
+                              : `${fmt.count(merged.sessions)} sessions · API estimate`
                           : `${fmt.count(merged.sessions)} sessions`}
                       </span>
                     </div>
@@ -320,14 +332,14 @@ export function UsagePage() {
                             </span>
                             <span className="shrink-0 text-sm font-medium text-foreground tabular-nums">
                               {metric === "cost"
-                                ? fmt.usd(totals?.costUsd ?? 0)
+                                ? costLabel(totals?.costUsd ?? 0)
                                 : fmt.tokens(totals?.totalTokens ?? 0)}
                             </span>
                           </div>
                           <span className="text-xs text-muted-foreground">
                             {metric === "cost"
                               ? `${fmt.percent(share)} of cost · ${fmt.tokens(totals?.totalTokens ?? 0)} tokens`
-                              : `${fmt.percent(share)} of tokens · ${fmt.usd(totals?.costUsd ?? 0)}`}
+                              : `${fmt.percent(share)} of tokens · ${costLabel(totals?.costUsd ?? 0)}`}
                           </span>
                         </div>
                       );
@@ -454,7 +466,7 @@ export function UsagePage() {
                                   </span>
                                 </td>
                                 <td className="py-2 text-end text-foreground tabular-nums">
-                                  {fmt.usd(model.costUsd)}
+                                  {costLabel(model.costUsd)}
                                 </td>
                                 <td className="py-2 text-end text-muted-foreground tabular-nums">
                                   {fmt.percent(model.costShare)}
@@ -527,11 +539,11 @@ export function UsagePage() {
                                     key={provider}
                                     className="py-2 text-end text-muted-foreground tabular-nums"
                                   >
-                                    {fmt.usd(period.byProvider.get(provider)?.costUsd ?? 0)}
+                                    {costLabel(period.byProvider.get(provider)?.costUsd ?? 0)}
                                   </td>
                                 ))}
                                 <td className="py-2 text-end text-foreground tabular-nums">
-                                  {fmt.usd(period.costUsd)}
+                                  {costLabel(period.costUsd)}
                                 </td>
                                 <td className="py-2 text-end text-muted-foreground tabular-nums">
                                   {fmt.tokens(period.totalTokens)}

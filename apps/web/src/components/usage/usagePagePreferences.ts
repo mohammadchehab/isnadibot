@@ -12,7 +12,9 @@ export type UsagePagePreferences = typeof UsagePagePreferencesSchema.Type;
 
 const STORAGE_KEY = "isnadi:usage-page-preferences:v1";
 
-const DEFAULT_PREFERENCES: UsagePagePreferences = { metric: "limits", windowDays: 30 };
+// Cost first: a user opening Usage is deciding about spend, not reading a
+// subscription meter. Limits stays one toggle away.
+const DEFAULT_PREFERENCES: UsagePagePreferences = { metric: "cost", windowDays: 30 };
 
 export function readUsagePagePreferences(): UsagePagePreferences {
   try {
