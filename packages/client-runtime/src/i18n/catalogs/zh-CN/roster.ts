@@ -467,4 +467,17 @@ export const rosterCatalog = {
   "Add a bot to {name}…": "向 {name} 添加机器人…",
   "Ends the turn this bot is running": "结束这个机器人正在进行的轮次",
   "Opens this space's members to add a bot": "打开此空间的成员以添加机器人",
+  Team: "团队",
+  "Asking you": "正在问你",
+  "Working on": "正在处理",
+  Context: "上下文",
+  "Bot actions": "机器人操作",
+  "Kanban board": "看板",
+  "No bots in this space yet": "此空间还没有机器人",
+  "Cards go to a bot when it goes idle.": "机器人空闲时就会收到卡片。",
+  "{inProgress} in progress · {done} done this week": "{inProgress} 项进行中 · 本周完成 {done} 项",
+  "{name}, the boss, assigns from the board. When a bot goes idle, the next card goes to it.":
+    "{name} 是负责人，从看板派发。机器人空闲时，下一张卡片就交给它。",
+  "{name}, the boss, assigns cards. They move when a bot finishes a step.":
+    "{name} 是负责人，负责派发卡片。机器人完成一步后卡片就会移动。",
 } as const;

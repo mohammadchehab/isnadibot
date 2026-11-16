@@ -17,6 +17,15 @@ const ENVIRONMENT = EnvironmentId.make("environment-1");
 
 const BOT_ID = BotId.make("bot-1");
 
+/** The finished page the Tasks tile reads: only the fields a count needs. */
+type FinishedPage = {
+  readonly items: ReadonlyArray<{
+    readonly id: string;
+    readonly state: string;
+    readonly doneAt?: string;
+  }>;
+};
+
 const mocks = vi.hoisted(() => ({
   decisions: [] as ReadonlyArray<Decision>,
   threads: [] as ReadonlyArray<{
@@ -31,6 +40,7 @@ const mocks = vi.hoisted(() => ({
   usage: { turns: 0, isPending: false, hasError: false },
   openChat: vi.fn(),
   snapshot: null as ReturnType<typeof makeShellSnapshot> | null,
+  finished: { items: [] } as FinishedPage,
 }));
 
 vi.mock("../../i18n", () => ({
@@ -81,6 +91,25 @@ vi.mock("../../state/environmentSnapshot", () => ({
 }));
 
 vi.mock("../chat/useOpenChat", () => ({ useOpenChat: () => mocks.openChat }));
+
+// The week's done count comes from the finished page; the shell carries open items only.
+vi.mock("../../state/query", () => ({
+  useEnvironmentQuery: () => ({
+    data: mocks.finished,
+    error: null,
+    isPending: false,
+    refresh: () => undefined,
+  }),
+}));
+
+vi.mock("../../state/workItems", () => ({
+  workItemEnvironment: { finished: () => ({ kind: "finished" }) },
+}));
+
+// The Team table and the board have their own tests; here only the tiles are under test.
+vi.mock("./SpaceTeamTable", () => ({ SpaceTeamTable: () => null }));
+
+vi.mock("./SpaceTasks", () => ({ SpaceTasks: () => null }));
 
 vi.mock("../roster/BotAvatarView", () => ({
   BotAvatarView: ({ name }: { name: string }) => <span>{`avatar:${name}`}</span>,
@@ -194,6 +223,7 @@ beforeEach(() => {
   mocks.delegations = [];
   mocks.usage = { turns: 0, isPending: false, hasError: false };
   mocks.snapshot = null;
+  mocks.finished = { items: [] };
 });
 
 describe("SpaceOverview", () => {
@@ -449,5 +479,45 @@ describe("SpaceOverview", () => {
 
   it("leaves the standup out until the snapshot arrives", () => {
     expect(render()).not.toContain('data-testid="space-standup"');
+  });
+
+  it("counts the space's open items and the week's finished ones on the Tasks tile", () => {
+    mocks.snapshot = makeShellSnapshot({
+      workItems: [
+        {
+          id: "w1",
+          groupId: "g1",
+          title: "Write the standup",
+          kind: "task",
+          briefPreview: "",
+          state: "in-progress",
+          createdAt: "2026-11-03T10:00:00.000Z",
+          updatedAt: "2026-11-03T10:00:00.000Z",
+        },
+        {
+          id: "w2",
+          groupId: "g1",
+          title: "Wire the tile",
+          kind: "task",
+          briefPreview: "",
+          state: "queued",
+          createdAt: "2026-11-03T11:00:00.000Z",
+          updatedAt: "2026-11-03T11:00:00.000Z",
+        },
+      ],
+    });
+
+    // The week starts on the mocked local day's Monday, so one of these lands inside it.
+    mocks.finished = {
+      items: [
+        { id: "w3", state: "done", doneAt: "2026-11-03T10:00:00.000Z" },
+        { id: "w4", state: "done", doneAt: "2026-10-20T10:00:00.000Z" },
+      ],
+    };
+
+    const html = render();
+
+    expect(html).toContain("2 open");
+    expect(html).toContain("1 in progress · 1 done this week");
   });
 });

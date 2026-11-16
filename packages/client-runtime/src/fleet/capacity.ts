@@ -5,7 +5,7 @@ import {
   countBotStatuses,
   deriveBotStatus,
 } from "@isnadi/shared/botStatus";
-import type { BotId, WorkItemSummary } from "@isnadi/contracts";
+import type { BotId, OrchestrationThreadShell, WorkItemSummary } from "@isnadi/contracts";
 
 /**
  * The capacity view's data: one row per bot in a fleet group, boss first, built
@@ -70,6 +70,32 @@ export interface Capacity {
   readonly rows: ReadonlyArray<CapacityRow>;
   /** Rows per state, for a header that wants a total. */
   readonly counts: Readonly<Record<BotStatus, number>>;
+}
+
+/**
+ * Which bot answers a chat. A group chat has no owner bot, so the responder is the
+ * only bot that can be busy in it — the same rule the status core applies.
+ */
+export function chatOwnerBotId(chat: OrchestrationThreadShell): string | null {
+  return chat.respondingBotId ?? chat.botId ?? null;
+}
+
+/** Each bot's newest chat, which is the one whose activities carry its context reading. */
+export function newestChatByBotId(
+  chats: ReadonlyArray<OrchestrationThreadShell>,
+): ReadonlyMap<string, OrchestrationThreadShell> {
+  const newest = new Map<string, OrchestrationThreadShell>();
+
+  for (const chat of chats) {
+    const owner = chatOwnerBotId(chat);
+
+    if (owner === null || chat.archivedAt !== null) continue;
+    const seen = newest.get(owner);
+
+    if (seen === undefined || seen.updatedAt < chat.updatedAt) newest.set(owner, chat);
+  }
+
+  return newest;
 }
 
 const OPEN_ITEM_STATES: ReadonlySet<string> = new Set([

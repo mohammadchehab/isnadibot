@@ -68,8 +68,20 @@ const columnEmptyCopy = (column: WorkItemColumn, t: (message: string) => string)
  *
  * The shell carries open cards only, so Closed and Done page in through
  * `workItems.list` and read the first page each.
+ *
+ * `overview` is the board as the space overview draws it: the page carries the
+ * board's one-line description above it, and the frame fits five narrow columns
+ * into the half of a split it gives the board (E13a `2167:614`).
  */
-export function SpaceTasks({ group }: { group: Group }) {
+export function SpaceTasks({
+  group,
+  variant = "page",
+}: {
+  group: Group;
+  variant?: "page" | "overview";
+}) {
+  const showDescription = variant === "page";
+  const columnWidth = variant === "page" ? "w-64" : "w-39";
   const { t, formatNumber } = useI18n();
   const environmentId = usePrimaryEnvironmentId();
   const snapshot = useEnvironmentSnapshot();
@@ -209,12 +221,18 @@ export function SpaceTasks({ group }: { group: Group }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="space-tasks">
-      <div className="flex items-start justify-between gap-3 p-4 pb-0">
-        <p className="text-sm text-muted-foreground">
-          {boss
-            ? t("{name} assigns cards. They move when a bot finishes a step.", { name: boss.name })
-            : t("Cards move when a bot finishes a step.")}
-        </p>
+      <div
+        className={`flex items-start gap-3 p-4 pb-0 ${showDescription ? "justify-between" : "justify-end"}`}
+      >
+        {showDescription ? (
+          <p className="text-sm text-muted-foreground">
+            {boss
+              ? t("{name} assigns cards. They move when a bot finishes a step.", {
+                  name: boss.name,
+                })
+              : t("Cards move when a bot finishes a step.")}
+          </p>
+        ) : null}
         <Button
           size="xs"
           variant="outline"
@@ -232,7 +250,7 @@ export function SpaceTasks({ group }: { group: Group }) {
             <section
               key={column}
               aria-label={columnTitle(column, t)}
-              className="flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2"
+              className={`flex shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2 ${columnWidth}`}
             >
               <h3 className="flex items-center justify-between gap-2 px-1 text-xs font-medium text-muted-foreground">
                 <span>{columnTitle(column, t)}</span>

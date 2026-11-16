@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 1986,
+  "directMessageCount": 1997,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -227,6 +227,9 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "label)).join(", "),",
     ],
     "apps/web/src/components/space/SpaceStandup.tsx": [
+      "BOT_STATUS_LABEL[row.status])}",
+    ],
+    "apps/web/src/components/space/SpaceTeamTable.tsx": [
       "BOT_STATUS_LABEL[row.status])}",
     ],
     "packages/client-runtime/src/botInbox.ts": [
@@ -629,6 +632,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/space/SpaceSettingsPage.tsx",
     "apps/web/src/components/space/SpaceStandup.tsx",
     "apps/web/src/components/space/SpaceTasks.tsx",
+    "apps/web/src/components/space/SpaceTeamTable.tsx",
     "apps/web/src/components/space/SpaceView.tsx",
     "apps/web/src/components/space/TaskDialog.tsx",
     "apps/web/src/components/ui/AnchoredToasts.tsx",
