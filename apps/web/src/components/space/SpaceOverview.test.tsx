@@ -343,6 +343,65 @@ describe("SpaceOverview", () => {
     expect(html).not.toContain(group.updatedAt);
   });
 
+  it("reflects a second and a third turn, not only the one that created the chat", () => {
+    // Turn one creates the chat.
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T10:00:00.000Z",
+        waiting: false,
+      },
+    ];
+
+    expect(render()).toContain("updated 2026-11-03T10:00:00.000Z");
+
+    // Turn two lands in the same chat: the overview must move with it.
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T11:00:00.000Z",
+        waiting: false,
+      },
+    ];
+
+    expect(render()).toContain("updated 2026-11-03T11:00:00.000Z");
+
+    // Turn three too, and the newest turn is the one the header reports.
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T12:00:00.000Z",
+        waiting: false,
+      },
+    ];
+
+    const html = render();
+
+    expect(html).toContain("updated 2026-11-03T12:00:00.000Z");
+    expect(html).not.toContain("updated 2026-11-03T11:00:00.000Z");
+  });
+
+  it("attributes the dashboard to nobody, and keeps the freshness tell", () => {
+    mocks.threads = [
+      {
+        id: "thread-1",
+        title: "Build the todo app",
+        updatedAt: "2026-11-03T10:00:00.000Z",
+        waiting: false,
+      },
+    ];
+
+    const html = render();
+
+    // No publish event exists, so nothing names a publisher (decision-99).
+    expect(html).not.toContain("Published by");
+    // The freshness stamp is the tell that the dashboard can be stale. It stays.
+    expect(html).toContain("updated 2026-11-03T10:00:00.000Z");
+  });
+
   it("counts the members' turns over the week and says so", () => {
     mocks.usage = { turns: 12, isPending: false, hasError: false };
 

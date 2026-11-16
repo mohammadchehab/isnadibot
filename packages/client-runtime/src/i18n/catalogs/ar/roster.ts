@@ -368,7 +368,6 @@ export const rosterCatalog = {
     "اسمح لـ {name} بالعثور على مهارات السجل التي لم تُمنح له وتحميلها.",
   "What {name} can load on demand.": "ما يمكن لـ {name} تحميله عند الحاجة.",
   Dashboard: "لوحة المعلومات",
-  "Published by {name}": "نشرها {name}",
   "updated {time}": "حُدّثت {time}",
   "Nothing here yet": "لا شيء هنا بعد",
   Space: "المساحة",
