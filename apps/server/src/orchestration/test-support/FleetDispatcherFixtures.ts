@@ -453,6 +453,13 @@ export const projectCreatedChats =
       }));
     });
 
+/**
+ * The dispatcher's own decisions, narrowed out of the union of receipts a reactor publishes.
+ * `kind` only exists on this member, so a test reads it through here rather than off the union.
+ */
+export const fleetDecisions = (receipts: ReadonlyArray<OrchestrationRuntimeReceipt>) =>
+  receipts.filter((receipt) => receipt.type === "fleet.dispatch.decided");
+
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];
 

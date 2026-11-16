@@ -25,6 +25,7 @@ import {
   BOT_A,
   NOW,
   botThread,
+  fleetDecisions,
   harness,
   keepBusyGroup,
   memberAssigned,
@@ -90,6 +91,38 @@ const board = (...extra: ReadonlyArray<ReturnType<typeof workItem>>) => [
 ];
 
 /**
+ * One drained pass over a board holding the architect item, with the architect's chat idle or
+ * busy and a free specialist there either way. The two answers a held role can give come from
+ * the same board, so both cases read it here rather than each building it.
+ */
+const dispatchWithArchitect = (architectChat: "idle" | "busy") =>
+  Effect.gen(function* () {
+    const h = yield* harness;
+
+    yield* Ref.set(
+      h.model,
+      modelWith(
+        [BOT_A, ARCHITECT_BOT],
+        [
+          architectChat === "busy"
+            ? busyThread(ARCHITECT_BOT.id, "thread-architect")
+            : botThread(ARCHITECT_BOT.id, "thread-architect"),
+          botThread(BOT_A.id, "thread-a"),
+        ],
+        board(),
+      ),
+    );
+
+    return yield* run(h, ({ reactor, receipts }) =>
+      Effect.gen(function* () {
+        yield* reactor.drain;
+
+        return { dispatched: h.dispatched, receipts: yield* receipts };
+      }),
+    );
+  }).pipe(Effect.scoped);
+
+/**
  * An item may name the role that should take it. The dispatcher never hands such an item to
  * whoever happens to be free — but it must never let the item quietly sit there either, and a
  * member gaining the role has to be enough to move it, without a restart.
@@ -120,9 +153,9 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
               activity: { payload: { workItemId: "item-1", role: ARCHITECT } },
             },
           ]);
-          expect((yield* receipts).filter((receipt) => receipt.kind === "skipped")).toMatchObject([
-            { kind: "skipped", reason: "no-role-holder", itemId: "item-1" },
-          ]);
+          expect(
+            fleetDecisions(yield* receipts).filter((receipt) => receipt.kind === "skipped"),
+          ).toMatchObject([{ kind: "skipped", reason: "no-role-holder", itemId: "item-1" }]);
           // The free member took the item behind it, so one starved item is not a stop sign.
           expect(claims(h.dispatched)).toMatchObject([{ workItemId: "item-2", botId: BOT_A.id }]);
         }),
@@ -166,40 +199,13 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       // The two answers a held role can give, from the same board: one bot was hired as the
       // architect and one was not, so a free specialist never stands in for it.
-      const dispatch = (architectChat: "idle" | "busy") =>
-        Effect.gen(function* () {
-          const h = yield* harness;
-
-          yield* Ref.set(
-            h.model,
-            modelWith(
-              [BOT_A, ARCHITECT_BOT],
-              [
-                architectChat === "busy"
-                  ? busyThread(ARCHITECT_BOT.id, "thread-architect")
-                  : botThread(ARCHITECT_BOT.id, "thread-architect"),
-                botThread(BOT_A.id, "thread-a"),
-              ],
-              board(),
-            ),
-          );
-
-          return yield* run(h, ({ reactor, receipts }) =>
-            Effect.gen(function* () {
-              yield* reactor.drain;
-
-              return { dispatched: h.dispatched, receipts: yield* receipts };
-            }),
-          );
-        }).pipe(Effect.scoped);
-
-      const idle = yield* dispatch("idle");
+      const idle = yield* dispatchWithArchitect("idle");
 
       expect(claims(idle.dispatched)).toMatchObject([
         { workItemId: "item-1", botId: ARCHITECT_BOT.id },
       ]);
 
-      const busy = yield* dispatch("busy");
+      const busy = yield* dispatchWithArchitect("busy");
 
       // A held role whose holder is busy waits on that member, and is not the answer the chat
       // should be told about.
