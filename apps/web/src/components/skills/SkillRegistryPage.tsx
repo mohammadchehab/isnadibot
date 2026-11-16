@@ -227,6 +227,7 @@ export function SkillRegistryPage({
       {adding ? (
         <SkillAddDialog
           skills={registry.skills}
+          projectName={registry.projectName}
           onClose={() => {
             setAdding(false);
           }}

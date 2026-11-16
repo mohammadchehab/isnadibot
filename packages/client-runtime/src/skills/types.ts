@@ -76,6 +76,11 @@ export type SkillRegistrySnapshot = {
   readonly skills: readonly RegistrySkill[];
   /** Connector ids the environment has no healthy copy of; drives "Needs <connector>". */
   readonly unavailableConnectors: readonly string[];
+  /**
+   * The name of the project this space's skills travel with, which the Add a skill dialog names
+   * in its "This space" scope row. Absent when the source has no project to name.
+   */
+  readonly projectName?: string;
 };
 
 /** How a skill enters the registry: copied from a provider, a GitHub folder, or an uploaded .zip. */

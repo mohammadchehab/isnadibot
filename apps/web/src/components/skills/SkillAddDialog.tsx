@@ -48,12 +48,27 @@ const SOURCE_DESCRIPTIONS = {
 
 const SCOPE_TITLES = { "this-space": "This space", "all-spaces": "All spaces" } as const;
 
-const SCOPE_SUBTITLES = {
-  "this-space": "Travels with this space's project.",
-  "all-spaces": "Available in every space.",
-} as const;
-
 const SCOPES: readonly SkillAddScope[] = ["this-space", "all-spaces"];
+
+/**
+ * The line under a scope row. "This space" names the project the skill travels with, when the
+ * source knows one; without it the row still says where the skill lands, just without the name.
+ */
+function SkillAddScopeSubtitle({
+  scope,
+  projectName,
+}: {
+  readonly scope: SkillAddScope;
+  readonly projectName: string | undefined;
+}) {
+  const { t } = useI18n();
+
+  if (scope === "all-spaces") return <>{t("Every space you open on this computer.")}</>;
+
+  if (projectName === undefined) return <>{t("Travels with this space's project.")}</>;
+
+  return <>{t("{project}. The skill travels with this project.", { project: projectName })}</>;
+}
 
 function isSkillAddSource(value: string | undefined): value is SkillAddSource {
   return value === "provider" || value === "github" || value === "zip";
@@ -132,9 +147,11 @@ function SkillProviderRow({
 /** The two scope rows: this space's folder, or the user's, which every space sees. */
 function SkillAddScopeRows({
   scope,
+  projectName,
   onScopeChange,
 }: {
   readonly scope: SkillAddScope;
+  readonly projectName: string | undefined;
   readonly onScopeChange: (next: SkillAddScope) => void;
 }) {
   const { t } = useI18n();
@@ -166,7 +183,7 @@ function SkillAddScopeRows({
                 {t(SCOPE_TITLES[option])}
               </span>
               <span className="text-11px leading-4 text-muted-foreground">
-                {t(SCOPE_SUBTITLES[option])}
+                <SkillAddScopeSubtitle scope={option} projectName={projectName} />
               </span>
             </span>
           </div>
@@ -185,11 +202,14 @@ function SkillAddScopeRows({
  */
 export function SkillAddDialog({
   skills,
+  projectName,
   initialSource = "provider",
   onClose,
   onNeedsApproval,
 }: {
   readonly skills: readonly RegistrySkill[];
+  /** The project "This space" names; absent when the source knows none. */
+  readonly projectName?: string | undefined;
   readonly initialSource?: SkillAddSource | undefined;
   readonly onClose: () => void;
   readonly onNeedsApproval: (skillId: SkillId) => void;
@@ -260,7 +280,7 @@ export function SkillAddDialog({
               </Fragment>
             ))}
           </RadioGroup>
-          <SkillAddScopeRows scope={scope} onScopeChange={setScope} />
+          <SkillAddScopeRows scope={scope} projectName={projectName} onScopeChange={setScope} />
           <SkillDialogNote>
             {t("The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.")}
           </SkillDialogNote>
@@ -290,7 +310,7 @@ export function SkillAddDialog({
               {t("Isnadi reads the ref, resolves it to a commit and fetches only that folder.")}
             </SkillDialogNote>
           )}
-          <SkillAddScopeRows scope={scope} onScopeChange={setScope} />
+          <SkillAddScopeRows scope={scope} projectName={projectName} onScopeChange={setScope} />
           {refusal === "link-not-found" ? null : <SkillDialogNote>{approvalNote}</SkillDialogNote>}
         </>
       );
@@ -306,7 +326,7 @@ export function SkillAddDialog({
               setRefusal(null);
             }}
           />
-          <SkillAddScopeRows scope={scope} onScopeChange={setScope} />
+          <SkillAddScopeRows scope={scope} projectName={projectName} onScopeChange={setScope} />
           {zipRefusal === null ? <SkillDialogNote>{approvalNote}</SkillDialogNote> : null}
         </>
       );

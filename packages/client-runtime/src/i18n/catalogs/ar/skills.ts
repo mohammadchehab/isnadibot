@@ -56,7 +56,8 @@ export const skillsCatalog = {
   "Where the skill comes from": "من أين تأتي المهارة",
   "Add to": "أضف إلى",
   "Travels with this space's project.": "تنتقل مع مشروع هذه المساحة.",
-  "Available in every space.": "متاحة في كل المساحات.",
+  "Every space you open on this computer.": "كل مساحة تفتحها على هذا الكمبيوتر.",
+  "{project}. The skill travels with this project.": "{project}. تنتقل المهارة مع هذا المشروع.",
   "The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.":
     "يحتفظ المزوّد بنسخته. يضيف إسنادي نسخته، فيحتفظ كل نموذج بالمهارة.",
   "Skill URL": "رابط المهارة",

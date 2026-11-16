@@ -18,6 +18,9 @@ export type SkillFixtureScenario = (typeof SKILL_FIXTURE_SCENARIOS)[number];
 /** The space the fixture's space-scoped skills belong to. */
 export const SKILL_FIXTURE_PROJECT_ID = ProjectId.make("space-recruiting");
 
+/** That space's project, by the name the frames draw. */
+const SKILL_FIXTURE_PROJECT_NAME = "Recruiting";
+
 /** Bot ids the fixture's Used by column names, so a screen can resolve avatars. */
 export const SKILL_FIXTURE_BOT_IDS = {
   scout: BotId.make("bot-scout"),
@@ -288,7 +291,12 @@ function fullRegistry(nowMs: number): SkillRegistrySnapshot {
     },
   ];
 
-  return { state: "ready", skills, unavailableConnectors: ["browser"] };
+  return {
+    state: "ready",
+    skills,
+    unavailableConnectors: ["browser"],
+    projectName: SKILL_FIXTURE_PROJECT_NAME,
+  };
 }
 
 function snapshotFor(scenario: SkillFixtureScenario, nowMs: number): SkillRegistrySnapshot {
@@ -296,7 +304,12 @@ function snapshotFor(scenario: SkillFixtureScenario, nowMs: number): SkillRegist
     case "full":
       return fullRegistry(nowMs);
     case "empty":
-      return { state: "ready", skills: [], unavailableConnectors: [] };
+      return {
+        state: "ready",
+        skills: [],
+        unavailableConnectors: [],
+        projectName: SKILL_FIXTURE_PROJECT_NAME,
+      };
     case "loading":
       return { state: "loading", skills: [], unavailableConnectors: [] };
     case "error":

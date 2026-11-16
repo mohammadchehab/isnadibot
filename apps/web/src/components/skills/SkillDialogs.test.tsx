@@ -94,6 +94,20 @@ describe("the add-skill dialogs", () => {
     expect(markup).toContain("Add skill");
   });
 
+  it("names the project in the This space row, and says where an all-spaces skill goes", () => {
+    const markup = renderToStaticMarkup(
+      <SkillAddDialog
+        skills={[]}
+        projectName="Recruiting"
+        onClose={() => undefined}
+        onNeedsApproval={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain("Recruiting. The skill travels with this project.");
+    expect(markup).toContain("Every space you open on this computer.");
+  });
+
   it("keeps the primary inert until the URL field holds a link", () => {
     const markup = renderToStaticMarkup(
       <SkillAddDialog

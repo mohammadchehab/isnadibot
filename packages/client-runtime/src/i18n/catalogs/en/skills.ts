@@ -55,7 +55,9 @@ export const skillsCatalog = {
   "Where the skill comes from": "Where the skill comes from",
   "Add to": "Add to",
   "Travels with this space's project.": "Travels with this space's project.",
-  "Available in every space.": "Available in every space.",
+  "Every space you open on this computer.": "Every space you open on this computer.",
+  "{project}. The skill travels with this project.":
+    "{project}. The skill travels with this project.",
   "The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.":
     "The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.",
   "Skill URL": "Skill URL",

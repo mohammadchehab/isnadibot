@@ -55,7 +55,8 @@ export const skillsCatalog = {
   "Where the skill comes from": "技能来源",
   "Add to": "添加到",
   "Travels with this space's project.": "随当前空间的项目一起移动。",
-  "Available in every space.": "在每个空间都可用。",
+  "Every space you open on this computer.": "在这台电脑上打开的每个空间。",
+  "{project}. The skill travels with this project.": "{project}。该技能随此项目一起移动。",
   "The provider keeps its copy. Isnadi adds its own, so every model keeps the skill.":
     "提供方保留自己的一份。Isnadi 添加自己的副本，因此每个模型都保留该技能。",
   "Skill URL": "技能链接",
