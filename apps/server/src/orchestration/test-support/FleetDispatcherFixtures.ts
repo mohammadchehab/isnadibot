@@ -87,6 +87,7 @@ export const workItem = (input: {
   readonly createdAt?: string;
   readonly updatedAt?: string;
   readonly attempts?: number;
+  readonly role?: WorkItem["role"];
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
   groupId: input.groupId ?? GROUP_ID,
@@ -96,6 +97,7 @@ export const workItem = (input: {
   state: input.state ?? "queued",
   ...(input.ownerBotId === undefined ? {} : { ownerBotId: input.ownerBotId }),
   ...(input.attempts === undefined ? {} : { attempts: input.attempts }),
+  ...(input.role === undefined ? {} : { role: input.role }),
   createdAt: input.createdAt ?? NOW,
   updatedAt: input.updatedAt ?? NOW,
 });
@@ -450,6 +452,13 @@ export const projectCreatedChats =
         threads: [...model.threads, botThread(botId, command.threadId)],
       }));
     });
+
+/**
+ * The dispatcher's own decisions, narrowed out of the union of receipts a reactor publishes.
+ * `kind` only exists on this member, so a test reads it through here rather than off the union.
+ */
+export const fleetDecisions = (receipts: ReadonlyArray<OrchestrationRuntimeReceipt>) =>
+  receipts.filter((receipt) => receipt.type === "fleet.dispatch.decided");
 
 export const harness = Effect.gen(function* () {
   const dispatched: OrchestrationCommand[] = [];

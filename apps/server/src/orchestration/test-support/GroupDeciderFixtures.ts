@@ -63,6 +63,7 @@ export function makeBot(input: {
   readonly createdByBotId?: OrchestrationBot["createdByBotId"];
   readonly provider?: string;
   readonly model?: string;
+  readonly roleId?: OrchestrationBot["roleId"];
 }): OrchestrationBot {
   return {
     id: input.id,
@@ -88,6 +89,7 @@ export function makeBot(input: {
     archivedAt: input.archivedAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
+    ...(input.roleId === undefined ? {} : { roleId: input.roleId }),
   };
 }
 

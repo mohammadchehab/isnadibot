@@ -133,6 +133,8 @@ export const FLEET_DISPATCH_CLAIM_ACTIVITY = "fleet.dispatch.claim";
 
 export const FLEET_DISPATCH_IDLE_ACTIVITY = "fleet.dispatch.idle";
 
+export const FLEET_DISPATCH_TRIAGE_ACTIVITY = "fleet.dispatch.triage";
+
 /** Who was handed what: the row reads "{botName} was idle, so the board gave it "{itemTitle}"." */
 export const FleetDispatchClaimPayload = Schema.Struct({
   botId: BotId,
@@ -147,6 +149,19 @@ export type FleetDispatchClaimPayload = typeof FleetDispatchClaimPayload.Type;
 export const FleetDispatchIdlePayload = Schema.Struct({});
 
 export type FleetDispatchIdlePayload = typeof FleetDispatchIdlePayload.Type;
+
+/**
+ * An item that named a role nobody in the group holds. It is not handed out, so
+ * the row is the only place the wait is visible: it names the role that is
+ * missing and what would unblock it.
+ */
+export const FleetDispatchTriagePayload = Schema.Struct({
+  workItemId: WorkItemId,
+  itemTitle: WorkItemTitle,
+  role: FleetRoleId,
+});
+
+export type FleetDispatchTriagePayload = typeof FleetDispatchTriagePayload.Type;
 
 export const WORK_ITEM_PREVIEW_LIMIT = 280;
 

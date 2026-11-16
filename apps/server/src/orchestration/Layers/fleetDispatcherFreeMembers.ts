@@ -1,6 +1,7 @@
 import {
   isGroupBotMember,
   type BotId,
+  type FleetRoleId,
   type IsoDateTime,
   type OrchestrationBot,
   type OrchestrationGroup,
@@ -106,20 +107,44 @@ function compareIdleRank(left: IdleRank, right: IdleRank): number {
  * Being idle is the whole test. Whether the member already has a chat is the caller's problem: a
  * hired member starts without one and is given the chat it would have opened for itself, so
  * leaving it out here would leave a fresh team unable to work at all.
+ *
+ * An item that names a role narrows the pick to the members hired as that role, and says so
+ * separately when the group holds nobody with it. The two "nobody" answers are not the same news:
+ * no holder means the item cannot move until someone is hired, while every holder being busy means
+ * the item moves as soon as one is free. The caller answers them differently.
  */
 export type PickResult =
   | { readonly kind: "member"; readonly bot: OrchestrationBot }
-  | { readonly kind: "none"; readonly reason: "no-idle-member" };
+  | { readonly kind: "none"; readonly reason: "no-idle-member" | "no-role-holder" };
 
 export function pickIdleMember(
   readModel: OrchestrationReadModel,
   group: OrchestrationGroup,
   busy: ReadonlySet<BotId> = new Set(),
   reading: StatusLookup = statusLookup(readModel),
+  role?: FleetRoleId,
 ): PickResult {
   const members = group.members.filter(isGroupBotMember).map((member) => member.botId);
-  const specialists = members.filter((botId) => botId !== group.bossBotId);
-  const candidates = specialists.length > 0 ? specialists : members;
+
+  // The role is fixed when a bot is created, so a member can only gain one by being hired or
+  // assigned with it — both of which wake the group, which is what lets a waiting item move
+  // without a restart. A fired member does not count: it is not there to take the work.
+  const holdsRole = (botId: BotId): boolean => {
+    const bot = readModel.bots.find((candidate) => candidate.id === botId);
+
+    return bot !== undefined && bot.archivedAt === null && bot.roleId === role;
+  };
+
+  const qualified = role === undefined ? members : members.filter(holdsRole);
+
+  // Nobody in the group was hired as this role, so no amount of idleness would ever hand the item
+  // out.
+  if (role !== undefined && qualified.length === 0) {
+    return { kind: "none", reason: "no-role-holder" };
+  }
+
+  const specialists = qualified.filter((botId) => botId !== group.bossBotId);
+  const candidates = specialists.length > 0 ? specialists : qualified;
 
   const free = candidates
     .filter((candidate) => !busy.has(candidate) && reading(candidate).status === "idle")
