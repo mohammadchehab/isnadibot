@@ -831,3 +831,73 @@ describe("Shell command intent inside an arithmetic region", () => {
     expect(classifyIsnadiExternalCommand(command)).toBe("delete");
   });
 });
+
+/**
+ * The credential filenames a security review measured the old denylist missing
+ * on main (TASK-382), as named in the review. Each one classifies as `secrets`,
+ * which is what makes a delegated read of it refuse instead of run: a `none`
+ * ceiling covers nothing above `user-computer`, so the classifier is the gate.
+ */
+const CREDENTIAL_PATHS = [
+  ".npmrc",
+  ".netrc",
+  ".pypirc",
+  ".git-credentials",
+  ".docker/config.json",
+  ".kube/config",
+  "id_rsa",
+  "key.pem",
+  "server.key",
+  ".terraform/credentials.tfrc.json",
+  ".pgpass",
+  ".my.cnf",
+  ".vault-token",
+  "adc.json",
+  "service-account.json",
+  "terraform.tfstate",
+  ".htpasswd",
+  "credentials.json",
+  "secrets.yaml",
+  "token.txt",
+] as const;
+
+describe("Sensitive path classification", () => {
+  const read = ISNADI_TOOL_CATALOG.find((tool) => tool.id === "ExternalRead")!;
+
+  it.each(CREDENTIAL_PATHS)("refuses a read of %s", (path) => {
+    expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
+  });
+
+  it("refuses a credential name that is a folder, not the basename", () => {
+    // A rule that reads only the last segment misses all four of these.
+    for (const path of [
+      "/home/me/project/.docker/config.json",
+      "/home/me/.kube/config",
+      "/home/me/project/.terraform/terraform.tfstate",
+      "/home/me/project/.git/config",
+    ]) {
+      expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    }
+  });
+
+  it("refuses a credential folder that is not hidden", () => {
+    for (const path of ["/home/me/credentials/aws.txt", "/home/me/secrets/prod.yaml"]) {
+      expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    }
+  });
+
+  it("still auto-approves ordinary source in the same folder", () => {
+    for (const path of [
+      "/home/me/project/src/index.ts",
+      "/home/me/project/package.json",
+      "/home/me/project/README.md",
+      "./README.md",
+      "../notes.md",
+      "C:\\Users\\me\\project\\notes.md",
+    ]) {
+      expect(isnadiToolApprovalForInput(read, { path })).toBe("user-computer");
+      expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(false);
+    }
+  });
+});

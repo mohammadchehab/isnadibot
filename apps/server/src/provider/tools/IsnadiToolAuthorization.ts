@@ -126,7 +126,8 @@ export const isInsideRoot = (root: string, target: string) => {
  * such a read needs no card, and a `none` ceiling (which nobody can answer)
  * must not strand it. The path is resolved with symlinks followed, so a link
  * or `..` cannot lead out of the folder. A protected path (secrets, production)
- * keeps its approval as a second gate.
+ * is the one read this grant never covers: the sensitive-path classifier is the
+ * only gate left on it, so it decides every credential name by itself.
  */
 type DelegatedReadVerdict =
   | { readonly kind: "none" }
