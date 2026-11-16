@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 1981,
+  "directMessageCount": 1978,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -548,6 +548,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/RosterRows.tsx",
     "apps/web/src/components/roster/RoutineCards.tsx",
     "apps/web/src/components/roster/RoutineFormDialog.tsx",
+    "apps/web/src/components/roster/RoutineList.tsx",
     "apps/web/src/components/roster/RoutinePanel.tsx",
     "apps/web/src/components/roster/RoutineReceiptRow.tsx",
     "apps/web/src/components/roster/RoutineRunHistory.tsx",
@@ -567,6 +568,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/useCreateGroup.ts",
     "apps/web/src/components/roster/useGroupThreadRuntime.ts",
     "apps/web/src/components/roster/useMessageReactionUpdater.ts",
+    "apps/web/src/components/roster/useRoutineActions.ts",
     "apps/web/src/components/roster/useThreadPendingUserInput.ts",
     "apps/web/src/components/settings/ArchivedBotsSettings.tsx",
     "apps/web/src/components/settings/ArchivedChatsSettings.tsx",
@@ -637,7 +639,6 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/hooks/useChatActions.ts",
     "apps/web/src/routes/-RootRouteErrorView.tsx",
     "apps/web/src/routes/__root.tsx",
-    "apps/web/src/routes/_chat.bots.$botId.tsx",
     "apps/web/src/routes/_chat.decisions.tsx",
     "apps/web/src/routes/_chat.routines.tsx",
     "packages/client-runtime/src/botInbox.ts",
