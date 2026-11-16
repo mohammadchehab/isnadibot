@@ -41,11 +41,16 @@ const ERRORS_FILE = NodePath.join(ORCHESTRATION_DIR, "Errors.ts");
  * situation with no code, and the number only goes down: a card that mints a
  * code replaces the registration with a `refused` arm and lowers this by one.
  *
+ * It has reached zero: every invariant throw in the server is now classified —
+ * it carries a refusal code, an exclusion that says why no code applies, or a
+ * pending arm that names the card which will mint one. The number is a ceiling
+ * from here on, not a debt counter: it stays zero.
+ *
  * Raising it is the wrong fix for a red test. It means a new user situation was
  * left uncoded, and the answer is a ticket on the board and a card to drain it,
  * not a bigger number here.
  */
-const PENDING_REFUSAL_COUNT = 5;
+const PENDING_REFUSAL_COUNT = 0;
 
 /** Every TypeScript file under `apps/server/src`, tests included unless excluded. */
 function sourceFiles(options: { readonly includeTests: boolean }): ReadonlyArray<string> {
@@ -234,9 +239,23 @@ describe("a pending refusal registers honest debt", () => {
   it("names the card that will mint its code, and why it needs one", () => {
     const registrations = pendingRefusalRegistrations();
 
-    // Guard against the scan silently finding nothing: a rename of the factory
-    // would otherwise turn every assertion below into a vacuous pass.
-    expect(registrations.length).toBeGreaterThan(0);
+    // Guard against the scan silently finding nothing. The ledger is empty, so
+    // the loop below proves nothing on its own. There are two ways the scan can
+    // go quiet, and both are pinned here so it keeps working at zero: the
+    // parser stops recognizing a call, or the factory is renamed and the scan
+    // no longer has a name to look for. Without the second, a registration
+    // could hide from the count under a name this file does not know.
+    expect(
+      callArguments(
+        'pendingRefusalInvariantError({ ticket: "TASK-1", reason: "sample" })',
+        "pendingRefusalInvariantError",
+      ),
+    ).toHaveLength(1);
+
+    expect(
+      maskComments(NodeFS.readFileSync(ERRORS_FILE, "utf8")),
+      "Errors.ts no longer declares the factory this file scans for",
+    ).toContain("function pendingRefusalInvariantError");
 
     for (const { file, args } of registrations) {
       const ticket = fieldLiteral(args, "ticket");

@@ -57,5 +57,9 @@ export const refusalsCatalog = {
   "This space already has as many open cards as it can hold. Close one first.":
     "此空间已拥有尽可能多的未关闭卡片。请先关闭一张。",
   "The server is installing an update. Try again in a moment.": "服务器正在安装更新。请稍后再试。",
+  "This routine was changed elsewhere since you opened it. Refresh to see the current version, then try again.":
+    "自你打开此例行任务后，它已在别处被更改。请刷新以查看当前版本，然后重试。",
+  "This routine's current procedure is not approved. Approve it, then try again.":
+    "此例行任务的任务内容尚未批准。请批准后重试。",
   "The command failed.": "命令失败。",
 } as const;

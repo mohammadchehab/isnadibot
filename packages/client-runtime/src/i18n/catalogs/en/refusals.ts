@@ -60,5 +60,9 @@ export const refusalsCatalog = {
     "This space already has as many open cards as it can hold. Close one first.",
   "The server is installing an update. Try again in a moment.":
     "The server is installing an update. Try again in a moment.",
+  "This routine was changed elsewhere since you opened it. Refresh to see the current version, then try again.":
+    "This routine was changed elsewhere since you opened it. Refresh to see the current version, then try again.",
+  "This routine's current procedure is not approved. Approve it, then try again.":
+    "This routine's current procedure is not approved. Approve it, then try again.",
   "The command failed.": "The command failed.",
 } as const;

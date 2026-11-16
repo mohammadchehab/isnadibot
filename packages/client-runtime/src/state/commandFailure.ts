@@ -79,6 +79,10 @@ const refusalMessages: Record<CommandRefusal, MessageKey> = {
   "work-item-limit-reached":
     "This space already has as many open cards as it can hold. Close one first.",
   "server-is-updating": "The server is installing an update. Try again in a moment.",
+  "routine-version-conflict":
+    "This routine was changed elsewhere since you opened it. Refresh to see the current version, then try again.",
+  "routine-procedure-unapproved":
+    "This routine's current procedure is not approved. Approve it, then try again.",
 };
 
 /**

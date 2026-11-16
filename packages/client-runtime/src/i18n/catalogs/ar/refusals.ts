@@ -59,5 +59,9 @@ export const refusalsCatalog = {
     "تحتوي هذه المساحة بالفعل على أكبر عدد ممكن من البطاقات المفتوحة. أغلق بطاقة واحدة أولًا.",
   "The server is installing an update. Try again in a moment.":
     "الخادم يثبّت تحديثًا. أعد المحاولة بعد قليل.",
+  "This routine was changed elsewhere since you opened it. Refresh to see the current version, then try again.":
+    "تم تغيير هذا الروتين في مكان آخر منذ أن فتحته. حدّث الصفحة لترى النسخة الحالية ثم حاول مجددًا.",
+  "This routine's current procedure is not approved. Approve it, then try again.":
+    "إجراء هذا الروتين الحالي غير معتمد. وافق عليه ثم حاول مجددًا.",
   "The command failed.": "فشل الأمر.",
 } as const;
