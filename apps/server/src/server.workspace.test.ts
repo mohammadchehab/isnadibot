@@ -283,7 +283,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(searchError.limit, 10);
       assert.equal(searchError.failure, "workspace_root_not_found");
       assert.equal(searchError.normalizedCwd, invalidWorkspace);
-      assert.isDefined(searchError.cause);
+      // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+      assert.notProperty(searchError, "cause");
 
       if (
         !Predicate.isTagged(results.list, "Failure") ||
@@ -297,7 +298,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(listError.cwd, invalidWorkspace);
       assert.equal(listError.failure, "workspace_root_not_found");
       assert.equal(listError.normalizedCwd, invalidWorkspace);
-      assert.isDefined(listError.cause);
+      // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+      assert.notProperty(listError, "cause");
 
       if (
         !Predicate.isTagged(results.read, "Failure") ||
@@ -315,7 +317,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(readError.relativePath, "linked-outside.txt");
       assert.equal(readError.failure, "resolved_path_outside_root");
       assert.equal(readError.resolvedPath, resolvedOutsideFile);
-      assert.isDefined(readError.cause);
+      // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+      assert.notProperty(readError, "cause");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -500,7 +503,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(writeError.cwd, workspaceDir);
       assert.equal(writeError.relativePath, "../escape.txt");
       assert.equal(writeError.failure, "workspace_path_outside_root");
-      assert.isDefined(writeError.cause);
+      // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+      assert.notProperty(writeError, "cause");
       assert.notProperty(writeError, "contents");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
