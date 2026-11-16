@@ -383,7 +383,6 @@ export const createWsOrchestrationHandlers = ({
               ? cause
               : new OrchestrationDispatchCommandError({
                   message: "Failed to dispatch orchestration command",
-                  cause,
                 }),
           ),
         ),
