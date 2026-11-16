@@ -52,7 +52,7 @@ export function ChatsPage() {
           <EmptyTitle variant="body" className="text-sm">
             {t("No conversations yet")}
           </EmptyTitle>
-          <EmptyDescription>
+          <EmptyDescription className="text-13px">
             {t("Start a chat with a bot and it will show up here.")}
           </EmptyDescription>
         </EmptyHeader>
@@ -80,10 +80,10 @@ export function ChatsPageSkeleton() {
     <div className="flex flex-col" data-testid="chats-skeleton">
       {SKELETON_ROWS.map((index) => (
         <div key={index} className="flex h-13 items-center gap-3 px-3">
-          <Skeleton className="size-10 rounded-2xl" />
+          <Skeleton className="size-10 rounded-lg" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-40" />
-            <Skeleton className="h-2.5 w-78 max-w-full" />
+            <Skeleton className="h-2.5 w-60 max-w-full" />
           </div>
         </div>
       ))}
