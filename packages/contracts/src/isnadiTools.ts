@@ -59,11 +59,34 @@ export function filterIsnadiTools(
   });
 }
 
+/**
+ * A path segment that is a hidden name, such as `.npmrc` or the `.kube` in
+ * `.kube/config`. `.` and `..` are navigation rather than names, so `./notes.md`
+ * stays an ordinary read.
+ */
+const HIDDEN_PATH_SEGMENT = /^\.(?![.]?$)/;
+
+/**
+ * A segment that names a credential store even in plain sight: `id_rsa`,
+ * `server.key`, `secrets.yaml`, `token.txt`, `terraform.tfstate`. Every segment
+ * is tested, so a file inside a `credentials/` folder is caught too.
+ */
+const CREDENTIAL_PATH_SEGMENT =
+  /\.pem$|\.key$|\.tfstate(\.backup)?$|^id_|credential|secret|token|keychain|^service-account|^adc\.json$/i;
+
+/**
+ * Why a read of `path` is a protected `secrets` action, or undefined when it is
+ * an ordinary read. This is the only gate on a delegated read of a user folder,
+ * so it errs toward refusing: any hidden segment, and any segment whose name
+ * names a credential store, needs an approval nobody in a `none` ceiling can give.
+ */
 export function classifyIsnadiSensitivePath(
   path: string,
 ): IsnadiProtectedApprovalClass | undefined {
-  return /(^|[/\\])(?:\.env(?:\.[^/\\]+)?|\.ssh|\.aws|\.config[/\\]gh|keychain|credentials?|secrets?|tokens?)(?:[/\\]|$)/i.test(
-    path,
+  const segments = path.split(/[/\\]+/).filter((segment) => segment.length > 0);
+
+  return segments.some(
+    (segment) => HIDDEN_PATH_SEGMENT.test(segment) || CREDENTIAL_PATH_SEGMENT.test(segment),
   )
     ? "secrets"
     : undefined;

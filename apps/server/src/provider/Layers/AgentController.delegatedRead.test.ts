@@ -118,6 +118,42 @@ const makeFolders = () => {
   return { root, outside };
 };
 
+/**
+ * The credential filenames a security review measured the old denylist missing
+ * (TASK-382). A delegated read of any of them must be declined, because the
+ * sensitive-path classifier is the only gate a `none` ceiling leaves on it.
+ */
+const CREDENTIAL_PATHS = [
+  ".npmrc",
+  ".netrc",
+  ".pypirc",
+  ".git-credentials",
+  ".docker/config.json",
+  ".kube/config",
+  "id_rsa",
+  "key.pem",
+  "server.key",
+  ".terraform/credentials.tfrc.json",
+  ".pgpass",
+  ".my.cnf",
+  ".vault-token",
+  "adc.json",
+  "service-account.json",
+  "terraform.tfstate",
+  "terraform.tfstate.backup",
+  ".htpasswd",
+  "credentials.json",
+  "secrets.yaml",
+  "token.txt",
+] as const;
+
+/** Writes `relative` inside `root`, creating the folders its name needs. */
+const writeInFolder = (root: string, relative: string) => {
+  const target = NodePath.join(root, relative);
+  NodeFS.mkdirSync(NodePath.dirname(target), { recursive: true });
+  NodeFS.writeFileSync(target, "credential");
+};
+
 const declined = (message: string) => ({
   toolCallId: "delegated-call",
   decision: "decline",
@@ -193,15 +229,18 @@ describe("AgentControllerLive delegated reads", () => {
     }),
   );
 
-  it.effect("still refuses a protected path inside the folder", () =>
+  it.effect("refuses every credential filename inside the folder, naming the action", () =>
     Effect.gen(function* () {
       const { root } = makeFolders();
-      NodeFS.writeFileSync(NodePath.join(root, ".env"), "KEY=1");
-      const { mastra } = yield* runDelegatedCall({}, { path: ".env" }, root);
 
-      expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
-        expect.objectContaining({ decision: "decline" }),
-      );
+      for (const path of [".env", ...CREDENTIAL_PATHS]) {
+        writeInFolder(root, path);
+        const { mastra } = yield* runDelegatedCall({}, { path }, root);
+
+        expect(mastra.session.respondToToolApproval).toHaveBeenCalledWith(
+          declined("'secrets' action"),
+        );
+      }
     }),
   );
 });
