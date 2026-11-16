@@ -41,6 +41,7 @@ policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../A
 - [Scripts](./internals/scripts.md)
 - [Local verification](./internals/verification.md)
 - [Lint rules](./internals/lint.md)
+- [Design system](./internals/design-system.md)
 - [Interface translations](./internals/interface-translations.md)
 - [Connection runtime](./internals/connection-runtime.md)
 - [Providers](./internals/providers.md)

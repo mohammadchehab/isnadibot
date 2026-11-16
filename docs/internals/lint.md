@@ -85,6 +85,10 @@ visibility. Everything else comes from a variant or size. Contracts open more fo
 default layout-only policy. When a call site needs a look no variant provides, add the variant to
 the primitive and use it by name.
 
+Adding a **size** is a separate decision with its own six conditions, in
+[design-system.md](./design-system.md). Read that before reaching for a new size; `no-restyle`
+catches the call-site override, and the admission rule is what stops the size existing at all.
+
 `apps/mobile` is out of scope. Its theme tokens live in uniwind `@layer theme` blocks that
 `@shadcn/lint` does not read, so real classes such as `bg-screen` come back as unknown. React
 Native also styles through `style` objects, which `no-inline-styles` would reject everywhere.
