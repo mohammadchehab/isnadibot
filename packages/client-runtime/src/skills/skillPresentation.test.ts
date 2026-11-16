@@ -191,10 +191,11 @@ describe("the Used by column", () => {
     });
   });
 
-  it("names a single bot", () => {
+  it("gives a single bot the avatar chip", () => {
     expect(skillUsedByPresentation(skill({ name: "a", usedBy: [scout] }), names)).toEqual({
-      kind: "text",
+      kind: "bot",
       label: "Scout",
+      botId: scout,
     });
   });
 
@@ -298,7 +299,7 @@ describe("a row that needs the user", () => {
 
     const attention = { kind: "changed-since-approved" } as const;
 
-    expect(skillAttentionLabel(attention)).toBe("Changed since approved");
+    expect(skillAttentionLabel(attention)).toBe("Needs approval");
     expect(skillAttentionDetail(changed, attention)).toBe(
       "Changed at commit 9b31e07 since you approved 4f2a1c9 · 1 file added, 2 edited.",
     );

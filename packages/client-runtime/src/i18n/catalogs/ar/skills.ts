@@ -12,7 +12,6 @@ export const skillsCatalog = {
   Source: "المصدر",
   Size: "الحجم",
   "Last loaded": "آخر تحميل",
-  "In the index": "في الفهرس",
   "Actions for {skill}": "إجراءات {skill}",
   "Size is what loads when a skill is used. The index costs about 30 tokens per skill.":
     "الحجم هو ما يُحمَّل عند استخدام المهارة. يكلّف الفهرس نحو 30 رمزًا لكل مهارة.",
@@ -32,7 +31,6 @@ export const skillsCatalog = {
   "Built in": "مدمجة",
   Yours: "مهاراتك",
   Community: "المجتمع",
-  "Changed since approved": "تغيّرت بعد الموافقة",
   "Needs {connector}": "تحتاج {connector}",
   "A bot cannot use it until you approve it.": "لا يمكن للبوت استخدامها حتى توافق عليها.",
   "Added from {origin} · a bot cannot use it until you approve it.":

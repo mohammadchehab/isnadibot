@@ -9,6 +9,7 @@ import {
   skillUsedByPresentation,
   type RegistrySkill,
   type SkillAttention,
+  type SkillUsedByPresentation,
 } from "@isnadi/client-runtime/skills";
 import { MoreHorizontalIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 
@@ -53,21 +54,61 @@ function SkillUsedByStack({
 }
 
 /**
+ * One bot, drawn as the avatar chip the roster uses elsewhere: a 16px face and the name.
+ */
+function SkillUsedByBot({
+  botId,
+  label,
+  bots,
+}: {
+  readonly botId: BotId;
+  readonly label: string;
+  readonly bots: readonly Bot[];
+}) {
+  const bot = bots.find((candidate) => candidate.id === botId);
+
+  if (!bot) return <span className="truncate">{label}</span>;
+
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-secondary/60 py-0.5 pe-2 ps-0.5">
+      <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-4 rounded-full" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+/** The Used by cell: a chip for one bot, a stack for up to three, words otherwise. */
+function SkillUsedByCell({
+  usedBy,
+  bots,
+}: {
+  readonly usedBy: SkillUsedByPresentation;
+  readonly bots: readonly Bot[];
+}) {
+  switch (usedBy.kind) {
+    case "bot":
+      return <SkillUsedByBot botId={usedBy.botId} label={usedBy.label} bots={bots} />;
+    case "stack":
+      return <SkillUsedByStack botIds={usedBy.botIds} bots={bots} />;
+    case "none":
+    case "text":
+      return <span className="truncate">{usedBy.label}</span>;
+  }
+}
+
+/**
  * One registry row. A row that needs the user swaps its Source badge for the state word, grows a
  * warning line under the description and moves its action into the Last loaded cell, so the name
  * and the source never move sideways between states.
  */
 export function SkillRegistryRow({
   skill,
-  winner,
   attention,
   bots,
   nowMs,
   removeLabel,
 }: {
   readonly skill: RegistrySkill;
-  /** Whether this copy is the one the index uses when the name appears more than once. */
-  readonly winner: boolean;
   readonly attention: SkillAttention | null;
   readonly bots: readonly Bot[];
   readonly nowMs: number;
@@ -85,14 +126,7 @@ export function SkillRegistryRow({
         <div className="flex min-w-0 items-start gap-2">
           <SparklesIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-mono text-xs text-foreground">{skill.name}</span>
-              {winner ? (
-                <Badge size="sm" variant="quiet" className="shrink-0">
-                  {t("In the index")}
-                </Badge>
-              ) : null}
-            </div>
+            <span className="block truncate font-mono text-xs text-foreground">{skill.name}</span>
             <p className="text-xs text-muted-foreground">{skill.description}</p>
             {attention ? (
               <p className="text-11px text-warning-foreground">
@@ -103,11 +137,7 @@ export function SkillRegistryRow({
         </div>
       </TableCell>
       <TableCell presentation="muted" className="w-30 px-3 py-2.5 align-top text-xs">
-        {usedBy.kind === "stack" ? (
-          <SkillUsedByStack botIds={usedBy.botIds} bots={bots} />
-        ) : (
-          <span className="truncate">{usedBy.label}</span>
-        )}
+        <SkillUsedByCell usedBy={usedBy} bots={bots} />
       </TableCell>
       <TableCell className="w-24 px-3 py-2.5 align-top">
         {attention ? (
@@ -115,7 +145,7 @@ export function SkillRegistryRow({
             {skillAttentionLabel(attention, i18n)}
           </Badge>
         ) : (
-          <Badge size="sm" variant="secondary">
+          <Badge size="sm" variant={skill.source === "community" ? "warning" : "secondary"}>
             {skillSourceLabel(skill.source, i18n)}
           </Badge>
         )}

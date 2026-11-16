@@ -12,7 +12,6 @@ export const skillsCatalog = {
   Source: "来源",
   Size: "大小",
   "Last loaded": "上次加载",
-  "In the index": "在索引中",
   "Actions for {skill}": "{skill} 的操作",
   "Size is what loads when a skill is used. The index costs about 30 tokens per skill.":
     "大小是技能被使用时加载的内容。索引每项技能约花费 30 个词元。",
@@ -31,7 +30,6 @@ export const skillsCatalog = {
   "Built in": "内置",
   Yours: "我的",
   Community: "社区",
-  "Changed since approved": "批准后已变更",
   "Needs {connector}": "需要 {connector}",
   "A bot cannot use it until you approve it.": "在你批准之前，机器人无法使用它。",
   "Added from {origin} · a bot cannot use it until you approve it.":

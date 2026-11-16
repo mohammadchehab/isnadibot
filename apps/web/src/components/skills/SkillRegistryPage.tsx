@@ -3,12 +3,10 @@ import {
   filterRegistrySkills,
   SKILL_REGISTRY_FILTERS,
   skillAttention,
-  skillWinnersByName,
   useSkillRegistry,
   type RegistrySkill,
   type SkillRegistryFilter,
 } from "@isnadi/client-runtime/skills";
-import { PlusIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useI18n } from "../../i18n";
@@ -18,7 +16,15 @@ import { useRelativeTimeTick } from "../settings/settingsLayout";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { Skeleton } from "../ui/skeleton";
-import { Table, TableBody, TableHead, TableHeader, TableRow } from "../ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { SkillRegistryRow } from "./SkillRegistryRow";
 
@@ -38,19 +44,19 @@ function SkillRegistryColumns() {
   return (
     <TableHeader>
       <TableRow presentation="flush">
-        <TableHead presentation="muted" className="h-10 px-3 text-xs font-medium">
+        <TableHead presentation="muted" className="h-10 px-3 text-xs">
           {t("Skill")}
         </TableHead>
-        <TableHead presentation="muted" className="h-10 w-30 px-3 text-xs font-medium">
+        <TableHead presentation="muted" className="h-10 w-30 px-3 text-xs">
           {t("Used by")}
         </TableHead>
-        <TableHead presentation="muted" className="h-10 w-24 px-3 text-xs font-medium">
+        <TableHead presentation="muted" className="h-10 w-24 px-3 text-xs">
           {t("Source")}
         </TableHead>
-        <TableHead presentation="muted" className="h-10 w-18 px-3 text-xs font-medium">
+        <TableHead presentation="muted" className="h-10 w-18 px-3 text-xs">
           {t("Size")}
         </TableHead>
-        <TableHead presentation="muted" className="h-10 w-24 px-3 text-xs font-medium">
+        <TableHead presentation="muted" className="h-10 w-24 px-3 text-xs">
           {t("Last loaded")}
         </TableHead>
         <TableHead className="h-10 w-10 px-1">
@@ -103,8 +109,6 @@ export function SkillRegistryPage({
     [registry.skills, filter, projectId],
   );
 
-  const winners = useMemo(() => skillWinnersByName(registry.skills), [registry.skills]);
-
   if (registry.state === "unavailable") return null;
 
   return (
@@ -138,8 +142,7 @@ export function SkillRegistryPage({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          <Button size="compact">
-            <PlusIcon aria-hidden />
+          <Button size="compact" variant="outline">
             {t("Add skill")}
           </Button>
         </div>
@@ -176,7 +179,6 @@ export function SkillRegistryPage({
                 <SkillRegistryRow
                   key={skill.id}
                   skill={skill}
-                  winner={winners.get(skill.name)?.id === skill.id}
                   attention={skillAttention(skill, registry.unavailableConnectors)}
                   bots={bots}
                   nowMs={nowMs}
@@ -188,13 +190,18 @@ export function SkillRegistryPage({
                 />
               ))}
             </TableBody>
+            <TableFooter>
+              <TableRow presentation="flush">
+                <TableCell presentation="muted" colSpan={6} className="h-10 px-3 text-11px">
+                  {t(
+                    "Size is what loads when a skill is used. The index costs about 30 tokens per skill.",
+                  )}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
         </div>
       )}
-
-      <p className="text-11px text-muted-foreground">
-        {t("Size is what loads when a skill is used. The index costs about 30 tokens per skill.")}
-      </p>
     </div>
   );
 }

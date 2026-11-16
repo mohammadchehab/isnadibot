@@ -4,7 +4,7 @@ Interface language is a client preference, not environment state. A browser prof
 
 ## Catalog conventions
 
-The framework-free implementation lives in `packages/client-runtime/src/i18n`. React and React Native adapters own subscriptions and persistence. Device locale resolution is explicit so shared code does not depend on browser or native globals.
+The framework-free implementation lives in `packages/client-runtime/src/i18n`. `packages/client-runtime` carries React as a peerDependency, allowed only for the hooks in its `skills/` subpath; every other module stays framework-free. React and React Native adapters own subscriptions and persistence. Device locale resolution is explicit so shared code does not depend on browser or native globals.
 
 English is the source and fallback language. The shipped set is English, Simplified Chinese (`zh-CN`), and, on web and desktop only, Arabic (`ar`). Traditional Chinese and other locales fall back to English. Test-only catalogs do not count as shipped translations. Additional languages load through the same lazy registry.
 

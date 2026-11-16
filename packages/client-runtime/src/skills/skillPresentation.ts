@@ -132,15 +132,16 @@ export function skillLastLoadedLabel(
   return i18n.t("{span} ago", { span });
 }
 
-/** How the Used by cell draws: nothing, a short avatar stack, or words. */
+/** How the Used by cell draws: nothing, one bot as a chip, a short avatar stack, or words. */
 export type SkillUsedByPresentation =
   | { readonly kind: "none"; readonly label: string }
+  | { readonly kind: "bot"; readonly label: string; readonly botId: BotId }
   | { readonly kind: "stack"; readonly label: string; readonly botIds: readonly BotId[] }
   | { readonly kind: "text"; readonly label: string };
 
 /**
- * Used by keeps one line: a name for one bot, overlapping avatars for up to three, and words
- * above that — "All spaces" for a skill added to all of them, otherwise the count.
+ * Used by keeps one line: one bot as an avatar chip, overlapping avatars for up to three, and
+ * words above that — "All spaces" for a skill added to all of them, otherwise the count.
  */
 export function skillUsedByPresentation(
   skill: RegistrySkill,
@@ -161,7 +162,11 @@ export function skillUsedByPresentation(
     };
   }
 
-  if (names.length === 1) return { kind: "text", label: names[0] ?? "" };
+  const onlyBotId = skill.usedBy[0];
+
+  if (names.length === 1 && onlyBotId !== undefined) {
+    return { kind: "bot", label: names[0] ?? "", botId: onlyBotId };
+  }
 
   return { kind: "stack", label: names.join(", "), botIds: [...skill.usedBy] };
 }
@@ -223,16 +228,19 @@ export function skillConnectorName(connector: string): string {
   return connector.charAt(0).toUpperCase() + connector.slice(1);
 }
 
-/** The state word the Source cell carries in place of the source badge. */
+/**
+ * The state word the Source cell carries in place of the source badge. A skill whose content
+ * changed after approval is still waiting for the user, so it carries the same word; what
+ * changed is told by the warning line under the description.
+ */
 export function skillAttentionLabel(
   attention: SkillAttention,
   i18n: SkillTranslator = englishTranslator,
 ): string {
   switch (attention.kind) {
     case "needs-approval":
-      return i18n.t("Needs approval");
     case "changed-since-approved":
-      return i18n.t("Changed since approved");
+      return i18n.t("Needs approval");
     case "needs-connector":
       return i18n.t("Needs {connector}", { connector: skillConnectorName(attention.connector) });
   }

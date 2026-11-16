@@ -12,7 +12,6 @@ export const skillsCatalog = {
   Source: "Source",
   Size: "Size",
   "Last loaded": "Last loaded",
-  "In the index": "In the index",
   "Actions for {skill}": "Actions for {skill}",
   "Size is what loads when a skill is used. The index costs about 30 tokens per skill.":
     "Size is what loads when a skill is used. The index costs about 30 tokens per skill.",
@@ -31,7 +30,6 @@ export const skillsCatalog = {
   "Built in": "Built in",
   Yours: "Yours",
   Community: "Community",
-  "Changed since approved": "Changed since approved",
   "Needs {connector}": "Needs {connector}",
   "A bot cannot use it until you approve it.": "A bot cannot use it until you approve it.",
   "Added from {origin} · a bot cannot use it until you approve it.":
