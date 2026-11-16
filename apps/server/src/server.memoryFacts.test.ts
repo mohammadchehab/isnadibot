@@ -393,6 +393,38 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.equal(edited.revision.fact, "Edited over WS");
       assert.equal(edited.revision.revision, 2);
 
+      // A save against a revision that has moved on is the CAS loss. It crosses
+      // with the authored reason, so a client recognises the case by code rather
+      // than by matching the server's sentence.
+      const stale = yield* Effect.flip(
+        Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[WS_METHODS.memoryFactMutate]({
+              threadId,
+              mutation: {
+                operation: "fact.edit",
+                memoryId: seeded.rootId,
+                expectedRevision: 1,
+                fact: "Edited behind the surface",
+              },
+            }),
+          ),
+        ),
+      );
+
+      assert.equal(stale._tag, "IsnadiMemoryOperationError");
+
+      if (!Predicate.isTagged(stale, "IsnadiMemoryOperationError")) {
+        return assert.fail("expected a memory operation error");
+      }
+
+      assert.equal(stale.operation, "facts.mutate");
+      assert.equal(stale.reason, "memory-changed");
+      assert.equal(
+        stale.message,
+        "Memory changed since you opened it. Reopen memory before saving.",
+      );
+
       const pinned = yield* Effect.scoped(
         withWsRpcClient(wsUrl, (client) =>
           client[WS_METHODS.memoryFactMutate]({
