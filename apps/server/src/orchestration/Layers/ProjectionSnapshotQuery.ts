@@ -47,6 +47,8 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     getLatestAssistantMessageRowForTurn,
     listThreadRows,
     listActiveThreadRows,
+    listActiveThreadPreviewRows,
+    getLatestThreadPreviewRow,
     listArchivedThreadRows,
     listThreadMessageRows,
     listThreadProposedPlanRows,
@@ -132,6 +134,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     projectionMcpServerRepository,
     routineRepository,
     listActiveThreadRows,
+    listActiveThreadPreviewRows,
     listActiveThreadSessionRows,
     listActiveLatestTurnRows,
     listProjectionStateRows,
@@ -189,6 +192,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     getTurnStartMessageRow,
     listPendingTurnStartRows,
     getTurnStartFailureRow,
+    getLatestThreadPreviewRow,
   });
 
   const { getThreadDetailById, getThreadDetailSnapshot } = createThreadDetail({

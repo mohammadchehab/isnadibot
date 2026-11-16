@@ -26,6 +26,7 @@ export const chatCatalog = {
   "New worktree": "New worktree",
   "No branches available": "No branches available",
   "No chats yet": "No chats yet",
+  "No conversations yet": "No conversations yet",
   "No matching branches": "No matching branches",
   "Open files": "Open files",
   "Opening chat…": "Opening chat…",
@@ -48,6 +49,8 @@ export const chatCatalog = {
   "Show chat sidebar": "Show chat sidebar",
   Snoozed: "Snoozed",
   "Sort chats": "Sort chats",
+  "Start a chat with a bot and it will show up here.":
+    "Start a chat with a bot and it will show up here.",
   "Start chat": "Start chat",
   "Starting chat": "Starting chat",
   "Swipe left for archive and delete actions": "Swipe left for archive and delete actions",

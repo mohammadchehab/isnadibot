@@ -16,6 +16,7 @@ import {
   maxIso,
   mapLatestTurn,
   mapSessionRow,
+  mapThreadPreview,
   computeSnapshotSequence,
   mapProjectShellRow,
   mapBotRow,
@@ -40,6 +41,7 @@ export function createShellSnapshots({
   listActiveThreadRows,
   listActiveThreadSessionRows,
   listActiveLatestTurnRows,
+  listActiveThreadPreviewRows,
   listProjectionStateRows,
   resolveRepositoryIdentitiesForProjects,
   threadBackgroundLiveness,
@@ -62,6 +64,7 @@ export function createShellSnapshots({
   | "listActiveThreadRows"
   | "listActiveThreadSessionRows"
   | "listActiveLatestTurnRows"
+  | "listActiveThreadPreviewRows"
   | "listProjectionStateRows"
   | "resolveRepositoryIdentitiesForProjects"
   | "threadBackgroundLiveness"
@@ -134,6 +137,14 @@ export function createShellSnapshots({
               ),
             ),
           ),
+          listActiveThreadPreviewRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getShellSnapshot:listThreadPreviews:query",
+                "ProjectionSnapshotQuery.getShellSnapshot:listThreadPreviews:decodeRows",
+              ),
+            ),
+          ),
           listProjectionStateRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -158,6 +169,7 @@ export function createShellSnapshots({
             threadRows,
             sessionRows,
             latestTurnRows,
+            previewRows,
             stateRows,
           ]) =>
             Effect.gen(function* () {
@@ -216,6 +228,10 @@ export function createShellSnapshots({
 
               const sessionByThread = new Map(
                 sessionRows.map((row) => [row.threadId, mapSessionRow(row)] as const),
+              );
+
+              const previewByThread = new Map(
+                previewRows.map((row) => [row.threadId, mapThreadPreview(row)] as const),
               );
 
               const snapshot = {
@@ -278,6 +294,7 @@ export function createShellSnapshots({
                           row.threadId,
                         ),
                         planProgress: threadPlanProgress.getThreadPlanProgress(row.threadId),
+                        lastMessage: previewByThread.get(row.threadId) ?? null,
                       } satisfies OrchestrationThreadShell)
                     : Result.failVoid,
                 ),

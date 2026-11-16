@@ -39,6 +39,7 @@ import {
   GroupHopBudget,
 } from "./roster.ts";
 import {
+  OrchestrationMessageRole,
   OrchestrationSession,
   OrchestrationLatestTurn,
   ThreadTitleRegeneration,
@@ -81,6 +82,19 @@ export const OrchestrationProjectShell = Schema.Struct({
 });
 
 export type OrchestrationProjectShell = typeof OrchestrationProjectShell.Type;
+
+/**
+ * A chat's newest user or assistant message, cut for a one-line preview. The
+ * text is markdown, truncated by the server; the client flattens it. The
+ * speaker is the bot that wrote it, or the person when `speakerBotId` is null.
+ */
+export const OrchestrationThreadPreviewMessage = Schema.Struct({
+  text: TrimmedNonEmptyString,
+  role: OrchestrationMessageRole,
+  speakerBotId: Schema.NullOr(BotId),
+});
+
+export type OrchestrationThreadPreviewMessage = typeof OrchestrationThreadPreviewMessage.Type;
 
 export const OrchestrationThreadShell = Schema.Struct({
   id: ThreadId,
@@ -141,6 +155,11 @@ export const OrchestrationThreadShell = Schema.Struct({
       }),
     ),
   ),
+  /**
+   * The newest user or assistant message, for the Chats page preview line.
+   * Optional so old servers/clients interop; absent = no previewable message.
+   */
+  lastMessage: Schema.optional(Schema.NullOr(OrchestrationThreadPreviewMessage)),
 });
 
 export type OrchestrationThreadShell = typeof OrchestrationThreadShell.Type;

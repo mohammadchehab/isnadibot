@@ -109,7 +109,7 @@ export function ExperimentalSidebar() {
         <SidebarTitleRow label={t("Collapse sidebar")} onToggle={toggleSidebar} />
 
         <nav aria-label={t("Main")} className="flex flex-col gap-1">
-          <SidebarMenuButton isActive={onChats} onClick={() => void navigate({ to: "/" })}>
+          <SidebarMenuButton isActive={onChats} onClick={() => void navigate({ to: "/chats" })}>
             <MessagesSquareIcon />
             <span>{t("Chats")}</span>
           </SidebarMenuButton>

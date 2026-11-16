@@ -20,6 +20,7 @@ import {
   ProjectionThreadSessionDbRowSchema,
   ProjectionCheckpointDbRowSchema,
   ProjectionLatestTurnDbRowSchema,
+  ProjectionThreadPreviewDbRowSchema,
   ProjectionStateDbRowSchema,
 } from "../ProjectionSnapshotRows.ts";
 
@@ -303,6 +304,51 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
           AND archived_at IS NULL
         ORDER BY project_id ASC, created_at ASC, thread_id ASC
       `,
+  });
+
+  const listActiveThreadPreviewRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: ProjectionThreadPreviewDbRowSchema,
+    execute: () =>
+      sql`
+        SELECT
+          threads.thread_id AS "threadId",
+          substr(trim(messages.text), 1, 200) AS "text",
+          messages.role,
+          messages.responding_bot_id AS "speakerBotId"
+        FROM projection_threads threads
+        JOIN projection_thread_messages messages
+          ON messages.message_id = (
+            SELECT latest.message_id
+            FROM projection_thread_messages latest
+            WHERE latest.thread_id = threads.thread_id
+              AND latest.role IN ('user', 'assistant')
+              AND trim(latest.text, char(32, 9, 10, 13)) <> ''
+            ORDER BY latest.created_at DESC, latest.message_id DESC
+            LIMIT 1
+          )
+        WHERE threads.deleted_at IS NULL
+          AND threads.archived_at IS NULL
+        ORDER BY threads.thread_id ASC
+      `,
+  });
+
+  const getLatestThreadPreviewRow = SqlSchema.findOneOption({
+    Request: ThreadIdLookupInput,
+    Result: ProjectionThreadPreviewDbRowSchema,
+    execute: ({ threadId }) => sql`
+      SELECT
+        thread_id AS "threadId",
+        substr(trim(text), 1, 200) AS "text",
+        role,
+        responding_bot_id AS "speakerBotId"
+      FROM projection_thread_messages
+      WHERE thread_id = ${threadId}
+        AND role IN ('user', 'assistant')
+        AND trim(text, char(32, 9, 10, 13)) <> ''
+      ORDER BY created_at DESC, message_id DESC
+      LIMIT 1
+    `,
   });
 
   const listArchivedThreadRows = SqlSchema.findAll({
@@ -679,6 +725,8 @@ export function createEnvironmentRows({ sql }: Pick<ProjectionSnapshotDependenci
     getLatestAssistantMessageRowForTurn,
     listThreadRows,
     listActiveThreadRows,
+    listActiveThreadPreviewRows,
+    getLatestThreadPreviewRow,
     listArchivedThreadRows,
     listThreadMessageRows,
     listThreadProposedPlanRows,

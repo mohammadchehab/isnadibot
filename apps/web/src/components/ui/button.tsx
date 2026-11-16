@@ -100,6 +100,11 @@ const buttonVariants = cva(
         row: "h-8 gap-1.5 px-2 sm:h-7",
         /** `row` with roomier gaps and regular weight, for list entries with trailing meta. */
         "row-relaxed": "h-8 gap-3 px-2 font-normal sm:h-7",
+        /**
+         * A 52px list row holding a name line over a preview line, used by the
+         * Chats page. It keeps its height at every width.
+         */
+        "row-two-line": "h-13 justify-start gap-3 px-3 font-normal",
         micro:
           "h-5 gap-1 rounded-sm px-[calc(--spacing(1.5)-1px)] text-[11px] before:rounded-[calc(var(--radius-sm)-1px)] sm:text-[11px] [&_svg:not([class*='size-'])]:size-3 sm:[&_svg:not([class*='size-'])]:size-3",
         onboarding: "h-10 rounded-xl px-[calc(--spacing(3)-1px)] sm:h-8",

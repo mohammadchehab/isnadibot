@@ -117,6 +117,7 @@ export {
 export {
   OrchestrationReadModel,
   OrchestrationProjectShell,
+  OrchestrationThreadPreviewMessage,
   OrchestrationThreadShell,
   OrchestrationShellSnapshot,
   OrchestrationShellStreamEvent,
