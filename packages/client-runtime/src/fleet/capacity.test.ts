@@ -32,7 +32,7 @@ const RUNNING: OrchestrationLatestTurn = {
 };
 
 function bot(id: BotId, name: string, archivedAt: string | null = null): CapacityBot {
-  return { id, name, archivedAt };
+  return { id, name, avatar: { kind: "blob", shape: "circle", color: "#2E8EFF" }, archivedAt };
 }
 
 function chat(overrides: Partial<BotStatusChat> = {}): BotStatusChat {
