@@ -1,4 +1,5 @@
 export {
+  isDirectoryPlugin,
   isInstallablePlugin,
   loadCatalog,
   loadDirectoryCatalog,
@@ -10,8 +11,6 @@ export {
   type PluginLogo,
   type PluginSkill,
 } from "./catalog";
-
-export { integrationsShListing, isListedIntegration } from "./integrationsSh";
 
 export {
   isInstallableManifest,

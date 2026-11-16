@@ -98,15 +98,15 @@ export function buildPluginSections(input: {
   return featured.length > 0 ? [{ title: "Featured", plugins: featured }, ...sections] : sections;
 }
 
+/**
+ * The reason an entry cannot be connected yet. A verification-pending entry is
+ * not blocked: connecting it is how its lifecycle gets verified, so it keeps
+ * only its status label.
+ */
 export function pluginBlocker(plugin: PluginDirectoryDefinition): string | null {
   if (plugin.connection.type === "brokered") return plugin.connection.pendingBlocker ?? null;
 
-  if (
-    plugin.connection.type === "approval-pending" ||
-    plugin.connection.type === "verification-pending"
-  ) {
-    return plugin.connection.blocker;
-  }
+  if (plugin.connection.type === "approval-pending") return plugin.connection.blocker;
 
   if (plugin.kind === "mcp-unavailable") return `${plugin.title} has no available connector.`;
 

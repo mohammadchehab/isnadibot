@@ -177,12 +177,19 @@ describe("plugin lifecycle matrix execution", () => {
     await runLifecycle({ url: fixture.url, headers: { authorization: "Bearer fixture-token" } });
   });
 
-  it("keeps every unverified entry non-installable with a named blocker", () => {
+  it("installs an unverified entry and keeps an unapproved vendor closed", () => {
     const catalog = loadManifestCatalog(catalogManifests());
 
     for (const plugin of catalog) {
       if (plugin.catalogStatus === "available" || plugin.catalogStatus === "deprecated") continue;
-      expect(isInstallableManifest(plugin)).toBe(false);
+
+      // A verification-pending entry installs so its lifecycle can be verified;
+      // a vendor that has not approved access, or an entry with no transport,
+      // stays closed with its named blocker.
+      const open =
+        plugin.catalogStatus === "verification-pending" && plugin.transport.type !== "unavailable";
+
+      expect(isInstallableManifest(plugin)).toBe(open);
 
       if (plugin.connection.type === "brokered") {
         expect(plugin.connection.pendingBlocker).toBeTruthy();

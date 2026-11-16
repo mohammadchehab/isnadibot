@@ -2,11 +2,12 @@ import { McpServerId, type McpServer } from "@isnadi/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import {
-  isListedIntegration,
+  isDirectoryPlugin,
   loadDirectoryCatalog,
   PLUGIN_CATEGORIES,
   type PluginDirectoryDefinition,
 } from "../../../../../plugins";
+import { PLUGIN_DIRECTORY_CATALOG } from "./pluginDirectoryCatalog";
 import { PluginDetailsContent } from "./PluginDetails";
 import {
   EMPTY_MCP_SERVER_DRAFT,
@@ -25,7 +26,7 @@ import { planPluginToggle, pluginMcpServerId } from "./pluginRegistry";
 
 const catalog = loadDirectoryCatalog();
 
-const listedCatalog = catalog.filter(isListedIntegration);
+const directoryCatalog = catalog.filter(isDirectoryPlugin);
 
 const firecrawlEntry = catalog.find((plugin) => plugin.id === "firecrawl");
 
@@ -96,6 +97,16 @@ const removedBuiltinServer: McpServer = {
 
 const noop = () => undefined;
 
+// The whole opening tag of the one action button a card renders, so a test can
+// read its disabled state and title without the rest of the card's markup.
+function actionButton(markup: string, label: string): string {
+  const index = markup.indexOf(`aria-label="${label}"`);
+
+  if (index === -1) throw new TypeError(`No action button labelled "${label}".`);
+
+  return markup.slice(markup.lastIndexOf("<button", index), markup.indexOf(">", index) + 1);
+}
+
 describe("Plugins dialog content", () => {
   it("gives the user a recovery action when an active session does not reconnect", () => {
     expect(
@@ -140,7 +151,7 @@ describe("Plugins dialog content", () => {
     expect(PLUGIN_DIRECTORY_PANEL_CLASS_NAME).not.toContain("pt-5!");
     expect(PLUGIN_DIRECTORY_FILTERS.slice(3)).toEqual(
       PLUGIN_CATEGORIES.filter((category) =>
-        listedCatalog.some((plugin) => plugin.category === category),
+        directoryCatalog.some((plugin) => plugin.category === category),
       ),
     );
   });
@@ -175,6 +186,55 @@ describe("Plugins dialog content", () => {
       expect(markup).toContain(`data-plugin-id="${plugin.id}"`);
       expect(markup).toContain(plugin.description.replaceAll("'", "&#x27;"));
     }
+  });
+
+  it("lists every directory plugin and keeps Connect live on a verification-pending entry", () => {
+    const markup = renderToStaticMarkup(
+      <PluginsCatalog
+        sections={buildPluginSections({
+          plugins: PLUGIN_DIRECTORY_CATALOG,
+          query: "",
+          filter: "All",
+        })}
+        servers={[]}
+        pendingServerId={null}
+        onToggle={noop}
+        onOpen={noop}
+      />,
+    );
+
+    // Exactly one card per entry: nothing is dropped from the directory and
+    // nothing is listed twice. Sections order the cards, so compare as sets.
+    const renderedIds = [...markup.matchAll(/data-plugin-id="([^"]+)"/g)].map((match) => match[1]);
+
+    expect(renderedIds.toSorted()).toEqual(
+      PLUGIN_DIRECTORY_CATALOG.map((plugin) => plugin.id).toSorted(),
+    );
+
+    const verificationPending = PLUGIN_DIRECTORY_CATALOG.find((plugin) => plugin.id === "exa");
+
+    const approvalPending = PLUGIN_DIRECTORY_CATALOG.find(
+      (plugin) => plugin.connection.type === "approval-pending",
+    );
+
+    if (verificationPending?.connection.type !== "verification-pending") {
+      throw new TypeError("Exa is no longer the verification-pending entry the card names.");
+    }
+
+    if (approvalPending?.connection.type !== "approval-pending") {
+      throw new TypeError("The directory no longer holds an approval-pending entry.");
+    }
+
+    // A verification-pending entry connects: the sign-in is how it gets verified.
+    // "disabled" also appears inside the class list, so match the attribute.
+    expect(actionButton(markup, `Connect ${verificationPending.title}`)).not.toContain(
+      'disabled=""',
+    );
+
+    // An approval-pending entry still shows, disabled, with its blocker named.
+    const approvalButton = actionButton(markup, `Connect ${approvalPending.title}`);
+    expect(approvalButton).toContain('disabled=""');
+    expect(approvalButton).toContain(approvalPending.connection.blocker.replaceAll("'", "&#x27;"));
   });
 
   it("groups the unfiltered directory under one heading per populated category", () => {

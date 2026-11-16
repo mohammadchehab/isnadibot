@@ -199,7 +199,7 @@ describe("Isnadi catalog MCP tool handlers", () => {
     });
   });
 
-  it("creates enabled plugins and rejects unavailable directory entries", async () => {
+  it("creates enabled plugins and rejects unapproved directory entries", async () => {
     const dispatch = vi.fn<(command: OrchestrationCommand) => Promise<void>>(async () => undefined);
 
     const runtime = createIsnadiPluginRuntime(
@@ -222,9 +222,9 @@ describe("Isnadi catalog MCP tool handlers", () => {
           connection: { type: "ready" },
           catalogStatus: "available",
         },
-        "./entries/typefully/plugin.json": JSON.parse(
+        "./entries/hubspot/plugin.json": JSON.parse(
           NodeFS.readFileSync(
-            new URL("../../../../plugins/entries/typefully/plugin.json", import.meta.url),
+            new URL("../../../../plugins/entries/hubspot/plugin.json", import.meta.url),
             "utf8",
           ),
         ),
@@ -240,7 +240,10 @@ describe("Isnadi catalog MCP tool handlers", () => {
         enabled: true,
       }),
     );
-    await expect(runtime.install("typefully")).rejects.toThrow("not available for installation");
+    // Hubspot's vendor has not approved access, so its named blocker wins over
+    // the install; an unverified recipe such as Typefully installs so its
+    // lifecycle can be verified.
+    await expect(runtime.install("hubspot")).rejects.toThrow("not available for installation");
     await expect(runtime.install("missing")).rejects.toThrow("was not found");
     expect(dispatch).toHaveBeenCalledOnce();
   });

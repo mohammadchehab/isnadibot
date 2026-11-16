@@ -12,9 +12,9 @@ platforms, permissions, approval classes, setup, documentation, source, and depe
 Health stays **Not checked** until a real request succeeds. An enabled plugin is not proof that its
 connection works. A routine can require an enabled connector.
 
-Entries marked **Verification pending** cannot be connected yet. The directory shows the vendor's
-official recipe and the named blocker so the entry can be re-verified; plugins only become available
-after a real install, connect, use, disable, reconnect, and remove lifecycle passes.
+Entries marked **Verification pending** can be connected. The directory shows the vendor's official
+recipe and keeps the verification label so you know the connection has not been proven yet; connecting
+is how that lifecycle gets verified.
 
 ## Plugin actions
 
