@@ -135,8 +135,18 @@ export function SkillAddSheet({
 
     const outcome = actions.addSkill({ source: "provider", scope, input: selectedSkillId });
 
-    if (outcome.kind === "needs-approval") onNeedsApproval(outcome.skillId);
-    else if (outcome.kind === "added") onClose();
+    switch (outcome.kind) {
+      case "added":
+        onClose();
+        break;
+      case "needs-approval":
+        onNeedsApproval(outcome.skillId);
+        break;
+      case "refused":
+        // A listed provider row cannot be refused, and no frame draws a refusal here, so the
+        // sheet stays open and says nothing rather than inventing copy for an unreachable state.
+        break;
+    }
   };
 
   return (

@@ -22,10 +22,6 @@ vi.mock("../../components/AppSymbol", () => ({ SymbolView: () => null }));
 // is not what these assertions read.
 vi.mock("../../lib/useThemeColor", () => ({ useThemeColor: () => undefined }));
 
-// The theme colour comes from uniwind, which cannot load outside a native runtime; the tint is
-// not what these assertions read.
-vi.mock("../../lib/useThemeColor", () => ({ useThemeColor: () => undefined }));
-
 vi.mock("../../lib/i18n", async () => {
   const { createTranslator } = await import("@isnadi/client-runtime/i18n");
   const translator = createTranslator("en");
