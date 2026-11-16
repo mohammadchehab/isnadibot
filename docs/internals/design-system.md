@@ -90,6 +90,26 @@ while every other size steps down at ≥640px. That is allowed only because the 
 is a constant `size-9 … rounded-full`, and a stepping size would misalign the pair. Without a named
 constant neighbour, a size that skips the step-down is a bug, not a size.
 
+### The round sizes
+
+**A round size is the round twin of a base size, and it inherits that base's stepping — unless a
+named constant neighbour holds it.** Round is a presentation of a base size, not a size of its own,
+so the question is never "how big should this circle be". It is "which base size is this the round
+form of", and the answer decides the stepping.
+
+- `icon-sm-round` (32→28) twins `icon-sm` (32→28, 41 callers) and steps with it. Its one caller is
+  the hang-up button in a compact call bar, beside controls of the same small size.
+- `icon-round` (36 at every width) twins `icon` (36→32, 14 callers) but does not step, because it
+  stands in the composer's send slot beside a constant 36 — the named constant neighbour the
+  exception above requires.
+
+Neither is a near-duplicate under condition 3: each is justified by a base size with real callers and
+by the container it sits in. The step is the `sm:` breakpoint, which is viewport width and not a
+pointer type: below it the two are 4px apart and from `sm` up they are 8px, so
+size alone does not tell them apart — their container does. The geometry is drawn, not inferred: Icon
+button `2047:324` declares both on its Size axis, `icon-round` at 36 and `icon-sm-round` at its
+stepped 28.
+
 ### When the rule says no
 
 Take the nearest declared size. Write the difference on the work item as a comment. Let the
@@ -117,9 +137,6 @@ and it should not survive as a hand-written utility — the fourth condition is 
 
 These are recorded, not fixed. Resolving any of them is its own work item.
 
-- **Two round sizes with no written distinction.** `icon-sm-round` (32→28, one caller) and
-  `icon-round` (36 constant, the dictation slot). Either a frame justifies both, or one absorbs the
-  other. Condition 3 says do not ship both; which one goes needs a frame nobody has read yet.
 - **Four looks share one Rest appearance.** `keybinding-action`, `ghost-muted`, `ghost-quiet` and
   `ghost-fade` all render muted ink on no fill at Rest; their difference is hover behavior and
   `aria-hidden`, which the set has no axis for.
