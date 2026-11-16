@@ -7,6 +7,7 @@ import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { NativeStackScreenOptions, nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
+import { BotSkillsScreen } from "../skills/BotSkillsScreen";
 import { ThreadMemoryScreen } from "./ThreadMemoryScreen";
 import { ThreadRoutinesScreen } from "./ThreadRoutinesScreen";
 import {
@@ -86,6 +87,11 @@ export function ThreadSettingsPickerNavigator(props: ThreadSettingsPickerPresent
           name="ThreadSettingsRoutines"
           component={ThreadRoutinesScreen}
           options={{ title: t("Routines") }}
+        />
+        <ThreadSettingsPickerStack.Screen
+          name="ThreadSettingsSkills"
+          component={BotSkillsScreen}
+          options={{ title: t("Skills") }}
         />
         <ThreadSettingsPickerStack.Screen
           name="ThreadSettingsChoice"

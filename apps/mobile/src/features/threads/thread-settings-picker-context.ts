@@ -14,6 +14,7 @@ export type ThreadSettingsPickerStackParams = {
     readonly threadId: ThreadId;
   };
   ThreadSettingsRoutines: NonNullable<ThreadSettingsSessionProps["routinesRef"]>;
+  ThreadSettingsSkills: NonNullable<ThreadSettingsSessionProps["botSkillsRef"]>;
 };
 
 export type ThreadSettingsPickerPresentation = {

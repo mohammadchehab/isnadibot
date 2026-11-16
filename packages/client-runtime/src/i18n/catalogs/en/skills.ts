@@ -88,4 +88,15 @@ export const skillsCatalog = {
   "What bots in this space can do. Turn one on for a bot in its chat.":
     "What bots in this space can do. Turn one on for a bot in its chat.",
   "needs your approval": "needs your approval",
+  "{name}'s skills": "{name}'s skills",
+  "{space} · {count} on": "{space} · {count} on",
+  "{count} on": "{count} on",
+  "On for this bot": "On for this bot",
+  Anywhere: "Anywhere",
+  "Let {name} load this space's skills when a task matches. It sees names and one-line descriptions only.":
+    "Let {name} load this space's skills when a task matches. It sees names and one-line descriptions only.",
+  "Turning a skill off keeps it in the space. It only stops this bot from loading it.":
+    "Turning a skill off keeps it in the space. It only stops this bot from loading it.",
+  "Open the registry": "Open the registry",
+  "Could not change this bot's skills": "Could not change this bot's skills",
 } as const;

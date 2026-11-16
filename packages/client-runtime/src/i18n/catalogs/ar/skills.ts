@@ -88,4 +88,15 @@ export const skillsCatalog = {
   "What bots in this space can do. Turn one on for a bot in its chat.":
     "ما يمكن للبوتات فعله في هذه المساحة. فعِّل مهارة لبوت من محادثته.",
   "needs your approval": "يحتاج موافقتك",
+  "{name}'s skills": "مهارات {name}",
+  "{space} · {count} on": "{space} · {count} مفعّلة",
+  "{count} on": "{count} مفعّلة",
+  "On for this bot": "مفعّلة لهذا البوت",
+  Anywhere: "في أي مكان",
+  "Let {name} load this space's skills when a task matches. It sees names and one-line descriptions only.":
+    "اسمح لـ {name} بتحميل مهارات هذه المساحة عندما تطابقها مهمة. لا يرى سوى الأسماء والأوصاف المختصرة.",
+  "Turning a skill off keeps it in the space. It only stops this bot from loading it.":
+    "إيقاف مهارة يُبقيها في المساحة. إنه يمنع هذا البوت فقط من تحميلها.",
+  "Open the registry": "فتح السجل",
+  "Could not change this bot's skills": "تعذّر تغيير مهارات هذا البوت",
 } as const;

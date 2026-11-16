@@ -239,7 +239,8 @@ export function ThreadSettingsOptionsItem(props: {
   const fallbackCount = session.fallbackCount ?? 0;
   const hasFallbacks = fallbackCount > 0;
   const skillsOnCount = session.skillsOnCount;
-  const hasSkills = skillsOnCount !== undefined && skillsOnCount > 0;
+  // The row opens the bot's own skills sheet, so it is there whenever a bot is.
+  const hasSkills = session.botSkillsRef !== undefined;
 
   const bottomToolbarInset =
     Platform.OS === "ios" && NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED
@@ -326,10 +327,11 @@ export function ThreadSettingsOptionsItem(props: {
         ) : null}
         {hasSkills ? (
           <Animated.View layout={THREAD_SETTINGS_OPTIONS_LAYOUT_TRANSITION}>
-            <InfoRow
+            <DisclosureRow
               isLast={!session.memoryThreadRef && !session.routinesRef}
               label={t("Skills on")}
-              value={String(skillsOnCount)}
+              value={String(skillsOnCount ?? 0)}
+              onPress={() => props.onOpenSubmenu({ kind: "skills" })}
             />
           </Animated.View>
         ) : null}
