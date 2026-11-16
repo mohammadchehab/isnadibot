@@ -99,4 +99,12 @@ export const skillsCatalog = {
     "Turning a skill off keeps it in the space. It only stops this bot from loading it.",
   "Open the registry": "Open the registry",
   "Could not change this bot's skills": "Could not change this bot's skills",
+  "{project} · this computer": "{project} · this computer",
+  "This computer": "This computer",
+  "A .zip has to be uploaded from the desktop app.":
+    "A .zip has to be uploaded from the desktop app.",
+  "Approve this skill?": "Approve this skill?",
+  "Community · {name}": "Community · {name}",
+  "Approving pins this commit. If the folder changes, Isnadi asks again.":
+    "Approving pins this commit. If the folder changes, Isnadi asks again.",
 } as const;

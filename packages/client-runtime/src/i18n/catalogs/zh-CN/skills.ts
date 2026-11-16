@@ -97,4 +97,11 @@ export const skillsCatalog = {
     "关闭技能不会将其移出空间，只会阻止此机器人加载它。",
   "Open the registry": "打开注册表",
   "Could not change this bot's skills": "无法更改此机器人的技能",
+  "{project} · this computer": "{project} · 这台电脑",
+  "This computer": "这台电脑",
+  "A .zip has to be uploaded from the desktop app.": "需从桌面应用上传 .zip 文件。",
+  "Approve this skill?": "批准此技能？",
+  "Community · {name}": "社区 · {name}",
+  "Approving pins this commit. If the folder changes, Isnadi asks again.":
+    "批准会固定此提交。如果文件夹发生变化，Isnadi 会再次询问。",
 } as const;

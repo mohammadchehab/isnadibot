@@ -99,4 +99,11 @@ export const skillsCatalog = {
     "إيقاف مهارة يُبقيها في المساحة. إنه يمنع هذا البوت فقط من تحميلها.",
   "Open the registry": "فتح السجل",
   "Could not change this bot's skills": "تعذّر تغيير مهارات هذا البوت",
+  "{project} · this computer": "{project} · هذا الكمبيوتر",
+  "This computer": "هذا الكمبيوتر",
+  "A .zip has to be uploaded from the desktop app.": "يجب رفع ملف .zip من تطبيق سطح المكتب.",
+  "Approve this skill?": "الموافقة على هذه المهارة؟",
+  "Community · {name}": "المجتمع · {name}",
+  "Approving pins this commit. If the folder changes, Isnadi asks again.":
+    "الموافقة تثبّت هذا الالتزام. إذا تغيّر المجلد، يسأل إسنادي مرة أخرى.",
 } as const;
