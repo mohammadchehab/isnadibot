@@ -5,7 +5,11 @@ import { Match, Predicate } from "effect";
  *
  * @module features/threads/ThreadDelegationCard
  */
-import type { IsnadiDelegationRecord, OrchestrationBot } from "@isnadi/contracts";
+import type {
+  ApprovalRequestId,
+  IsnadiDelegationRecord,
+  OrchestrationBot,
+} from "@isnadi/contracts";
 import { isnadiDelegationStateOf, type IsnadiDelegationState } from "@isnadi/contracts";
 import {
   presentDelegation,
@@ -18,6 +22,8 @@ import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { BotAvatarView, seededBlobAvatar } from "../../components/BotAvatarView";
 import { useMobileI18n } from "../../lib/i18n";
+import type { PendingApproval } from "../../lib/threadActivity";
+import { PendingApprovalCard, type PendingApprovalCardProps } from "./PendingApprovalCard";
 
 function stateLabel(
   state: IsnadiDelegationState,
@@ -92,6 +98,8 @@ function actionCopy(action: DelegationAction, t: Translate, name: string) {
 /**
  * `actions` comes from the shared `delegationActions`, judged against the whole
  * chat. `onAction` runs one; every button stays disabled until it settles.
+ * `childApproval` is the approval the delegated chat is parked on, answered
+ * here because the child chat is not reachable from anywhere else.
  */
 export function ThreadDelegationCard(props: {
   readonly delegation: IsnadiDelegationRecord;
@@ -99,6 +107,9 @@ export function ThreadDelegationCard(props: {
   readonly parentBot: OrchestrationBot | null;
   readonly actions?: ReadonlyArray<DelegationAction>;
   readonly onAction?: (action: DelegationAction) => Promise<void>;
+  readonly childApproval?: PendingApproval | null;
+  readonly respondingApprovalId?: ApprovalRequestId | null;
+  readonly onRespondToChildApproval?: PendingApprovalCardProps["onRespond"];
 }) {
   const { t } = useMobileI18n();
   const [pending, setPending] = useState<DelegationAction | null>(null);
@@ -110,6 +121,9 @@ export function ThreadDelegationCard(props: {
   const childName = props.childBot?.name ?? t("Unknown bot");
   const parentName = props.parentBot?.name ?? t("Unknown bot");
   const elapsed = delegationElapsed(delegation);
+  // Nothing is left to answer once the work has finished, so a stale row never
+  // turns into a prompt the server would refuse.
+  const childApproval = presentation.terminal ? null : (props.childApproval ?? null);
 
   const outcome = presentation.outcome
     ? presentation.outcome.text ||
@@ -163,6 +177,15 @@ export function ThreadDelegationCard(props: {
             : t("Result delivered to {name}", { name: parentName })}
         </Text>
       ) : null}
+      {childApproval === null || props.onRespondToChildApproval === undefined ? null : (
+        <View className="mt-1" testID="delegation-child-approval">
+          <PendingApprovalCard
+            approval={childApproval}
+            respondingApprovalId={props.respondingApprovalId ?? null}
+            onRespond={props.onRespondToChildApproval}
+          />
+        </View>
+      )}
       {onAction && actions.length > 0 ? (
         <View className="flex-row gap-1">
           {actions.map((action) => {

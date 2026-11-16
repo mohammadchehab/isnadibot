@@ -223,6 +223,7 @@ export const commonLabelsCatalog = {
   "Choose a reaction": "اختر تفاعلًا",
   Copy: "انسخ",
   "Could not approve procedure": "تعذّرت الموافقة على الإجراء",
+  "Could not answer the approval": "تعذّر الرد على الموافقة",
   "Could not cancel delegation": "تعذّر إلغاء التفويض",
   "Could not load errors": "تعذّر تحميل الأخطاء",
   "Bot is picking up the result": "الروبوت يستلم النتيجة",

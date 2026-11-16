@@ -10,13 +10,15 @@ import { Match } from "effect";
 import type { IsnadiDelegationRecord, EnvironmentId, OrchestrationBot } from "@isnadi/contracts";
 import type { DelegationAction } from "@isnadi/client-runtime/delegation-presentation";
 import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Alert } from "react-native";
 
 import { useMobileI18n } from "../../lib/i18n";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { delegationChildThreadRef } from "./childThreadApproval";
 import { ThreadDelegationCard } from "./ThreadDelegationCard";
+import { useChildThreadApproval } from "./useChildThreadApproval";
 
 export function ThreadDelegationFeedCard(props: {
   readonly environmentId: EnvironmentId;
@@ -28,6 +30,15 @@ export function ThreadDelegationFeedCard(props: {
   const { t } = useMobileI18n();
   const { environmentId } = props;
   const { delegationId } = props.delegation;
+
+  // The delegated chat is not listed anywhere in the app, so its approval is
+  // answered here or nowhere.
+  const childThreadRef = useMemo(
+    () => delegationChildThreadRef(environmentId, props.delegation),
+    [environmentId, props.delegation],
+  );
+
+  const childApproval = useChildThreadApproval(childThreadRef);
 
   const cancelDelegation = useAtomCommand(orchestrationEnvironment.cancelDelegation, {
     reportFailure: false,
@@ -68,6 +79,9 @@ export function ThreadDelegationFeedCard(props: {
       parentBot={props.parentBot}
       actions={props.actions}
       onAction={onAction}
+      childApproval={childApproval.pendingApproval}
+      respondingApprovalId={childApproval.respondingApprovalId}
+      onRespondToChildApproval={childApproval.respond}
     />
   );
 }
