@@ -168,9 +168,8 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
             const button = (
               <button
                 className={cn(
-                  "relative isolate flex w-full cursor-pointer aspect-square items-center justify-center rounded-md transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  isDisabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
-                  !isDisabled && isUnavailable && "opacity-60",
+                  "relative isolate flex w-full cursor-pointer aspect-square items-center justify-center rounded-md transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-64 aria-disabled:opacity-64",
+                  isDisabled && "cursor-not-allowed hover:bg-transparent",
                 )}
                 data-provider-accent-color={entry.accentColor}
                 onClick={() => !isDisabled && handleSelect(entry.instanceId)}
@@ -184,6 +183,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
                 }
                 disabled={isDisabled}
                 type="button"
+                aria-disabled={isUnavailable || undefined}
                 aria-pressed={isSelected}
                 aria-label={
                   isDisabled || isUnavailable

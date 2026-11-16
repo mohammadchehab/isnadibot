@@ -32,6 +32,7 @@ import {
 } from "./botConversationPresentation";
 import type { MessageReplyTarget } from "../chat/MessageControls";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { useI18n } from "../../i18n";
 import { BotComposerModelControl } from "./BotComposerModelControl";
@@ -632,8 +633,10 @@ export function BotPromptComposer({
                   />
                 </div>
               ) : (
-                <button
+                <Button
                   type="submit"
+                  variant="default"
+                  size="icon-round"
                   aria-label={
                     showBusyMeter ? t("{name} is working", { name: botName }) : t("Send message")
                   }
@@ -644,10 +647,10 @@ export function BotPromptComposer({
                   }
                   data-busy={showBusyMeter || undefined}
                   disabled={!canSubmit || mentionHint !== null}
-                  className="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-foreground text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-25 data-busy:opacity-70"
+                  className="pointer-events-auto"
                 >
                   {showBusyMeter ? <LoaderMeter /> : <ArrowUpIcon className="size-5" />}
-                </button>
+                </Button>
               )}
             </div>
           </div>
