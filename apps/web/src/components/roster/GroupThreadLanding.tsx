@@ -1,7 +1,7 @@
 import { responderQueueNames } from "@isnadi/client-runtime/responder-queue";
 import { Predicate } from "effect";
-import { threadDelegations } from "@isnadi/client-runtime/delegation-presentation";
-import { botChatTimeline } from "@isnadi/client-runtime/state/bot-chat-timeline";
+import { useBotLandingTimeline } from "./useBotLandingTimeline";
+import { RoutineReceiptRow } from "./RoutineReceiptRow";
 import { pendingMemoryApprovals } from "@isnadi/client-runtime/durable-memory";
 import { useAtomValue } from "@effect/atom-react";
 import { presentThreadError } from "@isnadi/client-runtime/errors";
@@ -289,6 +289,23 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
     return counts;
   }, [runtime.responderQueue]);
 
+  // Routine run notes belong to whichever chat they were written into, so a group
+  // chat gets them from the same merge the bot's own chat uses. Its own activities
+  // come along too: the board hands work out while nobody is typing, and those
+  // hand-outs are what the chat says happened. Called above the `!group` return so
+  // the hook order does not depend on the roster load.
+  const {
+    timelineItems: timeline,
+    delegations,
+    waitingOnChildren,
+    olderRoutineNotes,
+  } = useBotLandingTimeline({
+    threadRef: runtime.linkedThreadRef,
+    snapshot,
+    entries,
+    activities,
+  });
+
   if (!group) {
     // A failed first roster load leaves every group missing; say so and offer
     // a retry rather than a blank pane.
@@ -312,21 +329,6 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
     inboxQuery.data?.inbox ?? [],
     new Set(members.map((bot) => bot.id)),
   );
-
-  const { delegations, waitingOnChildren } =
-    runtime.linkedThreadRef && snapshot
-      ? threadDelegations(snapshot.delegations, runtime.linkedThreadRef.threadId)
-      : { delegations: [], waitingOnChildren: false };
-
-  const timeline = botChatTimeline({
-    messages: entries.map((entry) => ({
-      id: entry.message.id,
-      turnId: entry.message.turnId,
-      createdAt: entry.message.createdAt,
-      entry,
-    })),
-    delegations,
-  });
 
   const activeBotById = (id: string) =>
     bots.find((candidate) => candidate.id === id && candidate.archivedAt === null) ?? null;
@@ -363,6 +365,20 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
           <BotConversationScrollArea
             followKey={messages.findLast((message) => message.role === "user")?.id}
           >
+            {olderRoutineNotes.nextCursor ? (
+              <button
+                type="button"
+                className="mx-auto my-3 block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                disabled={olderRoutineNotes.isPending}
+                onClick={olderRoutineNotes.load}
+              >
+                {olderRoutineNotes.isPending
+                  ? t("Loading older routine notes…")
+                  : olderRoutineNotes.error
+                    ? t("Retry older routine notes")
+                    : t("Load older routine notes")}
+              </button>
+            ) : null}
             {timeline.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12">
                 <div className="flex -space-x-3">
@@ -393,6 +409,13 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
                       parentBot={activeBotById(item.delegation.parentBotId)}
                     />
                   );
+                }
+
+                if (Predicate.isTagged(item, "Receipt")) {
+                  // E13e draws this row as icon, text and time only, so it stays a
+                  // note here rather than the link a bot chat makes it: the group
+                  // route has no Routines panel to open.
+                  return <RoutineReceiptRow key={item.key} receipt={item.receipt} />;
                 }
 
                 if (!Predicate.isTagged(item, "Message")) return null;

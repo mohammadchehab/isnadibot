@@ -501,4 +501,6 @@ export const rosterCatalog = {
   "Needs two bots — one to work, one to hand off to.": "يحتاج بوتين — واحد للعمل وواحد للتسليم.",
   "{count} · No boss yet": "{count} · لا رئيس بعد",
   "{count} · {boss} is the boss": "{count} · {boss} هو الرئيس",
+  "{bot} was idle, so the board gave it “{item}”.": "كان {bot} خاملًا، فأعطاه اللوح «{item}».",
+  "Everyone is idle and the board is empty.": "الجميع خامل واللوح فارغ.",
 } as const;

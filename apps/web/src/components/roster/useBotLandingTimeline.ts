@@ -2,6 +2,7 @@ import { threadDelegations } from "@isnadi/client-runtime/delegation-presentatio
 import { botChatTimeline } from "@isnadi/client-runtime/state/bot-chat-timeline";
 import type {
   OrchestrationShellSnapshot,
+  OrchestrationThreadActivity,
   RoutineRun,
   RoutineRunId,
   ScopedThreadRef,
@@ -12,6 +13,7 @@ import { useI18n } from "../../i18n";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import type { BotConversationEntry } from "./botConversationPresentation";
+import { deriveFleetReceipts } from "./fleetReceipts";
 import { deriveRoutineReceipts, mergeRoutineRunHistory } from "./routineReceipts";
 
 /**
@@ -23,8 +25,14 @@ export function useBotLandingTimeline(input: {
   readonly threadRef: ScopedThreadRef | null;
   readonly snapshot: OrchestrationShellSnapshot | null;
   readonly entries: ReadonlyArray<BotConversationEntry>;
+  /**
+   * The chat's thread activities, when the surface shows what the board did on
+   * its own. A group chat passes them; a bot's own chat does not, so its rows
+   * stay the bot's work and the routines it ran.
+   */
+  readonly activities?: ReadonlyArray<OrchestrationThreadActivity>;
 }) {
-  const { entries, snapshot, threadRef } = input;
+  const { activities, entries, snapshot, threadRef } = input;
   const { t } = useI18n();
 
   const routineRunHistory = useEnvironmentQuery(
@@ -154,12 +162,15 @@ export function useBotLandingTimeline(input: {
   const routineReceipts = useMemo(
     () =>
       threadRef
-        ? deriveRoutineReceipts(
-            threadRef.threadId,
-            [...(snapshot?.routines ?? []), ...(snapshot?.routineReceiptSources ?? [])],
-            mergeRoutineRunHistory(currentHistory.runs, snapshot?.routineRuns ?? []),
-            { t },
-          )
+        ? [
+            ...deriveRoutineReceipts(
+              threadRef.threadId,
+              [...(snapshot?.routines ?? []), ...(snapshot?.routineReceiptSources ?? [])],
+              mergeRoutineRunHistory(currentHistory.runs, snapshot?.routineRuns ?? []),
+              { t },
+            ),
+            ...deriveFleetReceipts(activities ?? [], { t }),
+          ]
         : [],
     [
       threadRef,
@@ -167,6 +178,7 @@ export function useBotLandingTimeline(input: {
       snapshot?.routineReceiptSources,
       snapshot?.routineRuns,
       currentHistory.runs,
+      activities,
       t,
     ],
   );
