@@ -8,6 +8,7 @@ import {
   SANDBOX_PROVIDER_CREDENTIALS,
   ServerSettings,
   ServerSettingsError,
+  withCause,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -45,15 +46,16 @@ export const createSettingsSecretReads = (
           const secret = yield* secretStore
             .get(providerEnvironmentSecretName({ instanceId, name: variable.name }))
             .pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new ServerSettingsError({
                     settingsPath,
                     operation: "read-secret",
                     providerInstanceId: instanceId,
                     environmentVariable: variable.name,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 
@@ -93,15 +95,16 @@ export const createSettingsSecretReads = (
           const secret = yield* secretStore
             .get(sandboxEnvironmentSecretName({ provider, name: variable.name }))
             .pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new ServerSettingsError({
                     settingsPath,
                     operation: "read-secret",
                     providerInstanceId: `sandbox:${provider}`,
                     environmentVariable: variable.name,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 
@@ -126,15 +129,16 @@ export const createSettingsSecretReads = (
     if (!settings.browserProvider.browserbaseApiKeyRedacted) return Effect.succeed(settings);
 
     return secretStore.get(BROWSERBASE_API_KEY_SECRET).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new ServerSettingsError({
             settingsPath,
             operation: "read-secret",
             providerInstanceId: "browser:browserbase",
             environmentVariable: "BROWSERBASE_API_KEY",
-            cause,
           }),
+          cause,
+        ),
       ),
       Effect.map((secret) => ({
         ...settings,
@@ -149,15 +153,19 @@ export const createSettingsSecretReads = (
   const sandboxValidationError = (
     provider: CloudSandboxProvider,
     environmentVariable: string,
-    cause: string,
+    detail: string,
   ) =>
-    new ServerSettingsError({
-      settingsPath,
-      operation: "validate-sandbox",
-      providerInstanceId: `sandbox:${provider}`,
-      environmentVariable,
-      cause: new Error(cause),
-    });
+    // The explanation stays on the error for a log to read. It is a native Error cause, so it is
+    // never part of the schema and never crosses the wire.
+    withCause(
+      new ServerSettingsError({
+        settingsPath,
+        operation: "validate-sandbox",
+        providerInstanceId: `sandbox:${provider}`,
+        environmentVariable,
+      }),
+      new Error(detail),
+    );
 
   const validatePersistedSandboxSecrets = (settings: ServerSettings) =>
     Effect.gen(function* () {

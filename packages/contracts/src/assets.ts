@@ -99,9 +99,7 @@ export class AttachmentNotFoundError extends Schema.TaggedErrorClass<AttachmentN
 
 export class AttachmentUploadSigningKeyError extends Schema.TaggedErrorClass<AttachmentUploadSigningKeyError>()(
   "AttachmentUploadSigningKeyError",
-  {
-    cause: Schema.Defect(),
-  },
+  {},
 ) {
   override get message(): string {
     return "Failed to load the attachment upload signing key.";
@@ -123,7 +121,6 @@ export class AssetWorkspaceContextResolutionError extends Schema.TaggedErrorClas
   "AssetWorkspaceContextResolutionError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -135,7 +132,6 @@ export class AssetWorkspaceRootNormalizationError extends Schema.TaggedErrorClas
   "AssetWorkspaceRootNormalizationError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -147,7 +143,6 @@ export class AssetWorkspacePathValidationError extends Schema.TaggedErrorClass<A
   "AssetWorkspacePathValidationError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -170,7 +165,6 @@ export class AssetWorkspaceAssetInspectionError extends Schema.TaggedErrorClass<
   "AssetWorkspaceAssetInspectionError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -193,7 +187,6 @@ export class AssetWorkspaceResolutionError extends Schema.TaggedErrorClass<Asset
   "AssetWorkspaceResolutionError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
@@ -216,7 +209,6 @@ export class AssetSigningKeyLoadError extends Schema.TaggedErrorClass<AssetSigni
   "AssetSigningKeyLoadError",
   {
     resource: AssetResource,
-    cause: Schema.Defect(),
   },
 ) {
   override get message(): string {

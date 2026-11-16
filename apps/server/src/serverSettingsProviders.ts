@@ -10,6 +10,7 @@ import {
   resolveProviderInstanceEnabled,
   ServerSettings,
   ServerSettingsError,
+  withCause,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import { isModelSelectionProviderEnabled } from "@isnadi/shared/serverSettings";
@@ -77,13 +78,14 @@ export const normalizeServerSettings = (
   encodeServerSettings(settings).pipe(
     Effect.flatMap(decodeServerSettings),
     Effect.map(foldProviderInstanceEnabledFlags),
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new ServerSettingsError({
           settingsPath: "<memory>",
           operation: "normalize",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 

@@ -6,6 +6,7 @@ import {
   type EditorId,
   type FileManagerRevealKind,
   type LaunchEditorInput,
+  withCause,
 } from "@isnadi/contracts";
 import { isCommandAvailable, resolveSpawnCommand } from "@isnadi/shared/shell";
 import * as Clock from "effect/Clock";
@@ -75,15 +76,15 @@ const launchBrowser = Effect.fn("externalLauncher.launchBrowser")(function* (
 ): Effect.fn.Return<void, ExternalLauncherError, ChildProcessSpawner.ChildProcessSpawner> {
   const launch = yield* resolveBrowserLaunch(target);
 
-  return yield* launchAndUnref(
-    launch,
-    (cause) =>
+  return yield* launchAndUnref(launch, (cause) =>
+    withCause(
       new ExternalLauncherBrowserSpawnError({
         target,
         command: launch.command,
         args: launch.args,
-        cause,
       }),
+      cause,
+    ),
   );
 });
 
@@ -117,13 +118,15 @@ const launchEditorProcess = Effect.fn("externalLauncher.launchEditorProcess")(fu
       },
     },
     (cause) =>
-      new ExternalLauncherEditorSpawnError({
-        editor: launch.editor,
-        target: launch.target,
-        command: spawnCommand.command,
-        args: spawnCommand.args,
+      withCause(
+        new ExternalLauncherEditorSpawnError({
+          editor: launch.editor,
+          target: launch.target,
+          command: spawnCommand.command,
+          args: spawnCommand.args,
+        }),
         cause,
-      }),
+      ),
   );
 });
 

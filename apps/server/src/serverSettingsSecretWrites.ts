@@ -6,6 +6,7 @@ import {
   type SandboxProviderConnection,
   ServerSettings,
   ServerSettingsError,
+  withCause,
 } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
@@ -42,15 +43,16 @@ export const createSettingsSecretWrites = (
 
           if (!variable.sensitive) {
             yield* secretStore.remove(secretName).pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new ServerSettingsError({
                     settingsPath,
                     operation: "remove-secret",
                     providerInstanceId: instanceId,
                     environmentVariable: variable.name,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
             environment.push(redactProviderEnvironmentVariable(variable));
@@ -76,29 +78,31 @@ export const createSettingsSecretWrites = (
           if (!variable.valueRedacted || inlineValue !== undefined) {
             if (value.length > 0) {
               yield* secretStore.set(secretName, textEncoder.encode(value)).pipe(
-                Effect.mapError(
-                  (cause) =>
+                Effect.mapError((cause) =>
+                  withCause(
                     new ServerSettingsError({
                       settingsPath,
                       operation: "write-secret",
                       providerInstanceId: instanceId,
                       environmentVariable: variable.name,
-                      cause,
                     }),
+                    cause,
+                  ),
                 ),
               );
               environment.push({ ...variable, value: "", valueRedacted: true });
             } else {
               yield* secretStore.remove(secretName).pipe(
-                Effect.mapError(
-                  (cause) =>
+                Effect.mapError((cause) =>
+                  withCause(
                     new ServerSettingsError({
                       settingsPath,
                       operation: "remove-secret",
                       providerInstanceId: instanceId,
                       environmentVariable: variable.name,
-                      cause,
                     }),
+                    cause,
+                  ),
                 ),
               );
               const { valueRedacted: _omit, ...rest } = variable;
@@ -124,15 +128,16 @@ export const createSettingsSecretWrites = (
 
           if (nextSecretKeys.has(secretName)) continue;
           yield* secretStore.remove(secretName).pipe(
-            Effect.mapError(
-              (cause) =>
+            Effect.mapError((cause) =>
+              withCause(
                 new ServerSettingsError({
                   settingsPath,
                   operation: "remove-stale-secret",
                   providerInstanceId: instanceId,
                   environmentVariable: variable.name,
-                  cause,
                 }),
+                cause,
+              ),
             ),
           );
         }
@@ -160,15 +165,16 @@ export const createSettingsSecretWrites = (
 
           if (!variable.sensitive) {
             yield* secretStore.remove(secretName).pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new ServerSettingsError({
                     settingsPath,
                     operation: "remove-secret",
                     providerInstanceId: `sandbox:${provider}`,
                     environmentVariable: variable.name,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
             environment.push(redactProviderEnvironmentVariable(variable));
@@ -180,29 +186,31 @@ export const createSettingsSecretWrites = (
           if (!variable.valueRedacted) {
             if (variable.value.length > 0) {
               yield* secretStore.set(secretName, textEncoder.encode(variable.value)).pipe(
-                Effect.mapError(
-                  (cause) =>
+                Effect.mapError((cause) =>
+                  withCause(
                     new ServerSettingsError({
                       settingsPath,
                       operation: "write-secret",
                       providerInstanceId: `sandbox:${provider}`,
                       environmentVariable: variable.name,
-                      cause,
                     }),
+                    cause,
+                  ),
                 ),
               );
               environment.push({ ...variable, value: "", valueRedacted: true });
             } else {
               yield* secretStore.remove(secretName).pipe(
-                Effect.mapError(
-                  (cause) =>
+                Effect.mapError((cause) =>
+                  withCause(
                     new ServerSettingsError({
                       settingsPath,
                       operation: "remove-secret",
                       providerInstanceId: `sandbox:${provider}`,
                       environmentVariable: variable.name,
-                      cause,
                     }),
+                    cause,
+                  ),
                 ),
               );
               const { valueRedacted: _omit, ...rest } = variable;
@@ -225,15 +233,16 @@ export const createSettingsSecretWrites = (
 
           if (nextSecretKeys.has(secretName)) continue;
           yield* secretStore.remove(secretName).pipe(
-            Effect.mapError(
-              (cause) =>
+            Effect.mapError((cause) =>
+              withCause(
                 new ServerSettingsError({
                   settingsPath,
                   operation: "remove-stale-secret",
                   providerInstanceId: `sandbox:${provider}`,
                   environmentVariable: variable.name,
-                  cause,
                 }),
+                cause,
+              ),
             ),
           );
         }
@@ -260,15 +269,16 @@ export const createSettingsSecretWrites = (
       : secretStore.remove(BROWSERBASE_API_KEY_SECRET);
 
     return persist.pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new ServerSettingsError({
             settingsPath,
             operation: browserProvider.browserbaseApiKey ? "write-secret" : "remove-secret",
             providerInstanceId: "browser:browserbase",
             environmentVariable: "BROWSERBASE_API_KEY",
-            cause,
           }),
+          cause,
+        ),
       ),
       Effect.map(() => {
         const { browserbaseApiKeyRedacted: _redacted, ...browserProviderWithoutRedaction } =

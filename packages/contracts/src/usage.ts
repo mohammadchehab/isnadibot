@@ -240,9 +240,8 @@ export type UsageSummary = typeof UsageSummary.Type;
 
 export class UsageReadError extends Schema.TaggedErrorClass<UsageReadError>()("UsageReadError", {
   reason: Schema.Literals(["scanFailed", "invalidWindow"]),
-  /** Stable, bounded description. The underlying failure travels in `cause`. */
+  /** Stable, bounded description. The underlying failure stays on the server. */
   detail: TrimmedNonEmptyString,
-  cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return `Usage read failed (${this.reason}): ${this.detail}`;

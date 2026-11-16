@@ -42,7 +42,6 @@ const PreviewAutomationRemoteDiagnosticFields = {
   remoteDetailKind: Schema.optional(
     Schema.Literals(["null", "array", "object", "string", "number", "boolean"]),
   ),
-  cause: Schema.Defect(),
 };
 
 const PreviewAutomationOptionalRemoteDiagnosticFields = {
@@ -51,7 +50,6 @@ const PreviewAutomationOptionalRemoteDiagnosticFields = {
   remoteDetailKind: Schema.optional(
     Schema.Literals(["null", "array", "object", "string", "number", "boolean"]),
   ),
-  cause: Schema.optional(Schema.Defect()),
 };
 
 export class PreviewAutomationNoAvailableHostError extends Schema.TaggedErrorClass<PreviewAutomationNoAvailableHostError>()(

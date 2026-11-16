@@ -26,6 +26,7 @@ import {
   EnvironmentAuthorizationError,
   ImageGenerationError,
   SubscriptionAuthError,
+  withCause,
 } from "@isnadi/contracts";
 import { SubscriptionAuthService } from "./subscription-auth/service.ts";
 import { apiKeySessionReset } from "./subscription-auth/sessionReset.ts";
@@ -176,12 +177,13 @@ export const createWsServices = (
           toSequenceInclusive: headSequence,
         })
         .pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new OrchestrationGetSnapshotError({
                 message: "Failed to measure orchestration replay range",
-                cause,
               }),
+              cause,
+            ),
           ),
         );
 

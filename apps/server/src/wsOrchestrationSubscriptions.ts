@@ -8,6 +8,7 @@ import {
   OrchestrationGetSnapshotError,
   ORCHESTRATION_WS_METHODS,
   WsRpcGroup,
+  withCause,
 } from "@isnadi/contracts";
 import {
   projectActivityEvent,
@@ -153,12 +154,13 @@ export const createWsOrchestrationSubscriptions = ({
             Effect.tapError((cause) =>
               Effect.logError("orchestration shell snapshot load failed", { cause }),
             ),
-            Effect.mapError(
-              (cause) =>
+            Effect.mapError((cause) =>
+              withCause(
                 new OrchestrationGetSnapshotError({
                   message: "Failed to load orchestration shell snapshot",
-                  cause,
                 }),
+                cause,
+              ),
             ),
           );
 
@@ -217,12 +219,13 @@ export const createWsOrchestrationSubscriptions = ({
               orchestrationEngine.readEvents(afterSequence, replayGap, headSequence),
               sentThreads,
             ).pipe(
-              Stream.mapError(
-                (cause) =>
+              Stream.mapError((cause) =>
+                withCause(
                   new OrchestrationGetSnapshotError({
                     message: "Failed to replay orchestration shell events",
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 
@@ -308,12 +311,13 @@ export const createWsOrchestrationSubscriptions = ({
                       maxEvents: THREAD_RESUME_MAX_EVENTS,
                     })
                     .pipe(
-                      Effect.mapError(
-                        (cause) =>
+                      Effect.mapError((cause) =>
+                        withCause(
                           new OrchestrationGetSnapshotError({
                             message: `Failed to measure chat ${input.threadId} replay range`,
-                            cause,
                           }),
+                          cause,
+                        ),
                       ),
                     );
 
@@ -330,12 +334,13 @@ export const createWsOrchestrationSubscriptions = ({
                     kind: "event" as const,
                     event: projectActivityEvent(event),
                   })),
-                  Stream.mapError(
-                    (cause) =>
+                  Stream.mapError((cause) =>
+                    withCause(
                       new OrchestrationGetSnapshotError({
                         message: `Failed to restore chat ${input.threadId}`,
-                        cause,
                       }),
+                      cause,
+                    ),
                   ),
                 );
 
@@ -370,12 +375,13 @@ export const createWsOrchestrationSubscriptions = ({
               input.turnLimit === undefined ? undefined : { turnLimit: input.turnLimit },
             )
             .pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new OrchestrationGetSnapshotError({
                     message: `Failed to load chat ${input.threadId}`,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 
@@ -389,7 +395,6 @@ export const createWsOrchestrationSubscriptions = ({
 
             return yield* new OrchestrationGetSnapshotError({
               message: `Chat ${input.threadId} was not found`,
-              cause: input.threadId,
             });
           }
 

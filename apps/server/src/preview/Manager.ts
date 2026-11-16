@@ -20,6 +20,7 @@ import {
   PreviewSessionLookupError,
   type PreviewSessionSnapshot,
   type PreviewViewportSetting,
+  withCause,
 } from "@isnadi/contracts";
 import {
   isPreviewUrlNormalizationError,
@@ -111,19 +112,23 @@ const normalizeUrl = (rawUrl: string): Effect.Effect<string, PreviewInvalidUrlEr
     try: () => normalizePreviewUrl(rawUrl),
     catch: (cause) => {
       if (isPreviewUrlNormalizationError(cause)) {
-        return new PreviewInvalidUrlError({
-          inputLength: cause.inputLength,
-          reason: cause.reason,
-          protocol: cause.protocol,
+        return withCause(
+          new PreviewInvalidUrlError({
+            inputLength: cause.inputLength,
+            reason: cause.reason,
+            protocol: cause.protocol,
+          }),
           cause,
-        });
+        );
       }
 
-      return new PreviewInvalidUrlError({
-        inputLength: rawUrl.length,
-        reason: "unexpected",
+      return withCause(
+        new PreviewInvalidUrlError({
+          inputLength: rawUrl.length,
+          reason: "unexpected",
+        }),
         cause,
-      });
+      );
     },
   });
 

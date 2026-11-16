@@ -34,6 +34,8 @@ export * from "./relay.ts";
 
 export * from "./egress.ts";
 
+export * from "./errorCause.ts";
+
 export * from "./ipc.ts";
 
 export * from "./provider.ts";

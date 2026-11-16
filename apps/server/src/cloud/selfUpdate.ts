@@ -1,6 +1,7 @@
 import * as Predicate from "effect/Predicate";
 import {
   ServerSelfUpdateError,
+  withCause,
   type ServerSelfUpdateCapability,
   type ServerSelfUpdateInput,
   type ServerSelfUpdateProgressStage,
@@ -79,10 +80,10 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* (
   const capability: ServerSelfUpdateCapability | null =
     serverConfig.mode === "desktop" ? "desktop-managed" : launcher.managed ? "boot-service" : null;
 
+  // The failure behind a reason is kept for the log as a native Error cause, which the schema
+  // never encodes.
   const failWith = (reason: string, cause?: unknown) =>
-    cause === undefined
-      ? new ServerSelfUpdateError({ reason })
-      : new ServerSelfUpdateError({ reason, cause });
+    withCause(new ServerSelfUpdateError({ reason }), cause);
 
   const downloadReleaseAsset = (url: string) =>
     httpClient.get(url, { headers: { "user-agent": "Isnadi-Remote-Updater" } }).pipe(

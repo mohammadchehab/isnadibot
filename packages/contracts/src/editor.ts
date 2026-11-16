@@ -188,7 +188,6 @@ export class ExternalLauncherCommandNotFoundError extends Schema.TaggedErrorClas
 const ExternalLauncherSpawnFields = {
   command: Schema.String,
   args: Schema.Array(Schema.String),
-  cause: Schema.Defect(),
 };
 
 export class ExternalLauncherBrowserSpawnError extends Schema.TaggedErrorClass<ExternalLauncherBrowserSpawnError>()(

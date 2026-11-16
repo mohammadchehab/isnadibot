@@ -224,8 +224,10 @@ describe("provider feedback", () => {
 
     const error = new ProviderUploadFeedbackError({
       threadId: ThreadId.make("thread-1"),
-      cause,
     });
+
+    // The upstream failure rides along as a native Error cause, which the schema never encodes.
+    error.cause = cause;
 
     expect(error.threadId).toBe("thread-1");
     expect(error.cause).toBe(cause);

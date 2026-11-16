@@ -14,6 +14,7 @@ import {
   type ServerRemoveKeybindingInput,
   type ServerUpsertKeybindingInput,
   type ServerConfigIssue,
+  withCause,
 } from "@isnadi/contracts";
 import * as Array from "effect/Array";
 import * as Cache from "effect/Cache";
@@ -149,24 +150,26 @@ const make = Effect.gen(function* () {
     PubSub.publish(changesPubSub, configState).pipe(Effect.asVoid);
 
   const readConfigExists = fs.exists(keybindingsConfigPath).pipe(
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new KeybindingsConfigError({
           configPath: keybindingsConfigPath,
           detail: "failed to access keybindings config",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 
   const readRawConfig = fs.readFileString(keybindingsConfigPath).pipe(
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new KeybindingsConfigError({
           configPath: keybindingsConfigPath,
           detail: "failed to read keybindings config",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 
@@ -180,13 +183,14 @@ const make = Effect.gen(function* () {
 
     const rawConfig = yield* readRawConfig.pipe(
       Effect.flatMap(Schema.decodeEffect(RawKeybindingsEntries)),
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
             detail: "expected JSON array",
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -294,13 +298,14 @@ const make = Effect.gen(function* () {
           Effect.provideService(Path.Path, path),
         ),
       ),
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
             detail: "failed to write keybindings config",
-            cause,
           }),
+          cause,
+        ),
       ),
     );
   };
@@ -466,13 +471,14 @@ const make = Effect.gen(function* () {
     const keybindingsConfigPathResolved = path.resolve(keybindingsConfigPath);
 
     yield* fs.makeDirectory(keybindingsConfigDir, { recursive: true }).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
             detail: "failed to prepare keybindings config directory",
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
