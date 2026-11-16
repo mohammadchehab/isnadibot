@@ -19,6 +19,8 @@ export const fleetCatalog = {
   "Bot replies one message can chain before the space stops.":
     "Bot replies one message can chain before the space stops.",
   "No provider can run this bot yet.": "No provider can run this bot yet.",
+  "{provider} sign-in expired or revoked. Reconnect it in Settings > Providers.":
+    "{provider} sign-in expired or revoked. Reconnect it in Settings > Providers.",
   "Runs on another provider because the role's own is not set up.":
     "Runs on another provider because the role's own is not set up.",
   "The model has no such reasoning level, so it starts on the model's default.":

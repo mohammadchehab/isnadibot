@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  fleetRole,
   ProviderDriverKind,
   ProviderInstanceId,
   type ServerProvider,
   type SubscriptionProviderStatus,
 } from "@isnadi/contracts";
+import { seedSquadMember } from "@isnadi/shared/fleet";
 import {
   apiKeyStartInput,
   apiKeyValidationError,
@@ -14,7 +16,7 @@ import {
   providerConnectionLabel,
   providerUsesApiKey,
   providerSupportsBaseUrl,
-  withRefreshableSubscriptionLogin,
+  withSavedSubscriptionLogin,
 } from "./providerAuth.ts";
 import { providerAvailabilityReason } from "./providerAvailability.ts";
 
@@ -156,7 +158,7 @@ describe("filterProvidersBySubscriptionConnection", () => {
   });
 });
 
-describe("withRefreshableSubscriptionLogin", () => {
+describe("withSavedSubscriptionLogin", () => {
   const expiredClaude = (instanceId = "claudeAgent"): ServerProvider => ({
     instanceId: ProviderInstanceId.make(instanceId),
     driver: ProviderDriverKind.make("claudeAgent"),
@@ -174,7 +176,7 @@ describe("withRefreshableSubscriptionLogin", () => {
   });
 
   const reason = (provider: ServerProvider, statuses: ReadonlyArray<SubscriptionProviderStatus>) =>
-    providerAvailabilityReason(withRefreshableSubscriptionLogin(provider, statuses));
+    providerAvailabilityReason(withSavedSubscriptionLogin(provider, statuses));
 
   it("lets an expired OAuth login on the saved connection try a refresh", () => {
     expect(reason(expiredClaude(), [{ ...status, health: "expired", authMode: "oauth" }])).toBe(
@@ -207,9 +209,79 @@ describe("withRefreshableSubscriptionLogin", () => {
     };
 
     expect(
-      providerAvailabilityReason(
-        withRefreshableSubscriptionLogin(expiredClaude(), expired, ownKey),
-      ),
+      providerAvailabilityReason(withSavedSubscriptionLogin(expiredClaude(), expired, ownKey)),
     ).toBe("expired-login");
+  });
+});
+
+describe("withSavedSubscriptionLogin on a provider the snapshot calls ready", () => {
+  // What the server actually sends for a saved login: the CLI probe behind
+  // `unavailability` never reads the credential saved in Settings, so a login
+  // that was revoked arrives with no mark at all.
+  const readyClaude = (instanceId = "claudeAgent"): ServerProvider => ({
+    instanceId: ProviderInstanceId.make(instanceId),
+    driver: ProviderDriverKind.make("claudeAgent"),
+    enabled: true,
+    installed: true,
+    version: null,
+    status: "ready",
+    auth: { status: "authenticated" },
+    checkedAt: "2026-09-13T00:00:00.000Z",
+    models: [],
+    slashCommands: [],
+    skills: [],
+  });
+
+  const oauth = (health: SubscriptionProviderStatus["health"]) => [
+    { ...status, health, authMode: "oauth" as const },
+  ];
+
+  it("marks a revoked login so the provider stops counting as able to run", () => {
+    const revoked = withSavedSubscriptionLogin(readyClaude(), oauth("revoked"));
+
+    expect(providerAvailabilityReason(revoked)).toBe("expired-login");
+    expect(revoked.unavailabilityDetail).toBe("The saved provider login was revoked.");
+  });
+
+  it("leaves a healthy or an expired login as the snapshot reported it", () => {
+    const healthy = withSavedSubscriptionLogin(readyClaude(), oauth("healthy"));
+    const expired = withSavedSubscriptionLogin(readyClaude(), oauth("expired"));
+
+    expect(providerAvailabilityReason(healthy)).toBeNull();
+    expect(providerAvailabilityReason(expired)).toBeNull();
+    expect(expired.unavailability).toBeUndefined();
+  });
+
+  it("leaves an API-key login and a custom instance alone", () => {
+    expect(
+      withSavedSubscriptionLogin(readyClaude(), [
+        { ...status, health: "revoked", authMode: "api-key" },
+      ]).unavailability,
+    ).toBeUndefined();
+    expect(
+      withSavedSubscriptionLogin(readyClaude("claude_work"), oauth("revoked")).unavailability,
+    ).toBeUndefined();
+  });
+
+  it("stops a role from seeding an engine on a login the server refuses", () => {
+    const scout = fleetRole("scout");
+
+    if (scout === undefined) throw new Error("missing role scout");
+
+    const model = {
+      slug: scout.model.model,
+      name: scout.model.model,
+      isCustom: false,
+      capabilities: null,
+    };
+
+    const seeded = (health: SubscriptionProviderStatus["health"]) => {
+      const provider = withSavedSubscriptionLogin(readyClaude(), oauth(health));
+
+      return seedSquadMember(scout, [{ ...provider, models: [model] }]);
+    };
+
+    expect(seeded("revoked").engine).toBeNull();
+    expect(seeded("healthy").engine?.provider).toBe("claudeAgent");
   });
 });

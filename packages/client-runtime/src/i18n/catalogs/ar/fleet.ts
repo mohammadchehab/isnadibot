@@ -14,6 +14,8 @@ export const fleetCatalog = {
   "Bot replies one message can chain before the space stops.":
     "عدد ردود البوتات التي يمكن أن تتسلسل من رسالة واحدة قبل أن تتوقف المساحة.",
   "No provider can run this bot yet.": "لا يوجد مزود يمكنه تشغيل هذا البوت بعد.",
+  "{provider} sign-in expired or revoked. Reconnect it in Settings > Providers.":
+    "انتهت صلاحية تسجيل الدخول إلى {provider} أو تم إلغاؤه. أعد توصيله من الإعدادات > المزودون.",
   "Runs on another provider because the role's own is not set up.":
     "يعمل على مزود آخر لأن مزود الدور نفسه غير مهيأ.",
   "The model has no such reasoning level, so it starts on the model's default.":

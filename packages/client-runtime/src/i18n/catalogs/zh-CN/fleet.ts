@@ -14,6 +14,8 @@ export const fleetCatalog = {
   "Bot replies one message can chain before the space stops.":
     "一条消息可以串联的机器人回复数，达到后该空间停止。",
   "No provider can run this bot yet.": "暂无服务商可以运行该机器人。",
+  "{provider} sign-in expired or revoked. Reconnect it in Settings > Providers.":
+    "{provider} 登录已过期或被撤销。请在“设置 > 服务商”中重新连接。",
   "Runs on another provider because the role's own is not set up.":
     "运行在其他服务商上，因为该角色所需的服务商尚未配置。",
   "The model has no such reasoning level, so it starts on the model's default.":

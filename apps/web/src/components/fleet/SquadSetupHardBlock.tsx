@@ -1,4 +1,7 @@
 import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
+import { providerAvailabilityReason } from "@isnadi/client-runtime/provider-availability";
+import { commandRefusalMessage, type Translate } from "@isnadi/client-runtime/state/runtime";
+import { fleetRole, type ServerProvider } from "@isnadi/contracts";
 import { TriangleAlertIcon } from "lucide-react";
 
 import { useI18n } from "../../i18n";
@@ -43,6 +46,59 @@ export function squadSetupCaptionBlocker(
   return blockers.find(
     (candidate): candidate is SquadSetupCaptionBlocker => candidate.kind !== "no-provider",
   );
+}
+
+/**
+ * The provider a `no-provider` blocker is waiting on, when signing in again is
+ * what clears it. A role whose provider is missing from the environment has
+ * nothing to name, and neither has one whose provider was filtered out because
+ * no account is connected; both keep the band's generic sentence. A provider
+ * whose saved login the server refuses is in the list and carries the reason,
+ * so the band names it and says which provider to reconnect.
+ */
+export function squadSetupSignedOutProvider(
+  blockers: ReadonlyArray<FleetHireBlocker>,
+  providers: ReadonlyArray<ServerProvider>,
+): ServerProvider | undefined {
+  for (const blocker of blockers) {
+    if (blocker.kind !== "no-provider") continue;
+
+    const role = fleetRole(blocker.roleId);
+
+    if (role === undefined) continue;
+
+    const provider = providers.find(
+      (candidate) =>
+        candidate.driver === role.model.driver &&
+        providerAvailabilityReason(candidate) === "expired-login",
+    );
+
+    if (provider !== undefined) return provider;
+  }
+
+  return undefined;
+}
+
+/** The sentence the band carries, or null when nothing hard-blocks the screen. */
+export function squadSetupHardBlockMessage(
+  hardBlock: SquadSetupHardBlock | null,
+  blockers: ReadonlyArray<FleetHireBlocker>,
+  providers: ReadonlyArray<ServerProvider>,
+  t: Translate,
+): string | null {
+  if (hardBlock === "no-provider") {
+    const signedOut = squadSetupSignedOutProvider(blockers, providers);
+
+    return signedOut === undefined
+      ? t("No provider can run this bot yet.")
+      : t("{provider} sign-in expired or revoked. Reconnect it in Settings > Providers.", {
+          provider: signedOut.displayName ?? signedOut.driver,
+        });
+  }
+
+  if (hardBlock === "environment-rights") return commandRefusalMessage("environment-rights", t);
+
+  return null;
 }
 
 /**

@@ -106,12 +106,22 @@ export function filterProvidersBySubscriptionConnection(
 }
 
 /**
- * Server turn preflight lets an expired OAuth login on a saved connection try a
- * token refresh, so clients must not block Send on it. Returns the provider
- * with that expired login cleared; revoked and API-key logins stay blocked, as
- * do instances configured with their own credential in `providerInstances`.
+ * The provider with the login the user saved in Settings applied, read the way
+ * the server's turn preflight reads it, so a client counts a provider as able to
+ * run exactly when the server would.
+ *
+ * The snapshot alone cannot answer that. Its `unavailability` comes from the
+ * provider CLI's own probe, which knows nothing about the credential saved here:
+ * a saved OAuth login that was revoked leaves a provider that looks ready and
+ * fails every turn. So a revoked saved login is marked here, and preflight
+ * refuses it (`providerPreflight.ts`, "revoked").
+ *
+ * An expired OAuth login is not the same case: the server lets it try a token
+ * refresh at turn start, so clients must not block Send on it. Its
+ * `expired-login` mark is cleared instead. API-key logins and instances that
+ * configure their own credential in `providerInstances` are left as they are.
  */
-export function withRefreshableSubscriptionLogin(
+export function withSavedSubscriptionLogin(
   provider: ServerProvider,
   statuses: ReadonlyArray<SubscriptionProviderStatus> | undefined,
   providerInstances?: Readonly<Record<string, ProviderInstanceConfig>>,
@@ -130,7 +140,17 @@ export function withRefreshableSubscriptionLogin(
 
   const status = statuses?.find((candidate) => candidate.provider === subscriptionProvider);
 
-  if (status?.health !== "expired" || status.authMode !== "oauth") return provider;
+  if (status?.authMode !== "oauth") return provider;
+
+  if (status.health === "revoked") {
+    return {
+      ...provider,
+      unavailability: "expired-login",
+      unavailabilityDetail: "The saved provider login was revoked.",
+    };
+  }
+
+  if (status.health !== "expired") return provider;
   const expired = provider.unavailability === "expired-login";
 
   if (!expired && provider.auth.status !== "unauthenticated") return provider;
