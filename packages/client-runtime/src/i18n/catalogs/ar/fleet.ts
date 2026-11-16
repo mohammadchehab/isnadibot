@@ -105,4 +105,13 @@ export const fleetCatalog = {
   "Runs purchase requests": "يدير طلبات الشراء",
   Auditor: "المدقق",
   "Checks entries for mistakes": "يدقق القيود بحثا عن الأخطاء",
+  // E13d role library
+  "Add a bot to {name}": "أضف بوتا إلى {name}",
+  "Pick a role. It comes with its instructions, skills and a default model you can change.":
+    "اختر دورا. يأتي مع تعليماته ومهاراته ونموذج افتراضي يمكنك تغييره.",
+  Name: "الاسم",
+  Cancel: "إلغاء",
+  Add: "إضافة",
+  "Add {role}": "أضف {role}",
+  "Could not add the bot": "تعذر إضافة البوت",
 } as const;

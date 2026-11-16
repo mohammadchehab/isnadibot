@@ -87,7 +87,7 @@ export function buildTeamCommandPaletteGroup(
     value: "team:add-bot",
     searchTerms: [addBotTitle, input.t("Add bot"), "add", "bot", "member", spaceName],
     title: addBotTitle,
-    description: input.t("Opens this space's members to add a bot"),
+    description: input.t("Opens the role library to add a bot"),
     icon: input.icons.addBot,
     run: async () => {
       await input.onAddBot();

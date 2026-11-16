@@ -105,4 +105,13 @@ export const fleetCatalog = {
   "Runs purchase requests": "处理采购申请",
   Auditor: "审计员",
   "Checks entries for mistakes": "检查分录错误",
+  // E13d role library
+  "Add a bot to {name}": "向 {name} 添加机器人",
+  "Pick a role. It comes with its instructions, skills and a default model you can change.":
+    "选择一个角色。它会自带指令、技能和一个可更改的默认模型。",
+  Name: "名称",
+  Cancel: "取消",
+  Add: "添加",
+  "Add {role}": "添加 {role}",
+  "Could not add the bot": "无法添加机器人",
 } as const;

@@ -508,7 +508,7 @@ export const rosterCatalog = {
   "Interrupt {name} now": "مقاطعة {name} الآن",
   "Add a bot to {name}…": "إضافة بوت إلى {name}…",
   "Ends the turn this bot is running": "ينهي الدور الذي يشغّله هذا البوت",
-  "Opens this space's members to add a bot": "يفتح أعضاء هذه المساحة لإضافة بوت",
+  "Opens the role library to add a bot": "يفتح مكتبة الأدوار لإضافة بوت",
   Team: "الفريق",
   "Asking you": "يسألك",
   "Working on": "يعمل على",
