@@ -1,7 +1,14 @@
 import { BotId, ProjectId, SkillId } from "@isnadi/contracts";
 import { DateTime } from "effect";
 
-import type { RegistrySkill, SkillRegistrySnapshot, SkillRegistrySource } from "./types.ts";
+import { skillAddNameFromUrl, skillAddZipRefusal } from "./skillAdd.ts";
+import type {
+  RegistrySkill,
+  SkillAddOutcome,
+  SkillAddRequest,
+  SkillRegistrySnapshot,
+  SkillRegistrySource,
+} from "./types.ts";
 
 /** Which registry the dev fixture shows; the web entry reads it from `?skills=`. */
 export const SKILL_FIXTURE_SCENARIOS = ["full", "empty", "loading", "error"] as const;
@@ -10,6 +17,9 @@ export type SkillFixtureScenario = (typeof SKILL_FIXTURE_SCENARIOS)[number];
 
 /** The space the fixture's space-scoped skills belong to. */
 export const SKILL_FIXTURE_PROJECT_ID = ProjectId.make("space-recruiting");
+
+/** That space's project, by the name the frames draw. */
+const SKILL_FIXTURE_PROJECT_NAME = "Recruiting";
 
 /** Bot ids the fixture's Used by column names, so a screen can resolve avatars. */
 export const SKILL_FIXTURE_BOT_IDS = {
@@ -30,6 +40,31 @@ function ago(nowMs: number, elapsedMs: number): string {
 }
 
 const { scout, tailor, tracker, coach } = SKILL_FIXTURE_BOT_IDS;
+
+/**
+ * A short `SKILL.md` body and file list, so the approval dialog has real content to draw for
+ * every Community skill that waits for the user.
+ */
+function skillPreview(
+  name: string,
+  description: string,
+): Pick<RegistrySkill, "instructions" | "files"> {
+  return {
+    instructions: [
+      `# ${name}`,
+      description,
+      "",
+      "1. Read the space's own data before reaching outside it.",
+      "2. Say which source answered, and say so when none did.",
+      "3. Never message anyone from this skill.",
+    ].join("\n"),
+    files: [
+      { path: "SKILL.md", sizeTokens: 1_400 },
+      { path: "references/scoring.md", sizeTokens: 2_100 },
+      { path: "scripts/search.md", sizeTokens: 900 },
+    ],
+  };
+}
 
 /**
  * Every state the design notes ask a reviewer to click: all five sources, a name found twice
@@ -190,6 +225,7 @@ function fullRegistry(nowMs: number): SkillRegistrySnapshot {
       requires: [],
       usedBy: [scout, tailor, coach],
       origin: { url: "https://github.com/acme/recruiting-skills", commit: "4f2a1c9" },
+      ...skillPreview("salary-benchmark", "Compare a candidate's pay to the band for the role."),
     },
     {
       id: SkillId.make("community:recruiting:comp-bands"),
@@ -198,7 +234,7 @@ function fullRegistry(nowMs: number): SkillRegistrySnapshot {
       source: "community",
       projectId: SKILL_FIXTURE_PROJECT_ID,
       sizeTokens: 1_600,
-      fileCount: 5,
+      fileCount: 3,
       contentHash: "9b31e07",
       approval: "needs-approval",
       requires: [],
@@ -210,6 +246,7 @@ function fullRegistry(nowMs: number): SkillRegistrySnapshot {
         editedFiles: 2,
         removedFiles: 0,
       },
+      ...skillPreview("comp-bands", "Read the pay bands a role's offers must stay inside."),
     },
     {
       id: SkillId.make("yours:all:tone-of-voice"),
@@ -254,7 +291,12 @@ function fullRegistry(nowMs: number): SkillRegistrySnapshot {
     },
   ];
 
-  return { state: "ready", skills, unavailableConnectors: ["browser"] };
+  return {
+    state: "ready",
+    skills,
+    unavailableConnectors: ["browser"],
+    projectName: SKILL_FIXTURE_PROJECT_NAME,
+  };
 }
 
 function snapshotFor(scenario: SkillFixtureScenario, nowMs: number): SkillRegistrySnapshot {
@@ -262,7 +304,12 @@ function snapshotFor(scenario: SkillFixtureScenario, nowMs: number): SkillRegist
     case "full":
       return fullRegistry(nowMs);
     case "empty":
-      return { state: "ready", skills: [], unavailableConnectors: [] };
+      return {
+        state: "ready",
+        skills: [],
+        unavailableConnectors: [],
+        projectName: SKILL_FIXTURE_PROJECT_NAME,
+      };
     case "loading":
       return { state: "loading", skills: [], unavailableConnectors: [] };
     case "error":
@@ -270,10 +317,27 @@ function snapshotFor(scenario: SkillFixtureScenario, nowMs: number): SkillRegist
   }
 }
 
+const SCOPE_SOURCE = { "this-space": "space", "all-spaces": "yours" } as const;
+
+const SCOPE_ID = { "this-space": "recruiting", "all-spaces": "all" } as const;
+
+/** A stable seven-character commit for an added skill, so a reviewed dialog reads the same twice. */
+function fixtureCommit(name: string): string {
+  let hash = 7;
+
+  for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 0xfffffff;
+
+  return hash.toString(16).padStart(7, "0").slice(0, 7);
+}
+
 /**
  * The DEV-only registry source. With `dev` false it is the empty source: the screens read
  * `unavailable` and render nothing, which is what a shipped build must do. The flag is passed
  * in by the platform entry, never read here — React Native has no `import.meta.env`.
+ *
+ * The dev source is writable: the dialogs add, approve and remove skills and every screen
+ * subscribed to it redraws, which is what lets the screens be reviewed end to end before the
+ * server seam lands. Nothing here survives a reload.
  */
 export function createSkillRegistryFixture(options: {
   readonly dev: boolean;
@@ -290,10 +354,107 @@ export function createSkillRegistryFixture(options: {
     return { subscribe: () => () => undefined, getSnapshot: () => snapshot };
   }
 
-  const snapshot = snapshotFor(
+  let snapshot = snapshotFor(
     options.scenario ?? "full",
     options.nowMs ?? DateTime.toEpochMillis(DateTime.nowUnsafe()),
   );
 
-  return { subscribe: () => () => undefined, getSnapshot: () => snapshot };
+  const listeners = new Set<() => void>();
+
+  const publish = (skills: readonly RegistrySkill[]): void => {
+    snapshot = { ...snapshot, skills };
+
+    // A copy, so a listener that unsubscribes cannot change the list mid-loop.
+    for (const listener of Array.from(listeners)) listener();
+  };
+
+  /**
+   * A folder the fixture knows is one whose skill the registry already lists, because the
+   * fixture cannot fetch anything. An unknown name is refused the way the server refuses it,
+   * with the refusal each dialog draws.
+   */
+  const addSkill = (request: SkillAddRequest): SkillAddOutcome => {
+    if (request.source === "zip") {
+      const refusal = skillAddZipRefusal(request);
+
+      if (refusal !== null) return { kind: "refused", refusal };
+    }
+
+    const original =
+      request.source === "provider"
+        ? snapshot.skills.find((skill) => skill.id === request.input)
+        : undefined;
+
+    const name =
+      original?.name ??
+      (request.source === "zip"
+        ? request.input.replace(/\.zip$/i, "")
+        : skillAddNameFromUrl(request.input));
+
+    if (name === undefined || name === "") {
+      return {
+        kind: "refused",
+        refusal: request.source === "zip" ? "bad-archive" : "link-not-found",
+      };
+    }
+
+    if (request.source !== "provider" && !snapshot.skills.some((skill) => skill.name === name)) {
+      return {
+        kind: "refused",
+        refusal: request.source === "github" ? "link-not-found" : "bad-archive",
+      };
+    }
+
+    const source = request.source === "provider" ? SCOPE_SOURCE[request.scope] : "community";
+    const skillId = SkillId.make(`${source}:${SCOPE_ID[request.scope]}:${name}`);
+    const commit = fixtureCommit(name);
+    const description = original?.description ?? "Added from a folder you chose.";
+
+    const added: RegistrySkill = {
+      id: skillId,
+      name,
+      description,
+      source,
+      ...(request.scope === "this-space" ? { projectId: SKILL_FIXTURE_PROJECT_ID } : {}),
+      ...(source === "community" ? { origin: { url: request.input, commit } } : {}),
+      sizeTokens: original?.sizeTokens ?? 1_200,
+      fileCount: original?.fileCount ?? 3,
+      contentHash: commit,
+      approval: source === "community" ? "needs-approval" : "not-needed",
+      requires: original?.requires ?? [],
+      usedBy: [],
+      ...(source === "community" ? skillPreview(name, description) : {}),
+    };
+
+    publish([...snapshot.skills, added]);
+
+    return source === "community"
+      ? { kind: "needs-approval", skillId }
+      : { kind: "added", skillId };
+  };
+
+  const approveSkill = (skillId: SkillId): void => {
+    publish(
+      snapshot.skills.map((skill) =>
+        // The change record stays: it says what changed at the commit that was just approved.
+        skill.id === skillId ? { ...skill, approval: "approved" as const } : skill,
+      ),
+    );
+  };
+
+  const removeSkill = (skillId: SkillId): void => {
+    publish(snapshot.skills.filter((skill) => skill.id !== skillId));
+  };
+
+  return {
+    subscribe: (listener) => {
+      listeners.add(listener);
+
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot: () => snapshot,
+    actions: { addSkill, approveSkill, removeSkill },
+  };
 }

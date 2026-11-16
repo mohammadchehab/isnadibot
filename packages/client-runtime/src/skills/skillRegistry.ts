@@ -1,7 +1,12 @@
 import type { BotSkill } from "@isnadi/contracts";
 import { useMemo, useSyncExternalStore } from "react";
 
-import type { RegistrySkill, SkillRegistrySnapshot, SkillRegistrySource } from "./types.ts";
+import type {
+  RegistrySkill,
+  SkillRegistryActions,
+  SkillRegistrySnapshot,
+  SkillRegistrySource,
+} from "./types.ts";
 
 /**
  * The seam every skills screen reads. No screen calls `skills.list` or `bot.update` itself:
@@ -60,6 +65,20 @@ export function useSkillRegistry(): SkillRegistrySnapshot {
   );
 
   return useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot);
+}
+
+/**
+ * The writes behind the seam, or null on a source that cannot be written to. A screen reads
+ * this to decide whether its Add, Approve and Remove controls do anything.
+ */
+export function useSkillRegistryActions(): SkillRegistryActions | null {
+  const source = useSyncExternalStore(
+    subscribeToRegisteredSource,
+    getRegisteredSource,
+    getRegisteredSource,
+  );
+
+  return source.actions ?? null;
 }
 
 /** One entry of a bot's skill set, joined to its registry row. */

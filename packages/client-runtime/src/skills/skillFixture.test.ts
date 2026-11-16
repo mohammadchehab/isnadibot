@@ -85,3 +85,81 @@ describe("the dev fixture", () => {
     );
   });
 });
+
+describe("the dev fixture's writes", () => {
+  function writable() {
+    const source = createSkillRegistryFixture({ dev: true, nowMs: NOW });
+    const actions = source.actions;
+
+    if (actions === undefined) throw new Error("the dev fixture is not writable");
+
+    return { source, actions };
+  }
+
+  it("adds a provider skill to the space and redraws its subscribers", () => {
+    const { source, actions } = writable();
+    let redraws = 0;
+
+    source.subscribe(() => {
+      redraws += 1;
+    });
+
+    const provider = source
+      .getSnapshot()
+      .skills.find((skill) => skill.source === "provider" && skill.providerDriver !== undefined);
+
+    if (provider === undefined) throw new Error("the fixture lists no provider skill");
+
+    expect(
+      actions.addSkill({ source: "provider", scope: "this-space", input: provider.id }),
+    ).toEqual({ kind: "added", skillId: expect.anything() });
+    expect(redraws).toBe(1);
+    expect(
+      source.getSnapshot().skills.filter((skill) => skill.name === provider.name),
+    ).toHaveLength(2);
+  });
+
+  it("refuses a GitHub folder it cannot fetch, with the refusal the dialog draws", () => {
+    const { actions } = writable();
+
+    expect(
+      actions.addSkill({
+        source: "github",
+        scope: "this-space",
+        input: "https://github.com/acme/skills/tree/main/no-such-folder",
+      }),
+    ).toEqual({ kind: "refused", refusal: "link-not-found" });
+  });
+
+  it("hands a Community skill back for approval, and approving lets a bot use it", () => {
+    const { source, actions } = writable();
+
+    const outcome = actions.addSkill({
+      source: "github",
+      scope: "all-spaces",
+      input: "https://github.com/acme/recruiting-skills/tree/main/salary-benchmark",
+    });
+
+    if (outcome.kind !== "needs-approval") throw new Error(`unexpected outcome ${outcome.kind}`);
+
+    const approvalOf = () =>
+      source.getSnapshot().skills.find((skill) => skill.id === outcome.skillId)?.approval;
+
+    expect(approvalOf()).toBe("needs-approval");
+
+    actions.approveSkill(outcome.skillId);
+
+    expect(approvalOf()).toBe("approved");
+  });
+
+  it("removes a skill", () => {
+    const { source, actions } = writable();
+    const victim = source.getSnapshot().skills.find((skill) => skill.name === "video-cut-list");
+
+    if (victim === undefined) throw new Error("the fixture lists no video-cut-list");
+
+    actions.removeSkill(victim.id);
+
+    expect(source.getSnapshot().skills.some((skill) => skill.id === victim.id)).toBe(false);
+  });
+});

@@ -7,6 +7,16 @@ export {
 } from "./skillFixture.ts";
 
 export {
+  SKILL_ADD_LIMITS,
+  skillAddFileSizeLabel,
+  skillAddNameFromUrl,
+  skillAddUrlIsGitHub,
+  skillAddZipRefusal,
+  skillProviderGroups,
+  type SkillProviderGroup,
+} from "./skillAdd.ts";
+
+export {
   filterRegistrySkills,
   isSkillWinner,
   SKILL_REGISTRY_FILTERS,
@@ -17,6 +27,7 @@ export {
   skillConnectorName,
   skillLastLoadedLabel,
   skillOriginLabel,
+  skillOriginSource,
   skillScopeRank,
   skillSizeLabel,
   skillSourceLabel,
@@ -32,15 +43,23 @@ export {
   registerSkillRegistrySource,
   useBotSkills,
   useSkillRegistry,
+  useSkillRegistryActions,
   type BotSkillEntry,
   type BotSkillsView,
 } from "./skillRegistry.ts";
 
 export type {
   RegistrySkill,
+  SkillAddOutcome,
+  SkillAddRefusal,
+  SkillAddRequest,
+  SkillAddScope,
+  SkillAddSource,
   SkillApproval,
   SkillApprovalChange,
+  SkillFilePreview,
   SkillOrigin,
+  SkillRegistryActions,
   SkillRegistrySnapshot,
   SkillRegistrySource,
   SkillRegistryState,
