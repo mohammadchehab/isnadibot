@@ -374,25 +374,14 @@ describe("fleet dispatch receipts", () => {
       }),
     );
 
-    it.effect("says it once per item, not again on the next pass", () =>
+    it.effect("says it once per item, and again for the next item on the same role", () =>
       Effect.gen(function* () {
-        const dispatched = yield* noteOn(
-          modelWith(groupChat({ activities: [triageNote(triagePayload(ITEM.id))] })),
-          LATER,
-        );
+        // The receipt id is the item, so a note already on the thread is what makes it quiet.
+        const said = (noted: string) =>
+          noteOn(modelWith(groupChat({ activities: [triageNote(triagePayload(noted))] })), LATER);
 
-        expect(dispatched).toEqual([]);
-      }),
-    );
-
-    it.effect("says it again for a different item waiting on the same role", () =>
-      Effect.gen(function* () {
-        const dispatched = yield* noteOn(
-          modelWith(groupChat({ activities: [triageNote(triagePayload("item-other"))] })),
-          LATER,
-        );
-
-        expect(appendCommands(dispatched)).toHaveLength(1);
+        expect(yield* said(ITEM.id)).toEqual([]);
+        expect(appendCommands(yield* said("item-other"))).toHaveLength(1);
       }),
     );
 

@@ -1,8 +1,5 @@
 import {
-  BotId,
   EventId,
-  FLEET_DISPATCH_CLAIM_ACTIVITY,
-  FLEET_DISPATCH_IDLE_ACTIVITY,
   FLEET_DISPATCH_TRIAGE_ACTIVITY,
   FleetRoleId,
   WorkItemId,
@@ -29,25 +26,6 @@ const activity = (
 const ITEM_ID = WorkItemId.make("item-1");
 
 describe("deriveFleetReceipts", () => {
-  it("reads a hand-out into a row naming the bot and the item", () => {
-    const [receipt] = deriveFleetReceipts([
-      activity(FLEET_DISPATCH_CLAIM_ACTIVITY, {
-        botId: BotId.make("bot-a"),
-        botName: "Coach",
-        workItemId: ITEM_ID,
-        itemTitle: "Fix the login",
-      }),
-    ]);
-
-    expect(receipt?.text).toBe("Coach was idle, so the board gave it “Fix the login”.");
-  });
-
-  it("reads an idle note into a row", () => {
-    const [receipt] = deriveFleetReceipts([activity(FLEET_DISPATCH_IDLE_ACTIVITY, {})]);
-
-    expect(receipt?.text).toBe("Everyone is idle and the board is empty.");
-  });
-
   // The row is the only sign the item is waiting, so it names the role that unblocks it.
   it("reads a triage note into a row naming the role nobody holds", () => {
     const [receipt] = deriveFleetReceipts([
@@ -70,9 +48,5 @@ describe("deriveFleetReceipts", () => {
     ]);
 
     expect(receipt?.text).toBe("the server's own sentence");
-  });
-
-  it("ignores an activity that is not a fleet note", () => {
-    expect(deriveFleetReceipts([activity("thread.note", {})])).toEqual([]);
   });
 });

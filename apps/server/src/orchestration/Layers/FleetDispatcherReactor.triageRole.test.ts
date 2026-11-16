@@ -83,48 +83,19 @@ const triageNotes = (dispatched: ReadonlyArray<OrchestrationCommand>) =>
       command.activity.kind === FLEET_DISPATCH_TRIAGE_ACTIVITY,
   );
 
+/** The one architect item, on a board that may also carry items naming no role. */
+const board = (...extra: ReadonlyArray<ReturnType<typeof workItem>>) => [
+  workItem({ id: "item-1", role: ARCHITECT }),
+  ...extra,
+];
+
 /**
  * An item may name the role that should take it. The dispatcher never hands such an item to
  * whoever happens to be free — but it must never let the item quietly sit there either, and a
  * member gaining the role has to be enough to move it, without a restart.
  */
 describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
-  it.effect("an item naming a role nobody holds is not handed out, and the chat says why", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [BOT_A],
-          [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
-          [workItem({ id: "item-1", role: ARCHITECT })],
-        ),
-      );
-
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
-
-          // The only member is idle and would have taken it before this rule existed.
-          expect(claims(h.dispatched)).toEqual([]);
-
-          // Guard (i): the wait is visible, and the row names the role that would unblock it.
-          expect(triageNotes(h.dispatched)).toMatchObject([
-            {
-              threadId: ThreadId.make("thread-group"),
-              activity: { payload: { workItemId: "item-1", role: ARCHITECT } },
-            },
-          ]);
-          expect(yield* receipts).toMatchObject([
-            { kind: "skipped", reason: "no-role-holder", itemId: "item-1" },
-          ]);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("a starved item does not stop the item behind it from being handed out", () =>
+  it.effect("a starved item is skipped and the chat says why, while the item behind it moves", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
@@ -134,23 +105,32 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
         modelWith(
           [BOT_A],
           [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
-          [workItem({ id: "item-1", role: ARCHITECT }), workItem({ id: "item-2" })],
+          board(workItem({ id: "item-2" })),
         ),
       );
 
-      yield* run(h, ({ reactor }) =>
+      yield* run(h, ({ reactor, receipts }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
-          // Only the item that named no role moved, and it moved rather than waiting its turn.
-          expect(claims(h.dispatched)).toMatchObject([{ workItemId: "item-2" }]);
-          expect(triageNotes(h.dispatched)).toHaveLength(1);
+          // Guard (i): the wait is visible, and the row names the role that would unblock it.
+          expect(triageNotes(h.dispatched)).toMatchObject([
+            {
+              threadId: ThreadId.make("thread-group"),
+              activity: { payload: { workItemId: "item-1", role: ARCHITECT } },
+            },
+          ]);
+          expect((yield* receipts).filter((receipt) => receipt.kind === "skipped")).toMatchObject([
+            { kind: "skipped", reason: "no-role-holder", itemId: "item-1" },
+          ]);
+          // The free member took the item behind it, so one starved item is not a stop sign.
+          expect(claims(h.dispatched)).toMatchObject([{ workItemId: "item-2", botId: BOT_A.id }]);
         }),
       );
     }).pipe(Effect.scoped),
   );
 
-  it.effect("a member gaining the role re-opens the item without a restart", () =>
+  it.effect("a member gaining the role hands the item out without a restart", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
@@ -159,9 +139,8 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
         botThread(ARCHITECT_BOT.id, "thread-architect"),
         makeGroupThread(),
       ];
-      const item = [workItem({ id: "item-1", role: ARCHITECT })];
 
-      yield* Ref.set(h.model, modelWith([BOT_A], threads, item));
+      yield* Ref.set(h.model, modelWith([BOT_A], threads, board()));
 
       yield* run(h, ({ reactor }) =>
         Effect.gen(function* () {
@@ -171,7 +150,7 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
 
           // Guard (ii): the roster change is the only thing that happens, and the same reactor
           // hands the item out on the wake it causes.
-          yield* Ref.set(h.model, modelWith([BOT_A, ARCHITECT_BOT], threads, item));
+          yield* Ref.set(h.model, modelWith([BOT_A, ARCHITECT_BOT], threads, board()));
           yield* PubSub.publish(h.events, memberAssigned(1, ARCHITECT_BOT.id));
           yield* reactor.drainThrough(1);
 
@@ -183,58 +162,50 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("an item naming a role the group does hold goes to the member hired as it", () =>
+  it.effect("a named role goes to its holder, and waits quietly while that holder is busy", () =>
     Effect.gen(function* () {
-      const h = yield* harness;
-
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [BOT_A, ARCHITECT_BOT],
-          [botThread(BOT_A.id, "thread-a"), botThread(ARCHITECT_BOT.id, "thread-architect")],
-          [workItem({ id: "item-1", role: ARCHITECT })],
-        ),
-      );
-
-      yield* run(h, ({ reactor }) =>
+      // The two answers a held role can give, from the same board: one bot was hired as the
+      // architect and one was not, so a free specialist never stands in for it.
+      const dispatch = (architectChat: "idle" | "busy") =>
         Effect.gen(function* () {
-          yield* reactor.drain;
+          const h = yield* harness;
 
-          // Both are idle, and only one was hired as the architect.
-          expect(claims(h.dispatched)).toMatchObject([
-            { workItemId: "item-1", botId: ARCHITECT_BOT.id },
-          ]);
-        }),
-      );
-    }).pipe(Effect.scoped),
-  );
+          yield* Ref.set(
+            h.model,
+            modelWith(
+              [BOT_A, ARCHITECT_BOT],
+              [
+                architectChat === "busy"
+                  ? busyThread(ARCHITECT_BOT.id, "thread-architect")
+                  : botThread(ARCHITECT_BOT.id, "thread-architect"),
+                botThread(BOT_A.id, "thread-a"),
+              ],
+              board(),
+            ),
+          );
 
-  it.effect("a role that is held but busy waits on the member, not on the role", () =>
-    Effect.gen(function* () {
-      const h = yield* harness;
+          return yield* run(h, ({ reactor, receipts }) =>
+            Effect.gen(function* () {
+              yield* reactor.drain;
 
-      yield* Ref.set(
-        h.model,
-        modelWith(
-          [BOT_A, ARCHITECT_BOT],
-          [busyThread(ARCHITECT_BOT.id, "thread-architect"), botThread(BOT_A.id, "thread-a")],
-          [workItem({ id: "item-1", role: ARCHITECT })],
-        ),
-      );
+              return { dispatched: h.dispatched, receipts: yield* receipts };
+            }),
+          );
+        }).pipe(Effect.scoped);
 
-      yield* run(h, ({ reactor, receipts }) =>
-        Effect.gen(function* () {
-          yield* reactor.drain;
+      const idle = yield* dispatch("idle");
 
-          // The free member was not hired as the architect, so the item waits for the one who was.
-          expect(claims(h.dispatched)).toEqual([]);
+      expect(claims(idle.dispatched)).toMatchObject([
+        { workItemId: "item-1", botId: ARCHITECT_BOT.id },
+      ]);
 
-          // A held role whose holder is busy is a different answer from a role nobody holds, and
-          // it is not the one the chat should be told about.
-          expect(yield* receipts).toMatchObject([{ kind: "skipped", reason: "no-idle-member" }]);
-          expect(triageNotes(h.dispatched)).toEqual([]);
-        }),
-      );
+      const busy = yield* dispatch("busy");
+
+      // A held role whose holder is busy waits on that member, and is not the answer the chat
+      // should be told about.
+      expect(claims(busy.dispatched)).toEqual([]);
+      expect(busy.receipts).toMatchObject([{ kind: "skipped", reason: "no-idle-member" }]);
+      expect(triageNotes(busy.dispatched)).toEqual([]);
     }).pipe(Effect.scoped),
   );
 });
