@@ -4,6 +4,7 @@ import { ProvidersListSection } from "./ProviderDetailPage";
 import { SandboxSettingsPanel } from "./SandboxSettingsPanel";
 import { AdvancedSettingsSections, BotWorkspaceSettingsSection } from "./SettingsPanels";
 import { SettingsPageContainer } from "./settingsLayout";
+import { SkillRegistryPage } from "../skills/SkillRegistryPage";
 import { VoiceSettingsSection } from "./VoiceSettings";
 
 // Pages that combine sections from several panels. Each section keeps its own
@@ -31,6 +32,16 @@ export function BrowserSettingsPage() {
   return (
     <SettingsPageContainer>
       <BrowserSettingsSection />
+    </SettingsPageContainer>
+  );
+}
+
+export function SkillsSettingsPage() {
+  return (
+    <SettingsPageContainer>
+      {/* Settings lists every space's skills, so it opens on `All skills` rather than the
+          space tab's narrower default. */}
+      <SkillRegistryPage defaultFilter="all" />
     </SettingsPageContainer>
   );
 }

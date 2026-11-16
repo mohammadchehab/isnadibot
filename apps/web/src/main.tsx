@@ -43,4 +43,9 @@ ReactDOM.createRoot(rootElement).render(
 
 if (import.meta.env.DEV) {
   void import("react-grab");
+  // The skills screens read a dev-only registry until phase 1 wires `skills.list` behind the
+  // same seam. The chunk and its fixtures stay out of a shipped build.
+  void import("./skills/registerSkillRegistryFixture").then(({ registerSkillRegistryFixture }) =>
+    registerSkillRegistryFixture(),
+  );
 }

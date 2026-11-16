@@ -11,10 +11,12 @@ import {
   SecurityCheckIcon,
   Settings02Icon,
   SlidersHorizontalIcon,
+  SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import type { MessageKey } from "@isnadi/client-runtime/i18n";
-import { Fragment, Suspense, lazy, type ComponentType } from "react";
+import { useSkillRegistry } from "@isnadi/client-runtime/skills";
+import { Fragment, Suspense, lazy, useMemo, type ComponentType } from "react";
 
 import { useI18n } from "~/i18n";
 import { cn } from "~/lib/utils";
@@ -40,6 +42,10 @@ const SandboxSettingsPage = lazy(async () => ({
 
 const BrowserSettingsPage = lazy(async () => ({
   default: (await import("./SettingsPages")).BrowserSettingsPage,
+}));
+
+const SkillsSettingsPage = lazy(async () => ({
+  default: (await import("./SettingsPages")).SkillsSettingsPage,
 }));
 
 const AdvancedSettingsPage = lazy(async () => ({
@@ -86,6 +92,7 @@ const SECTION_PANELS: Readonly<Record<SettingsSection, ComponentType>> = {
   channels: BotChannelsSettingsPanel,
   sandbox: SandboxSettingsPage,
   browser: BrowserSettingsPage,
+  skills: SkillsSettingsPage,
   "image-generation": ImageGenerationSettingsPanel,
   diagnostics: DiagnosticsSettingsPanel,
 };
@@ -141,14 +148,37 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       { section: "channels", label: "Channels", icon: Message01Icon },
       { section: "sandbox", label: "Sandbox", icon: HardDriveIcon },
       { section: "browser", label: "Browser", icon: GlobeIcon },
+      { section: "skills", label: "Skills", icon: SparklesIcon },
       { section: "image-generation", label: "Image generation", icon: Image01Icon },
     ],
   },
 ];
 
+export type SettingsNavGroup = (typeof SETTINGS_NAV_GROUPS)[number];
+
 export const SETTINGS_NAV_ITEMS: ReadonlyArray<SettingsNavItem> = SETTINGS_NAV_GROUPS.flatMap(
   (group) => group.items,
 );
+
+/**
+ * The nav groups as a platform should draw them: a row whose screen has nothing to show is
+ * dropped. Skills goes when no registry source is registered, the same condition the space's
+ * Skills tab uses; `SETTINGS_NAV_ITEMS` stays complete so a deep link still resolves a label.
+ */
+export function useSettingsNavGroups(): ReadonlyArray<SettingsNavGroup> {
+  const skillsAvailable = useSkillRegistry().state !== "unavailable";
+
+  return useMemo(
+    () =>
+      skillsAvailable
+        ? SETTINGS_NAV_GROUPS
+        : SETTINGS_NAV_GROUPS.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.section !== "skills"),
+          })),
+    [skillsAvailable],
+  );
+}
 
 /** Header labels for pages without a nav row. */
 const UNLISTED_SECTION_LABELS: Readonly<Partial<Record<SettingsSection, MessageKey>>> = {
@@ -168,6 +198,7 @@ export function SettingsDialog() {
   const { t } = useI18n();
   const section = useSettingsDialogStore((state) => state.section);
   const openSettings = useSettingsDialogStore((state) => state.openSettings);
+  const navGroups = useSettingsNavGroups();
 
   return (
     <Dialog
@@ -185,7 +216,7 @@ export function SettingsDialog() {
           aria-label={t("Settings sections")}
           className="flex w-52 shrink-0 flex-col gap-0.5 border-e bg-muted/30 p-2 max-sm:w-full max-sm:flex-row max-sm:overflow-x-auto max-sm:border-e-0 max-sm:border-b"
         >
-          {SETTINGS_NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <Fragment key={group.label}>
               <div className="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground max-sm:hidden">
                 {t(group.label)}

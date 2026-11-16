@@ -1,0 +1,47 @@
+export const skillsCatalog = {
+  "Skill registry": "Skill registry",
+  "Bots see a short index of skills, not the skills themselves. A skill's full instructions load only when a task needs it.":
+    "Bots see a short index of skills, not the skills themselves. A skill's full instructions load only when a task needs it.",
+  "Filter skills": "Filter skills",
+  "This space": "This space",
+  "All skills": "All skills",
+  Unused: "Unused",
+  "Add skill": "Add skill",
+  Skill: "Skill",
+  "Used by": "Used by",
+  Source: "Source",
+  Size: "Size",
+  "Last loaded": "Last loaded",
+  "In the index": "In the index",
+  "Actions for {skill}": "Actions for {skill}",
+  "Size is what loads when a skill is used. The index costs about 30 tokens per skill.":
+    "Size is what loads when a skill is used. The index costs about 30 tokens per skill.",
+  "Remove from this space…": "Remove from this space…",
+  "Remove from all spaces…": "Remove from all spaces…",
+  "The skill registry did not load.": "The skill registry did not load.",
+  "Try again in a moment.": "Try again in a moment.",
+  "Every skill has been used": "Every skill has been used",
+  "Skills appear here once a bot has loaded none of them.":
+    "Skills appear here once a bot has loaded none of them.",
+  "Skills a bot can load on demand show up here.": "Skills a bot can load on demand show up here.",
+  "Not indexed": "Not indexed",
+  "Just now": "Just now",
+  "No role": "No role",
+  "All spaces": "All spaces",
+  "Built in": "Built in",
+  Yours: "Yours",
+  Community: "Community",
+  "Changed since approved": "Changed since approved",
+  "Needs {connector}": "Needs {connector}",
+  "A bot cannot use it until you approve it.": "A bot cannot use it until you approve it.",
+  "Added from {origin} · a bot cannot use it until you approve it.":
+    "Added from {origin} · a bot cannot use it until you approve it.",
+  "Changed since you approved it.": "Changed since you approved it.",
+  "{count} file added": "{count} file added",
+  "{count} edited": "{count} edited",
+  "{count} removed": "{count} removed",
+  "Changed at commit {commit} since you approved {approved} · {summary}.":
+    "Changed at commit {commit} since you approved {approved} · {summary}.",
+  "Connect the {connector} connector in Settings › Connections. Until then a bot cannot run this skill.":
+    "Connect the {connector} connector in Settings › Connections. Until then a bot cannot run this skill.",
+} as const;

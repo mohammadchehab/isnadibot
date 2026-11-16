@@ -7,6 +7,7 @@ import { commonCatalog } from "./common.ts";
 import { browserAuthCatalog } from "./browserAuth.ts";
 import { refusalsCatalog } from "./refusals.ts";
 import { fleetCatalog } from "./fleet.ts";
+import { skillsCatalog } from "./skills.ts";
 
 export const arCatalog = {
   ...rosterCatalog,
@@ -18,4 +19,5 @@ export const arCatalog = {
   ...browserAuthCatalog,
   ...refusalsCatalog,
   ...fleetCatalog,
+  ...skillsCatalog,
 } as const;
