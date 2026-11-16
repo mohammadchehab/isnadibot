@@ -7,6 +7,7 @@ import {
   BotId,
   GroupId,
   type OrchestrationEvent,
+  type OrchestrationGroup,
   type OrchestrationShellStreamEvent,
   type OrchestrationShellStreamItem,
   type ProjectId,
@@ -23,6 +24,24 @@ import {
   isUnchangedThreadShell,
 } from "./wsSupport.ts";
 import type { WsServices } from "./wsServices.ts";
+import type { ProjectionGroup } from "./persistence/Services/ProjectionGroups.ts";
+
+/**
+ * The group the client is told about. The client replaces its whole group with this
+ * object, so every field the UI reads has to be here: `keepBusy` was left out, and the
+ * keep-busy switch read back as off no matter what the server had stored.
+ */
+export const toShellGroup = (group: ProjectionGroup): OrchestrationGroup => ({
+  id: group.groupId,
+  name: group.name,
+  bossBotId: group.bossBotId,
+  members: group.members,
+  keepBusy: group.keepBusy,
+  fleetTemplateId: group.fleetTemplateId,
+  createdByBotId: group.createdByBotId,
+  createdAt: group.createdAt,
+  updatedAt: group.updatedAt,
+});
 
 export const createWsOrchestrationStreams = ({
   projectionSnapshotQuery,
@@ -69,6 +88,9 @@ export const createWsOrchestrationStreams = ({
         );
       case "group.created":
       case "group.renamed":
+      // The keep-busy switch is drawn from the group the client holds, so a change
+      // to it that never reaches the stream leaves the switch reading the old value.
+      case "group.keep-busy-set":
       case "group.member-assigned":
       case "group.member-unassigned":
       case "group.person-assigned":
@@ -325,16 +347,7 @@ export const createWsOrchestrationStreams = ({
               Option.some<OrchestrationShellStreamEvent>({
                 kind: "group-upserted",
                 sequence,
-                group: {
-                  id: nextGroup.groupId,
-                  name: nextGroup.name,
-                  bossBotId: nextGroup.bossBotId,
-                  members: nextGroup.members,
-                  fleetTemplateId: nextGroup.fleetTemplateId,
-                  createdByBotId: nextGroup.createdByBotId,
-                  createdAt: nextGroup.createdAt,
-                  updatedAt: nextGroup.updatedAt,
-                },
+                group: toShellGroup(nextGroup),
               }),
           }),
         ),
