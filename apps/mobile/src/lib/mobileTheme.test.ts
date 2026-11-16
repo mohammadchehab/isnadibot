@@ -97,7 +97,7 @@ describe("mobile themes", () => {
     expect(channels).toContain('className="font-t3-medium text-sm text-channel-heading"');
     expect(channels.match(/text-channel-heading/g)).toHaveLength(3);
     expect(channels.match(/text-channel-detail/g)).toHaveLength(4);
-    expect(rows).toContain('className="font-t3-medium text-[11px] text-channel-detail"');
+    expect(rows).toContain('className="font-t3-medium text-3xs text-channel-detail"');
   });
 
   it("shares all built-in desktop palettes", () => {

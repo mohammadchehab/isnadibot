@@ -136,7 +136,8 @@ export function spaceStandup(input: SpaceStandupInput): StandupReport {
 
   for (const bot of input.bots) names.set(bot.id, bot.name);
 
-  const queued = workItems.filter((item) => QUEUE_STATES.has(item.state)).toSorted(oldestFirst);
+  // .sort() on a copy, not .toSorted(): Hermes lacks ES2023 change-by-copy.
+  const queued = workItems.filter((item) => QUEUE_STATES.has(item.state)).sort(oldestFirst);
 
   const queue = queued.slice(0, STANDUP_QUEUE_LIMIT).map(
     (item): StandupQueueItem => ({
@@ -148,7 +149,7 @@ export function spaceStandup(input: SpaceStandupInput): StandupReport {
 
   const blocked = workItems
     .filter((item) => item.state === "blocked")
-    .toSorted(oldestFirst)
+    .sort(oldestFirst)
     .map(
       (item): StandupBlocker => ({
         id: item.id,

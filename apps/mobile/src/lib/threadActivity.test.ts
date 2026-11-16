@@ -98,7 +98,7 @@ describe("buildThreadFeed", () => {
           createdAt: "2026-08-31T00:00:01.000Z",
           payload: {
             botId: "bot-1",
-            engine: { provider: "codex", model: "gpt-5.6-sol" },
+            engine: { provider: "codex", model: "gpt-5.6-sol", fallbacks: [] },
             tokens: 1_200,
             estimatedCost: { status: "available", usd: 0.42 },
           },
@@ -148,7 +148,7 @@ describe("buildThreadFeed", () => {
 
     const payload = {
       botId: BotId.make("bot-meter-cache"),
-      engine: { provider: "codex", model: "gpt-5.4" },
+      engine: { provider: "codex", model: "gpt-5.4", fallbacks: [] },
       tokens: 10,
       estimatedCost: { status: "available", usd: 0.01 },
     };
