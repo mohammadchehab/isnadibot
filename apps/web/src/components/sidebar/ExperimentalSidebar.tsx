@@ -1,51 +1,52 @@
-import { Match } from "effect";
-import {
-  Analytics01Icon,
-  BubbleChatIcon,
-  Calendar03Icon,
-  HelpCircleIcon,
-  Moon02Icon,
-  PuzzleIcon,
-  Settings02Icon,
-  Sun03Icon,
-} from "@hugeicons/core-free-icons";
-import type { IconSvgElement } from "@hugeicons/react";
+import type { Decision } from "@isnadi/client-runtime/decisions";
+import { spaceMembers } from "@isnadi/client-runtime/space";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  BotIcon,
+  Clock3Icon,
+  FolderIcon,
+  MessagesSquareIcon,
+  PanelLeftIcon,
+  PuzzleIcon,
+  SettingsIcon,
+  UsersIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { APP_DISPLAY_NAME } from "../../branding";
 import { isElectron } from "../../env";
 import { useI18n } from "../../i18n";
-import { useChangedSinceMount } from "../../hooks/useChangedSinceMount";
-import { useClientSettings } from "../../hooks/useSettings";
-import { useTheme } from "../../hooks/useTheme";
 import { cn } from "../../lib/utils";
 import { openPlugins } from "../../pluginsDialogStore";
-import { openProductFeedback } from "../../productFeedbackStore";
-import { openUsage } from "../../usageDialogStore";
 import { openSettings } from "../../settingsDialogStore";
-import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
-import BotRosterSidebar from "../roster/BotRosterSidebar";
+import { useDecisions } from "../../state/entities";
+import { usePrimaryEnvironmentId } from "../../state/environments";
 import { BotAvatarView } from "../roster/BotAvatarView";
-import { formatRosterTimestamp } from "../roster/roster.logic";
 import { useRosterStore } from "../roster/rosterStore";
-import { SettingsPanelNav } from "../settings/SettingsSidebarNav";
-import { AppIcon } from "../ui/app-icon";
-import { useSidebar } from "../ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { SidebarGroupLabel, SidebarMenuBadge, SidebarMenuButton, useSidebar } from "../ui/sidebar";
 
 /**
- * Codex-style sidebar experiment: a rail of places beside a raised panel.
- * On by default; `?sidebar=classic` on any URL switches back, and the choice
- * sticks in localStorage until `?sidebar=places`.
+ * Frame 2088:817: one 248 column of 32px rows — header, the nav group, a Spaces
+ * group, a Bots group, and Settings pinned at the bottom. Every row is an
+ * instance of a design-system primitive the frame names, so the geometry comes
+ * from those and not from local styles.
+ *
+ * Decision-82 adds the Decisions row and its count badge; the frame draws no
+ * Decisions row. Decision-92 keeps the Chats row, which opens the
+ * all-conversations page while that page is still being drawn.
  */
-const EXPERIMENT = "places";
+const SIDEBAR_WIDTH = 248;
 
 const STORAGE_KEY = "isnadi:sidebar-experiment";
 
-const RAIL_WIDTH = 60;
+const EXPERIMENT = "places";
 
-const PANEL_WIDTH = 296;
+export const EXPERIMENTAL_SIDEBAR_WIDTH = SIDEBAR_WIDTH;
+
+function isPathUnder(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
 
 function readExperiment(): boolean {
   const param = new URLSearchParams(window.location.search).get("sidebar");
@@ -62,314 +63,155 @@ export function useSidebarExperiment(): boolean {
   return enabled;
 }
 
-/** Rail plus panel use a fixed width; resizing is ignored while experimenting. */
-export const EXPERIMENTAL_SIDEBAR_WIDTH = RAIL_WIDTH + PANEL_WIDTH;
-
-/** Full-page places such as Plugins and Usage show only the rail. */
-export const EXPERIMENTAL_RAIL_ONLY_WIDTH = RAIL_WIDTH;
-
-export function isRailOnlyPath(pathname: string): boolean {
-  return isPathUnder(pathname, "/plugins") || isPathUnder(pathname, "/usage");
-}
-
-function isPathUnder(pathname: string, base: string): boolean {
-  return pathname === base || pathname.startsWith(`${base}/`);
-}
-
-type Place = "chats" | "routines";
-
 export function ExperimentalSidebar() {
-  const [place, setPlace] = useState<Place>("chats");
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
-  // Settings is a route, not a panel toggle: the URL decides whether it owns
-  // the panel, and leaving it goes back to the chat workspace.
-  const onSettings = pathname === "/settings" || pathname.startsWith("/settings/");
-  const onPlugins = isPathUnder(pathname, "/plugins");
-  const onUsage = isPathUnder(pathname, "/usage");
-  const railOnly = onPlugins || onUsage;
-  // Collapsing hides the panel and keeps the rail; picking a place brings it back.
-  const { state: sidebarState, setOpen: setSidebarOpen, isMobile } = useSidebar();
-
-  const revealPanel = () => {
-    if (sidebarState === "collapsed") setSidebarOpen(true);
-  };
-
-  const choosePlace = (next: Place) => {
-    setPlace(next);
-    revealPanel();
-
-    if (onSettings || railOnly) void navigate({ to: "/" });
-  };
-
-  const { resolvedTheme, setAppearanceMode } = useTheme();
-  const nextAppearance = resolvedTheme === "dark" ? "light" : "dark";
-  const panel = onSettings ? "settings" : place;
-  // Only rail switches animate; the first paint of the panel stays still.
-  const panelSwitched = useChangedSinceMount(panel);
   const { t } = useI18n();
+  const { toggleSidebar } = useSidebar();
+  const decisions = useDecisions(usePrimaryEnvironmentId());
+
+  const onSettings = isPathUnder(pathname, "/settings");
+  const onPlugins = isPathUnder(pathname, "/plugins");
+  const onRoutines = isPathUnder(pathname, "/routines");
+  const onDecisions = isPathUnder(pathname, "/decisions");
+  const onChats = !onSettings && !onPlugins && !onRoutines && !onDecisions;
+
+  const { groups, bots } = useRosterStore(
+    useShallow((state) => ({ groups: state.groups, bots: state.bots })),
+  );
+
+  const liveBots = useMemo(() => bots.filter((bot) => bot.archivedAt === null), [bots]);
+
+  // A bot belongs to at most one space, so the Bots group lists the loose ones.
+  // The frame cannot say this; it is the only reading that keeps the two groups
+  // disjoint and stops a hired fleet's bots appearing twice.
+  const spaceBotIds = useMemo(
+    () => new Set(groups.flatMap((group) => [...spaceMembers(group)])),
+    [groups],
+  );
+
+  const looseBots = useMemo(
+    () => liveBots.filter((bot) => !spaceBotIds.has(bot.id)),
+    [liveBots, spaceBotIds],
+  );
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-      {/* The macOS traffic lights are wider than the rail, so while they show
-          they get a titlebar strip across rail and panel. Fullscreen hides
-          them and drops the strip. */}
+      {/* The macOS traffic lights sit over the sidebar, so they get a strip
+          above the header while they show. */}
       <div
         className={cn(
           "hidden h-(--workspace-topbar-height) w-full shrink-0 in-data-[macos-traffic-lights]:block",
           isElectron && "drag-region",
         )}
       />
-      <div className="flex min-h-0 w-full flex-1 overflow-hidden">
-        <nav
-          aria-label={t("Main")}
-          className="flex h-full w-(--rail-width) shrink-0 flex-col items-center pb-3"
-          style={{ "--rail-width": `${RAIL_WIDTH}px` }}
-        >
-          {/* The first icon centers on the panel title row. */}
-          <div
-            className={cn(
-              "h-topbar-spacer w-full shrink-0 in-data-[macos-traffic-lights]:h-0",
-              isElectron && "drag-region",
-            )}
-          />
-          <div className="flex flex-col items-center gap-1.5">
-            <RailButton
-              label={t("Chats")}
-              icon={BubbleChatIcon}
-              active={!onSettings && !railOnly && place === "chats"}
-              onClick={() => choosePlace("chats")}
-            />
-            <RailButton
-              label={t("Routines")}
-              icon={Calendar03Icon}
-              active={!onSettings && !railOnly && place === "routines"}
-              onClick={() => choosePlace("routines")}
-            />
-            <RailButton
-              label={t("Plugins")}
-              icon={PuzzleIcon}
-              active={onPlugins}
-              onClick={() => {
-                if (!onPlugins) openPlugins();
-              }}
-            />
-            <RailButton
-              label={t("Usage")}
-              icon={Analytics01Icon}
-              active={onUsage}
-              onClick={() => {
-                if (!onUsage) openUsage();
-              }}
-            />
-          </div>
-          <div className="mt-auto flex flex-col items-center gap-1.5">
-            <RailButton
-              label={
-                nextAppearance === "dark" ? t("Switch to dark mode") : t("Switch to light mode")
-              }
-              icon={nextAppearance === "dark" ? Moon02Icon : Sun03Icon}
-              onClick={() => setAppearanceMode(nextAppearance)}
-            />
-            <RailButton
-              label={t("Feedback")}
-              icon={HelpCircleIcon}
-              onClick={() => openProductFeedback()}
-            />
-            <RailButton
-              label={t("Settings")}
-              icon={Settings02Icon}
-              active={onSettings}
-              onClick={() => {
-                revealPanel();
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto bg-sidebar p-3">
+        <SidebarTitleRow label={t("Collapse sidebar")} onToggle={toggleSidebar} />
 
-                if (!onSettings) openSettings();
-              }}
-            />
-          </div>
-        </nav>
-        {/* The panel is a raised card; its row tokens are re-based on the card surface. */}
-        {/* Fixed width so collapsing clips the panel instead of squeezing its rows. */}
-        <div
-          className={cn(
-            "flex w-(--panel-width) shrink-0 py-2 pe-2 in-data-[macos-traffic-lights]:pt-0",
-            railOnly && !isMobile && "hidden",
-          )}
-          style={{ "--panel-width": `${PANEL_WIDTH}px` }}
-        >
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-sidebar-border/70 bg-sidebar shadow-(--shell-card-shadow) sidebar-shell-card">
-            <div
-              key={panel}
-              className={cn("flex min-h-0 flex-1 flex-col", panelSwitched && "motion-place-enter")}
-            >
-              {Match.value(panel).pipe(
-                Match.when("settings", () => (
-                  <>
-                    <PanelHeader title={t("Settings")} />
-                    <SettingsPanelNav />
-                  </>
-                )),
-                Match.when("chats", () => <BotRosterSidebar chrome="panel" />),
-                Match.orElse(() => <RoutinesPanel />),
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RailButton({
-  label,
-  icon,
-  active = false,
-  onClick,
-}: {
-  label: string;
-  icon: IconSvgElement;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            aria-current={active || undefined}
-            onClick={onClick}
-            className={cn(
-              "flex size-10 cursor-pointer items-center justify-center rounded-xl outline-none transition-bg-color-shadow duration-(--duration-fast) ease-(--ease-smooth-out) select-none motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring app-region-no-drag",
-              active
-                ? "bg-(--shell-card) text-sidebar-foreground shadow-xs ring-1 ring-sidebar-border/70"
-                : "text-sidebar-muted-foreground hover:bg-sidebar-wash hover:text-sidebar-foreground",
-            )}
+        <nav aria-label={t("Main")} className="flex flex-col gap-1">
+          <SidebarMenuButton isActive={onChats} onClick={() => void navigate({ to: "/" })}>
+            <MessagesSquareIcon />
+            <span>{t("Chats")}</span>
+          </SidebarMenuButton>
+          <SidebarMenuButton
+            isActive={onRoutines}
+            onClick={() => void navigate({ to: "/routines" })}
           >
-            <AppIcon icon={icon} className="size-5" strokeWidth={active ? 2 : 1.7} />
-          </button>
-        }
-      />
-      <TooltipPopup side="right">{label}</TooltipPopup>
-    </Tooltip>
-  );
-}
+            <Clock3Icon />
+            <span>{t("Routines")}</span>
+          </SidebarMenuButton>
+          <SidebarMenuButton
+            isActive={onPlugins}
+            onClick={() => {
+              if (!onPlugins) openPlugins();
+            }}
+          >
+            <PuzzleIcon />
+            <span>{t("Plugins")}</span>
+          </SidebarMenuButton>
+          <SidebarMenuButton
+            isActive={onDecisions}
+            onClick={() => void navigate({ to: "/decisions" })}
+          >
+            <UsersIcon />
+            <span>{t("Decisions")}</span>
+            {decisions.length > 0 ? (
+              <SidebarMenuBadge>{decisionCount(decisions)}</SidebarMenuBadge>
+            ) : null}
+          </SidebarMenuButton>
 
-function PanelHeader({ title }: { title: string }) {
-  return (
-    <div
-      className={cn(
-        "flex h-(--workspace-topbar-height) shrink-0 items-center px-4",
-        isElectron && "drag-region",
-      )}
-    >
-      <h2 className="truncate text-17px font-semibold tracking-tight text-sidebar-foreground">
-        {title}
-      </h2>
+          {groups.length > 0 ? (
+            <>
+              <SidebarGroupLabel>{t("Spaces")}</SidebarGroupLabel>
+              {groups.map((group) => (
+                <SidebarMenuButton
+                  isActive={pathname === `/groups/${group.id}`}
+                  key={group.id}
+                  onClick={() =>
+                    void navigate({ to: "/groups/$groupId", params: { groupId: group.id } })
+                  }
+                >
+                  <FolderIcon />
+                  <span>{group.name}</span>
+                  <SidebarMenuBadge>{spaceMembers(group).size}</SidebarMenuBadge>
+                </SidebarMenuButton>
+              ))}
+            </>
+          ) : null}
+
+          {looseBots.length > 0 ? (
+            <>
+              <SidebarGroupLabel>{t("Bots")}</SidebarGroupLabel>
+              {looseBots.map((bot) => (
+                <SidebarMenuButton
+                  isActive={pathname === `/bots/${bot.id}`}
+                  key={bot.id}
+                  onClick={() => void navigate({ to: "/bots/$botId", params: { botId: bot.id } })}
+                >
+                  <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-7" />
+                  <span>{bot.name}</span>
+                </SidebarMenuButton>
+              ))}
+            </>
+          ) : null}
+        </nav>
+      </div>
+      <div className="shrink-0 bg-sidebar p-3 pt-0">
+        <SidebarMenuButton
+          isActive={onSettings}
+          onClick={() => {
+            if (!onSettings) openSettings();
+          }}
+        >
+          <SettingsIcon />
+          <span>{t("Settings")}</span>
+        </SidebarMenuButton>
+      </div>
     </div>
   );
 }
 
-function PanelRow({
-  onClick,
-  leading,
-  title,
-  detail,
-}: {
-  onClick: () => void;
-  leading: ReactNode;
-  title: string;
-  detail: string;
-}) {
+/** The badge caps at 99+ so a long queue cannot widen the row. */
+function decisionCount(decisions: ReadonlyArray<Decision>): string {
+  return decisions.length > 99 ? "99+" : String(decisions.length);
+}
+
+function SidebarTitleRow({ label, onToggle }: { label: string; onToggle: () => void }) {
   return (
-    <li className="list-none">
+    <div className={cn("flex w-full shrink-0 items-center gap-2 p-2", isElectron && "drag-region")}>
+      <BotIcon className="size-4 shrink-0 text-sidebar-foreground" />
+      <span className="truncate font-semibold text-15px text-sidebar-foreground leading-5 tracking-title-sm">
+        {APP_DISPLAY_NAME}
+      </span>
+      <span className="h-px min-w-px flex-1" />
       <button
+        aria-label={label}
+        className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={onToggle}
         type="button"
-        onClick={onClick}
-        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-start outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {leading}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium text-sidebar-foreground">
-            <bdi>{title}</bdi>
-          </span>
-          <span className="truncate text-13px text-sidebar-muted-foreground">
-            <bdi>{detail}</bdi>
-          </span>
-        </span>
+        <PanelLeftIcon className="size-4" />
       </button>
-    </li>
-  );
-}
-
-function useLiveBots() {
-  const { bots, pinnedItems } = useRosterStore(
-    useShallow((state) => ({ bots: state.bots, pinnedItems: state.pinnedItems })),
-  );
-
-  return useMemo(() => {
-    const live = bots.filter((bot) => bot.archivedAt === null);
-    // Pinned bots lead, in pin order; everything else keeps roster order.
-    const pinnedIds = pinnedItems.flatMap((item) => (item.kind === "bot" ? [item.id] : []));
-
-    return [
-      ...pinnedIds.flatMap((id) => live.filter((bot) => bot.id === id)),
-      ...live.filter((bot) => !pinnedIds.includes(bot.id)),
-    ];
-  }, [bots, pinnedItems]);
-}
-
-function RoutinesPanel() {
-  const navigate = useNavigate();
-  const snapshot = useEnvironmentSnapshot();
-  const bots = useLiveBots();
-  const timestampFormat = useClientSettings((s) => s.timestampFormat);
-  const { t } = useI18n();
-  const routines = (snapshot?.routines ?? []).filter((routine) => routine.lifecycle !== "deleted");
-
-  return (
-    <>
-      <PanelHeader title={t("Routines")} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-2">
-        {routines.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-sidebar-muted-foreground">
-            {t("No routines yet. Ask a bot to do something on a schedule.")}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-0.5">
-            {routines.map((routine) => {
-              const bot = bots.find((candidate) => candidate.id === routine.botId);
-
-              const time = routine.nextRunAt
-                ? formatRosterTimestamp(routine.nextRunAt, timestampFormat)
-                : null;
-
-              const when = !routine.enabled
-                ? t("Paused")
-                : time
-                  ? t("Next {time}", { time })
-                  : t("Not scheduled");
-
-              return (
-                <PanelRow
-                  key={routine.id}
-                  onClick={() =>
-                    void navigate({ to: "/bots/$botId", params: { botId: routine.botId } })
-                  }
-                  leading={
-                    bot ? (
-                      <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-9" />
-                    ) : null
-                  }
-                  title={routine.job}
-                  detail={`${bot?.name ?? t("Unknown bot")} · ${when}`}
-                />
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </>
+    </div>
   );
 }

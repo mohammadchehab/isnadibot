@@ -19,9 +19,7 @@ import { primaryServerKeybindingsAtom } from "../state/server";
 import BotRosterSidebar from "./roster/BotRosterSidebar";
 import {
   ExperimentalSidebar,
-  EXPERIMENTAL_RAIL_ONLY_WIDTH,
   EXPERIMENTAL_SIDEBAR_WIDTH,
-  isRailOnlyPath,
   useSidebarExperiment,
 } from "./sidebar/ExperimentalSidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
@@ -187,16 +185,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   // SAFETY: React CSSProperties omits custom properties; these values are CSS variables consumed by the component stylesheet.
   const sidebarProviderStyle = {
-    "--sidebar-width": `${
-      sidebarExperiment
-        ? isRailOnlyPath(pathname)
-          ? EXPERIMENTAL_RAIL_ONLY_WIDTH
-          : EXPERIMENTAL_SIDEBAR_WIDTH
-        : sidebarWidth
-    }px`,
-    // Collapsed, the experiment keeps its full rail.
+    // The experiment is one column of rows, so it keeps its drawn width on
+    // every route; collapsing it slides that column out rather than shrinking
+    // it to a rail. The drawn collapsed rail is TASK-392.
+    "--sidebar-width": `${sidebarExperiment ? EXPERIMENTAL_SIDEBAR_WIDTH : sidebarWidth}px`,
     "--sidebar-width-icon": sidebarExperiment
-      ? `${EXPERIMENTAL_RAIL_ONLY_WIDTH}px`
+      ? `${EXPERIMENTAL_SIDEBAR_WIDTH}px`
       : SIDEBAR_WIDTH_ICON,
     "--workspace-controls-left":
       isMacosDesktop && !isWindowFullscreen ? MACOS_TRAFFIC_LIGHTS_LEFT_INSET : undefined,
@@ -253,7 +247,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       <ProjectProjectionRetention />
       <Sidebar
         side="left"
-        collapsible="icon"
+        collapsible={sidebarExperiment ? "offcanvas" : "icon"}
         data-app-sidebar=""
         surface={sidebarExperiment ? "app" : "app-bordered"}
         resizable={{

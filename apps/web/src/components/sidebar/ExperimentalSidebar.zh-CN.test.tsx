@@ -10,27 +10,19 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => () => undefined,
 }));
 
-vi.mock("@effect/atom-react", () => ({ useAtomValue: () => null }));
-
-vi.mock("../../hooks/useTheme", () => ({
-  useTheme: () => ({ resolvedTheme: "light", setAppearanceMode: () => undefined }),
-}));
-
-vi.mock("../../hooks/useSettings", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../hooks/useSettings")>()),
-  useClientSettings: () => "locale",
-}));
+vi.mock("../../state/entities", () => ({ useDecisions: () => [] }));
 
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => null }));
 
-vi.mock("../../state/shell", () => ({ environmentSnapshotAtom: () => null }));
-
-vi.mock("../roster/BotRosterSidebar", () => ({ default: () => null }));
-
-vi.mock("../settings/SettingsSidebarNav", () => ({ SettingsPanelNav: () => null }));
-
-vi.mock("../ui/sidebar", () => ({
-  useSidebar: () => ({ state: "expanded", setOpen: () => undefined }),
+// The rows are the real primitives; only the provider context is faked, because
+// this renders the sidebar on its own.
+vi.mock("../ui/sidebarContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../ui/sidebarContext")>()),
+  useSidebar: () => ({
+    isMobile: false,
+    state: "expanded",
+    toggleSidebar: () => undefined,
+  }),
 }));
 
 import { ExperimentalSidebar } from "./ExperimentalSidebar";
@@ -38,18 +30,21 @@ import { ExperimentalSidebar } from "./ExperimentalSidebar";
 const zhCNCatalog = await catalogRegistry["zh-CN"]!();
 
 describe("experimental sidebar in Simplified Chinese", () => {
-  it("translates the rail and the settings panel header", () => {
+  it("translates every row and the collapse control", () => {
     const html = renderToStaticMarkup(
       <LanguageProvider testCatalog={{ locale: "zh-CN", catalog: zhCNCatalog }}>
         <ExperimentalSidebar />
       </LanguageProvider>,
     );
 
-    for (const label of ["主导航", "聊天", "例行任务", "插件", "切换到深色模式", "反馈", "设置"]) {
-      expect(html).toContain(`aria-label="${label}"`);
+    expect(html).toContain('aria-label="主导航"');
+    expect(html).toContain('aria-label="收起侧边栏"');
+
+    for (const label of ["聊天", "例行任务", "插件", "待决事项", "设置"]) {
+      expect(html).toContain(`>${label}</span>`);
     }
 
-    expect(html).toContain(">设置</h2>");
-    expect(html).not.toContain("Switch to dark mode");
+    expect(html).not.toContain("Chats");
+    expect(html).not.toContain("Decisions");
   });
 });

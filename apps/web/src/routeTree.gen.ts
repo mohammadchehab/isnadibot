@@ -17,6 +17,8 @@ import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
 import { Route as SettingsSplatRouteImport } from './routes/settings.$'
+import { Route as ChatRoutinesRouteImport } from './routes/_chat.routines'
+import { Route as ChatDecisionsRouteImport } from './routes/_chat.decisions'
 import { Route as SettingsProvidersProviderIdRouteImport } from './routes/settings.providers.$providerId'
 import { Route as SettingsChannelsChannelRouteImport } from './routes/settings.channels.$channel'
 import { Route as BotsBotIdSettingsRouteImport } from './routes/bots.$botId.settings'
@@ -65,6 +67,16 @@ const SettingsSplatRoute = SettingsSplatRouteImport.update({
   id: '/$',
   path: '/$',
   getParentRoute: () => SettingsRoute,
+} as any)
+const ChatRoutinesRoute = ChatRoutinesRouteImport.update({
+  id: '/routines',
+  path: '/routines',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatDecisionsRoute = ChatDecisionsRouteImport.update({
+  id: '/decisions',
+  path: '/decisions',
+  getParentRoute: () => ChatRoute,
 } as any)
 const SettingsProvidersProviderIdRoute =
   SettingsProvidersProviderIdRouteImport.update({
@@ -120,6 +132,8 @@ export interface FileRoutesByFullPath {
   '/plugins': typeof PluginsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/usage': typeof UsageRoute
+  '/decisions': typeof ChatDecisionsRoute
+  '/routines': typeof ChatRoutinesRoute
   '/settings/$': typeof SettingsSplatRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
@@ -137,6 +151,8 @@ export interface FileRoutesByTo {
   '/plugins': typeof PluginsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/usage': typeof UsageRoute
+  '/decisions': typeof ChatDecisionsRoute
+  '/routines': typeof ChatRoutinesRoute
   '/settings/$': typeof SettingsSplatRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/': typeof ChatIndexRoute
@@ -157,6 +173,8 @@ export interface FileRoutesById {
   '/plugins': typeof PluginsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/usage': typeof UsageRoute
+  '/_chat/decisions': typeof ChatDecisionsRoute
+  '/_chat/routines': typeof ChatRoutinesRoute
   '/settings/$': typeof SettingsSplatRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/_chat/': typeof ChatIndexRoute
@@ -178,6 +196,8 @@ export interface FileRouteTypes {
     | '/plugins'
     | '/settings'
     | '/usage'
+    | '/decisions'
+    | '/routines'
     | '/settings/$'
     | '/settings/$section'
     | '/$environmentId/$threadId'
@@ -195,6 +215,8 @@ export interface FileRouteTypes {
     | '/plugins'
     | '/settings'
     | '/usage'
+    | '/decisions'
+    | '/routines'
     | '/settings/$'
     | '/settings/$section'
     | '/'
@@ -214,6 +236,8 @@ export interface FileRouteTypes {
     | '/plugins'
     | '/settings'
     | '/usage'
+    | '/_chat/decisions'
+    | '/_chat/routines'
     | '/settings/$'
     | '/settings/$section'
     | '/_chat/'
@@ -295,6 +319,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsSplatRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/_chat/routines': {
+      id: '/_chat/routines'
+      path: '/routines'
+      fullPath: '/routines'
+      preLoaderRoute: typeof ChatRoutinesRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/decisions': {
+      id: '/_chat/decisions'
+      path: '/decisions'
+      fullPath: '/decisions'
+      preLoaderRoute: typeof ChatDecisionsRouteImport
+      parentRoute: typeof ChatRoute
+    }
     '/settings/providers/$providerId': {
       id: '/settings/providers/$providerId'
       path: '/providers/$providerId'
@@ -362,6 +400,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface ChatRouteChildren {
+  ChatDecisionsRoute: typeof ChatDecisionsRoute
+  ChatRoutinesRoute: typeof ChatRoutinesRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ChatEnvironmentIdThreadIdRoute: typeof ChatEnvironmentIdThreadIdRoute
   ChatBotsBotIdRoute: typeof ChatBotsBotIdRoute
@@ -372,6 +412,8 @@ interface ChatRouteChildren {
 }
 
 const ChatRouteChildren: ChatRouteChildren = {
+  ChatDecisionsRoute: ChatDecisionsRoute,
+  ChatRoutinesRoute: ChatRoutinesRoute,
   ChatIndexRoute: ChatIndexRoute,
   ChatEnvironmentIdThreadIdRoute: ChatEnvironmentIdThreadIdRoute,
   ChatBotsBotIdRoute: ChatBotsBotIdRoute,
