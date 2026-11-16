@@ -466,6 +466,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/computer/ComputerViewerDialog.tsx",
     "apps/web/src/components/computer/ComputerViewerPanel.tsx",
     "apps/web/src/components/fleet/HireMemberRow.tsx",
+    "apps/web/src/components/fleet/SquadSetupHardBlock.tsx",
     "apps/web/src/components/fleet/SquadSetupHeading.tsx",
     "apps/web/src/components/fleet/SquadSetupScreen.tsx",
     "apps/web/src/components/fleet/StartSpaceScreen.tsx",
