@@ -57,9 +57,19 @@ const busyThread = (botId: BotId, id: string): OrchestrationThread => ({
   },
 });
 
-/** Every item the reactor claimed, in the order it claimed them. */
-const claimedItemIds = (dispatched: ReadonlyArray<OrchestrationCommand>) =>
-  dispatched.flatMap((command) => (command.type === "work-item.claim" ? [command.workItemId] : []));
+/** A read model whose one group holds `bots`, with the board carrying `items`. */
+const modelWith = (
+  bots: ReadonlyArray<OrchestrationBot>,
+  threads: ReadonlyArray<OrchestrationThread>,
+  items: ReadonlyArray<ReturnType<typeof workItem>>,
+) => ({
+  ...makeReadModel({
+    bots,
+    groups: [keepBusyGroup({ bossBotId: null, members: bots.map((bot) => specialist(bot.id)) })],
+    threads,
+  }),
+  workItems: items,
+});
 
 /** The claims themselves, so a test can say which bot took which item. */
 const claims = (dispatched: ReadonlyArray<OrchestrationCommand>) =>
@@ -83,21 +93,21 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       const h = yield* harness;
 
-      yield* Ref.set(h.model, {
-        ...makeReadModel({
-          bots: [BOT_A],
-          groups: [keepBusyGroup({ bossBotId: null, members: [specialist(BOT_A.id)] })],
-          threads: [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
-        }),
-        workItems: [workItem({ id: "item-1", role: ARCHITECT })],
-      });
+      yield* Ref.set(
+        h.model,
+        modelWith(
+          [BOT_A],
+          [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
+          [workItem({ id: "item-1", role: ARCHITECT })],
+        ),
+      );
 
       yield* run(h, ({ reactor, receipts }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
           // The only member is idle and would have taken it before this rule existed.
-          expect(claimedItemIds(h.dispatched)).toEqual([]);
+          expect(claims(h.dispatched)).toEqual([]);
 
           // Guard (i): the wait is visible, and the row names the role that would unblock it.
           expect(triageNotes(h.dispatched)).toMatchObject([
@@ -118,22 +128,22 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       const h = yield* harness;
 
-      yield* Ref.set(h.model, {
-        ...makeReadModel({
-          bots: [BOT_A],
-          groups: [keepBusyGroup({ bossBotId: null, members: [specialist(BOT_A.id)] })],
-          threads: [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
-        }),
-        // The starved item is the oldest, so the pass meets it first.
-        workItems: [workItem({ id: "item-1", role: ARCHITECT }), workItem({ id: "item-2" })],
-      });
+      // The starved item is the oldest, so the pass meets it first.
+      yield* Ref.set(
+        h.model,
+        modelWith(
+          [BOT_A],
+          [botThread(BOT_A.id, "thread-a"), makeGroupThread()],
+          [workItem({ id: "item-1", role: ARCHITECT }), workItem({ id: "item-2" })],
+        ),
+      );
 
       yield* run(h, ({ reactor }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
           // Only the item that named no role moved, and it moved rather than waiting its turn.
-          expect(claimedItemIds(h.dispatched)).toEqual(["item-2"]);
+          expect(claims(h.dispatched)).toMatchObject([{ workItemId: "item-2" }]);
           expect(triageNotes(h.dispatched)).toHaveLength(1);
         }),
       );
@@ -144,36 +154,24 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const model = (
-        members: ReadonlyArray<GroupMembership>,
-        bots: ReadonlyArray<OrchestrationBot>,
-      ) => ({
-        ...makeReadModel({
-          bots,
-          groups: [keepBusyGroup({ bossBotId: null, members })],
-          threads: [
-            botThread(BOT_A.id, "thread-a"),
-            botThread(ARCHITECT_BOT.id, "thread-architect"),
-            makeGroupThread(),
-          ],
-        }),
-        workItems: [workItem({ id: "item-1", role: ARCHITECT })],
-      });
+      const threads = [
+        botThread(BOT_A.id, "thread-a"),
+        botThread(ARCHITECT_BOT.id, "thread-architect"),
+        makeGroupThread(),
+      ];
+      const item = [workItem({ id: "item-1", role: ARCHITECT })];
 
-      yield* Ref.set(h.model, model([specialist(BOT_A.id)], [BOT_A]));
+      yield* Ref.set(h.model, modelWith([BOT_A], threads, item));
 
       yield* run(h, ({ reactor }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
-          expect(claimedItemIds(h.dispatched)).toEqual([]);
+          expect(claims(h.dispatched)).toEqual([]);
 
           // Guard (ii): the roster change is the only thing that happens, and the same reactor
           // hands the item out on the wake it causes.
-          yield* Ref.set(
-            h.model,
-            model([specialist(BOT_A.id), specialist(ARCHITECT_BOT.id)], [BOT_A, ARCHITECT_BOT]),
-          );
+          yield* Ref.set(h.model, modelWith([BOT_A, ARCHITECT_BOT], threads, item));
           yield* PubSub.publish(h.events, memberAssigned(1, ARCHITECT_BOT.id));
           yield* reactor.drainThrough(1);
 
@@ -189,22 +187,14 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       const h = yield* harness;
 
-      yield* Ref.set(h.model, {
-        ...makeReadModel({
-          bots: [BOT_A, ARCHITECT_BOT],
-          groups: [
-            keepBusyGroup({
-              bossBotId: null,
-              members: [specialist(BOT_A.id), specialist(ARCHITECT_BOT.id)],
-            }),
-          ],
-          threads: [
-            botThread(BOT_A.id, "thread-a"),
-            botThread(ARCHITECT_BOT.id, "thread-architect"),
-          ],
-        }),
-        workItems: [workItem({ id: "item-1", role: ARCHITECT })],
-      });
+      yield* Ref.set(
+        h.model,
+        modelWith(
+          [BOT_A, ARCHITECT_BOT],
+          [botThread(BOT_A.id, "thread-a"), botThread(ARCHITECT_BOT.id, "thread-architect")],
+          [workItem({ id: "item-1", role: ARCHITECT })],
+        ),
+      );
 
       yield* run(h, ({ reactor }) =>
         Effect.gen(function* () {
@@ -223,29 +213,21 @@ describe("FleetDispatcherReactor triage by role (TASK-447)", () => {
     Effect.gen(function* () {
       const h = yield* harness;
 
-      yield* Ref.set(h.model, {
-        ...makeReadModel({
-          bots: [BOT_A, ARCHITECT_BOT],
-          groups: [
-            keepBusyGroup({
-              bossBotId: null,
-              members: [specialist(BOT_A.id), specialist(ARCHITECT_BOT.id)],
-            }),
-          ],
-          threads: [
-            busyThread(ARCHITECT_BOT.id, "thread-architect"),
-            botThread(BOT_A.id, "thread-a"),
-          ],
-        }),
-        workItems: [workItem({ id: "item-1", role: ARCHITECT })],
-      });
+      yield* Ref.set(
+        h.model,
+        modelWith(
+          [BOT_A, ARCHITECT_BOT],
+          [busyThread(ARCHITECT_BOT.id, "thread-architect"), botThread(BOT_A.id, "thread-a")],
+          [workItem({ id: "item-1", role: ARCHITECT })],
+        ),
+      );
 
       yield* run(h, ({ reactor, receipts }) =>
         Effect.gen(function* () {
           yield* reactor.drain;
 
           // The free member was not hired as the architect, so the item waits for the one who was.
-          expect(claimedItemIds(h.dispatched)).toEqual([]);
+          expect(claims(h.dispatched)).toEqual([]);
 
           // A held role whose holder is busy is a different answer from a role nobody holds, and
           // it is not the one the chat should be told about.

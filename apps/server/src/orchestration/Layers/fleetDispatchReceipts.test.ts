@@ -345,19 +345,25 @@ describe("fleet dispatch receipts", () => {
       role: ARCHITECT,
     });
 
-    it.effect("appends the row that names the role nobody holds", () =>
+    /** Notes ITEM's wait on `readModel` and hands back what the engine was asked to append. */
+    const noteOn = (readModel: OrchestrationReadModel, createdAt: string = NOW) =>
       Effect.gen(function* () {
         const { engine, dispatched } = recordingEngine();
 
         yield* noteDispatchTriage(engine, {
-          readModel: modelWith(groupChat()),
+          readModel,
           groupId: GROUP_ID,
           item: ITEM,
           role: ARCHITECT,
-          createdAt: NOW,
+          createdAt,
         });
 
-        const command = onlyAppend(dispatched);
+        return dispatched;
+      });
+
+    it.effect("appends the row that names the role nobody holds", () =>
+      Effect.gen(function* () {
+        const command = onlyAppend(yield* noteOn(modelWith(groupChat())));
 
         expect(command.threadId).toBe("thread-group");
         expect(command.activity.kind).toBe(FLEET_DISPATCH_TRIAGE_ACTIVITY);
@@ -370,17 +376,10 @@ describe("fleet dispatch receipts", () => {
 
     it.effect("says it once per item, not again on the next pass", () =>
       Effect.gen(function* () {
-        const { engine, dispatched } = recordingEngine();
-
-        const model = modelWith(groupChat({ activities: [triageNote(triagePayload(ITEM.id))] }));
-
-        yield* noteDispatchTriage(engine, {
-          readModel: model,
-          groupId: GROUP_ID,
-          item: ITEM,
-          role: ARCHITECT,
-          createdAt: LATER,
-        });
+        const dispatched = yield* noteOn(
+          modelWith(groupChat({ activities: [triageNote(triagePayload(ITEM.id))] })),
+          LATER,
+        );
 
         expect(dispatched).toEqual([]);
       }),
@@ -388,19 +387,10 @@ describe("fleet dispatch receipts", () => {
 
     it.effect("says it again for a different item waiting on the same role", () =>
       Effect.gen(function* () {
-        const { engine, dispatched } = recordingEngine();
-
-        const model = modelWith(
-          groupChat({ activities: [triageNote(triagePayload("item-other"))] }),
+        const dispatched = yield* noteOn(
+          modelWith(groupChat({ activities: [triageNote(triagePayload("item-other"))] })),
+          LATER,
         );
-
-        yield* noteDispatchTriage(engine, {
-          readModel: model,
-          groupId: GROUP_ID,
-          item: ITEM,
-          role: ARCHITECT,
-          createdAt: LATER,
-        });
 
         expect(appendCommands(dispatched)).toHaveLength(1);
       }),
@@ -408,15 +398,7 @@ describe("fleet dispatch receipts", () => {
 
     it.effect("writes nothing when the group has no chat", () =>
       Effect.gen(function* () {
-        const { engine, dispatched } = recordingEngine();
-
-        yield* noteDispatchTriage(engine, {
-          readModel: modelWith(botThread(BOT.id, "thread-bot-specialist")),
-          groupId: GROUP_ID,
-          item: ITEM,
-          role: ARCHITECT,
-          createdAt: NOW,
-        });
+        const dispatched = yield* noteOn(modelWith(botThread(BOT.id, "thread-bot-specialist")));
 
         expect(dispatched).toEqual([]);
       }),
