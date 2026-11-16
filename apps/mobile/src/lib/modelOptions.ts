@@ -8,7 +8,7 @@ import { PROVIDER_DISPLAY_NAMES, ProviderDriverKind } from "@isnadi/contracts";
 import { formatModelSlug } from "@isnadi/shared/model";
 import {
   filterProvidersBySubscriptionConnection,
-  withRefreshableSubscriptionLogin,
+  withSavedSubscriptionLogin,
 } from "@isnadi/client-runtime/provider-auth";
 import {
   presentProviderUnavailability,
@@ -79,7 +79,7 @@ export function resolveModelSendBlock(
       ? "missing-login"
       : providerAvailabilityReason(
           provider &&
-            withRefreshableSubscriptionLogin(
+            withSavedSubscriptionLogin(
               provider,
               subscriptionStatuses,
               config.settings.providerInstances,
@@ -153,11 +153,7 @@ export function resolveSelectableModelSelection(
 
   const provider =
     found &&
-    withRefreshableSubscriptionLogin(
-      found,
-      subscriptionStatuses,
-      config.settings.providerInstances,
-    );
+    withSavedSubscriptionLogin(found, subscriptionStatuses, config.settings.providerInstances);
 
   return provider &&
     provider.enabled &&
@@ -215,7 +211,7 @@ export function buildModelOptions(
 
     const reason = providerAvailabilityReason(
       provider &&
-        withRefreshableSubscriptionLogin(
+        withSavedSubscriptionLogin(
           provider,
           subscriptionStatuses,
           config?.settings.providerInstances,

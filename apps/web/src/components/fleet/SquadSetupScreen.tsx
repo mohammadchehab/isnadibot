@@ -1,5 +1,4 @@
 import { FLEET_TEMPLATES, type FleetTemplate } from "@isnadi/contracts";
-import { commandRefusalMessage, type Translate } from "@isnadi/client-runtime/state/runtime";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
@@ -16,8 +15,8 @@ import {
   SquadSetupHardBlockBand,
   squadSetupCaptionBlocker,
   squadSetupHardBlock,
+  squadSetupHardBlockMessage,
   type SquadSetupCaptionBlocker,
-  type SquadSetupHardBlock,
 } from "./SquadSetupHardBlock";
 import { SquadSetupHeading } from "./SquadSetupHeading";
 import { useSquadSetupReadOnly } from "./useSquadSetupAccess";
@@ -37,15 +36,6 @@ function BlockerNotice({ blocker }: { readonly blocker: SquadSetupCaptionBlocker
     case "duplicate-name":
       return t("Two bots share that name");
   }
-}
-
-/** The sentence the band carries, or null when nothing hard-blocks the screen. */
-function hardBlockMessage(hardBlock: SquadSetupHardBlock | null, t: Translate): string | null {
-  if (hardBlock === "no-provider") return t("No provider can run this bot yet.");
-
-  if (hardBlock === "environment-rights") return commandRefusalMessage("environment-rights", t);
-
-  return null;
 }
 
 /**
@@ -90,6 +80,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
     draft,
     blockers,
     locked,
+    providers,
     instanceEntries,
     modelOptionsByInstance,
     pickBoss,
@@ -137,7 +128,7 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
                 the frame's band, so it is read before the squad it blocks. */}
             <SquadSetupHardBlockBand
               hardBlock={hardBlock}
-              message={hardBlockMessage(hardBlock, t)}
+              message={squadSetupHardBlockMessage(hardBlock, blockers, providers, t)}
               onOpenSettings={() =>
                 void navigate({ to: "/settings/$section", params: { section: "providers" } })
               }

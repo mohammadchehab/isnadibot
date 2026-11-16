@@ -11,7 +11,7 @@ import { createServerEnvironmentAtoms } from "@isnadi/client-runtime/state/serve
 import { createEnvironmentServerConfigsAtom } from "@isnadi/client-runtime/state/shell";
 import {
   filterProvidersBySubscriptionConnection,
-  withRefreshableSubscriptionLogin,
+  withSavedSubscriptionLogin,
 } from "@isnadi/client-runtime/provider-auth";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@isnadi/shared/keybindings";
 import * as Option from "effect/Option";
@@ -98,7 +98,7 @@ export const primaryServerProvidersAtom = Atom.make((get): ReadonlyArray<ServerP
   const providerInstances = get(primaryServerSettingsAtom).providerInstances;
 
   return filterProvidersBySubscriptionConnection(providers, statuses?.providers).map((provider) =>
-    withRefreshableSubscriptionLogin(provider, statuses?.providers, providerInstances),
+    withSavedSubscriptionLogin(provider, statuses?.providers, providerInstances),
   );
 }).pipe(Atom.withLabel("web-primary-server-providers"));
 

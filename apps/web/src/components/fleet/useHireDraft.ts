@@ -84,6 +84,8 @@ export function useHireDraft(template: FleetTemplate) {
     blockers: draftBlockers(draft),
     /** A send whose outcome is unknown owns the draft: nothing may edit it until it answers. */
     locked: draftLocked(draft),
+    /** The catalog the draft was seeded from, so a band can name the provider it is waiting on. */
+    providers,
     instanceEntries,
     modelOptionsByInstance,
     pickBoss: (roleId: FleetRoleId) => {
