@@ -461,4 +461,10 @@ export const rosterCatalog = {
   "{count} · {boss} is the boss": "{count} · {boss} 是负责人",
   "{bot} was idle, so the board gave it “{item}”.": "{bot} 空闲了，于是看板把「{item}」交给了它。",
   "Everyone is idle and the board is empty.": "所有机器人都空闲，看板也没有待办。",
+  "Team · {name}": "团队 · {name}",
+  "Steer {name}…": "纠正 {name}…",
+  "Interrupt {name} now": "立即中断 {name}",
+  "Add a bot to {name}…": "向 {name} 添加机器人…",
+  "Ends the turn this bot is running": "结束这个机器人正在进行的轮次",
+  "Opens this space's members to add a bot": "打开此空间的成员以添加机器人",
 } as const;

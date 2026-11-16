@@ -482,4 +482,10 @@ export const rosterCatalog = {
   "{bot} was idle, so the board gave it “{item}”.":
     "{bot} was idle, so the board gave it “{item}”.",
   "Everyone is idle and the board is empty.": "Everyone is idle and the board is empty.",
+  "Team · {name}": "Team · {name}",
+  "Steer {name}…": "Steer {name}…",
+  "Interrupt {name} now": "Interrupt {name} now",
+  "Add a bot to {name}…": "Add a bot to {name}…",
+  "Ends the turn this bot is running": "Ends the turn this bot is running",
+  "Opens this space's members to add a bot": "Opens this space's members to add a bot",
 } as const;

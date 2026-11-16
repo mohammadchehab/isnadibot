@@ -11,9 +11,11 @@ import {
   ImageIcon,
   LanguagesIcon,
   MessageCircleIcon,
+  MessageSquareIcon,
   MessagesSquareIcon,
   MoonIcon,
   PaletteIcon,
+  PlusIcon,
   PuzzleIcon,
   SettingsIcon,
   SquareIcon,
@@ -22,7 +24,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAtomValue } from "@effect/atom-react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { isGroupBotMember } from "@isnadi/contracts";
 
 import { useTheme } from "../hooks/useTheme";
 import { isPreviewFocused } from "../lib/previewFocus";
@@ -43,6 +46,7 @@ import {
 } from "./CommandPalette.logic";
 import { CommandPaletteContent } from "./CommandPaletteContent";
 import { CommandPaletteResults } from "./CommandPaletteResults";
+import { buildTeamCommandPaletteGroup, type TeamCommandBot } from "./CommandPalette.team.logic";
 import { toggleThemeEditorForTheme } from "./settings/themeEditorStore";
 import { openSettings } from "~/settingsDialogStore";
 import { openProductFeedback } from "~/productFeedbackStore";
@@ -56,7 +60,8 @@ import { useThreadSearch } from "../state/queries";
 import { findLatestGroupThreadIds, latestGroupThreadKey } from "./roster/botThreadRuntime.logic";
 import { useOpenChat } from "./chat/useOpenChat";
 import { useRosterStore } from "./roster/rosterStore";
-import { useBotFleetControls } from "./roster/useBotControls";
+import { useBotControlCommands, useBotFleetControls } from "./roster/useBotControls";
+import { useGroupDetailsOpen } from "./roster/detailsPanelOpen";
 import { resolveShortcutCommand } from "../keybindings";
 import { CommandDialog, CommandDialogPopup } from "./ui/command";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -302,6 +307,21 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   // saying whose.
   const botNameIn = buildEnvironmentOwnerNames(rosters);
 
+  // The space this palette is open over. Rows that act on a space's own team
+  // only exist inside one, and they must not reach another space's bots.
+  const activeGroupId = useParams({
+    strict: false,
+    select: (params) => {
+      const groupId = "groupId" in params ? params.groupId : null;
+
+      return Predicate.isString(groupId) ? groupId : null;
+    },
+  });
+
+  const rosterGroups = useRosterStore((state) => state.groups);
+  const [, setGroupDetailsOpen] = useGroupDetailsOpen();
+  const { interruptThread } = useBotControlCommands();
+
   const steerItems: CommandPaletteActionItem[] = fleet.steerable.flatMap((target) => {
     const name =
       target.botId === null ? null : botNameIn(target.environmentId, { botId: target.botId });
@@ -356,8 +376,75 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
       : []),
   ];
 
+  // The space's own team rows. A bot is listed only while it is running, because
+  // steering and interrupting are the only two things the rows do, and adding a
+  // bot is always offered: a space can always take another member.
+  const activeGroup =
+    activeGroupId === null
+      ? null
+      : (rosterGroups.find((group) => group.id === activeGroupId) ?? null);
+
+  const memberBotIds = new Set(
+    activeGroup === null
+      ? []
+      : activeGroup.members.filter(isGroupBotMember).map((member) => member.botId),
+  );
+
+  const teamBots: TeamCommandBot[] = fleet.running.flatMap((target) => {
+    if (target.botId === null || !memberBotIds.has(target.botId)) return [];
+
+    const name = botNameIn(target.environmentId, { botId: target.botId });
+
+    if (name === null) return [];
+
+    return [
+      {
+        id: target.botId,
+        name,
+        environmentId: target.environmentId,
+        threadId: target.threadId,
+        isRunning: true,
+      },
+    ];
+  });
+
+  const targetFor = (bot: TeamCommandBot) =>
+    fleet.running.find((target) => target.botId === bot.id && target.threadId === bot.threadId);
+
+  const teamGroup = buildTeamCommandPaletteGroup({
+    spaceName: activeGroup?.name ?? "",
+    bots: teamBots,
+    t,
+    icons: {
+      steer: <MessageSquareIcon className={ITEM_ICON_CLASS} />,
+      interrupt: <SquareIcon className={ITEM_ICON_CLASS} />,
+      addBot: <PlusIcon className={ITEM_ICON_CLASS} />,
+    },
+    onSteer: async (bot) => {
+      const target = targetFor(bot);
+
+      if (target !== undefined) await fleet.steer(target);
+    },
+    onInterrupt: async (bot) => {
+      const target = targetFor(bot);
+
+      if (target === undefined) return;
+
+      await interruptThread({
+        environmentId: target.environmentId,
+        threadId: target.threadId,
+        // The turn id pins the interrupt to the turn the row was built from.
+        ...(target.turnId === null ? {} : { turnId: target.turnId }),
+      });
+    },
+    onAddBot: () => {
+      setGroupDetailsOpen(true);
+    },
+  });
+
   const groups: CommandPaletteGroup[] = [
     ...(chatItems.length > 0 ? [{ value: "chat", label: t("This chat"), items: chatItems }] : []),
+    ...(teamGroup === null ? [] : [teamGroup]),
     ...(botItems.length > 0 ? [{ value: "bots", label: t("Bots"), items: botItems }] : []),
     { value: "actions", label: t("Actions"), items: actionItems },
   ];

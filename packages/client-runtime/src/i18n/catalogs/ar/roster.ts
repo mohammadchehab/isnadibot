@@ -503,4 +503,10 @@ export const rosterCatalog = {
   "{count} · {boss} is the boss": "{count} · {boss} هو الرئيس",
   "{bot} was idle, so the board gave it “{item}”.": "كان {bot} خاملًا، فأعطاه اللوح «{item}».",
   "Everyone is idle and the board is empty.": "الجميع خامل واللوح فارغ.",
+  "Team · {name}": "الفريق · {name}",
+  "Steer {name}…": "توجيه {name}…",
+  "Interrupt {name} now": "مقاطعة {name} الآن",
+  "Add a bot to {name}…": "إضافة بوت إلى {name}…",
+  "Ends the turn this bot is running": "ينهي الدور الذي يشغّله هذا البوت",
+  "Opens this space's members to add a bot": "يفتح أعضاء هذه المساحة لإضافة بوت",
 } as const;
