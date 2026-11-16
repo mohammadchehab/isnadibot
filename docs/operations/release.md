@@ -15,7 +15,9 @@ receive the same version. Packages without versions remain outside the release t
 
 After changes reach `main`, the Version packages workflow runs `pnpm release:version`, force-pushes
 the result to `changeset-release/main`, and creates or refreshes one Version Packages pull request
-with `gh`. Changesets combines the pending release levels, updates all four manifests and
+with `gh`. While a CI run for that branch is still queued or running, the workflow leaves the branch
+alone and refreshes it on the next push to `main`, so the revision under review is the revision whose
+checks are running. Changesets combines the pending release levels, updates all four manifests and
 changelogs, and consumes the changeset files. The pull request body lists the new changelog section
 of every package that changed. Merging this pull request is the deliberate stable release button. That merge
 starts the native builds, verifies every artifact, creates the `vX.Y.Z` tag, and creates the stable
