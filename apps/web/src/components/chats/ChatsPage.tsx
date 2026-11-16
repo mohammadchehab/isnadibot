@@ -52,7 +52,7 @@ export function ChatsPage() {
           <EmptyTitle variant="body" className="text-sm">
             {t("No conversations yet")}
           </EmptyTitle>
-          <EmptyDescription className="text-13px">
+          <EmptyDescription size="compact">
             {t("Start a chat with a bot and it will show up here.")}
           </EmptyDescription>
         </EmptyHeader>

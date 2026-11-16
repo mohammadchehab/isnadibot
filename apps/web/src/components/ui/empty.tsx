@@ -96,11 +96,19 @@ function EmptyTitle({
   );
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+/** `compact` sets the description at 13px, for the in-panel empty states the frames draw. */
+function EmptyDescription({
+  className,
+  size = "default",
+  ...props
+}: React.ComponentProps<"p"> & {
+  size?: "default" | "compact";
+}) {
   return (
     <div
       className={cn(
-        "text-muted-foreground text-sm [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4 [[data-slot=empty-title]+&]:mt-1",
+        "text-muted-foreground [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4 [[data-slot=empty-title]+&]:mt-1",
+        size === "compact" ? "text-13px" : "text-sm",
         className,
       )}
       data-slot="empty-description"
