@@ -42,6 +42,10 @@ through `EnvironmentAuth.authenticateWebSocketUpgrade`, then hands the socket to
 to a scope, and `authorizeEffect`/`authorizeStream` enforce it. Holding a valid socket is not
 authorization to call everything on it. See [environment-auth.md](./environment-auth.md).
 
+Failures cross on two channels that are not interchangeable: a declared `Fail` cause is a wire field
+and reaches the client, a `Defect` never does — the outgoing envelope is scrubbed. See
+[the RPC error channel](./rpc-errors.md).
+
 On the client, [`session.ts`][session] opens the socket and builds the typed client.
 `RpcSessionFactory` is the service; a session exposes `client`, `initialConfig`, `ready`, `probe`,
 and `closed`. It performs one attempt and does not retry. Retry, backoff, and offline policy belong
@@ -171,6 +175,7 @@ narrows that to a re-read and a link, and a crashed predecessor is required. CLI
 
 - [Workspace layout](./workspace-layout.md), [Glossary](./glossary.md)
 - [Remote environments](./remote.md), [Server updates](./server-updates.md)
+- [The RPC error channel](./rpc-errors.md), [Refusals](./refusals.md)
 - [Resource telemetry](./resource-telemetry.md)
 - [Scripts](./scripts.md), [CI gates](./ci.md)
 
