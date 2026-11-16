@@ -178,14 +178,19 @@ describe("web chat actions", () => {
     expect(toast().description).not.toContain("thread-7f3a");
   });
 
-  it("keeps the server sentence for a refusal code it does not know", async () => {
+  it("says its own sentence for a refusal code it does not know", async () => {
+    // A newer server's code: the refusal vocabulary is the server's, so a code
+    // this build cannot name is not news it can word. The surface says its own
+    // line rather than printing the server's sentence. TASK-384 AC4 supersedes
+    // TASK-287's unknown-code fallback here.
     mocks.settle.mockResolvedValue(
       failedCommand("thread-state-unheard-of", "Thread 'thread-7f3a' history already matches."),
     );
 
     await actions().settle(threadRef);
 
-    expect(toast().description).toBe("Thread 'thread-7f3a' history already matches.");
+    expect(toast().description).toBe("An unexpected error occurred.");
+    expect(toast().description).not.toContain("thread-7f3a");
   });
 
   it("stays quiet when the command lands", async () => {
