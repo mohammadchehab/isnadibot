@@ -10,6 +10,7 @@ export const rosterCatalog = {
   "{count} chats waiting on you#two": "محادثتان تنتظرانك ({count})",
   "{count} chats waiting on you#few": "{count} محادثات تنتظرك",
   "{count} chats waiting on you#many": "{count} محادثة تنتظرك",
+  "Waiting on you": "بانتظارك",
   "Show all ({count})": "عرض الكل ({count})",
   "Run bots in a persistent Linux VM. Public previews are enabled by default.":
     "شغّل البوتات في جهاز افتراضي Linux دائم. المعاينات العامة مفعلة افتراضيا.",

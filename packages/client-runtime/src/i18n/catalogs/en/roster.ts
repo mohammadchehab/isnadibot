@@ -6,6 +6,7 @@ export const rosterCatalog = {
   "Loading decisions": "Loading decisions",
   "{count} chats waiting on you": "{count} chats waiting on you",
   "{count} chats waiting on you#one": "{count} chat waiting on you",
+  "Waiting on you": "Waiting on you",
   "Show all ({count})": "Show all ({count})",
   "Run bots in a persistent Linux VM. Public previews are enabled by default.":
     "Run bots in a persistent Linux VM. Public previews are enabled by default.",
