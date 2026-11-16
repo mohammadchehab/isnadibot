@@ -95,7 +95,7 @@ describe("the team group in the command palette", () => {
     expect(build([tailor])?.items.map((item) => item.description)).toEqual([
       "Opens the chat and puts the caret in the composer",
       "Ends the turn this bot is running",
-      "Opens this space's members to add a bot",
+      "Opens the role library to add a bot",
     ]);
   });
 });

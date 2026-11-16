@@ -487,7 +487,7 @@ export const rosterCatalog = {
   "Interrupt {name} now": "Interrupt {name} now",
   "Add a bot to {name}…": "Add a bot to {name}…",
   "Ends the turn this bot is running": "Ends the turn this bot is running",
-  "Opens this space's members to add a bot": "Opens this space's members to add a bot",
+  "Opens the role library to add a bot": "Opens the role library to add a bot",
   Team: "Team",
   "Asking you": "Asking you",
   "Working on": "Working on",

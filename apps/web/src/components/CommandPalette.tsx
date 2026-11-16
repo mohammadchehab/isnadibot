@@ -61,7 +61,7 @@ import { findLatestGroupThreadIds, latestGroupThreadKey } from "./roster/botThre
 import { useOpenChat } from "./chat/useOpenChat";
 import { useRosterStore } from "./roster/rosterStore";
 import { useBotControlCommands, useBotFleetControls } from "./roster/useBotControls";
-import { useGroupDetailsOpen } from "./roster/detailsPanelOpen";
+import { RoleLibraryDialog } from "./fleet/RoleLibraryDialog";
 import { resolveShortcutCommand } from "../keybindings";
 import { CommandDialog, CommandDialogPopup } from "./ui/command";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -319,7 +319,8 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   });
 
   const rosterGroups = useRosterStore((state) => state.groups);
-  const [, setGroupDetailsOpen] = useGroupDetailsOpen();
+  const rosterBots = useRosterStore((state) => state.bots);
+  const [roleLibraryOpen, setRoleLibraryOpen] = useState(false);
   const { interruptThread } = useBotControlCommands();
 
   const steerItems: CommandPaletteActionItem[] = fleet.steerable.flatMap((target) => {
@@ -387,8 +388,12 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   const memberBotIds = new Set(
     activeGroup === null
       ? []
-      : activeGroup.members.filter(isGroupBotMember).map((member) => member.botId),
+      : activeGroup.members.filter(isGroupBotMember).map((member) => String(member.botId)),
   );
+
+  // The names the space already answers to, so the role dialog's suggested name
+  // steps around them instead of colliding.
+  const spaceBotNames = rosterBots.flatMap((bot) => (memberBotIds.has(bot.id) ? [bot.name] : []));
 
   const teamBots: TeamCommandBot[] = fleet.running.flatMap((target) => {
     if (target.botId === null || !memberBotIds.has(target.botId)) return [];
@@ -438,7 +443,7 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
       });
     },
     onAddBot: () => {
-      setGroupDetailsOpen(true);
+      setRoleLibraryOpen(true);
     },
   });
 
@@ -475,29 +480,39 @@ function OpenCommandPaletteDialog(props: { readonly setOpen: (open: boolean) => 
   }
 
   return (
-    <CommandPaletteContent
-      aria-label={t("Command palette")}
-      autoHighlight="always"
-      footerActionLabel={t("Select")}
-      inputProps={{ placeholder: t("Search commands and chats...") }}
-      mode="none"
-      onItemHighlighted={(value) => {
-        setHighlightedItemValue(Predicate.isString(value) ? value : null);
-      }}
-      onValueChange={(nextQuery: string) => {
-        setHighlightedItemValue(null);
-        setQuery(nextQuery);
-      }}
-      value={query}
-    >
-      <CommandPaletteResults
-        groups={filteredGroups}
-        highlightedItemValue={highlightedItemValue}
-        keybindings={keybindings}
-        onExecuteItem={executeItem}
-        {...(chatSearch.isPending ? { emptyStateMessage: t("Searching chats…") } : {})}
-      />
-    </CommandPaletteContent>
+    <>
+      <CommandPaletteContent
+        aria-label={t("Command palette")}
+        autoHighlight="always"
+        footerActionLabel={t("Select")}
+        inputProps={{ placeholder: t("Search commands and chats...") }}
+        mode="none"
+        onItemHighlighted={(value) => {
+          setHighlightedItemValue(Predicate.isString(value) ? value : null);
+        }}
+        onValueChange={(nextQuery: string) => {
+          setHighlightedItemValue(null);
+          setQuery(nextQuery);
+        }}
+        value={query}
+      >
+        <CommandPaletteResults
+          groups={filteredGroups}
+          highlightedItemValue={highlightedItemValue}
+          keybindings={keybindings}
+          onExecuteItem={executeItem}
+          {...(chatSearch.isPending ? { emptyStateMessage: t("Searching chats…") } : {})}
+        />
+      </CommandPaletteContent>
+      {activeGroup === null ? null : (
+        <RoleLibraryDialog
+          open={roleLibraryOpen}
+          onOpenChange={setRoleLibraryOpen}
+          space={activeGroup}
+          takenNames={spaceBotNames}
+        />
+      )}
+    </>
   );
 }
 

@@ -466,7 +466,7 @@ export const rosterCatalog = {
   "Interrupt {name} now": "立即中断 {name}",
   "Add a bot to {name}…": "向 {name} 添加机器人…",
   "Ends the turn this bot is running": "结束这个机器人正在进行的轮次",
-  "Opens this space's members to add a bot": "打开此空间的成员以添加机器人",
+  "Opens the role library to add a bot": "打开角色库以添加机器人",
   Team: "团队",
   "Asking you": "正在问你",
   "Working on": "正在处理",

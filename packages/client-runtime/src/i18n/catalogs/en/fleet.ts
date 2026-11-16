@@ -110,4 +110,13 @@ export const fleetCatalog = {
   "Runs purchase requests": "Runs purchase requests",
   Auditor: "Auditor",
   "Checks entries for mistakes": "Checks entries for mistakes",
+  // E13d role library
+  "Add a bot to {name}": "Add a bot to {name}",
+  "Pick a role. It comes with its instructions, skills and a default model you can change.":
+    "Pick a role. It comes with its instructions, skills and a default model you can change.",
+  Name: "Name",
+  Cancel: "Cancel",
+  Add: "Add",
+  "Add {role}": "Add {role}",
+  "Could not add the bot": "Could not add the bot",
 } as const;
