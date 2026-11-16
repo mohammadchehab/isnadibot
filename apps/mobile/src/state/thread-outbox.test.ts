@@ -402,12 +402,9 @@ describe("queued message failures", () => {
     });
 
     // The user reads the catalog sentence, not the server's prose and its ids.
-    expect(
-      commandRefusalDescription(
-        "group-has-no-responder",
-        "Group 'group-product' has no boss bot that can respond.",
-      ),
-    ).toBe("No bot in this space can answer right now. Set a boss, or add a bot.");
+    expect(commandRefusalDescription("group-has-no-responder")).toBe(
+      "No bot in this space can answer right now. Set a boss, or add a bot.",
+    );
   });
 
   it("blocks a refusal that needs a person, and one it cannot name", () => {

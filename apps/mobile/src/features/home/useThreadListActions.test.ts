@@ -168,9 +168,11 @@ describe("mobile thread actions", () => {
     expect(alertDescription()).not.toContain("thread-7f3a");
   });
 
-  it("keeps the surface's own sentence for a refusal code it does not know", async () => {
-    // A newer server's code, or a throw outside the coded family: the surface
-    // must not claim to know why, and must not lose the server's sentence.
+  it("says its own sentence for a refusal code it does not know", async () => {
+    // A newer server's code: the refusal vocabulary is the server's, so a code
+    // this build cannot name is not news it can word. The surface says its own
+    // line rather than printing the server's sentence. TASK-384 AC4 supersedes
+    // TASK-287's unknown-code fallback here.
     mocks.command.mockResolvedValue(
       failedCommand("thread-state-unheard-of", "Thread 'thread-7f3a' history already matches."),
     );
@@ -178,7 +180,8 @@ describe("mobile thread actions", () => {
     const { pinThread } = useThreadListActions();
     await pinThread(makeThreadShell());
 
-    expect(alertDescription()).toBe("Thread 'thread-7f3a' history already matches.");
+    expect(alertDescription()).toBe("The chat could not be pinned.");
+    expect(alertDescription()).not.toContain("thread-7f3a");
   });
 
   it("still reports the surface's own wording when the server sent no sentence", async () => {

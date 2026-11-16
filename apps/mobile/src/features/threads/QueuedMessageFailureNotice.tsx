@@ -30,7 +30,7 @@ export function QueuedMessageFailureNotice(props: {
 
   const canRetry = props.failure.action === "block";
 
-  const sentence = commandRefusalDescription(props.failure.refusal, "", {
+  const sentence = commandRefusalDescription(props.failure.refusal, {
     t,
     fallback: canRetry
       ? "This chat could not send your message. Try again, or discard it."

@@ -10,7 +10,6 @@ import {
   botImageProviderOptionLabel,
   globalDefaultOptionLabel,
 } from "@isnadi/client-runtime/image-generation";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { driverSupportsDelegation } from "@isnadi/shared/delegationProviders";
 import { Brain02Icon, Link02Icon } from "@hugeicons/core-free-icons";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
@@ -163,14 +162,11 @@ export function BotSettingsForm({
       setDeleting(false);
 
       if (Predicate.isTagged(result, "Failure")) {
-        const error = squashAtomCommandFailure(result);
-
         const space = bossGroupOf(groups, bot.id);
 
         const copy = botDeleteFailureToast(
           {
             refusal: classifyBotDeleteFailure(result),
-            message: error instanceof Error ? error.message : "",
             botName: bot.name,
             bossSpaceName: space?.name ?? null,
           },

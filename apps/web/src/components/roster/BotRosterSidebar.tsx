@@ -2,7 +2,6 @@ import { Match, Predicate } from "effect";
 import { DndContext } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
 import { useAtomValue } from "@effect/atom-react";
-import { squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
 import { ARCHIVED_BOT_RETENTION_DAYS, BotId } from "@isnadi/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
@@ -333,14 +332,12 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
       archivedFocusTarget.current = undefined;
       focusRosterRow(botKey);
       // Archiving is refused with a reason (a group boss, a group left too small), so say it.
-      // The copy comes from the refusal code, so a space left too small says its
-      // floor in words instead of the invariant sentence and its group id.
-      const error = squashAtomCommandFailure(result);
+      // The copy comes from the refusal code alone, so a space left too small says
+      // its floor in words instead of the invariant sentence and its group id.
 
       const copy = botArchiveFailureToast(
         {
           refusal: classifyBotArchiveFailure(result),
-          message: error instanceof Error ? error.message : "",
           botName: bot.name,
           // The space this bot leads, named the same way the delete toast names it.
           bossSpaceName: bossGroupOf(groups, bot.id)?.name ?? null,

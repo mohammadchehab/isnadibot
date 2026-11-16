@@ -102,7 +102,8 @@ export interface BotThreadFailure {
  * A refusal code this client knows is shown in the user's own language, because
  * the server's own sentence carries internal ids and invariant prose — the reason
  * every coded refusal used to leak on this surface. A code this client does not
- * know keeps the server's sentence, so a newer server still says something true.
+ * know takes this surface's own fallback: the refusal vocabulary is the server's,
+ * so a code this build cannot name is not news it can word.
  * `t` comes from the caller: this module has no translator of its own, and every
  * send path that reaches it already holds one.
  */

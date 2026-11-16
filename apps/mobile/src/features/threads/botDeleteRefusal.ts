@@ -8,8 +8,6 @@ type Translate = (message: string, params?: Readonly<Record<string, string | num
 /** Why a delete failed, in the shape the settings sheet renders. */
 export interface DeleteBotFailure {
   readonly refusal: CommandRefusalCode;
-  /** The server's own sentence, used only when the code is one this client cannot name. */
-  readonly message: string;
 }
 
 /** What a failed delete shows: a title naming the bot, and a body the app has copy for. */
@@ -25,7 +23,12 @@ export interface BotDeleteRefusalCopy {
  * explains in plain words, so the two clients say the same thing. Every other
  * code the client knows takes the shared sentence, so the authorization
  * refusals that name a person id and a group id no longer print them here. A
- * code a newer server added keeps the server's sentence.
+ * code a newer server added takes the shared fallback: the refusal vocabulary is
+ * the server's, so a code this build cannot name is not news it can word.
+ *
+ * The failure carries no `message` on purpose. Once a refusal carries a code the
+ * wire `message` is a fixed placeholder, so accepting it would let a caller pass
+ * server text that is then ignored.
  */
 export function botDeleteRefusalCopy(
   input: { readonly failure: DeleteBotFailure; readonly botName: string },
@@ -48,6 +51,6 @@ export function botDeleteRefusalCopy(
 
   return {
     title,
-    description: commandRefusalDescription(input.failure.refusal, input.failure.message, { t }),
+    description: commandRefusalDescription(input.failure.refusal, { t }),
   };
 }

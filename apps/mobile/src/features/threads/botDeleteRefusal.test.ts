@@ -12,12 +12,11 @@ const englishTranslate = createTranslator("en").translate;
 /** A translator that marks every key it sees, so a caller that skips it fails here. */
 const markingTranslate = (message: string) => `xx:${message}`;
 
-/** The shape the composer hands the sheet: the code the server sent, plus its own sentence. */
+/** The shape the composer hands the sheet: the code the server sent, and nothing else. */
 const botDeleteFailure = (refusal: string): DeleteBotFailure => ({
   refusal: commandRefusalOf({
     cause: Cause.fail({ refusal, message: "Bot 'bot-7' is the boss of group 'group-3'." }),
   }),
-  message: "Bot 'bot-7' is the boss of group 'group-3'.",
 });
 
 describe("commandRefusalOf", () => {
@@ -62,25 +61,13 @@ describe("botDeleteRefusalCopy", () => {
     expect(`${copy.title} ${copy.description}`).not.toMatch(/bot-\d|group-\d/);
   });
 
-  it("keeps the server's sentence for a refusal the client cannot name", () => {
-    const failure: DeleteBotFailure = {
-      refusal: "unknown",
-      message: "The space was archived while you were deleting it.",
-    };
+  it("gives a refusal the client cannot name the app's own sentence, not the server's", () => {
+    const failure: DeleteBotFailure = { refusal: "unknown" };
 
     expect(botDeleteRefusalCopy({ failure, botName }, englishTranslate)).toEqual({
       title: "Could not delete Ada",
-      description: "The space was archived while you were deleting it.",
+      description: "The command failed.",
     });
-  });
-
-  it("says something true when even the server's sentence is empty", () => {
-    const copy = botDeleteRefusalCopy(
-      { failure: { refusal: "unknown", message: "   " }, botName },
-      englishTranslate,
-    );
-
-    expect(copy.description).toBe("The command failed.");
   });
 
   it("renders through the translator the sheet passes, not English", () => {
@@ -104,14 +91,8 @@ describe("botDeleteRefusalCopy", () => {
     // TASK-302: the two authorization refusals carried a person id and a group
     // id because this copy had no branch for them. The shared table fixes every
     // code at once, so the guarantee is per code, not per branch.
-    const serverSentence = (code: string) =>
-      `Orchestration command invariant failed (bot.delete): Person 'person-9f2a' is not a member of group 'group-7c1d'. [${code}]`;
-
     for (const code of CommandRefusalCodes) {
-      const copy = botDeleteRefusalCopy(
-        { failure: { refusal: code, message: serverSentence(code) }, botName },
-        englishTranslate,
-      );
+      const copy = botDeleteRefusalCopy({ failure: { refusal: code }, botName }, englishTranslate);
 
       expect(`${copy.title} ${copy.description}`).not.toMatch(/person-9f2a|group-7c1d|invariant/i);
     }
@@ -123,16 +104,7 @@ describe("botDeleteRefusalCopy", () => {
 
       expect(shared).not.toBeNull();
       expect(
-        botDeleteRefusalCopy(
-          {
-            failure: {
-              refusal: code,
-              message: `Person 'person-9f2a' is not a member of group 'group-7c1d'.`,
-            },
-            botName,
-          },
-          englishTranslate,
-        ).description,
+        botDeleteRefusalCopy({ failure: { refusal: code }, botName }, englishTranslate).description,
       ).toBe(shared);
     }
   });
