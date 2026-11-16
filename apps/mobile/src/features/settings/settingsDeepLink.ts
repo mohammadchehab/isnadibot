@@ -41,6 +41,7 @@ const destinations: Readonly<Record<SettingsDeepLinkId, MobileSettingsDestinatio
   connections: { kind: "screen", screen: "SettingsEnvironments" },
   "bot-inbox": { kind: "health", target: "bot-inbox" },
   diagnostics: HOME,
+  skills: HOME,
 };
 
 export function resolveMobileSettingsDestination(href: string): MobileSettingsDestination | null {
