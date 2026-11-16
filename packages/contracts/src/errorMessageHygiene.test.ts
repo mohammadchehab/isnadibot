@@ -35,7 +35,6 @@ describe("A settings failure describes the work, not the file", () => {
       operation: "write-file",
       providerInstanceId: INSTANCE_ID,
       environmentVariable: ENVIRONMENT_VARIABLE,
-      cause: new Error("EACCES: permission denied"),
     });
 
     expect(error.message).toBe("The server settings could not be saved.");
@@ -55,7 +54,6 @@ describe("A settings failure describes the work, not the file", () => {
         operation,
         providerInstanceId: INSTANCE_ID,
         environmentVariable: ENVIRONMENT_VARIABLE,
-        cause: new Error("EACCES: permission denied"),
       });
 
       expect(error.message.length).toBeGreaterThan(0);
@@ -73,7 +71,6 @@ describe("A settings failure describes the work, not the file", () => {
         new ServerSettingsError({
           settingsPath: SETTINGS_PATH,
           operation,
-          cause: new Error("EACCES: permission denied"),
         }).message,
     );
 
@@ -86,7 +83,6 @@ describe("A settings failure describes the work, not the file", () => {
         new ServerSettingsError({
           settingsPath: SETTINGS_PATH,
           operation,
-          cause: new Error("EACCES: permission denied"),
         }).message,
     );
 
@@ -116,7 +112,6 @@ describe("An editor launch failure names neither the file nor the command", () =
       target: KEYBINDINGS_PATH,
       command: "/Applications/Cursor.app/Contents/MacOS/Cursor",
       args: ["-n", KEYBINDINGS_PATH],
-      cause: new Error("spawn ENOENT"),
     });
 
     expect(error.message).toBe("Failed to launch cursor.");
@@ -131,7 +126,6 @@ describe("An editor launch failure names neither the file nor the command", () =
       target: "https://isnadi.local:7443/threads/thread-1",
       command: "/usr/bin/open",
       args: ["-a", "Google Chrome"],
-      cause: new Error("spawn ENOENT"),
     });
 
     expect(error.message).toBe("Failed to launch the browser.");

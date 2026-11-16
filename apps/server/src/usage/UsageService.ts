@@ -20,6 +20,7 @@ import {
   type UsageSummaryInput,
   type UsageTokenTotals,
   UsageReadError,
+  withCause,
 } from "@isnadi/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -407,13 +408,14 @@ export const make = Effect.gen(function* () {
         untilAt: DateTime.formatIso(queryUntil),
       })
       .pipe(
-        Effect.mapError(
-          (cause) =>
+        Effect.mapError((cause) =>
+          withCause(
             new UsageReadError({
               reason: "scanFailed",
               detail: "IsnadiBot provider usage could not be read.",
-              cause,
             }),
+            cause,
+          ),
         ),
       );
 

@@ -12,6 +12,7 @@ import {
   AttachmentNotFoundError,
   WS_METHODS,
   WsRpcGroup,
+  withCause,
 } from "@isnadi/contracts";
 import { issueAssetUrl } from "./assets/AssetAccess.ts";
 import { deletePendingAttachment, issueAttachmentUploadUrl } from "./assets/AttachmentUpload.ts";
@@ -47,7 +48,6 @@ export const createWsWorkspaceHandlers = ({
               queryLength: input.query.length,
               limit: input.limit,
               ...projectEntriesFailureContext(cause),
-              cause,
             }),
           ),
         ),
@@ -62,7 +62,6 @@ export const createWsWorkspaceHandlers = ({
             ProjectListEntriesError.fromContext({
               ...input,
               ...projectEntriesFailureContext(cause),
-              cause,
             }),
           ),
         ),
@@ -148,12 +147,13 @@ export const createWsWorkspaceHandlers = ({
           const thread = yield* projectionSnapshotQuery
             .getThreadShellById(input.resource.threadId)
             .pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new AssetWorkspaceContextResolutionError({
                     resource: input.resource,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 
@@ -166,12 +166,13 @@ export const createWsWorkspaceHandlers = ({
           const project = yield* projectionSnapshotQuery
             .getProjectShellById(thread.value.projectId)
             .pipe(
-              Effect.mapError(
-                (cause) =>
+              Effect.mapError((cause) =>
+                withCause(
                   new AssetWorkspaceContextResolutionError({
                     resource: input.resource,
-                    cause,
                   }),
+                  cause,
+                ),
               ),
             );
 

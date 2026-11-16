@@ -4,6 +4,7 @@ import {
   ATTACHMENT_UPLOAD_URL_TTL_MS,
   type AttachmentCreateUploadUrlInput,
   AttachmentUploadSigningKeyError,
+  withCause,
 } from "@isnadi/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -75,7 +76,9 @@ export const issueAttachmentUploadUrl = Effect.fn("AttachmentUpload.issueUrl")(f
   input: AttachmentCreateUploadUrlInput,
 ) {
   const secret = yield* loadSigningSecret.pipe(
-    Effect.mapError((cause) => new AttachmentUploadSigningKeyError({ cause })),
+    // The key-load failure is the only diagnostic this error has, so it rides along as a native
+    // Error cause: a log reads it, the wire never does.
+    Effect.mapError((cause) => withCause(new AttachmentUploadSigningKeyError(), cause)),
   );
 
   const config = yield* ServerConfig.ServerConfig;

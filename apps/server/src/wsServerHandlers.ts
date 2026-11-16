@@ -15,6 +15,7 @@ import {
   RpcClientId,
   WS_METHODS,
   WsRpcGroup,
+  withCause,
 } from "@isnadi/contracts";
 import * as ServerSettings from "./serverSettings.ts";
 
@@ -82,12 +83,13 @@ export const createWsServerHandlers = ({
       observeRpcEffect(
         WS_METHODS.providerUploadFeedback,
         agentController.uploadFeedback(input).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new ProviderUploadFeedbackError({
                 threadId: input.threadId,
-                cause,
               }),
+              cause,
+            ),
           ),
         ),
         { "rpc.aggregate": "provider" },

@@ -1,4 +1,9 @@
-import { CLOUD_SANDBOX_PROVIDERS, ServerSettings, ServerSettingsError } from "@isnadi/contracts";
+import {
+  CLOUD_SANDBOX_PROVIDERS,
+  ServerSettings,
+  ServerSettingsError,
+  withCause,
+} from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
@@ -56,14 +61,15 @@ export const createSettingsSecretRollback = (
 
       for (const [name, reference] of references) {
         const previous = yield* secretStore.get(name).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new ServerSettingsError({
                 settingsPath,
                 operation: "read-secret",
                 ...reference,
-                cause,
               }),
+              cause,
+            ),
           ),
         );
 
@@ -82,15 +88,16 @@ export const createSettingsSecretRollback = (
           onNone: () => secretStore.remove(snapshot.name),
           onSome: (value) => secretStore.set(snapshot.name, value),
         }).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new ServerSettingsError({
                 settingsPath,
                 operation: "rollback-secret",
                 providerInstanceId: snapshot.providerInstanceId,
                 environmentVariable: snapshot.environmentVariable,
-                cause,
               }),
+              cause,
+            ),
           ),
         );
 

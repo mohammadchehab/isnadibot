@@ -16,7 +16,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as Path from "effect/Path";
 
-import { OrchestrationGetWorkflowScriptError } from "@isnadi/contracts";
+import { OrchestrationGetWorkflowScriptError, withCause } from "@isnadi/contracts";
 import * as Effect from "effect/Effect";
 
 const SCRIPT_BYTE_CAP = 256 * 1024;
@@ -37,11 +37,13 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
   const root = yield* Effect.tryPromise({
     try: () => NodeFSP.realpath(path.join(NodeOS.homedir(), ".claude", "projects")),
     catch: (cause) =>
-      new OrchestrationGetWorkflowScriptError({
-        reason: "root-unavailable",
-        scriptPath: requested,
+      withCause(
+        new OrchestrationGetWorkflowScriptError({
+          reason: "root-unavailable",
+          scriptPath: requested,
+        }),
         cause,
-      }),
+      ),
   });
 
   // Realpath the FILE itself (not just its directory): a symlink named
@@ -49,11 +51,13 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
   const resolved = yield* Effect.tryPromise({
     try: () => NodeFSP.realpath(requested),
     catch: (cause) =>
-      new OrchestrationGetWorkflowScriptError({
-        reason: "not-found",
-        scriptPath: requested,
+      withCause(
+        new OrchestrationGetWorkflowScriptError({
+          reason: "not-found",
+          scriptPath: requested,
+        }),
         cause,
-      }),
+      ),
   });
 
   if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
@@ -109,11 +113,13 @@ export const readWorkflowScript = Effect.fn("orchestration.readWorkflowScript")(
       }
     },
     catch: (cause) =>
-      new OrchestrationGetWorkflowScriptError({
-        reason: "read-failed",
-        scriptPath: resolved,
+      withCause(
+        new OrchestrationGetWorkflowScriptError({
+          reason: "read-failed",
+          scriptPath: resolved,
+        }),
         cause,
-      }),
+      ),
   });
 
   if ("failure" in read) {

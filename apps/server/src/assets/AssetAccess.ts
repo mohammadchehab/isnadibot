@@ -10,6 +10,7 @@ import {
   AssetWorkspacePathValidationError,
   AssetWorkspaceResolutionError,
   AssetWorkspaceRootNormalizationError,
+  withCause,
 } from "@isnadi/contracts";
 import {
   isWorkspaceImagePreviewPath,
@@ -214,12 +215,13 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
     }
 
     const workspaceRoot = yield* workspacePaths.normalizeWorkspaceRoot(input.workspaceRoot).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new AssetWorkspaceRootNormalizationError({
             resource: input.resource,
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -230,12 +232,13 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
     const resolved = yield* workspacePaths
       .resolveRelativePathWithinRoot({ workspaceRoot, relativePath })
       .pipe(
-        Effect.mapError(
-          (cause) =>
+        Effect.mapError((cause) =>
+          withCause(
             new AssetWorkspacePathValidationError({
               resource: input.resource,
-              cause,
             }),
+            cause,
+          ),
         ),
       );
 
@@ -249,12 +252,13 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
       workspaceRoot,
       relativePath: resolved.relativePath,
     }).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new AssetWorkspaceAssetInspectionError({
             resource: input.resource,
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -267,12 +271,13 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
     imageDimensions = yield* readImageDimensionsFromHeader(canonicalFile);
 
     const canonicalWorkspaceRoot = yield* fileSystem.realPath(workspaceRoot).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new AssetWorkspaceResolutionError({
             resource: input.resource,
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -319,12 +324,13 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
 
   const signingSecret = yield* secretStore.getOrCreateRandom(SIGNING_SECRET_NAME, 32).pipe(
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new AssetSigningKeyLoadError({
           resource: input.resource,
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 

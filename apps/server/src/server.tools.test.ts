@@ -138,7 +138,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       if (Predicate.isTagged(error, "ProviderUploadFeedbackError")) {
         assert.strictEqual(error.threadId, threadId);
         assert.strictEqual(error.message, `Failed to upload feedback for thread ${threadId}.`);
-        assert.isDefined(error.cause);
+        // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+        assert.notProperty(error, "cause");
       }
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );

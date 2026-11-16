@@ -214,7 +214,6 @@ export class OrchestrationGetWorkflowScriptError extends Schema.TaggedErrorClass
       "read-failed",
     ]),
     scriptPath: Schema.String,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {
@@ -265,7 +264,6 @@ export class OrchestrationGetSnapshotError extends Schema.TaggedErrorClass<Orche
   "OrchestrationGetSnapshotError",
   {
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {}
 
@@ -312,7 +310,6 @@ export class OrchestrationGetTurnDiffError extends Schema.TaggedErrorClass<Orche
   "OrchestrationGetTurnDiffError",
   {
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {}
 
@@ -320,7 +317,6 @@ export class OrchestrationGetFullThreadDiffError extends Schema.TaggedErrorClass
   "OrchestrationGetFullThreadDiffError",
   {
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {}
 
@@ -328,7 +324,6 @@ export class OrchestrationFleetPlanError extends Schema.TaggedErrorClass<Orchest
   "OrchestrationFleetPlanError",
   {
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {}
 
@@ -336,6 +331,5 @@ export class OrchestrationSearchThreadsError extends Schema.TaggedErrorClass<Orc
   "OrchestrationSearchThreadsError",
   {
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {}

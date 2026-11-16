@@ -163,7 +163,6 @@ export class ProviderUploadFeedbackError extends Schema.TaggedErrorClass<Provide
   "ProviderUploadFeedbackError",
   {
     threadId: ThreadId,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {

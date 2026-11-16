@@ -15,6 +15,7 @@ import {
   ORCHESTRATION_WS_METHODS,
   ProviderInstanceId,
   WsRpcGroup,
+  withCause,
 } from "@isnadi/contracts";
 import { deriveProviderInstanceConfigMap } from "./provider/Layers/ProviderInstanceRegistryHydration.ts";
 import * as ChannelCommand from "./channels/ChannelCommand.ts";
@@ -400,12 +401,13 @@ export const createWsOrchestrationHandlers = ({
       observeRpcEffect(
         ORCHESTRATION_WS_METHODS.getTurnDiff,
         checkpointDiffQuery.getTurnDiff(input).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new OrchestrationGetTurnDiffError({
                 message: "Failed to load turn diff",
-                cause,
               }),
+              cause,
+            ),
           ),
         ),
         { "rpc.aggregate": "orchestration" },
@@ -415,12 +417,13 @@ export const createWsOrchestrationHandlers = ({
       observeRpcEffect(
         ORCHESTRATION_WS_METHODS.getFullThreadDiff,
         checkpointDiffQuery.getFullThreadDiff(input).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new OrchestrationGetFullThreadDiffError({
                 message: "Failed to load the full chat diff",
-                cause,
               }),
+              cause,
+            ),
           ),
         ),
         { "rpc.aggregate": "orchestration" },
@@ -430,12 +433,13 @@ export const createWsOrchestrationHandlers = ({
       observeRpcEffect(
         ORCHESTRATION_WS_METHODS.searchThreads,
         projectionSnapshotQuery.searchThreads(input).pipe(
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new OrchestrationSearchThreadsError({
                 message: "Failed to search conversations",
-                cause,
               }),
+              cause,
+            ),
           ),
         ),
         { "rpc.aggregate": "orchestration" },
@@ -455,12 +459,13 @@ export const createWsOrchestrationHandlers = ({
           Effect.tapError((cause) =>
             Effect.logError("orchestration archived shell snapshot load failed", { cause }),
           ),
-          Effect.mapError(
-            (cause) =>
+          Effect.mapError((cause) =>
+            withCause(
               new OrchestrationGetSnapshotError({
                 message: "Failed to load archived orchestration shell snapshot",
-                cause,
               }),
+              cause,
+            ),
           ),
         ),
         { "rpc.aggregate": "orchestration" },

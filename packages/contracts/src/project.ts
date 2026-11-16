@@ -6,6 +6,7 @@ import {
   TrimmedNonEmptyString,
   TrimmedString,
 } from "./baseSchemas.ts";
+import { withCause } from "./errorCause.ts";
 
 const PROJECT_SEARCH_ENTRIES_MAX_LIMIT = 200;
 
@@ -112,6 +113,7 @@ type ProjectEntriesFailureContext = {
   readonly normalizedCwd?: string;
   readonly timeout?: string;
   readonly detail?: string;
+  /** The underlying failure, kept on the error for a log and never encoded onto the wire. */
   readonly cause?: unknown;
 };
 
@@ -132,7 +134,6 @@ export class ProjectSearchEntriesError extends Schema.TaggedErrorClass<ProjectSe
     timeout: Schema.optional(TrimmedNonEmptyString),
     detail: Schema.optional(TrimmedNonEmptyString),
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   // The structured fields are optional on the wire so newer peers can decode legacy message-only
@@ -144,12 +145,17 @@ export class ProjectSearchEntriesError extends Schema.TaggedErrorClass<ProjectSe
       readonly limit: number;
     },
   ) {
-    return new ProjectSearchEntriesError({
-      ...props,
-      message:
-        decodedProjectErrorMessage(props) ??
-        `Failed to search workspace entries in '${props.cwd}'.`,
-    });
+    const { cause, ...fields } = props;
+
+    return withCause(
+      new ProjectSearchEntriesError({
+        ...fields,
+        message:
+          decodedProjectErrorMessage(props) ??
+          `Failed to search workspace entries in '${props.cwd}'.`,
+      }),
+      cause,
+    );
   }
 }
 
@@ -192,15 +198,20 @@ export class ProjectListEntriesError extends Schema.TaggedErrorClass<ProjectList
     timeout: Schema.optional(TrimmedNonEmptyString),
     detail: Schema.optional(TrimmedNonEmptyString),
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   static fromContext(props: ProjectEntriesFailureContext & { readonly cwd: string }) {
-    return new ProjectListEntriesError({
-      ...props,
-      message:
-        decodedProjectErrorMessage(props) ?? `Failed to list workspace entries in '${props.cwd}'.`,
-    });
+    const { cause, ...fields } = props;
+
+    return withCause(
+      new ProjectListEntriesError({
+        ...fields,
+        message:
+          decodedProjectErrorMessage(props) ??
+          `Failed to list workspace entries in '${props.cwd}'.`,
+      }),
+      cause,
+    );
   }
 }
 
@@ -265,16 +276,20 @@ export class ProjectReadFileError extends Schema.TaggedErrorClass<ProjectReadFil
     operation: Schema.optional(ProjectFileOperation),
     operationPath: Schema.optional(TrimmedNonEmptyString),
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   static fromContext(props: ProjectFileFailureContext) {
-    return new ProjectReadFileError({
-      ...props,
-      message:
-        decodedProjectErrorMessage(props) ??
-        `Failed to read workspace file '${props.relativePath}' in '${props.cwd}'.`,
-    });
+    const { cause, ...fields } = props;
+
+    return withCause(
+      new ProjectReadFileError({
+        ...fields,
+        message:
+          decodedProjectErrorMessage(props) ??
+          `Failed to read workspace file '${props.relativePath}' in '${props.cwd}'.`,
+      }),
+      cause,
+    );
   }
 }
 
@@ -303,15 +318,19 @@ export class ProjectWriteFileError extends Schema.TaggedErrorClass<ProjectWriteF
     operation: Schema.optional(ProjectFileOperation),
     operationPath: Schema.optional(TrimmedNonEmptyString),
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   static fromContext(props: ProjectFileFailureContext) {
-    return new ProjectWriteFileError({
-      ...props,
-      message:
-        decodedProjectErrorMessage(props) ??
-        `Failed to write workspace file '${props.relativePath}' in '${props.cwd}'.`,
-    });
+    const { cause, ...fields } = props;
+
+    return withCause(
+      new ProjectWriteFileError({
+        ...fields,
+        message:
+          decodedProjectErrorMessage(props) ??
+          `Failed to write workspace file '${props.relativePath}' in '${props.cwd}'.`,
+      }),
+      cause,
+    );
   }
 }

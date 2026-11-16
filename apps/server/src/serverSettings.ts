@@ -19,6 +19,7 @@ import {
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
+  withCause,
 } from "@isnadi/contracts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
@@ -155,24 +156,26 @@ const make = Effect.gen(function* () {
     PubSub.publish(changesPubSub, settings).pipe(Effect.asVoid);
 
   const readConfigExists = fs.exists(settingsPath).pipe(
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new ServerSettingsError({
           settingsPath,
           operation: "check-exists",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 
   const readRawConfig = fs.readFileString(settingsPath).pipe(
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new ServerSettingsError({
           settingsPath,
           operation: "read-file",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 
@@ -223,13 +226,14 @@ const make = Effect.gen(function* () {
       FROM provider_session_runtime
       WHERE provider_name IN ('cursor', 'grok', 'opencode')
     `.pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new ServerSettingsError({
             settingsPath,
             operation: "read-provider-history",
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -356,13 +360,14 @@ const make = Effect.gen(function* () {
         Effect.provideService(Path.Path, pathService),
       );
     },
-    Effect.mapError(
-      (cause) =>
+    Effect.mapError((cause) =>
+      withCause(
         new ServerSettingsError({
           settingsPath,
           operation: "write-file",
-          cause,
         }),
+        cause,
+      ),
     ),
   );
 
@@ -380,13 +385,14 @@ const make = Effect.gen(function* () {
     const settingsPathResolved = pathService.resolve(settingsPath);
 
     yield* fs.makeDirectory(settingsDir, { recursive: true }).pipe(
-      Effect.mapError(
-        (cause) =>
+      Effect.mapError((cause) =>
+        withCause(
           new ServerSettingsError({
             settingsPath,
             operation: "prepare-directory",
-            cause,
           }),
+          cause,
+        ),
       ),
     );
 
@@ -483,16 +489,16 @@ const make = Effect.gen(function* () {
               if (Exit.isSuccess(exit)) return Effect.void;
 
               return rollbackSettingsSecrets(secretSnapshots).pipe(
-                Effect.mapError(
-                  (rollbackError) =>
-                    new ServerSettingsError({
-                      settingsPath,
-                      operation: "rollback-secret",
-                      cause: new AggregateError(
-                        [Cause.squash(exit.cause), rollbackError],
-                        "Failed to restore server settings secrets after an update failure.",
-                      ),
-                    }),
+                // The original failure and the rollback failure ride along as a native Error
+                // cause, so a log reads them and the wire never does.
+                Effect.mapError((rollbackError) =>
+                  withCause(
+                    new ServerSettingsError({ settingsPath, operation: "rollback-secret" }),
+                    new AggregateError(
+                      [Cause.squash(exit.cause), rollbackError],
+                      "Failed to restore server settings secrets after an update failure.",
+                    ),
+                  ),
                 ),
               );
             }),
@@ -505,13 +511,14 @@ const make = Effect.gen(function* () {
             yield* Effect.all(
               [analyticsStatePath, anonymousIdPath].map((filePath) =>
                 fs.remove(filePath, { force: true }).pipe(
-                  Effect.mapError(
-                    (cause) =>
+                  Effect.mapError((cause) =>
+                    withCause(
                       new ServerSettingsError({
                         settingsPath: filePath,
                         operation: "remove-analytics-state",
-                        cause,
                       }),
+                      cause,
+                    ),
                   ),
                 ),
               ),

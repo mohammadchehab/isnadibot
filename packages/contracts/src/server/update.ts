@@ -22,7 +22,6 @@ export class ServerProviderUpdateError extends Schema.TaggedErrorClass<ServerPro
   {
     provider: ProviderDriverKind,
     reason: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {
@@ -70,7 +69,6 @@ export class ServerSelfUpdateError extends Schema.TaggedErrorClass<ServerSelfUpd
   "ServerSelfUpdateError",
   {
     reason: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {

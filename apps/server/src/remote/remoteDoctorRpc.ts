@@ -2,6 +2,7 @@ import {
   RemoteDoctorError,
   type RemoteDoctorRepairInput,
   type RemoteDoctorStatus,
+  withCause,
 } from "@isnadi/contracts";
 import { HostProcessPlatform } from "@isnadi/shared/hostProcess";
 import * as Effect from "effect/Effect";
@@ -15,11 +16,13 @@ const runDoctor = (baseDir: string, repair: false | ReadonlySet<string>) =>
     return yield* Effect.tryPromise({
       try: () => runRemoteDoctor({ baseDir, repair, platform }),
       catch: (cause) =>
-        new RemoteDoctorError({
-          reason: "doctor-failed",
-          detail: "The remote doctor could not finish.",
+        withCause(
+          new RemoteDoctorError({
+            reason: "doctor-failed",
+            detail: "The remote doctor could not finish.",
+          }),
           cause,
-        }),
+        ),
     });
   });
 

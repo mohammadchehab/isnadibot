@@ -46,7 +46,6 @@ export class RemoteDoctorError extends Schema.TaggedErrorClass<RemoteDoctorError
   {
     reason: Schema.Literals(["not-remote", "not-repairable", "doctor-failed"]),
     detail: Schema.String,
-    cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {

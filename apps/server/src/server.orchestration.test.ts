@@ -184,8 +184,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
       assertTrue(Predicate.isTagged(result, "Failure"));
       assertTrue(Predicate.isTagged(result.failure, "OrchestrationGetSnapshotError"));
-      assertTrue(result.failure.cause instanceof Error);
-      assert.include(result.failure.cause.message, projectionError.message);
+      // The cause is a server-side diagnostic now (the underlying failure stays on the server (TASK-394): it must not cross the wire).
+      assert.notProperty(result.failure, "cause");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 });

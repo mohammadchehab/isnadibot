@@ -383,7 +383,6 @@ export class PreviewInvalidUrlError extends Schema.TaggedErrorClass<PreviewInval
     inputLength: Schema.Number,
     reason: Schema.Literals(["empty", "parse", "unsupported-protocol", "unexpected"]),
     protocol: Schema.optional(Schema.String),
-    cause: Schema.Defect(),
   },
 ) {
   override get message() {
