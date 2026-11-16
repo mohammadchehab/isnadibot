@@ -488,4 +488,18 @@ export const rosterCatalog = {
   "Add a bot to {name}…": "Add a bot to {name}…",
   "Ends the turn this bot is running": "Ends the turn this bot is running",
   "Opens this space's members to add a bot": "Opens this space's members to add a bot",
+  Team: "Team",
+  "Asking you": "Asking you",
+  "Working on": "Working on",
+  Context: "Context",
+  "Bot actions": "Bot actions",
+  "Kanban board": "Kanban board",
+  "No bots in this space yet": "No bots in this space yet",
+  "Cards go to a bot when it goes idle.": "Cards go to a bot when it goes idle.",
+  "{inProgress} in progress · {done} done this week":
+    "{inProgress} in progress · {done} done this week",
+  "{name}, the boss, assigns from the board. When a bot goes idle, the next card goes to it.":
+    "{name}, the boss, assigns from the board. When a bot goes idle, the next card goes to it.",
+  "{name}, the boss, assigns cards. They move when a bot finishes a step.":
+    "{name}, the boss, assigns cards. They move when a bot finishes a step.",
 } as const;

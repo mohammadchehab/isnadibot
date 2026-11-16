@@ -150,6 +150,9 @@ export function SpaceOverview({ group }: { group: Group }) {
   const updated = relativeRunTime(spaceUpdatedAt(group, decisions, activity), Date.now(), i18n);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.id, bot])), [bots]);
 
+  // The board's line names the boss the way the Team table's does, so it reads the roster.
+  const bossName = group.bossBotId === null ? null : (botsById.get(group.bossBotId)?.name ?? null);
+
   const open = (chat: { environmentId: string; threadId: string }) => void openChat(chat);
 
   const openDecision = (decision: Decision) =>
@@ -215,95 +218,109 @@ export function SpaceOverview({ group }: { group: Group }) {
         </SpaceTile>
       </div>
       <SpaceTeamTable group={group} />
-      {/* SpaceTasks owns its own scroll and grows; the frame bounds the board so
-          the Activity list below it keeps its place on the page. */}
-      <section className="flex min-w-0 flex-col gap-3">
-        <h3 className="text-sm font-medium">{t("Kanban board")}</h3>
-        <div className="h-80 min-h-0">
-          <SpaceTasks group={group} />
-        </div>
-      </section>
-      <SpaceTile title={t("Activity")}>
-        {rows.length === 0 ? (
-          <p className="text-sm">{t("Nothing here yet")}</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border/60">
-            {rows.map((row) => {
-              if (row.kind === "delegation") {
-                const presentation = presentDelegation(row.delegation);
-                const bot = botsById.get(row.delegation.childBotId);
-                const childThreadId = presentation.childThreadId;
+      {/* The frame splits this row: the board takes the width and Activity keeps a
+          fixed 300px column beside it, both 560 tall (E13a `2167:614`). */}
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
+        <section className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium">{t("Kanban board")}</h3>
+            <p className="text-xs text-muted-foreground">
+              {bossName === null
+                ? t("Cards move when a bot finishes a step.")
+                : t("{name}, the boss, assigns cards. They move when a bot finishes a step.", {
+                    name: bossName,
+                  })}
+            </p>
+          </div>
+          <div className="flex h-140 min-h-0">
+            <SpaceTasks group={group} variant="overview" />
+          </div>
+        </section>
+        <section className="flex h-140 w-full min-w-0 shrink-0 flex-col gap-2 lg:w-75">
+          <h3 className="text-sm font-medium">{t("Activity")}</h3>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("Nothing here yet")}</p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-border/60">
+                {rows.map((row) => {
+                  if (row.kind === "delegation") {
+                    const presentation = presentDelegation(row.delegation);
+                    const bot = botsById.get(row.delegation.childBotId);
+                    const childThreadId = presentation.childThreadId;
 
-                return (
-                  <li
-                    key={`delegation-${row.delegation.delegationId}`}
-                    className="flex items-center gap-2 py-2"
-                  >
-                    {bot ? (
-                      <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
-                    ) : null}
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      {bot ? (
-                        <span className="truncate text-xs text-muted-foreground">
-                          <bdi>{bot.name}</bdi>
-                        </span>
-                      ) : null}
-                      <bdi className="truncate text-sm">{row.delegation.task}</bdi>
-                      {/* The state and the time share the meta line under the task, so
-                          neither takes width from the task the row exists to show. */}
-                      <span className="truncate text-xs text-muted-foreground">
-                        {[
-                          delegationStateLabel(presentation.state, t),
-                          relativeRunTime(row.at, Date.now(), i18n),
-                        ].join(" · ")}
-                      </span>
-                    </div>
-                    {/* Queued delegations have no child yet, and there is no chat to open
-                        without a connected environment. */}
-                    {childThreadId === null || environmentId === null ? null : (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={() => open({ environmentId, threadId: childThreadId })}
+                    return (
+                      <li
+                        key={`delegation-${row.delegation.delegationId}`}
+                        className="flex items-center gap-2 py-2"
                       >
-                        {t("Open")}
-                      </Button>
-                    )}
-                  </li>
-                );
-              }
+                        {bot ? (
+                          <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
+                        ) : null}
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          {bot ? (
+                            <span className="truncate text-xs text-muted-foreground">
+                              <bdi>{bot.name}</bdi>
+                            </span>
+                          ) : null}
+                          <bdi className="truncate text-sm">{row.delegation.task}</bdi>
+                          {/* The state and the time share the meta line under the task, so
+                              neither takes width from the task the row exists to show. */}
+                          <span className="truncate text-xs text-muted-foreground">
+                            {[
+                              delegationStateLabel(presentation.state, t),
+                              relativeRunTime(row.at, Date.now(), i18n),
+                            ].join(" · ")}
+                          </span>
+                        </div>
+                        {/* Queued delegations have no child yet, and there is no chat to open
+                            without a connected environment. */}
+                        {childThreadId === null || environmentId === null ? null : (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => open({ environmentId, threadId: childThreadId })}
+                          >
+                            {t("Open")}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  }
 
-              const shell = row.shell;
-              const bot = botOf(shell);
-              const decision = waiting.get(shell.id);
+                  const shell = row.shell;
+                  const bot = botOf(shell);
+                  const decision = waiting.get(shell.id);
 
-              return (
-                <li key={shell.id} className="flex items-center gap-2 py-2">
-                  {bot ? (
-                    <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
-                  ) : null}
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    {bot ? (
-                      <span className="truncate text-xs text-muted-foreground">
-                        <bdi>{bot.name}</bdi>
+                  return (
+                    <li key={shell.id} className="flex items-center gap-2 py-2">
+                      {bot ? (
+                        <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
+                      ) : null}
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        {bot ? (
+                          <span className="truncate text-xs text-muted-foreground">
+                            <bdi>{bot.name}</bdi>
+                          </span>
+                        ) : null}
+                        <bdi className="truncate text-sm">{shell.title}</bdi>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {relativeRunTime(shell.updatedAt, Date.now(), i18n)}
                       </span>
-                    ) : null}
-                    <bdi className="truncate text-sm">{shell.title}</bdi>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {relativeRunTime(shell.updatedAt, Date.now(), i18n)}
-                  </span>
-                  {decision ? (
-                    <Button size="xs" variant="outline" onClick={() => openDecision(decision)}>
-                      {t("Review")}
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </SpaceTile>
+                      {decision ? (
+                        <Button size="xs" variant="outline" onClick={() => openDecision(decision)}>
+                          {t("Review")}
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

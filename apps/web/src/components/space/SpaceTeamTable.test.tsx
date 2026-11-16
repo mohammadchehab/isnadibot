@@ -26,7 +26,7 @@ const ENGINEER = BotId.make("bot-engineer");
 const mocks = vi.hoisted(() => ({
   snapshot: null as ReturnType<typeof makeShellSnapshot> | null,
   activitiesByThreadId: new Map<string, ReadonlyArray<OrchestrationThreadActivity>>(),
-  openDetails: vi.fn(),
+  openChat: vi.fn(),
 }));
 
 vi.mock("../../i18n", () => ({
@@ -50,9 +50,7 @@ vi.mock("../../state/entities", () => ({
     ref === null ? [] : (mocks.activitiesByThreadId.get(ref.threadId) ?? []),
 }));
 
-vi.mock("../roster/detailsPanelOpen", () => ({
-  useGroupDetailsOpen: () => [false, mocks.openDetails],
-}));
+vi.mock("../chat/useOpenChat", () => ({ useOpenChat: () => mocks.openChat }));
 
 import { SpaceTeamTable } from "./SpaceTeamTable";
 
@@ -131,12 +129,39 @@ describe("space team table", () => {
 
     expect(markup).toContain("Leo bot");
     expect(markup).toContain("Boss");
-    expect(markup).toContain("Busy");
+    // The state wears the frame's badge, not a bare cell with a colour.
+    expect(markup).toContain('data-slot="badge">Busy</span>');
     expect(markup).toContain("Wire the team table");
     // The frames draw the reading as a size, not a percentage.
     expect(markup).toContain("21k of 100k");
 
     // The boss has no chat and no item, so it reads as two em dashes and no number.
     expect(markup).not.toContain("0k of");
+  });
+
+  it("gives every row its action trigger, and the asking row an Open before it", () => {
+    mocks.snapshot = makeShellSnapshot({
+      bots: [
+        { id: "bot-boss", name: "Leo bot" },
+        { id: "bot-engineer", name: "Engineer" },
+      ],
+      threads: [
+        {
+          id: "chat-engineer",
+          botId: "bot-engineer",
+          groupId: "group-fleet",
+          updatedAt: "2026-11-13T11:00:00.000Z",
+          hasPendingApprovals: true,
+        },
+      ],
+    });
+
+    const markup = render();
+
+    // Every row carries the menu's trigger; the menu itself is E13b's.
+    expect(markup.match(/aria-label="Bot actions"/g)).toHaveLength(2);
+    // Only the bot that is asking offers the chat where it asks.
+    expect(markup).toContain('data-slot="badge">Asking you</span>');
+    expect(markup.match(/>Open</g)).toHaveLength(1);
   });
 });

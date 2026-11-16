@@ -509,4 +509,18 @@ export const rosterCatalog = {
   "Add a bot to {name}…": "إضافة بوت إلى {name}…",
   "Ends the turn this bot is running": "ينهي الدور الذي يشغّله هذا البوت",
   "Opens this space's members to add a bot": "يفتح أعضاء هذه المساحة لإضافة بوت",
+  Team: "الفريق",
+  "Asking you": "يسألك",
+  "Working on": "يعمل على",
+  Context: "السياق",
+  "Bot actions": "إجراءات البوت",
+  "Kanban board": "اللوح",
+  "No bots in this space yet": "لا بوتات في هذه المساحة بعد",
+  "Cards go to a bot when it goes idle.": "تذهب البطاقات إلى البوت عندما يكون خاملًا.",
+  "{inProgress} in progress · {done} done this week":
+    "{inProgress} قيد التنفيذ · {done} منجز هذا الأسبوع",
+  "{name}, the boss, assigns from the board. When a bot goes idle, the next card goes to it.":
+    "{name} هو الرئيس، يوزّع من اللوح. عندما يكون بوت خاملًا، تذهب البطاقة التالية إليه.",
+  "{name}, the boss, assigns cards. They move when a bot finishes a step.":
+    "{name} هو الرئيس، يوزّع البطاقات. تتحرك عندما ينهي بوت خطوة.",
 } as const;
