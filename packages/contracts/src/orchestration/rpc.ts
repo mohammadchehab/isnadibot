@@ -272,8 +272,16 @@ export class OrchestrationGetSnapshotError extends Schema.TaggedErrorClass<Orche
 export class OrchestrationDispatchCommandError extends Schema.TaggedErrorClass<OrchestrationDispatchCommandError>()(
   "OrchestrationDispatchCommandError",
   {
+    /**
+     * The one sentence a client prints. There is no `cause` beside it on
+     * purpose: the throw already reaches here as this sentence, so a cause
+     * would put the same string on the wire a second time, and `Schema.Defect`
+     * encodes an `Error` as its name plus message — a wrapped `Cause` can
+     * serialize far more than that. Host, port and paths stay in this sentence
+     * because they are what makes a provider failure actionable, and they cross
+     * exactly once, here. Server-side context belongs in the server's log.
+     */
     message: TrimmedNonEmptyString,
-    cause: Schema.optional(Schema.Defect()),
     bootstrapThreadDisposition: Schema.optional(Schema.Literal("deleted")),
     /**
      * Why the provider could not run the command, when that has a repair. A plain string on the

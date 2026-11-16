@@ -603,7 +603,6 @@ export const createWsServices = (
         ? error
         : new OrchestrationDispatchCommandError({
             message: error instanceof Error ? error.message : "Failed to start the chat.",
-            cause,
           });
     };
 

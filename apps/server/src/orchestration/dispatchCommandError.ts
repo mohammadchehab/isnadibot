@@ -53,6 +53,5 @@ export const toDispatchCommandError = (cause: unknown, fallbackMessage: string) 
 
   return new OrchestrationDispatchCommandError({
     message: cause instanceof Error ? cause.message : fallbackMessage,
-    cause,
   });
 };

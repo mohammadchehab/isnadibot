@@ -101,10 +101,10 @@ const makeBootstrap = Effect.fn("makeBootstrap")(function* (
       dispatchActor: { personId: AuthSessionId.make("bootstrap-test"), canManageGroups: true },
       dispatchFromClient: dispatch,
       serverCommandId: (name) => Effect.succeed(CommandId.make(name)),
-      toDispatchCommandError: (cause, message) =>
-        new OrchestrationDispatchCommandError({ message, cause }),
-      toBootstrapDispatchCommandCauseError: (cause) =>
-        new OrchestrationDispatchCommandError({ message: "Bootstrap failed", cause }),
+      toDispatchCommandError: (_cause, message) =>
+        new OrchestrationDispatchCommandError({ message }),
+      toBootstrapDispatchCommandCauseError: (_cause) =>
+        new OrchestrationDispatchCommandError({ message: "Bootstrap failed" }),
     });
 
     return yield* commands.dispatchBootstrapTurnStart({

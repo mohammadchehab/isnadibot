@@ -162,10 +162,9 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
 
             const info = yield* fileSystem.stat(claim.currentPath).pipe(
               Effect.mapError(
-                (cause) =>
+                () =>
                   new OrchestrationDispatchCommandError({
                     message: `Attachment '${attachment.name}' cannot be sent: attachment not found.`,
-                    cause,
                   }),
               ),
             );
@@ -200,10 +199,9 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
             // bootstrap can then retry with a fresh thread id.
             yield* fileSystem.copyFile(claim.currentPath, claim.finalPath).pipe(
               Effect.mapError(
-                (cause) =>
+                () =>
                   new OrchestrationDispatchCommandError({
                     message: `Failed to claim attachment '${attachment.name}' for this chat.`,
-                    cause,
                   }),
               ),
             );
