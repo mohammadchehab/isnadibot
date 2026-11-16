@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: null as ReturnType<typeof makeShellSnapshot> | null,
   activitiesByThreadId: new Map<string, ReadonlyArray<OrchestrationThreadActivity>>(),
   openChat: vi.fn(),
+  unblock: vi.fn(),
 }));
 
 vi.mock("../../i18n", () => ({
@@ -51,6 +52,12 @@ vi.mock("../../state/entities", () => ({
 }));
 
 vi.mock("../chat/useOpenChat", () => ({ useOpenChat: () => mocks.openChat }));
+
+vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => mocks.unblock }));
+
+vi.mock("../../state/workItems", () => ({ workItemEnvironment: { unblock: "work-item.unblock" } }));
+
+vi.mock("../ui/toast", () => ({ toastManager: { add: vi.fn() } }));
 
 import { SpaceTeamTable } from "./SpaceTeamTable";
 
@@ -163,5 +170,43 @@ describe("space team table", () => {
     // Only the bot that is asking offers the chat where it asks.
     expect(markup).toContain('data-slot="badge">Asking you</span>');
     expect(markup.match(/>Open</g)).toHaveLength(1);
+  });
+
+  it("gives a held row the reason it waits and the way out of it", () => {
+    mocks.snapshot = makeShellSnapshot({
+      bots: [
+        { id: "bot-boss", name: "Leo bot" },
+        { id: "bot-engineer", name: "Engineer" },
+      ],
+      threads: [],
+      workItems: [
+        {
+          id: "item-blocked",
+          groupId: "group-fleet",
+          title: "Wire the team table",
+          kind: "task",
+          briefPreview: "",
+          state: "blocked",
+          ownerBotId: "bot-engineer",
+          blockedFrom: "assigned",
+          blockedOn: {
+            by: "bot",
+            botId: "bot-engineer",
+            note: "Two dispatcher turns failed in a row: no progress reported",
+          },
+          createdAt: "2026-11-13T09:00:00.000Z",
+          updatedAt: "2026-11-13T09:00:00.000Z",
+        },
+      ],
+    });
+
+    const markup = render();
+
+    expect(markup).toContain('data-slot="badge">Held</span>');
+    // The row says what it is waiting on, in the block's own words.
+    expect(markup).toContain("Two dispatcher turns failed in a row: no progress reported");
+    // The way out sits in the action cell, beside the menu's trigger.
+    expect(markup.match(/>Resume</g)).toHaveLength(1);
+    expect(markup.match(/aria-label="Bot actions"/g)).toHaveLength(2);
   });
 });
