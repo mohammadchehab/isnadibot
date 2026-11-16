@@ -78,6 +78,44 @@ export function workItemBoard<T extends BoardItem>(items: Iterable<T>): WorkItem
   return columns;
 }
 
+/** What the Overview's Tasks tile reports. */
+export interface SpaceTaskCounts {
+  readonly open: number;
+  readonly inProgress: number;
+  readonly doneThisWeek: number;
+}
+
+/**
+ * Counts a space's items for the Tasks tile. `items` is every item the caller
+ * holds for the space — the shell's open summaries plus the finished page — so
+ * the done count needs that page, because the shell carries open items only.
+ */
+export function spaceTaskCounts(
+  items: Iterable<Pick<WorkItemSummary, "state" | "doneAt">>,
+  weekStartIso: string,
+): SpaceTaskCounts {
+  const since = Date.parse(weekStartIso);
+  let open = 0;
+  let inProgress = 0;
+  let doneThisWeek = 0;
+
+  for (const item of items) {
+    if (isOpenWorkItem(item.state)) {
+      open += 1;
+
+      if (workItemColumn(item.state) === "in-progress") inProgress += 1;
+    } else if (
+      item.state === "done" &&
+      item.doneAt !== undefined &&
+      Date.parse(item.doneAt) >= since
+    ) {
+      doneThisWeek += 1;
+    }
+  }
+
+  return { open, inProgress, doneThisWeek };
+}
+
 /**
  * The edit controls an item allows, mirroring the server decider so the board
  * never offers a move the server will reject.

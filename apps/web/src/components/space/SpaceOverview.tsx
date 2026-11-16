@@ -14,6 +14,8 @@ import {
   type SpaceRoutine,
 } from "@isnadi/client-runtime/space";
 import { spaceStandup } from "@isnadi/client-runtime/space/standup";
+import { spaceTaskCounts } from "@isnadi/client-runtime/space/work-items";
+import { GroupId } from "@isnadi/contracts";
 
 import { useMemo } from "react";
 
@@ -22,6 +24,8 @@ import { useSpaceUsage } from "../../state/botUsage";
 import { useDecisions } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
+import { useEnvironmentQuery } from "../../state/query";
+import { workItemEnvironment } from "../../state/workItems";
 import { useOpenChat } from "../chat/useOpenChat";
 import { BotAvatarView } from "../roster/BotAvatarView";
 import { delegationStateLabel } from "../roster/DelegationDetail";
@@ -30,6 +34,8 @@ import { useLocalDay } from "../roster/useLocalDay";
 import { useRosterStore } from "../roster/rosterStore";
 import { Button } from "../ui/button";
 import { SpaceStandup } from "./SpaceStandup";
+import { SpaceTasks } from "./SpaceTasks";
+import { SpaceTeamTable } from "./SpaceTeamTable";
 import { SpaceTile } from "./SpaceTile";
 
 const NO_ROUTINES: ReadonlyArray<SpaceRoutine> = [];
@@ -37,6 +43,9 @@ const NO_ROUTINES: ReadonlyArray<SpaceRoutine> = [];
 const NO_THREADS: ReadonlyArray<OrchestrationThreadShell> = [];
 
 const NO_DELEGATIONS: ReadonlyArray<IsnadiDelegationRecord> = [];
+
+/** The Tasks tile counts the week's done items, so it reads the same page SpaceTasks does. */
+const FINISHED_PAGE_SIZE = 50;
 
 /**
  * The space's dashboard. Everything is derived from data the client already holds (the
@@ -99,6 +108,31 @@ export function SpaceOverview({ group }: { group: Group }) {
 
   const usage = useSpaceUsage(environmentId, since, memberIds);
 
+  const groupId = GroupId.make(group.id);
+
+  // The shell carries open items only, so the week's done count comes from the
+  // finished read — the same query, key and page SpaceTasks issues below.
+  const doneQuery = useEnvironmentQuery(
+    environmentId === null
+      ? null
+      : workItemEnvironment.finished({
+          environmentId,
+          input: { groupId, state: "done", limit: FINISHED_PAGE_SIZE },
+        }),
+  );
+
+  const taskCounts = useMemo(
+    () =>
+      spaceTaskCounts(
+        [
+          ...(snapshot?.workItems ?? []).filter((item) => item.groupId === group.id),
+          ...(doneQuery.data?.items ?? []),
+        ],
+        since,
+      ),
+    [snapshot?.workItems, doneQuery.data, group.id, since],
+  );
+
   const standup = useMemo(
     () =>
       snapshot === null
@@ -137,7 +171,7 @@ export function SpaceOverview({ group }: { group: Group }) {
         {t("updated {time}", { time: updated })}
       </p>
       {standup === null ? null : <SpaceStandup report={standup} />}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SpaceTile title={t("Decisions")}>
           {decisions.length === 0 ? (
             <p className="text-sm">{t("Nothing waiting on you")}</p>
@@ -158,6 +192,17 @@ export function SpaceOverview({ group }: { group: Group }) {
             {t("Next run")}: {routineDateLabel(routines.nextRunAt, i18n)}
           </p>
         </SpaceTile>
+        <SpaceTile title={t("Tasks")}>
+          <p className="text-2xl font-semibold">
+            {t("{count} open", { count: i18n.formatNumber(taskCounts.open) })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("{inProgress} in progress · {done} done this week", {
+              inProgress: i18n.formatNumber(taskCounts.inProgress),
+              done: i18n.formatNumber(taskCounts.doneThisWeek),
+            })}
+          </p>
+        </SpaceTile>
         <SpaceTile title={t("Usage")}>
           <p className="text-2xl font-semibold">
             {usage.isPending
@@ -169,6 +214,15 @@ export function SpaceOverview({ group }: { group: Group }) {
           </p>
         </SpaceTile>
       </div>
+      <SpaceTeamTable group={group} />
+      {/* SpaceTasks owns its own scroll and grows; the frame bounds the board so
+          the Activity list below it keeps its place on the page. */}
+      <section className="flex min-w-0 flex-col gap-3">
+        <h3 className="text-sm font-medium">{t("Kanban board")}</h3>
+        <div className="h-80 min-h-0">
+          <SpaceTasks group={group} />
+        </div>
+      </section>
       <SpaceTile title={t("Activity")}>
         {rows.length === 0 ? (
           <p className="text-sm">{t("Nothing here yet")}</p>

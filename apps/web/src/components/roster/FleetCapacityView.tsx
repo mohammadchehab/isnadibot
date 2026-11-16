@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
   buildCapacity,
+  newestChatByBotId,
   type CapacityBot,
   type CapacityRow,
   type CapacityWorkItem,
@@ -24,32 +25,6 @@ import { BOT_STATUS_LABEL, BOT_STATUS_TONE } from "./botStatusPresentation";
 
 // SAFETY: the empty ID is an inactive-query sentinel; no environment request is sent for it.
 const NO_ENVIRONMENT = "" as EnvironmentId;
-
-/**
- * Which chats belong to one bot: its own chats and the group chats it answers.
- * A group chat has no owner bot, so the responder is the only bot that can be
- * busy in it — the same rule the status core applies.
- */
-function ownerOfChat(chat: OrchestrationThreadShell): string | null {
-  return chat.respondingBotId ?? chat.botId ?? null;
-}
-
-function newestChatByBot(
-  chats: ReadonlyArray<OrchestrationThreadShell>,
-): ReadonlyMap<string, OrchestrationThreadShell> {
-  const newest = new Map<string, OrchestrationThreadShell>();
-
-  for (const chat of chats) {
-    const owner = ownerOfChat(chat);
-
-    if (owner === null || chat.archivedAt !== null) continue;
-    const seen = newest.get(owner);
-
-    if (seen === undefined || seen.updatedAt < chat.updatedAt) newest.set(owner, chat);
-  }
-
-  return newest;
-}
 
 /**
  * One bot's line: what it is doing, the item it is on, how full its context is
@@ -176,7 +151,7 @@ export function FleetCapacityView({
       queuedByBotId,
     });
 
-    return { ...built, newestChat: newestChatByBot(chats) };
+    return { ...built, newestChat: newestChatByBotId(chats) };
   }, [groupId, queuedByBotId, snapshot]);
 
   if (capacity === null || capacity.rows.length === 0) return null;

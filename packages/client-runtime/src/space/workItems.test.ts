@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   WORK_ITEM_BOARD_COLUMNS,
   isOpenWorkItem,
+  spaceTaskCounts,
   workItemActions,
   workItemBoard,
   workItemColumn,
@@ -143,5 +144,23 @@ describe("workItemActions", () => {
     for (const state of ["done", "closed"] as const) {
       expect(workItemActions(state)).toMatchObject({ canEdit: false, canAssign: false });
     }
+  });
+});
+
+describe("spaceTaskCounts", () => {
+  it("counts what is open, what is in progress, and what was done inside the week", () => {
+    const counts = spaceTaskCounts(
+      [
+        summary("a", { state: "queued" }),
+        summary("b", { state: "assigned" }),
+        summary("c", { state: "in-progress" }),
+        summary("d", { state: "done", doneAt: "2026-11-12T09:00:00.000Z" }),
+        summary("e", { state: "done", doneAt: "2026-11-02T09:00:00.000Z" }),
+        summary("f", { state: "closed", doneAt: "2026-11-12T09:00:00.000Z" }),
+      ],
+      "2026-11-10T00:00:00.000Z",
+    );
+
+    expect(counts).toEqual({ open: 3, inProgress: 1, doneThisWeek: 1 });
   });
 });
