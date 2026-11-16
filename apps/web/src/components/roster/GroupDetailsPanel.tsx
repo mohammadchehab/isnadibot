@@ -62,7 +62,7 @@ export function GroupDetailsPanel(props: {
   const content = (closeButton?: ReactNode) => (
     <>
       <header className="relative flex h-(--workspace-topbar-height) shrink-0 items-center justify-center px-4">
-        <h2 className="text-sm font-medium">{t("Group")}</h2>
+        <h2 className="text-sm font-medium">{t("Space settings")}</h2>
         <div className="absolute end-3 flex items-center min-[981px]:fixed min-[981px]:end-(--workspace-controls-right) min-[981px]:top-(--workspace-controls-top) min-[981px]:z-40 min-[981px]:h-(--workspace-topbar-height)">
           {closeButton}
         </div>

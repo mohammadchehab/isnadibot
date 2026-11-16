@@ -483,4 +483,20 @@ export const rosterCatalog = {
   "Turn it off and bots stop taking new cards; cards already running finish.":
     "أوقفه فتتوقف البوتات عن أخذ بطاقات جديدة، أما البطاقات الجارية فتُكمل عملها.",
   "Could not change keep-busy for this group": "تعذر تغيير إبقاء هذه المجموعة منشغلة",
+  "Space settings": "إعدادات المساحة",
+  "Space settings breadcrumb": "مسار إعدادات المساحة",
+  "Space actions": "إجراءات المساحة",
+  "Open space settings": "فتح إعدادات المساحة",
+  "Unavailable space": "مساحة غير متاحة",
+  "This space is no longer available.": "لم تعد هذه المساحة متاحة.",
+  "Space boss": "رئيس المساحة",
+  "Answers every message by default and assigns the cards.":
+    "يرد على كل رسالة افتراضيًا ويوزّع البطاقات.",
+  "Choose a boss": "اختر رئيسًا",
+  "Add a bot to this space first.": "أضف بوتًا إلى هذه المساحة أولًا.",
+  "The only bot in this space.": "البوت الوحيد في هذه المساحة.",
+  "Cards wait in the queue until a boss is chosen.": "تنتظر البطاقات في الطابور حتى يُختار رئيس.",
+  "Needs two bots — one to work, one to hand off to.": "يحتاج بوتين — واحد للعمل وواحد للتسليم.",
+  "{count} · No boss yet": "{count} · لا رئيس بعد",
+  "{count} · {boss} is the boss": "{count} · {boss} هو الرئيس",
 } as const;

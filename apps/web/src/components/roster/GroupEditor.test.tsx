@@ -1,7 +1,7 @@
 import type { TestProps, TestValue } from "../test-support/reactTree";
 import { Predicate } from "effect";
 import * as Cause from "effect/Cause";
-import type { ReactElement } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { BotId, EnvironmentId } from "@isnadi/contracts";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -10,10 +10,15 @@ const mocks = vi.hoisted(() => ({
   assignMember: vi.fn(),
   unassignMember: vi.fn(),
   renameGroup: vi.fn(),
-  setBoss: vi.fn(),
-  setKeepBusy: vi.fn(),
   deleteGroup: vi.fn(),
   toast: vi.fn(),
+}));
+
+// The panel only links to the settings page; the router itself is not under test.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { readonly to: string; readonly children?: ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -61,8 +66,6 @@ vi.mock("../../state/bots", () => ({
       delete: "delete",
       assignMember: "assignMember",
       unassignMember: "unassignMember",
-      setBoss: "setBoss",
-      setKeepBusy: "setKeepBusy",
     },
   },
 }));
@@ -78,10 +81,6 @@ vi.mock("../../state/use-atom-command", () => ({
         return mocks.unassignMember;
       case "rename":
         return mocks.renameGroup;
-      case "setBoss":
-        return mocks.setBoss;
-      case "setKeepBusy":
-        return mocks.setKeepBusy;
       default:
         return mocks.deleteGroup;
     }
@@ -203,8 +202,6 @@ describe("GroupEditor member change refusals", () => {
       mocks.assignMember,
       mocks.unassignMember,
       mocks.renameGroup,
-      mocks.setBoss,
-      mocks.setKeepBusy,
       mocks.deleteGroup,
       mocks.toast,
     ]) {
@@ -384,5 +381,30 @@ describe("GroupEditor member change refusals", () => {
     // id included. Only the two member commands opt in to the description.
     expect(mocks.toast).toHaveBeenCalledWith({ type: "error", title: "Could not rename group" });
     expect(mocks.toast.mock.calls[0]?.[0]).not.toHaveProperty("description");
+  });
+});
+
+describe("GroupEditor and the space settings page", () => {
+  beforeEach(() => {
+    reactHookHarness.reset();
+    mocks.locale = "en";
+  });
+
+  it("links to the settings page instead of carrying the two settings itself", () => {
+    const row = visitElements(
+      editor(),
+      (element) =>
+        isValidElement(element.props.render) &&
+        (element.props.render as ReactElement<TestProps>).props.to === "/groups/$groupId/settings",
+    );
+
+    expect(row?.props.children).toBe("Open space settings");
+  });
+
+  // One setting, one control: the Work card owns both, and a second copy here
+  // would have to stay in sync with it forever.
+  it("no longer draws a boss or a keep-busy control of its own", () => {
+    expect(findByLabel(editor(), "Group boss")).toBeNull();
+    expect(findByLabel(editor(), "Keep everyone busy")).toBeNull();
   });
 });

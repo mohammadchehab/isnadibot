@@ -459,4 +459,22 @@ export const rosterCatalog = {
   "Turn it off and bots stop taking new cards; cards already running finish.":
     "Turn it off and bots stop taking new cards; cards already running finish.",
   "Could not change keep-busy for this group": "Could not change keep-busy for this group",
+  "Space settings": "Space settings",
+  "Space settings breadcrumb": "Space settings breadcrumb",
+  "Space actions": "Space actions",
+  "Open space settings": "Open space settings",
+  "Unavailable space": "Unavailable space",
+  "This space is no longer available.": "This space is no longer available.",
+  "Space boss": "Space boss",
+  "Answers every message by default and assigns the cards.":
+    "Answers every message by default and assigns the cards.",
+  "Choose a boss": "Choose a boss",
+  "Add a bot to this space first.": "Add a bot to this space first.",
+  "The only bot in this space.": "The only bot in this space.",
+  "Cards wait in the queue until a boss is chosen.":
+    "Cards wait in the queue until a boss is chosen.",
+  "Needs two bots — one to work, one to hand off to.":
+    "Needs two bots — one to work, one to hand off to.",
+  "{count} · No boss yet": "{count} · No boss yet",
+  "{count} · {boss} is the boss": "{count} · {boss} is the boss",
 } as const;

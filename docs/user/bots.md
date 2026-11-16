@@ -207,6 +207,24 @@ Pinning, unpinning, and moving an item keeps the sidebar at your current scroll 
 
 On this device the layout is stored in the browser for the connected environment. Refresh keeps it. Other devices keep their own layout until the environment can store roster order.
 
+## Space settings
+
+A space's settings page holds the choices that shape how the space works. Open it from the space's
+**Space actions** menu in its header, or from **Open space settings** at the foot of the space's panel.
+
+The page names the space and summarizes it at a glance, for example **4 bots · Ada is the boss**, then
+lists its settings under **Work**:
+
+- **Space boss** — the bot that answers every message by default and assigns the cards.
+- **Keep everyone busy** — turn it off and bots stop taking new cards; cards already running finish.
+
+A setting that cannot be used yet says why rather than disappearing: a space with no bots asks you to
+add one first, a space with a single bot explains that it is the only bot there, and a space with no
+boss says its cards wait in the queue until one is chosen. The space's panel keeps the roster and
+links to this page, so each setting has one control.
+
+Space settings are not on mobile yet. Change them on web or desktop.
+
 ## Conversation panel
 
 Use the panel button to collapse or reopen the bot editor. The default shortcut is `Mod+Alt+B`. You

@@ -8,6 +8,7 @@ import {
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@isnadi/client-runtime/state/runtime";
+import { Link } from "@tanstack/react-router";
 import { BotIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -19,11 +20,9 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { GroupMemberStack } from "./GroupMemberStack";
 import { GroupPeopleSection } from "./GroupPeopleSection";
-import { groupKeepBusyCopy, groupKeepsBusy } from "./groupKeepBusy.logic";
 import { groupBotMembers, groupContainsBot } from "./roster.logic";
 import type { Bot, Group } from "./types";
 import { classifyGroupDeleteFailure, openWorkItemCountForGroup } from "./groupDelete.logic";
@@ -63,14 +62,6 @@ export function GroupEditor({
     reportFailure: false,
   });
 
-  const setBoss = useAtomCommand(botEnvironment.groups.setBoss, {
-    reportFailure: false,
-  });
-
-  const setKeepBusy = useAtomCommand(botEnvironment.groups.setKeepBusy, {
-    reportFailure: false,
-  });
-
   const [name, setName] = useState(group.name);
   const [newMemberId, setNewMemberId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,7 +70,6 @@ export function GroupEditor({
   const availableBots = activeBots.filter((bot) => !groupContainsBot(group, bot.id));
   const removalHintId = useId();
   const addHintId = useId();
-  const keepBusyCopy = groupKeepBusyCopy(t);
 
   const removalHint = groupMemberRemovalHint(
     {
@@ -205,70 +195,6 @@ export function GroupEditor({
             </Button>
           </div>
         </label>
-        <label className="block space-y-2 text-sm font-medium">
-          {t("Boss")}
-          <Select
-            value={group.bossBotId ?? ""}
-            onValueChange={(botId) => {
-              if (!botId || botId === group.bossBotId) return;
-              void run(
-                () =>
-                  setBoss({
-                    environmentId,
-                    input: {
-                      groupId: GroupId.make(group.id),
-                      bossBotId: BotId.make(botId),
-                      unassignPreviousBoss: false,
-                    },
-                  }),
-                t("Could not change group boss"),
-              );
-            }}
-          >
-            <SelectTrigger aria-label={t("Group boss")} className="w-full">
-              <SelectValue>
-                {members.find((bot) => bot.id === group.bossBotId)?.name ?? t("Choose boss")}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectPopup>
-              {members.map((bot) => (
-                <SelectItem key={bot.id} value={bot.id}>
-                  {bot.name}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </label>
-        <label className="flex items-center justify-between gap-3 text-sm font-medium">
-          <span>
-            {keepBusyCopy.label}
-            <span className="block text-xs font-normal text-muted-foreground">
-              {keepBusyCopy.hint}
-            </span>
-            <span className="block text-xs font-normal text-muted-foreground">
-              {keepBusyCopy.offHint}
-            </span>
-          </span>
-          <Switch
-            aria-label={keepBusyCopy.label}
-            aria-busy={busy}
-            checked={groupKeepsBusy(group)}
-            disabled={busy}
-            onCheckedChange={(checked) =>
-              void run(
-                () =>
-                  setKeepBusy({
-                    environmentId,
-                    input: {
-                      groupId: GroupId.make(group.id),
-                      keepBusy: checked,
-                    },
-                  }),
-                keepBusyCopy.failureTitle,
-              )
-            }
-          />
-        </label>
         <section className="space-y-2" aria-labelledby="group-bots-heading">
           <h3 id="group-bots-heading" className="text-sm font-medium">
             {t("Bots")}
@@ -378,59 +304,68 @@ export function GroupEditor({
         </section>
         <GroupPeopleSection environmentId={environmentId} group={group} />
       </div>
-      <Button
-        className="mt-6 w-full"
-        disabled={busy}
-        variant="destructive-outline"
-        onClick={async () => {
-          const confirmed = await ensureLocalApi().dialogs.confirm(
-            openWorkItemCount > 0
-              ? plural(
-                  openWorkItemCount,
-                  {
-                    one: 'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.',
-                    other:
-                      'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.',
-                  },
-                  { name: group.name },
-                )
-              : t('Delete "{name}"? Its bots stay in your roster.', { name: group.name }),
-            {
-              variant: "destructive",
-              confirmLabel: openWorkItemCount > 0 ? t("Delete and discard") : t("Delete group"),
-            },
-          );
+      <div className="mt-6 space-y-2">
+        <Button
+          className="w-full"
+          variant="outline"
+          render={<Link to="/groups/$groupId/settings" params={{ groupId: group.id }} />}
+        >
+          {t("Open space settings")}
+        </Button>
+        <Button
+          className="w-full"
+          disabled={busy}
+          variant="destructive-outline"
+          onClick={async () => {
+            const confirmed = await ensureLocalApi().dialogs.confirm(
+              openWorkItemCount > 0
+                ? plural(
+                    openWorkItemCount,
+                    {
+                      one: 'Delete "{name}"? Its bots stay in your roster. {count} open work item will be discarded. This cannot be undone.',
+                      other:
+                        'Delete "{name}"? Its bots stay in your roster. {count} open work items will be discarded. This cannot be undone.',
+                    },
+                    { name: group.name },
+                  )
+                : t('Delete "{name}"? Its bots stay in your roster.', { name: group.name }),
+              {
+                variant: "destructive",
+                confirmLabel: openWorkItemCount > 0 ? t("Delete and discard") : t("Delete group"),
+              },
+            );
 
-          if (!confirmed) return;
+            if (!confirmed) return;
 
-          setBusy(true);
+            setBusy(true);
 
-          const result = await deleteGroup({
-            environmentId,
-            input: {
-              groupId: GroupId.make(group.id),
-              // Only once the dialog has named the items and the user confirmed
-              // discarding them; a group with no open work never sends the flag.
-              ...(openWorkItemCount > 0 ? { discardWorkItems: true } : {}),
-            },
-          });
-
-          setBusy(false);
-
-          if (Predicate.isTagged(result, "Failure")) {
-            toastManager.add({
-              type: "error",
-              ...deleteFailureToast(result),
+            const result = await deleteGroup({
+              environmentId,
+              input: {
+                groupId: GroupId.make(group.id),
+                // Only once the dialog has named the items and the user confirmed
+                // discarding them; a group with no open work never sends the flag.
+                ...(openWorkItemCount > 0 ? { discardWorkItems: true } : {}),
+              },
             });
 
-            return;
-          }
+            setBusy(false);
 
-          onDeleted();
-        }}
-      >
-        {t("Delete group")}
-      </Button>
+            if (Predicate.isTagged(result, "Failure")) {
+              toastManager.add({
+                type: "error",
+                ...deleteFailureToast(result),
+              });
+
+              return;
+            }
+
+            onDeleted();
+          }}
+        >
+          {t("Delete group")}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { MoreHorizontalIcon } from "lucide-react";
 
 import { useI18n } from "../../i18n";
 import { GroupMemberStack } from "../roster/GroupMemberStack";
@@ -7,7 +9,9 @@ import { useGroupDetailsOpen } from "../roster/detailsPanelOpen";
 import { useRosterStore } from "../roster/rosterStore";
 import type { Group } from "../roster/types";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { Empty, EmptyHeader } from "../ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "../ui/tabs";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { SpaceHeaderActionsHost } from "./spaceHeaderActions";
@@ -34,6 +38,7 @@ export function SpaceView({
   chat: ReactNode;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const bots = useRosterStore((state) => state.bots);
   const [detailsPanelOpen] = useGroupDetailsOpen();
   // A space a bot made says so. The creator is resolved by id so a deleted bot still
@@ -81,11 +86,35 @@ export function SpaceView({
             {t("Files")}
           </TabsTab>
         </TabsList>
-        <div
-          ref={setActionsHost}
-          data-space-header-actions=""
-          className="ms-auto flex items-center"
-        />
+        <div className="ms-auto flex items-center">
+          <div ref={setActionsHost} data-space-header-actions="" className="flex items-center" />
+          <Menu>
+            <MenuTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost-muted"
+                  aria-label={t("Space actions")}
+                >
+                  <MoreHorizontalIcon aria-hidden />
+                </Button>
+              }
+            />
+            <MenuPopup align="end" className="min-w-40">
+              <MenuItem
+                onClick={() =>
+                  void navigate({
+                    to: "/groups/$groupId/settings",
+                    params: { groupId: group.id },
+                  })
+                }
+              >
+                {t("Space settings")}
+              </MenuItem>
+            </MenuPopup>
+          </Menu>
+        </div>
       </WorkspacePageHeader>
       <SpaceHeaderActionsHost.Provider value={actionsHost}>
         <TabsPanel value="overview">
