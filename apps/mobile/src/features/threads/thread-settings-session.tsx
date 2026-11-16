@@ -2,6 +2,7 @@ import { driverSupportsDelegation } from "@isnadi/shared/delegationProviders";
 import type {
   EnvironmentId,
   GroupHopBudget,
+  GroupId,
   ModelSelection,
   ProviderOptionDescriptor,
   ProviderOptionSelection,
@@ -50,6 +51,11 @@ export type ThreadSettingsSessionProps = {
   readonly hopBudget?: {
     readonly value: number;
     readonly onChange: (hopBudget: GroupHopBudget) => Promise<boolean>;
+  };
+  /** The space this chat answers for; absent on a direct bot chat. */
+  readonly spaceRef?: {
+    readonly environmentId: EnvironmentId;
+    readonly groupId: GroupId;
   };
   /** Deletes the chat's bot. Resolves null on success, or why the server refused. */
   readonly onDeleteBot?: () => Promise<DeleteBotFailure | null>;
@@ -131,6 +137,7 @@ export type ThreadSettingsSessionValue = {
   readonly skillsOnCount: ThreadSettingsSessionProps["skillsOnCount"];
   readonly onDeleteBot: ThreadSettingsSessionProps["onDeleteBot"];
   readonly hopBudget: ThreadSettingsSessionProps["hopBudget"];
+  readonly spaceRef: ThreadSettingsSessionProps["spaceRef"];
   /** False when the shown model's provider can neither hand off work nor receive it. */
   readonly canDelegate: boolean;
 };
@@ -277,6 +284,7 @@ export function ThreadSettingsSessionProvider(
       skillsOnCount: props.skillsOnCount,
       onDeleteBot: props.onDeleteBot,
       hopBudget: props.hopBudget,
+      spaceRef: props.spaceRef,
       canDelegate,
     }),
     [
@@ -300,6 +308,7 @@ export function ThreadSettingsSessionProvider(
       props.skillsOnCount,
       props.onDeleteBot,
       props.hopBudget,
+      props.spaceRef,
       searchQuery,
       showLegacyToggle,
       toggleProvider,

@@ -2,6 +2,9 @@ import type { GroupHopBudget } from "@isnadi/contracts";
 import { stepHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useMobileI18n } from "../../lib/i18n";
 import { getProviderOptionCurrentLabel, getProviderOptionCurrentValue } from "@isnadi/shared/model";
+import { useAtomValue } from "@effect/atom-react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
@@ -12,17 +15,23 @@ import { AppText as Text } from "../../components/AppText";
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
 import { useThemeColor } from "../../lib/useThemeColor";
+import { environmentGroupsAtom } from "../../state/bots";
 import {
   NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET,
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
+import { SettingsRow } from "../settings/components/SettingsRow";
 import { botDeleteRefusalCopy } from "./botDeleteRefusal";
 import { RUNTIME_MODE_CHOICES, selectableChoices } from "./thread-settings-options";
 import {
+  type ThreadSettingsSessionProps,
   type ThreadSettingsSubmenuPage,
   useThreadSettingsSession,
 } from "./thread-settings-session";
-import { useThreadSettingsPickerPresentation } from "./thread-settings-picker-context";
+import {
+  type ThreadSettingsPickerStackParams,
+  useThreadSettingsPickerPresentation,
+} from "./thread-settings-picker-context";
 
 const THREAD_SETTINGS_OPTIONS_LAYOUT_TRANSITION = LinearTransition.duration(180);
 
@@ -83,7 +92,7 @@ function InfoRow(props: {
 }
 
 /** Single option inside a submenu panel. */
-function ChoiceRow(props: {
+export function ChoiceRow(props: {
   readonly label: string;
   readonly description?: string;
   readonly selected: boolean;
@@ -248,6 +257,7 @@ export function ThreadSettingsOptionsItem(props: {
 
   return (
     <View style={{ paddingBottom: insets.bottom + bottomToolbarInset + 12 }}>
+      {session.spaceRef ? <SpaceSettingsDoor spaceRef={session.spaceRef} /> : null}
       <Text className="px-5 pb-2 pt-2 text-sm font-t3-medium text-foreground-muted">
         {t("Options")}
       </Text>
@@ -381,6 +391,33 @@ export function ThreadSettingsOptionsItem(props: {
           </View>
         </>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * The way into the chat's space. The phone has no space screen to hang a
+ * settings link on, so the chat's own settings carry the door — the same row
+ * web puts on the space page, reached from the other side.
+ */
+function SpaceSettingsDoor(props: {
+  readonly spaceRef: NonNullable<ThreadSettingsSessionProps["spaceRef"]>;
+}) {
+  const { t } = useMobileI18n();
+  const navigation = useNavigation<NativeStackNavigationProp<ThreadSettingsPickerStackParams>>();
+  const groups = useAtomValue(environmentGroupsAtom(props.spaceRef.environmentId));
+  const space = groups.find((group) => group.id === props.spaceRef.groupId);
+
+  if (!space) return null;
+
+  return (
+    <View className="mx-4 mb-2 overflow-hidden rounded-2xl bg-card">
+      <SettingsRow
+        icon="person.2"
+        label={t("Space")}
+        value={space.name}
+        onPress={() => navigation.navigate("SpaceSettings", props.spaceRef)}
+      />
     </View>
   );
 }

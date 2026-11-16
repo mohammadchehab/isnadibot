@@ -209,8 +209,9 @@ On this device the layout is stored in the browser for the connected environment
 
 ## Space settings
 
-A space's settings page holds the choices that shape how the space works. Open it from the space's
-**Space actions** menu in its header, or from **Open space settings** at the foot of the space's panel.
+A space's settings hold the choices that shape how the space works. On web and desktop, open them
+from the space's **Space actions** menu in its header, or from **Open space settings** at the foot of
+the space's panel. On mobile, open a group chat's settings and select **Space**.
 
 The page names the space and summarizes it at a glance, for example **4 bots · Ada is the boss**, then
 lists its settings under **Work**:
@@ -223,7 +224,9 @@ add one first, a space with a single bot explains that it is the only bot there,
 boss says its cards wait in the queue until one is chosen. The space's panel keeps the roster and
 links to this page, so each setting has one control.
 
-Space settings are not on mobile yet. Change them on web or desktop.
+On mobile the same two settings live in a sheet. **Boss** pushes the space's bots with the current boss
+checked, and **Keep everyone busy** sits under it. The phone applies the same rules and uses the same
+words as the page, so a choice the server would refuse is unavailable there too.
 
 ## Conversation panel
 
