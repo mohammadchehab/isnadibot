@@ -276,11 +276,31 @@ jobs:
       - name: Test resource monitor
         run: cargo test --locked --manifest-path native/resource-monitor/Cargo.toml
 
+  # Mobile tests run in their own job: the desktop job's package filter excludes @isnadi/mobile, so
+  # without this job no CI run executes them, and a red mobile suite cannot fail the build.
+  mobile:
+    name: Mobile tests
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.expected_sha || github.sha }}
+
+      - name: Install workspace
+        uses: ./.github/actions/install
+
+      - name: Test the mobile app
+        run: vp run --filter @isnadi/mobile test
+
   # The only job the repository ruleset requires. It stays green when docs-only pull requests skip the
   # heavy jobs, and fails when any job fails, is cancelled, or is skipped when it should have run.
   check:
     name: Repository checks
-    needs: [changes, static, desktop, server, native]
+    needs: [changes, static, desktop, server, native, mobile]
     if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
