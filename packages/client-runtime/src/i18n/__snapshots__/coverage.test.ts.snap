@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 2014,
+  "directMessageCount": 2018,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -59,6 +59,12 @@ exports[`discovered interface message coverage > covers static calls and finite 
       "member.name)}</p>",
       "member.title)}</p>",
       "noticeCopy(member.notice))}</p>",
+    ],
+    "apps/web/src/components/fleet/RoleLibraryDialog.tsx": [
+      "selectedRole.name);",
+      "role.name)}</span>",
+      "role.description)}</span>",
+      "selectedRole.name) })}",
     ],
     "apps/web/src/components/fleet/SquadSetupHeading.tsx": [
       "templateName));",
@@ -475,6 +481,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/computer/ComputerViewerDialog.tsx",
     "apps/web/src/components/computer/ComputerViewerPanel.tsx",
     "apps/web/src/components/fleet/HireMemberRow.tsx",
+    "apps/web/src/components/fleet/RoleLibraryDialog.tsx",
     "apps/web/src/components/fleet/SquadSetupHardBlock.tsx",
     "apps/web/src/components/fleet/SquadSetupHeading.tsx",
     "apps/web/src/components/fleet/SquadSetupScreen.tsx",

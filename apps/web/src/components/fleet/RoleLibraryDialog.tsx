@@ -51,12 +51,25 @@ export function RoleLibraryDialog({
   const createBot = useAtomCommand(botEnvironment.create, { reportFailure: false });
   const rows = roleLibraryRows();
   const [roleId, setRoleId] = useState<string>(() => rows[0]?.id ?? "");
-  const [name, setName] = useState("");
+  /** What the user typed; `null` while the field still follows the role's suggestion. */
+  const [editedName, setEditedName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedRole = rows.find((role) => role.id === roleId) ?? rows[0];
+  const roleName = selectedRole === undefined ? "" : t(selectedRole.name);
+  // The frame rests with the suggestion filled in and Add live, so hiring a bot
+  // costs one click: the field follows the role until the user types over it.
+  const suggestedName = suggestedBotName(roleName, takenNames);
+  const name = editedName ?? suggestedName;
   const trimmedName = name.trim();
   const canAdd = selectedRole !== undefined && trimmedName.length > 0 && !submitting;
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    // Reopening starts from the suggestion again, whichever role is current then.
+    if (!nextOpen) setEditedName(null);
+
+    onOpenChange(nextOpen);
+  };
 
   const handleAdd = async () => {
     if (selectedRole === undefined || trimmedName.length === 0 || environmentId === null) return;
@@ -88,15 +101,14 @@ export function RoleLibraryDialog({
         return;
       }
 
-      setName("");
-      onOpenChange(false);
+      handleOpenChange(false);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup
         className="flex max-h-(--spacing-dvh-2rem) max-w-lg flex-col overflow-hidden"
         bottomStickOnMobile={false}
@@ -118,16 +130,16 @@ export function RoleLibraryDialog({
           </DialogHeader>
 
           <DialogPanel className="grid gap-5">
-            <RadioGroup value={roleId} onValueChange={setRoleId}>
+            <RadioGroup value={roleId} onValueChange={setRoleId} className="gap-2">
               {rows.map((role) => (
                 <label
                   key={role.id}
-                  className="flex items-start gap-3 rounded-md p-2 hover:bg-accent/50"
+                  className="flex items-start gap-3 rounded-lg border border-border px-3.5 py-3 hover:bg-accent/50"
                 >
                   <Radio value={role.id} className="mt-0.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="font-medium text-sm">{t(role.name)}</span>
-                    <span className="text-muted-foreground text-sm">{t(role.description)}</span>
+                    <span className="text-muted-foreground text-xs">{t(role.description)}</span>
                   </span>
                   <span className="shrink-0 text-muted-foreground text-xs">
                     {roleModelLabel(role, providers)}
@@ -141,18 +153,14 @@ export function RoleLibraryDialog({
               <Input
                 id="role-library-name"
                 value={name}
-                placeholder={
-                  selectedRole === undefined
-                    ? ""
-                    : suggestedBotName(t(selectedRole.name), takenNames)
-                }
-                onChange={(event) => setName(event.target.value)}
+                placeholder={suggestedName}
+                onChange={(event) => setEditedName(event.target.value)}
               />
             </div>
           </DialogPanel>
 
           <DialogFooter className="shrink-0">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               {t("Cancel")}
             </Button>
             <Button type="submit" disabled={!canAdd}>
