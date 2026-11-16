@@ -34,8 +34,10 @@ import { OrchestrationProjectionSnapshotQueryLive } from "../ProjectionSnapshotQ
 import * as ThreadBackgroundLiveness from "../../ThreadBackgroundLiveness.ts";
 import * as ThreadPlanProgress from "../../ThreadPlanProgress.ts";
 import { ProviderCommandReactorLive } from "../ProviderCommandReactor.ts";
+import { DelegationWakeReactorLive } from "../DelegationWakeReactor.ts";
 import { OrchestrationEngineService } from "../../Services/OrchestrationEngine.ts";
 import { ProviderCommandReactor } from "../../Services/ProviderCommandReactor.ts";
+import { DelegationWakeReactor } from "../../Services/DelegationWakeReactor.ts";
 import { ProjectionSnapshotQuery } from "../../Services/ProjectionSnapshotQuery.ts";
 import { PersistenceSqlError } from "../../../persistence/Errors.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -614,6 +616,19 @@ export function createProviderCommandHarness() {
           Effect.gen(function* () {
             const context = yield* Layer.build(Layer.fresh(ProviderCommandReactorLive));
             const started = Context.get(context, ProviderCommandReactor);
+            yield* started.start();
+
+            return started;
+          }).pipe(Scope.provide(reactorScope)),
+        ),
+      // Runs the real wake reactor over the same persistence. A test that needs
+      // a delegating bot to pick up a finished child's result starts it, then
+      // waits on `drainThrough` instead of a timer.
+      startDelegationWakeReactor: (reactorScope: Scope.Scope) =>
+        managedRuntime.runPromise(
+          Effect.gen(function* () {
+            const context = yield* Layer.build(Layer.fresh(DelegationWakeReactorLive));
+            const started = Context.get(context, DelegationWakeReactor);
             yield* started.start();
 
             return started;
