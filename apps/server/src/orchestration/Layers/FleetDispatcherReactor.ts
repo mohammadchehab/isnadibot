@@ -65,6 +65,21 @@ type ChatCreation =
   | { readonly kind: "none"; readonly reason: "no-chat-project" | "chat-create-failed" };
 
 /**
+ * One decision a pass reached about a group. A skip always carries its reason, so every skip the
+ * dispatcher reports can be read as a diagnosis rather than as silence.
+ */
+type SkipDecision = {
+  readonly kind: "skipped";
+  readonly reason: SkipReason;
+  readonly itemId?: WorkItemId;
+  readonly botId?: BotId;
+};
+
+type DispatchDecision =
+  | { readonly kind: "assigned"; readonly itemId: WorkItemId; readonly botId: BotId }
+  | SkipDecision;
+
+/**
  * How long a requeued item waits before the dispatcher tries it again. A death is usually the
  * provider being briefly unavailable, so the retry is one breath, not a spin.
  */
@@ -132,27 +147,45 @@ const make = Effect.gen(function* () {
   // Where the retry sleep is forked: the layer's scope, so it dies with the reactor.
   const scope = yield* Effect.scope;
 
-  const publishDecision = (
-    groupId: GroupId,
-    kind: "assigned" | "skipped",
-    fields: {
-      readonly itemId?: WorkItemId;
-      readonly botId?: BotId;
-      readonly reason?: SkipReason;
-    },
-  ) =>
+  // An empty queue is a healthy group between turns, and the wake that finds it is routine, so it
+  // is a detail an operator can ask for rather than a warning on every turn end. Every other
+  // reason means work is waiting and not moving, which is what the failure paths warn about. Both
+  // name the group, the reason, and the member and item when a pass had them in hand.
+  const logSkip = (groupId: GroupId, decision: SkipDecision) => {
+    const line = "fleet dispatcher skipped a group";
+
+    const fields = {
+      groupId,
+      reason: decision.reason,
+      itemId: decision.itemId,
+      botId: decision.botId,
+    };
+
+    return decision.reason === "queue-empty"
+      ? Effect.logDebug(line, fields)
+      : Effect.logWarning(line, fields);
+  };
+
+  // Every decision the dispatcher makes flows through here, and the receipt bus is in-process and
+  // read by tests only. A skip leaves the queue exactly as it was, so without a log line a running
+  // server shows nothing at all while a group waits all day.
+  const publishDecision = (groupId: GroupId, decision: DispatchDecision) =>
     DateTime.now.pipe(
-      Effect.flatMap((now) =>
-        runtimeReceiptBus.publish({
-          type: "fleet.dispatch.decided",
+      Effect.flatMap((now) => {
+        const receipt = {
+          type: "fleet.dispatch.decided" as const,
           groupId,
-          kind,
-          ...(fields.itemId === undefined ? {} : { itemId: fields.itemId }),
-          ...(fields.botId === undefined ? {} : { botId: fields.botId }),
-          ...(fields.reason === undefined ? {} : { reason: fields.reason }),
+          kind: decision.kind,
+          ...(decision.itemId === undefined ? {} : { itemId: decision.itemId }),
+          ...(decision.botId === undefined ? {} : { botId: decision.botId }),
+          ...(decision.kind === "skipped" ? { reason: decision.reason } : {}),
           createdAt: DateTime.formatIso(now),
-        }),
-      ),
+        };
+
+        return decision.kind === "skipped"
+          ? logSkip(groupId, decision).pipe(Effect.andThen(runtimeReceiptBus.publish(receipt)))
+          : runtimeReceiptBus.publish(receipt);
+      }),
     );
 
   // The claim is the only authority on who owns the item: it rejects when another group took the
@@ -492,7 +525,8 @@ const make = Effect.gen(function* () {
       });
 
       if (waiting.length === 0) {
-        yield* publishDecision(group.id, "skipped", {
+        yield* publishDecision(group.id, {
+          kind: "skipped",
           reason: queued.length === 0 ? "queue-empty" : "retry-pending",
         });
 
@@ -510,7 +544,7 @@ const make = Effect.gen(function* () {
 
         sweepState.skipped = true;
 
-        return publishDecision(group.id, "skipped", fields);
+        return publishDecision(group.id, { kind: "skipped", ...fields });
       };
 
       let lostClaim = false;
@@ -584,7 +618,11 @@ const make = Effect.gen(function* () {
           continue;
         }
 
-        yield* publishDecision(group.id, "assigned", { itemId: item.id, botId: pick.bot.id });
+        yield* publishDecision(group.id, {
+          kind: "assigned",
+          itemId: item.id,
+          botId: pick.bot.id,
+        });
         sweepState.busied.add(pick.bot.id);
       }
 
