@@ -9,6 +9,7 @@ import {
   sharedProjectMemoryMode,
 } from "@isnadi/client-runtime/durable-memory";
 import type { MessageKey } from "@isnadi/client-runtime/i18n";
+import { useSkillRegistry } from "@isnadi/client-runtime/skills";
 import { EnvironmentId } from "@isnadi/contracts";
 import type { MemorySettingsPatch } from "@isnadi/contracts/settings";
 import Constants from "expo-constants";
@@ -366,9 +367,13 @@ function EnvironmentMemorySettingsSection({
 
 function GeneralSettingsSection() {
   const { t } = useMobileI18n();
+  const registry = useSkillRegistry();
 
   return (
     <SettingsSection title={t("General")}>
+      {registry.state === "unavailable" ? null : (
+        <SettingsRow icon="sparkles" label={t("Skills")} target="SettingsSkills" />
+      )}
       <SettingsRow icon="folder" label={t("Project Grouping")} target="SettingsProjectGrouping" />
       <SettingsRow icon="chart.bar.xaxis" label={t("Usage")} target="SettingsUsage" />
     </SettingsSection>
