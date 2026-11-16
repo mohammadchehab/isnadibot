@@ -20,6 +20,7 @@ import {
   OrchestrationCheckpointFile,
   ResponderTrigger,
   OrchestrationMessageReaction,
+  OrchestrationMessageRole,
   OrchestrationProposedPlanId,
   OrchestrationReadModel,
   OrchestrationThreadSearchSource,
@@ -36,6 +37,7 @@ import {
   type OrchestrationProject,
   type OrchestrationSession,
   type OrchestrationThreadActivity,
+  type OrchestrationThreadPreviewMessage,
   ModelSelection,
   ProjectId,
   ThreadLinkedPullRequest,
@@ -203,6 +205,14 @@ export const ProjectionLatestTurnDbRowSchema = Schema.Struct({
   trigger: Schema.optional(Schema.NullOr(Schema.fromJsonString(ResponderTrigger))),
   sourceProposedPlanThreadId: Schema.NullOr(ThreadId),
   sourceProposedPlanId: Schema.NullOr(OrchestrationProposedPlanId),
+});
+
+/** One chat's newest user or assistant message, already cut to preview width. */
+export const ProjectionThreadPreviewDbRowSchema = Schema.Struct({
+  threadId: ProjectionThread.fields.threadId,
+  text: Schema.String,
+  role: OrchestrationMessageRole,
+  speakerBotId: Schema.NullOr(BotId),
 });
 
 export const ProjectionStateDbRowSchema = ProjectionState;
@@ -452,6 +462,12 @@ export function mapLatestTurn(
         }
       : {}),
   };
+}
+
+export function mapThreadPreview(
+  row: Schema.Schema.Type<typeof ProjectionThreadPreviewDbRowSchema>,
+): OrchestrationThreadPreviewMessage {
+  return { text: row.text, role: row.role, speakerBotId: row.speakerBotId };
 }
 
 export function mapTitleRegeneration(row: Schema.Schema.Type<typeof ProjectionThreadDbRowSchema>) {

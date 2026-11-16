@@ -24,6 +24,7 @@ import {
   mapLatestTurn,
   mapTitleRegeneration,
   mapSessionRow,
+  mapThreadPreview,
   mapBotRow,
   mapGroupRow,
   shellHopBudget,
@@ -48,6 +49,7 @@ export function createLookups({
   getActiveThreadRowById,
   getLatestTurnRowByThread,
   getThreadSessionRowByThread,
+  getLatestThreadPreviewRow,
   threadBackgroundLiveness,
   threadPlanProgress,
   getThreadRuntimeContextRow,
@@ -77,6 +79,7 @@ export function createLookups({
   | "getActiveThreadRowById"
   | "getLatestTurnRowByThread"
   | "getThreadSessionRowByThread"
+  | "getLatestThreadPreviewRow"
   | "threadBackgroundLiveness"
   | "threadPlanProgress"
   | "getThreadRuntimeContextRow"
@@ -315,7 +318,7 @@ export function createLookups({
 
   const getThreadShellById: ProjectionSnapshotQueryShape["getThreadShellById"] = (threadId) =>
     Effect.gen(function* () {
-      const [threadRow, latestTurnRow, sessionRow] = yield* Effect.all([
+      const [threadRow, latestTurnRow, sessionRow, previewRow] = yield* Effect.all([
         getActiveThreadRowById({ threadId }).pipe(
           Effect.mapError(
             toPersistenceSqlOrDecodeError(
@@ -337,6 +340,14 @@ export function createLookups({
             toPersistenceSqlOrDecodeError(
               "ProjectionSnapshotQuery.getThreadShellById:getSession:query",
               "ProjectionSnapshotQuery.getThreadShellById:getSession:decodeRow",
+            ),
+          ),
+        ),
+        getLatestThreadPreviewRow({ threadId }).pipe(
+          Effect.mapError(
+            toPersistenceSqlOrDecodeError(
+              "ProjectionSnapshotQuery.getThreadShellById:getPreview:query",
+              "ProjectionSnapshotQuery.getThreadShellById:getPreview:decodeRow",
             ),
           ),
         ),
@@ -386,6 +397,7 @@ export function createLookups({
           threadRow.value.threadId,
         ),
         planProgress: threadPlanProgress.getThreadPlanProgress(threadRow.value.threadId),
+        lastMessage: Option.isSome(previewRow) ? mapThreadPreview(previewRow.value) : null,
       } satisfies OrchestrationThreadShell);
     });
 

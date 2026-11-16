@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 2021,
+  "directMessageCount": 2024,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -478,6 +478,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/chat/chatPaletteActions.ts",
     "apps/web/src/components/chat/composerProviderMenuItems.ts",
     "apps/web/src/components/chat/traitsPicker.logic.ts",
+    "apps/web/src/components/chats/ChatsPage.tsx",
     "apps/web/src/components/computer/ComputerViewerDialog.tsx",
     "apps/web/src/components/computer/ComputerViewerPanel.tsx",
     "apps/web/src/components/decisions/DecisionRow.tsx",
@@ -665,6 +666,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/hooks/useChatActions.ts",
     "apps/web/src/routes/-RootRouteErrorView.tsx",
     "apps/web/src/routes/__root.tsx",
+    "apps/web/src/routes/_chat.chats.tsx",
     "apps/web/src/routes/_chat.routines.tsx",
     "packages/client-runtime/src/botInbox.ts",
     "packages/client-runtime/src/channelPresentation.ts",

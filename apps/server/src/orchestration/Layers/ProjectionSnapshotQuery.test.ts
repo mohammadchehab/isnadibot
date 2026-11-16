@@ -435,6 +435,11 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           },
           interactionMode: "default",
           runtimeMode: "full-access",
+          lastMessage: {
+            role: "assistant",
+            speakerBotId: null,
+            text: "hello from projection",
+          },
           branch: null,
           worktreePath: null,
           linkedPullRequest: {
