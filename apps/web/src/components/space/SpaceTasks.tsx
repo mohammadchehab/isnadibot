@@ -308,6 +308,7 @@ function TaskCard({
 }) {
   const { t } = useI18n();
   const actions = workItemActions(card.state);
+  const blockedNote = card.blockedOn?.note;
 
   return (
     <Card className="min-w-0 gap-2 p-3">
@@ -347,15 +348,19 @@ function TaskCard({
         </Menu>
       </div>
       {/*
-        The state label only. This badge is one line at a fixed height, so a note up to 200
-        characters would truncate to a fragment and cost the card the word that says what state it
-        is in. The note is read in the standup, where it gets a full line.
+        The badge carries the state, never the note: it is one line at a fixed height, so a note up
+        to 200 characters would truncate to a fragment and cost the card the word that says what
+        state it is in. The note gets its own line, bounded at two, so the reader on this tab still
+        learns why the card stopped.
       */}
       {card.state === "blocked" ? (
         <Badge size="sm" variant="warning">
           {t("Blocked")}
         </Badge>
       ) : null}
+      {blockedNote === undefined ? null : (
+        <bdi className="line-clamp-2 text-xs text-muted-foreground">{blockedNote}</bdi>
+      )}
       {assignedBy ? (
         <span className="truncate text-xs text-muted-foreground">
           {t("Assigned by {name}", { name: assignedBy.name })}
