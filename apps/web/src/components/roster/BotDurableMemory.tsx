@@ -194,7 +194,6 @@ function DurableFactsSection({
       {failure ? (
         <p role="alert" className="text-sm text-destructive">
           {t(failure.message)}
-          {failure.detail ? ` ${failure.detail}` : null}
         </p>
       ) : null}
       {query.isPending && !query.data ? (

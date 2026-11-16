@@ -258,15 +258,16 @@ export const DURABLE_FACT_CONFLICT_MESSAGE: MessageKey =
   "This fact changed somewhere else. The latest version is shown now.";
 
 /**
- * Plain copy for a failed fact mutation. `message` is a catalog key; `detail` is the raw
- * server text for failures without a stable meaning, shown as received next to it.
- * `conflict` tells the caller its copy is stale; the command already refreshes the lists,
- * so the latest version arrives on its own.
+ * Plain copy for a failed fact mutation. `message` is a catalog key the surface translates.
+ * `conflict` tells the caller its copy is stale; the command already refreshes the lists, so
+ * the latest version arrives on its own.
+ *
+ * There is no `detail`: the server's `detail` is the raw cause, and the contract says it stays
+ * a log field and never becomes copy, because it can carry a filesystem path or an internal id.
  */
 type DescribeDurableFactFailureResult = {
   readonly conflict: boolean;
   readonly message: MessageKey;
-  readonly detail: string | null;
 };
 
 export function describeDurableFactFailure(cause: unknown): DescribeDurableFactFailureResult {
@@ -276,20 +277,16 @@ export function describeDurableFactFailure(cause: unknown): DescribeDurableFactF
     return {
       conflict: false,
       message: "This connection can read memory but not change it.",
-      detail: null,
     };
   }
 
-  const detail =
-    Predicate.isObjectOrArray(cause) && "detail" in cause
-      ? String(cause.detail)
-      : cause instanceof Error
-        ? cause.message
-        : null;
+  // A save that lost the compare-and-swap names it in the error's typed reason, so the case is
+  // recognised by code rather than by matching the server's sentence.
+  const reason = Predicate.isObjectOrArray(cause) && "reason" in cause ? cause.reason : undefined;
 
-  if (detail?.includes("revision conflict")) {
-    return { conflict: true, message: DURABLE_FACT_CONFLICT_MESSAGE, detail: null };
+  if (tag === "IsnadiMemoryOperationError" && reason === "memory-changed") {
+    return { conflict: true, message: DURABLE_FACT_CONFLICT_MESSAGE };
   }
 
-  return { conflict: false, message: "The fact could not be updated.", detail: detail || null };
+  return { conflict: false, message: "The fact could not be updated." };
 }

@@ -400,9 +400,10 @@ describe("durable fact actions", () => {
       describeDurableFactFailure({
         _tag: "IsnadiMemoryOperationError",
         operation: "facts.mutate",
+        reason: "memory-changed",
         detail: "Memory revision conflict for root-1. Expected 3, found 4.",
       }),
-    ).toEqual({ conflict: true, message: DURABLE_FACT_CONFLICT_MESSAGE, detail: null });
+    ).toEqual({ conflict: true, message: DURABLE_FACT_CONFLICT_MESSAGE });
     expect(
       describeDurableFactFailure({
         _tag: "EnvironmentAuthorizationError",
@@ -413,13 +414,50 @@ describe("durable fact actions", () => {
     expect(
       describeDurableFactFailure({
         _tag: "IsnadiMemoryOperationError",
+        operation: "facts.mutate",
         detail: "Memory is turned off.",
       }),
     ).toEqual({
       conflict: false,
       message: "The fact could not be updated.",
-      detail: "Memory is turned off.",
     });
+  });
+
+  it("recognises a revision conflict by its typed reason, not by the server's sentence", () => {
+    // The old detector matched "revision conflict" inside the server's text, so a copy change
+    // upstream silently broke it. A reasonless failure that happens to read like a conflict is
+    // not one, and a typed one is even when its sentence says nothing about revisions.
+    expect(
+      describeDurableFactFailure({
+        _tag: "IsnadiMemoryOperationError",
+        operation: "facts.mutate",
+        detail: "Memory revision conflict for root-1. Expected 3, found 4.",
+      }).conflict,
+    ).toBe(false);
+    expect(
+      describeDurableFactFailure({
+        _tag: "IsnadiMemoryOperationError",
+        operation: "facts.mutate",
+        reason: "memory-changed",
+        detail: "The fact could not be saved.",
+      }).conflict,
+    ).toBe(true);
+  });
+
+  it("never hands a caller the server's raw detail, so no path or id reaches a screen", () => {
+    const leaked = {
+      _tag: "IsnadiMemoryOperationError",
+      operation: "facts.mutate",
+      detail: "ENOENT: no such file or directory, open '/Users/alex/.isnadi/memory/USER.md'",
+    };
+
+    const described = describeDurableFactFailure(leaked);
+
+    // The shape itself is the guard: there is no field left to render the cause with, so a
+    // future caller cannot reintroduce the leak without changing this assertion.
+    expect(Object.keys(described).sort()).toEqual(["conflict", "message"]);
+    expect(JSON.stringify(described)).not.toContain("/Users/alex");
+    expect(JSON.stringify(described)).not.toContain("ENOENT");
   });
 });
 
