@@ -120,11 +120,8 @@ export function SkillRegistryRow({
           </Badge>
         )}
       </TableCell>
-      <TableCell
-        presentation="muted"
-        className="w-18 px-3 py-2.5 align-top font-mono text-11px tabular-nums"
-      >
-        {skillSizeLabel(skill.sizeTokens)}
+      <TableCell presentation="muted" className="w-18 px-3 py-2.5 align-top">
+        <span className="font-mono text-11px tabular-nums">{skillSizeLabel(skill.sizeTokens)}</span>
       </TableCell>
       <TableCell presentation="muted" className="w-24 px-3 py-2.5 align-top text-xs">
         {attention ? (
