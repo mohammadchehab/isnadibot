@@ -34,6 +34,7 @@
 
   --leading-copy: 1.45;
   --leading-copy-tight: 1.4;
+  --leading-18px: 18px;
 
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
 
@@ -63,6 +64,7 @@
   --spacing-min-40rem-vw-2rem: min(40rem, calc(100vw - 2rem));
   --spacing-min-92vw-24rem: min(92vw, 24rem);
   --spacing-min-42rem-pct-2\.5rem: min(42rem, calc(100% - 2.5rem));
+  --spacing-min-45rem-pct-2rem: min(45rem, calc(100% - 2rem));
   --spacing-min-46rem-pct-2rem: min(46rem, calc(100% - 2rem));
   --spacing-min-48rem-pct-2rem: min(48rem, calc(100% - 2rem));
   --spacing-min-21\.625rem-dvh-2rem: min(21.625rem, calc(100dvh - 2rem));

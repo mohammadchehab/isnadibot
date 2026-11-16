@@ -26,12 +26,18 @@ export interface RoutineActionProps {
 
 export function RoutineCard({
   routine,
+  ownerName = null,
   busy,
   onOpen,
   onSetEnabled,
   onSetPaused,
 }: {
   readonly routine: RoutineAdapterItem;
+  /**
+   * The bot the routine belongs to. A cross-bot list names the owner in the schedule
+   * line; the per-bot panel is already inside that bot and leaves it out.
+   */
+  readonly ownerName?: string | null;
   readonly busy: boolean;
   readonly onOpen: () => void;
 } & Pick<RoutineActionProps, "onSetEnabled" | "onSetPaused">) {
@@ -72,6 +78,7 @@ export function RoutineCard({
             {routine.name}
           </span>
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {ownerName === null ? null : <bdi>{`${ownerName} · `}</bdi>}
             {routineScheduleLabel(routine.schedule, i18n)}
           </span>
         </span>

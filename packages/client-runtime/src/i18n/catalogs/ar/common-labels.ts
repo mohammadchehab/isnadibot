@@ -150,6 +150,7 @@ export const commonLabelsCatalog = {
   Daily: "يوميًا",
   "App access request": "طلب وصول إلى التطبيق",
   Collapse: "اطوِ",
+  "Collapse sidebar": "اطوِ الشريط الجانبي",
   Goal: "الهدف",
   Identity: "الهوية",
   "Use an API key": "استخدم مفتاح API",

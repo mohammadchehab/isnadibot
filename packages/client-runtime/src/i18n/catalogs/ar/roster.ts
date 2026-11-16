@@ -329,6 +329,8 @@ export const rosterCatalog = {
   "Project ID": "معرّف المشروع",
   "No routines yet. Ask a bot to do something on a schedule.":
     "لا توجد روتينات بعد. اطلب من بوت أن يفعل شيئا وفق جدول.",
+  "No routines yet": "لا توجد روتينات بعد",
+  "Ask a bot to do something on a schedule.": "اطلب من بوت أن يفعل شيئا وفق جدول.",
   "The routine details did not come through. Read the bot's last message before creating it.":
     "لم تصل تفاصيل الروتين. اقرأ آخر رسالة من البوت قبل إنشائه.",
   "Chat with your bots and start new work": "تحادث مع بوتاتك وابدأ عملا جديدا",

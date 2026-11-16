@@ -152,6 +152,7 @@ export const commonLabelsCatalog = {
   Daily: "每天",
   "App access request": "应用访问请求",
   Collapse: "收起",
+  "Collapse sidebar": "收起侧边栏",
   Goal: "目标",
   Identity: "身份",
   "Use an API key": "使用 API 密钥",

@@ -34,6 +34,7 @@ const run: RoutineAdapterRun = {
 
 const routine: RoutineAdapterItem = {
   id: "routine-1",
+  botId: "bot-1",
   name: "Morning brief",
   prompt: "Summarize the inbox and prepare the daily brief.",
   projectId: "project-1",

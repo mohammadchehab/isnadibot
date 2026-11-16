@@ -18,6 +18,7 @@ import {
   relativeRunTime,
   botRoutinesView,
   enabledSkillNames,
+  environmentRoutinesView,
   routineApprovalSummary,
   routineLifecycleAction,
   routineStateNote,
@@ -156,6 +157,37 @@ describe("botRoutinesView", () => {
       connectors: ["Gmail"],
       procedureApproved: true,
     });
+  });
+});
+
+describe("environmentRoutinesView", () => {
+  it("waits for the snapshot before claiming anything", () => {
+    expect(environmentRoutinesView(null)).toEqual({ kind: "loading" });
+  });
+
+  it("separates an environment without routines from one with none yet", () => {
+    expect(environmentRoutinesView({})).toEqual({ kind: "unavailable" });
+    expect(environmentRoutinesView({ routines: [] })).toEqual({ kind: "ready", routines: [] });
+  });
+
+  it("lists every bot's live routines, not just one bot's", () => {
+    const other = decodeRoutine({
+      ...routine,
+      id: RoutineId.make("routine-2"),
+      botId: "bot-2",
+      job: "Nightly backup",
+    });
+
+    const deleted = decodeRoutine({
+      ...routine,
+      id: RoutineId.make("routine-3"),
+      lifecycle: "deleted",
+    });
+
+    const view = environmentRoutinesView({ ...snapshot, routines: [routine, other, deleted] });
+
+    if (view.kind !== "ready") throw new Error("the view should be ready");
+    expect(view.routines.map((item) => item.id)).toEqual(["routine-1", "routine-2"]);
   });
 });
 
