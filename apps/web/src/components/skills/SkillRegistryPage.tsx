@@ -192,7 +192,7 @@ export function SkillRegistryPage({
             </TableBody>
             <TableFooter>
               <TableRow presentation="flush">
-                <TableCell presentation="muted" colSpan={6} className="h-10 px-3 text-11px">
+                <TableCell presentation="muted" size="compact" colSpan={6} className="h-10 px-3">
                   {t(
                     "Size is what loads when a skill is used. The index costs about 30 tokens per skill.",
                   )}
