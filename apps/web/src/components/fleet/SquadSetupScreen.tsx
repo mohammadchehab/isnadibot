@@ -135,7 +135,13 @@ function SquadSetup({ template }: { readonly template: FleetTemplate }) {
             <SquadSetupHeading templateName={template.name} />
             {/* A refusal this client cannot clear by editing the squad is drawn as
                 the frame's band, so it is read before the squad it blocks. */}
-            <SquadSetupHardBlockBand message={hardBlockMessage(hardBlock, t)} />
+            <SquadSetupHardBlockBand
+              hardBlock={hardBlock}
+              message={hardBlockMessage(hardBlock, t)}
+              onOpenSettings={() =>
+                void navigate({ to: "/settings/$section", params: { section: "providers" } })
+              }
+            />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{t("Boss")}</p>

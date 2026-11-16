@@ -1,7 +1,9 @@
 import type { FleetHireBlocker } from "@isnadi/client-runtime/fleet/hire-plan";
 import { TriangleAlertIcon } from "lucide-react";
 
-import { Alert, AlertDescription } from "../ui/alert";
+import { useI18n } from "../../i18n";
+import { Alert, AlertAction, AlertDescription } from "../ui/alert";
+import { Button } from "../ui/button";
 
 /**
  * The refusals squad setup cannot get past from inside the screen. A missing or
@@ -47,16 +49,38 @@ export function squadSetupCaptionBlocker(
  * A hard block, drawn the way the frame draws it: a full-width band under the
  * heading, read before the squad it blocks, with Create left in the footer.
  * Warning is the drawn variant and both blocks are the same kind of news, so
- * they share it. Neither has an action this screen can offer — re-pairing and
- * connecting a provider happen elsewhere — so the band carries none.
+ * they share it.
+ *
+ * Only the provider block has a way out this app can reach: a provider is
+ * connected in Settings, so the band carries the frame's action (2f: Button
+ * Outline xs, "Open Settings"). Environment rights are granted by whoever owns
+ * the environment, not on a settings page, so that band stays actionless rather
+ * than offering a button that leads nowhere.
  */
-export function SquadSetupHardBlockBand({ message }: { readonly message: string | null }) {
-  if (message === null) return null;
+export function SquadSetupHardBlockBand({
+  hardBlock,
+  message,
+  onOpenSettings,
+}: {
+  readonly hardBlock: SquadSetupHardBlock | null;
+  readonly message: string | null;
+  readonly onOpenSettings: () => void;
+}) {
+  const { t } = useI18n();
+
+  if (hardBlock === null || message === null) return null;
 
   return (
     <Alert variant="warning" controlAlignment="first-line">
       <TriangleAlertIcon aria-hidden />
       <AlertDescription>{message}</AlertDescription>
+      {hardBlock === "no-provider" ? (
+        <AlertAction>
+          <Button variant="outline" size="xs" onClick={onOpenSettings}>
+            {t("Open Settings")}
+          </Button>
+        </AlertAction>
+      ) : null}
     </Alert>
   );
 }

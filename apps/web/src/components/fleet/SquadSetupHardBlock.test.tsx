@@ -55,9 +55,15 @@ describe("squad setup footer caption", () => {
 });
 
 describe("squad setup hard block band", () => {
+  const noop = () => {};
+
   it("draws the reason as the frame's warning Alert", () => {
     const markup = renderToStaticMarkup(
-      <SquadSetupHardBlockBand message="No provider can run this bot yet." />,
+      <SquadSetupHardBlockBand
+        hardBlock="no-provider"
+        message="No provider can run this bot yet."
+        onOpenSettings={noop}
+      />,
     );
 
     expect(markup).toContain('role="alert"');
@@ -65,7 +71,40 @@ describe("squad setup hard block band", () => {
     expect(markup).toContain("No provider can run this bot yet.");
   });
 
+  it("offers the frame's way out when no provider can run the squad", () => {
+    const markup = renderToStaticMarkup(
+      <SquadSetupHardBlockBand
+        hardBlock="no-provider"
+        message="No provider can run this bot yet."
+        onOpenSettings={noop}
+      />,
+    );
+
+    // Frame 2f: Button Outline xs, "Open Settings", in the band's action slot.
+    expect(markup).toContain("Open Settings");
+    expect(markup).toContain('data-slot="alert-action"');
+  });
+
+  it("offers no action when the environment's rights are the block", () => {
+    // A settings page cannot grant them, so a button there would lead nowhere.
+    const markup = renderToStaticMarkup(
+      <SquadSetupHardBlockBand
+        hardBlock="environment-rights"
+        message="This environment does not allow you to hire bots."
+        onOpenSettings={noop}
+      />,
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).not.toContain("Open Settings");
+    expect(markup).not.toContain('data-slot="alert-action"');
+  });
+
   it("draws nothing for a screen no hard block is on", () => {
-    expect(renderToStaticMarkup(<SquadSetupHardBlockBand message={null} />)).toBe("");
+    expect(
+      renderToStaticMarkup(
+        <SquadSetupHardBlockBand hardBlock={null} message={null} onOpenSettings={noop} />,
+      ),
+    ).toBe("");
   });
 });
