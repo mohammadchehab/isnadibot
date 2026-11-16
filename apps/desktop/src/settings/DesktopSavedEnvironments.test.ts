@@ -35,6 +35,7 @@ describe("DesktopSavedEnvironments", () => {
         assert.equal(persisted.version, 1);
         assert.lengthOf(persisted.records, 1);
       }),
+      { fileSystem: "disk" },
     ),
   );
 
