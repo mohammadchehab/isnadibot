@@ -110,6 +110,7 @@ export const commonMessagesCatalog = {
   "Result delivered to {name}": "结果已发送给 {name}",
   "Delegation to {name}": "委派给 {name}",
   "{parent} asked {child}": "{parent} 请 {child} 处理",
+  "{name} needs an answer": "{name} 需要答复",
   "{count} open": "{count} 个待处理",
   "Next: {action}": "下一步：{action}",
   "Opening page…": "正在打开页面…",

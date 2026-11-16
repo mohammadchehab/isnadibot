@@ -9,6 +9,7 @@ import {
   type DelegationAction,
   delegationActions,
   delegationElapsedMs,
+  descendantDelegations,
   presentDelegation,
 } from "@isnadi/client-runtime/delegation-presentation";
 import { scopeThreadRef } from "@isnadi/client-runtime/environment";
@@ -27,10 +28,14 @@ import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { BotAvatarView } from "./BotAvatarView";
+import { DelegationDescendantApproval } from "./DelegationDescendantApproval";
 import { DelegationDetail, delegationStateLabel, formatDelegationAccess } from "./DelegationDetail";
 import { useDelegationClock } from "./delegationClock";
 import type { Bot } from "./types";
 import { useRosterPendingApproval } from "./useRosterPendingApproval";
+
+/** A stable empty list, so a card without the environment's list keeps referential equality. */
+const NO_DELEGATIONS: ReadonlyArray<IsnadiDelegationRecord> = [];
 
 const STATE_DOT: Record<IsnadiDelegationState, string> = {
   queued: "bg-muted-foreground/50",
@@ -180,6 +185,7 @@ function actionCopy(action: DelegationAction, t: Translate, name: string) {
 export function DelegationCard({
   delegation,
   delegations,
+  environmentDelegations = NO_DELEGATIONS,
   childBot,
   parentBot,
   variant = "bot",
@@ -187,6 +193,11 @@ export function DelegationCard({
 }: {
   readonly delegation: IsnadiDelegationRecord;
   readonly delegations: ReadonlyArray<IsnadiDelegationRecord>;
+  /**
+   * Every delegation in the environment. A card cannot see the work its own
+   * child chat started from `delegations`, which holds only this chat's.
+   */
+  readonly environmentDelegations?: ReadonlyArray<IsnadiDelegationRecord>;
   readonly childBot: Bot | null;
   readonly parentBot: Bot | null;
   readonly variant?: "bot" | "group";
@@ -204,6 +215,14 @@ export function DelegationCard({
         ? scopeThreadRef(environmentId, presentation.childThreadId)
         : null,
     [presentation.childThreadId, environmentId],
+  );
+
+  const descendantApprovals = useMemo(
+    () =>
+      presentation.childThreadId === null
+        ? []
+        : descendantDelegations(environmentDelegations, presentation.childThreadId),
+    [environmentDelegations, presentation.childThreadId],
   );
 
   const childThread = useThreadShell(childThreadRef);
@@ -301,6 +320,9 @@ export function DelegationCard({
           />
         </div>
       )}
+      {descendantApprovals.map((descendant) => (
+        <DelegationDescendantApproval key={descendant.delegationId} delegation={descendant} />
+      ))}
       <details className="mt-1 text-xs text-muted-foreground" data-delegation-details>
         <summary className="min-h-11 w-fit content-center">{t("Details")}</summary>
         <dl className="flex flex-col gap-1 pb-1">

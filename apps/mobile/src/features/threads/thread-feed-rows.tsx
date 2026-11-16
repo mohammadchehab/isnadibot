@@ -196,6 +196,7 @@ export function renderFeedEntry(
         actions={entry.actions}
         childBot={botsById?.get(entry.delegation.childBotId) ?? null}
         parentBot={botsById?.get(entry.delegation.parentBotId) ?? null}
+        botsById={botsById}
       />
     );
   }

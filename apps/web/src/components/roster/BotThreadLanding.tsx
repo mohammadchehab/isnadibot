@@ -251,8 +251,13 @@ export function BotThreadLanding({
     [messages, today, todayLabel, locale],
   );
 
-  const { timelineItems, delegations, waitingOnChildren, olderRoutineNotes } =
-    useBotLandingTimeline({ threadRef: runtime.linkedThreadRef, snapshot, entries });
+  const {
+    timelineItems,
+    delegations,
+    environmentDelegations,
+    waitingOnChildren,
+    olderRoutineNotes,
+  } = useBotLandingTimeline({ threadRef: runtime.linkedThreadRef, snapshot, entries });
 
   const arrivedMessageIds = useMessageArrivals(
     { owner: botId, thread: runtime.linkedThreadRef?.threadId ?? null },
@@ -437,6 +442,7 @@ export function BotThreadLanding({
                       <DelegationCard
                         delegation={item.delegation}
                         delegations={delegations}
+                        environmentDelegations={environmentDelegations}
                         childBot={activeBot(item.delegation.childBotId)}
                         parentBot={activeBot(item.delegation.parentBotId)}
                       />

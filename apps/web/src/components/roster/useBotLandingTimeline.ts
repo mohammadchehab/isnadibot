@@ -210,6 +210,9 @@ export function useBotLandingTimeline(input: {
   return {
     timelineItems,
     delegations,
+    // The whole environment's list, so a card can reach the work its own child
+    // chat started — `delegations` above holds only this chat's.
+    environmentDelegations: snapshot?.delegations ?? [],
     waitingOnChildren,
     olderRoutineNotes: {
       nextCursor: nextRoutineCursor,
