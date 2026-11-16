@@ -560,6 +560,14 @@ export function ThreadSettingsModelsScreen() {
             return;
           }
 
+          if (submenu.kind === "skills") {
+            if (session.botSkillsRef) {
+              navigation.navigate("ThreadSettingsSkills", session.botSkillsRef);
+            }
+
+            return;
+          }
+
           const title =
             submenu.kind === "runtime"
               ? "Runtime"

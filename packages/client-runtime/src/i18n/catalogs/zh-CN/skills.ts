@@ -86,4 +86,15 @@ export const skillsCatalog = {
   "What bots in this space can do. Turn one on for a bot in its chat.":
     "机器人在这台空间里能做什么。在它的聊天里为某个机器人开启技能。",
   "needs your approval": "需要你的批准",
+  "{name}'s skills": "{name} 的技能",
+  "{space} · {count} on": "{space} · {count} 项开启",
+  "{count} on": "{count} 项开启",
+  "On for this bot": "此机器人已开启",
+  Anywhere: "任意位置",
+  "Let {name} load this space's skills when a task matches. It sees names and one-line descriptions only.":
+    "允许 {name} 在任务匹配时加载此空间的技能。它只能看到名称和一行说明。",
+  "Turning a skill off keeps it in the space. It only stops this bot from loading it.":
+    "关闭技能不会将其移出空间，只会阻止此机器人加载它。",
+  "Open the registry": "打开注册表",
+  "Could not change this bot's skills": "无法更改此机器人的技能",
 } as const;

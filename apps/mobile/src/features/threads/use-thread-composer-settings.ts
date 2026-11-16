@@ -111,6 +111,7 @@ export function useThreadComposerSettings(input: {
       ...(bot && bot.archivedAt === null && selectedThread.groupId === null
         ? { engineBotRef: { environmentId, botId: bot.id } }
         : {}),
+      ...(bot && bot.archivedAt === null ? { botSkillsRef: { environmentId, botId: bot.id } } : {}),
       providerGroups: threadProviderGroups,
       selectedModel: currentModelSelection,
       onSelectModel: (option) => onUpdateModelSelection(option.selection),

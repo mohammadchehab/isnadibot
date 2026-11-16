@@ -1,5 +1,6 @@
 import { driverSupportsDelegation } from "@isnadi/shared/delegationProviders";
 import type {
+  BotId,
   EnvironmentId,
   GroupHopBudget,
   ModelSelection,
@@ -23,6 +24,7 @@ export type ThreadSettingsSubmenuPage =
   | { readonly kind: "descriptor"; readonly id: string }
   | { readonly kind: "runtime" }
   | { readonly kind: "memory" }
+  | { readonly kind: "skills" }
   | { readonly kind: "routines" };
 
 export type ThreadSettingsSessionProps = {
@@ -41,6 +43,11 @@ export type ThreadSettingsSessionProps = {
     readonly environmentId: EnvironmentId;
     readonly botId: string;
     readonly botName?: string;
+  };
+  /** The chat's bot whose skills sheet the "Skills on" row opens. */
+  readonly botSkillsRef?: {
+    readonly environmentId: EnvironmentId;
+    readonly botId: BotId;
   };
   /** How many fallback models the chat's bot has; edited on web and desktop. */
   readonly fallbackCount?: number;
@@ -127,6 +134,7 @@ export type ThreadSettingsSessionValue = {
   readonly toggleProvider: (providerKey: string) => void;
   readonly memoryThreadRef: ThreadSettingsSessionProps["memoryThreadRef"];
   readonly routinesRef: ThreadSettingsSessionProps["routinesRef"];
+  readonly botSkillsRef: ThreadSettingsSessionProps["botSkillsRef"];
   readonly fallbackCount: ThreadSettingsSessionProps["fallbackCount"];
   readonly skillsOnCount: ThreadSettingsSessionProps["skillsOnCount"];
   readonly onDeleteBot: ThreadSettingsSessionProps["onDeleteBot"];
@@ -273,6 +281,7 @@ export function ThreadSettingsSessionProvider(
       toggleProvider,
       memoryThreadRef: props.memoryThreadRef,
       routinesRef: props.routinesRef,
+      botSkillsRef: props.botSkillsRef,
       fallbackCount: props.fallbackCount,
       skillsOnCount: props.skillsOnCount,
       onDeleteBot: props.onDeleteBot,
@@ -296,6 +305,7 @@ export function ThreadSettingsSessionProvider(
       props.runtimeMode,
       props.memoryThreadRef,
       props.routinesRef,
+      props.botSkillsRef,
       props.fallbackCount,
       props.skillsOnCount,
       props.onDeleteBot,
