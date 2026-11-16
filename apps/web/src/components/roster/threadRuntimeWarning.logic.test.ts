@@ -332,10 +332,15 @@ describe("commandFailure", () => {
     expect(failure.message).not.toContain("group-owned thread");
   });
 
-  it("keeps the server sentence for a code this client does not know", () => {
+  it("shows its own sentence for a code this client does not know", () => {
+    // TASK-384 AC4, per the architect's 2026-11-16T13:24Z ruling: the refusal
+    // vocabulary is the server's, so a code this build cannot name is not news it
+    // can word. The server's sentence for a coded refusal is where the invariant
+    // prose and the ids inside it reach a screen, so it must not appear here.
     const failure = commandFailure(refusalFailure("a-code-from-a-newer-server"), translate);
 
-    expect(failure.message).toContain("group-owned thread");
+    expect(failure.message).toBe("Could not send the message.");
+    expect(failure.message).not.toContain("group-owned thread");
   });
 
   it("still shows catalog copy when a caller passes no translator", () => {
