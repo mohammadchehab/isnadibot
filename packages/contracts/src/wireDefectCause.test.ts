@@ -27,6 +27,21 @@ function defectsIn(ast: SchemaAST.AST, path: string, found: Array<string>): void
       defectsIn(property.type, path === "" ? name : `${path}.${name}`, found);
     }
 
+    // A `Schema.Record` carries its value type here, not in a property signature.
+    for (const index of ast.indexSignatures) {
+      defectsIn(index.type, `${path}[key]`, found);
+    }
+
+    return;
+  }
+
+  // `Schema.Array` and `Schema.Tuple` are both an `Arrays` node: a tuple's fixed
+  // positions are `elements`, an array's element type is in `rest`.
+  if (SchemaAST.isArrays(ast)) {
+    for (const element of ast.elements) defectsIn(element, `${path}[]`, found);
+
+    for (const rest of ast.rest) defectsIn(rest, `${path}[...]`, found);
+
     return;
   }
 
@@ -70,5 +85,29 @@ describe("A failure's Defect stays on the server", () => {
     defectsIn(RegressedError.ast, "", found);
 
     expect(found).toEqual(["cause"]);
+  });
+
+  it("is caught inside an array, a tuple and a record, not just a field", () => {
+    class RegressedError extends Schema.TaggedErrorClass<RegressedError>()("RegressedError", {
+      cause: Schema.optional(Schema.Defect()),
+    }) {}
+
+    // Each of these nests the same Defect one shape deeper. Before the walker
+    // descended Arrays and index signatures, every one of them found nothing.
+    const shapes = {
+      array: Schema.Array(RegressedError),
+      tuple: Schema.Tuple([Schema.String, RegressedError]),
+      record: Schema.Record(Schema.String, RegressedError),
+    };
+
+    for (const [shape, schema] of Object.entries(shapes)) {
+      const found: Array<string> = [];
+      defectsIn(schema.ast, "", found);
+
+      expect({
+        shape,
+        found: found.length > 0 && found.every((at) => at.endsWith("cause")),
+      }).toEqual({ shape, found: true });
+    }
   });
 });
