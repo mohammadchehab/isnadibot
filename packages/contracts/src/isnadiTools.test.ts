@@ -866,6 +866,12 @@ const CREDENTIAL_PATHS = [
  * Keystores and key material whose extension names no credential word (TASK-390,
  * family 1). A `.p8` is an Apple private key and a `.kdbx` is a whole KeePass
  * database, so one delegated read of it hands over everything it holds.
+ *
+ * The second group is TASK-410. Each of these extensions had no alternative in
+ * the rule at all, so only the hidden form was caught: `.jceks` was refused
+ * because a leading dot is a hidden segment, and `bundle.jceks` was an ordinary
+ * read. Spelling these suffixed, not dot-prefixed, is the whole point — a
+ * `.jceks` case passes before the fix and pins nothing.
  */
 const KEYSTORE_BASENAMES = [
   "bundle.p12",
@@ -875,6 +881,14 @@ const KEYSTORE_BASENAMES = [
   "bundle.ppk",
   "vault.kdbx",
   "auth.json",
+  "bundle.jceks",
+  "truststore.bcfks",
+  "vault.kdb",
+  "app.keystore",
+  "cert.der",
+  "client.ovpn",
+  "key.gpg",
+  "signature.asc",
 ] as const;
 
 /**
@@ -882,8 +896,35 @@ const KEYSTORE_BASENAMES = [
  * hidden-segment rule already refuses `.netrc`, `.npmrc` and `.kube/config`, so
  * these are the same files with the dot dropped — the form that used to slip
  * through, because nothing keys on a name that has no dot and no extension.
+ *
+ * The TASK-410 group extends that idea to build-tool and system files. These
+ * are matched as exact names, never as suffixes: `gradle.properties` must be
+ * refused while `gradle-wrapper.properties` stays ordinary, so a `properties`
+ * suffix would break the false-positive control in the next test.
  */
-const DOTLESS_CREDENTIAL_BASENAMES = ["netrc", "npmrc", "kubeconfig"] as const;
+const DOTLESS_CREDENTIAL_BASENAMES = [
+  "netrc",
+  "npmrc",
+  "kubeconfig",
+  "pypirc",
+  "gradle.properties",
+  "settings.xml",
+  "nuget.config",
+  "_netrc",
+  "shadow",
+] as const;
+
+/**
+ * One context per file is the common kubeconfig shape, so the rule matches
+ * `kubeconfig` as a suffix rather than an exact name (TASK-410, AC1). Anchoring
+ * it to the whole segment was the gap: bare `kubeconfig` was refused and every
+ * prefixed variant — the form people actually have — was an ordinary read.
+ */
+const PREFIXED_KUBECONFIG_BASENAMES = [
+  "prod.kubeconfig",
+  "dev.kubeconfig",
+  "staging.kubeconfig",
+] as const;
 
 describe("Sensitive path classification", () => {
   const read = ISNADI_TOOL_CATALOG.find((tool) => tool.id === "ExternalRead")!;
@@ -909,6 +950,13 @@ describe("Sensitive path classification", () => {
     expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
   });
 
+  it.each(PREFIXED_KUBECONFIG_BASENAMES)("refuses a read of the prefixed %s", (basename) => {
+    const path = `/home/me/project/${basename}`;
+
+    expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(true);
+  });
+
   it("refuses a credential name that is a folder, not the basename", () => {
     // A rule that reads only the last segment misses all four of these.
     for (const path of [
@@ -927,6 +975,11 @@ describe("Sensitive path classification", () => {
     }
   });
 
+  // AC4. The last five are TASK-410's control on its own new alternatives.
+  // `gradle-wrapper.properties` reds if `gradle.properties` is matched as a
+  // `properties` suffix; `settings.json` and `mysettings.xml` red if
+  // `settings.xml` is matched as a prefix; `monkey.txt` reds if `.key` loses its
+  // dot; `consideration.md` reds if `.der` does.
   it("still auto-approves ordinary source in the same folder", () => {
     for (const path of [
       "/home/me/project/src/index.ts",
@@ -935,6 +988,13 @@ describe("Sensitive path classification", () => {
       "./README.md",
       "../notes.md",
       "C:\\Users\\me\\project\\notes.md",
+      "/home/me/project/gradle/wrapper/gradle-wrapper.properties",
+      "/home/me/project/settings.json",
+      "/home/me/project/config.xml",
+      "/home/me/project/report.pdf",
+      "/home/me/project/mysettings.xml",
+      "/home/me/project/monkey.txt",
+      "/home/me/project/consideration.md",
     ]) {
       expect(isnadiToolApprovalForInput(read, { path })).toBe("user-computer");
       expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(false);

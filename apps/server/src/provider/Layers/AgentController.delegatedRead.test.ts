@@ -122,6 +122,12 @@ const makeFolders = () => {
  * The credential filenames a security review measured the old denylist missing
  * (TASK-382). A delegated read of any of them must be declined, because the
  * sensitive-path classifier is the only gate a `none` ceiling leaves on it.
+ *
+ * TASK-410 adds the families that review missed: the suffixed keystore and key
+ * material, the dotless build-tool names, and the prefixed kubeconfig. Each is
+ * spelled in the form that was actually an ordinary read — `bundle.jceks`, not
+ * `.jceks` — so this table proves the real gap is closed, not the hidden form
+ * that was already caught.
  */
 const CREDENTIAL_PATHS = [
   ".npmrc",
@@ -145,6 +151,22 @@ const CREDENTIAL_PATHS = [
   "credentials.json",
   "secrets.yaml",
   "token.txt",
+  "prod.kubeconfig",
+  "dev.kubeconfig",
+  "bundle.jceks",
+  "truststore.bcfks",
+  "vault.kdb",
+  "app.keystore",
+  "cert.der",
+  "client.ovpn",
+  "key.gpg",
+  "signature.asc",
+  "pypirc",
+  "gradle.properties",
+  "settings.xml",
+  "nuget.config",
+  "_netrc",
+  "shadow",
 ] as const;
 
 /** Writes `relative` inside `root`, creating the folders its name needs. */
