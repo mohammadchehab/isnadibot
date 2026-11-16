@@ -276,7 +276,7 @@ export function UsageProviderChart({
   // A blank plot reads as broken; the breakdown below already says this, so match it.
   if (peak === 0) {
     return (
-      <p className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+      <p className="flex h-31 items-center justify-center text-sm text-muted-foreground sm:h-48">
         No activity in this window.
       </p>
     );
@@ -286,7 +286,9 @@ export function UsageProviderChart({
     <div dir="ltr" className="flex flex-col gap-1">
       <div
         ref={plotRef}
-        className="relative h-48"
+        // The frame's phone card is 160 tall and its desktop card 236, so the
+        // plot gives up the difference rather than letting the card grow.
+        className="relative h-31 sm:h-48"
         onMouseMove={handleMove}
         onMouseLeave={() => {
           hoverPositionRef.current = null;

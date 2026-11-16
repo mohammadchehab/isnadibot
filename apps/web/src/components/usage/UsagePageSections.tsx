@@ -271,7 +271,7 @@ export function UsageSkeleton() {
         <div className="flex flex-col gap-3">
           <Skeleton shimmer={false} className="h-7 w-35 rounded-lg" />
           <div className="rounded-xl border border-border p-2">
-            <Skeleton shimmer={false} tone="faint" className="h-48" />
+            <Skeleton shimmer={false} tone="faint" className="h-31 sm:h-48" />
             <Skeleton shimmer={false} className="mt-1 h-3 w-full" />
           </div>
         </div>
