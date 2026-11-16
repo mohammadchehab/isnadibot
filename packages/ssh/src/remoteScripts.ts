@@ -269,6 +269,37 @@ printf 'Remote host is missing the isnadi CLI and could not install @@T3_PACKAGE
 exit 1
 `;
 
+/**
+ * Whether a remote PID is gone, for scripts that have to wait for one to exit.
+ *
+ * `kill -0` answers "does this PID exist", and a zombie's PID does: a process that has exited but
+ * whose parent has not reaped it yet still answers to `kill -0`. Asking only that question reports
+ * a server that already stopped as still running, and under load the parent's reap can lag past any
+ * bounded poll. Read the state as well, and treat `Z` as exited.
+ *
+ * `ps` can also print nothing for a PID that `kill -0` accepted a moment earlier, because the
+ * process was reaped in between. That is the same answer as a zombie, so confirm it with `kill -0`
+ * once more rather than assuming the worst: a host whose `ps` cannot report a live process must not
+ * turn a running server into a stopped one.
+ */
+const REMOTE_PROCESS_STOPPED_SCRIPT = `process_has_stopped() {
+  PID_TO_CHECK="$1"
+  if ! kill -0 "$PID_TO_CHECK" 2>/dev/null; then
+    return 0
+  fi
+  PROCESS_STATE="$(ps -o stat= -p "$PID_TO_CHECK" 2>/dev/null | tr -d '[:space:]' || true)"
+  case "$PROCESS_STATE" in
+    Z*) return 0 ;;
+    "")
+      if kill -0 "$PID_TO_CHECK" 2>/dev/null; then
+        return 1
+      fi
+      return 0
+      ;;
+  esac
+  return 1
+}`;
+
 export const REMOTE_LAUNCH_SCRIPT = `set -eu
 @@T3_NODE_ENV_SCRIPT@@
 STATE_KEY="$1"
@@ -309,10 +340,11 @@ wait_ready() {
 @@T3_WAIT_READY_SCRIPT@@
 NODE
 }
+${REMOTE_PROCESS_STOPPED_SCRIPT}
 wait_for_pid_exit() {
   PID_TO_WAIT="$1"
   WAIT_COUNT=0
-  while kill -0 "$PID_TO_WAIT" 2>/dev/null && [ "$WAIT_COUNT" -lt 20 ]; do
+  while ! process_has_stopped "$PID_TO_WAIT" && [ "$WAIT_COUNT" -lt 20 ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
     sleep 0.1
   done
@@ -448,14 +480,15 @@ PORT_FILE="$STATE_DIR/port"
 MANAGED_FILE="$STATE_DIR/managed"
 REMOTE_MANAGED="$(cat "$MANAGED_FILE" 2>/dev/null || true)"
 REMOTE_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
-if [ "$REMOTE_MANAGED" != "external" ] && [ -n "$REMOTE_PID" ] && kill -0 "$REMOTE_PID" 2>/dev/null; then
+${REMOTE_PROCESS_STOPPED_SCRIPT}
+if [ "$REMOTE_MANAGED" != "external" ] && [ -n "$REMOTE_PID" ] && ! process_has_stopped "$REMOTE_PID"; then
   kill "$REMOTE_PID" 2>/dev/null || true
   WAIT_COUNT=0
-  while kill -0 "$REMOTE_PID" 2>/dev/null && [ "$WAIT_COUNT" -lt 20 ]; do
+  while ! process_has_stopped "$REMOTE_PID" && [ "$WAIT_COUNT" -lt 20 ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
     sleep 0.1
   done
-  if kill -0 "$REMOTE_PID" 2>/dev/null; then
+  if ! process_has_stopped "$REMOTE_PID"; then
     printf 'Remote Isnadi server with PID %s did not stop within 2 seconds. Its ownership files were kept.\\n' "$REMOTE_PID" >&2
     exit 1
   fi

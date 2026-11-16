@@ -318,6 +318,118 @@ server.listen(0, "127.0.0.1", () => {
           }
         }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
     );
+
+    it.live("reports a server stopped while its exited process is still an unreaped zombie", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const fixture = yield* fs.makeTempDirectoryScoped({ prefix: "isnadi-stop-zombie-" });
+        const pidPath = path.join(fixture, "pid");
+
+        // A holder that spawns the server and then blocks its own event loop, so the exited
+        // server is never reaped. A loaded machine produces this by accident; here it is the
+        // point. `kill -0` answers "yes" for as long as the zombie lasts.
+        const holder = yield* spawner.spawn(
+          ChildProcess.make(
+            process.execPath,
+            [
+              "--input-type=module",
+              "-e",
+              `import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import * as path from "node:path";
+const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" });
+writeFileSync(path.join(process.argv[1], "pid"), String(child.pid));
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 60000);
+`,
+              fixture,
+            ],
+            { cwd: fixture, detached: false },
+          ),
+        );
+
+        // Every path kills the holder, or it sits on a core for a minute.
+        yield* Effect.addFinalizer(() =>
+          holder.kill({ killSignal: "SIGKILL" }).pipe(Effect.ignore),
+        );
+
+        const readProcessState = (pid: string) =>
+          Effect.gen(function* () {
+            const ps = yield* spawner.spawn(ChildProcess.make("ps", ["-o", "stat=", "-p", pid]));
+            const state = yield* ps.stdout.pipe(Stream.decodeText(), Stream.mkString);
+            yield* ps.exitCode;
+
+            return state.trim();
+          });
+
+        let serverPid = "";
+        let state = "";
+
+        for (let attempt = 0; attempt < 250; attempt += 1) {
+          const pid = (yield* fs.exists(pidPath)) ? (yield* fs.readFileString(pidPath)).trim() : "";
+
+          if (pid !== "") {
+            serverPid = pid;
+            state = yield* readProcessState(pid);
+          }
+
+          if (state.startsWith("Z")) {
+            break;
+          }
+
+          yield* Effect.sleep("20 millis");
+        }
+
+        assert.isTrue(
+          state.startsWith("Z"),
+          `the holder never let its server become a zombie (state [${state}])`,
+        );
+
+        yield* fs.writeFileString(path.join(fixture, "managed"), "managed\n");
+
+        const script = buildRemoteStopScript({
+          alias: "fixture",
+          hostname: "fixture",
+          username: null,
+          port: null,
+        });
+
+        // Redirect only the state directory. Never use the developer's SSH state.
+        const isolatedScript = script.replace(/^STATE_DIR=.*$/mu, 'STATE_DIR="$T3_TEST_STATE_DIR"');
+
+        assert.notEqual(isolatedScript, script);
+
+        const stop = yield* spawner.spawn(
+          ChildProcess.make("/bin/sh", ["-s"], {
+            cwd: fixture,
+            env: { T3_TEST_STATE_DIR: fixture },
+            stdin: Stream.make(new TextEncoder().encode(isolatedScript)),
+          }),
+        );
+
+        const result = yield* Effect.all(
+          {
+            stdout: stop.stdout.pipe(Stream.decodeText(), Stream.mkString),
+            stderr: stop.stderr.pipe(Stream.decodeText(), Stream.mkString),
+            exitCode: stop.exitCode,
+          },
+          { concurrency: "unbounded" },
+        );
+
+        assert.equal(result.exitCode, 0);
+        assert.equal(result.stdout, '{"stopped":true}\n');
+        assert.equal(result.stderr, "");
+
+        for (const name of ["pid", "managed"]) {
+          assert.isFalse(yield* fs.exists(path.join(fixture, name)));
+        }
+
+        // The zombie outlived the stop, so the stop answered the question it was actually asked.
+        assert.isTrue(yield* holder.isRunning);
+        assert.isTrue((yield* readProcessState(serverPid)).startsWith("Z"));
+      }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+    );
   },
 );
 
