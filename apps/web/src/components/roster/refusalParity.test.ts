@@ -6,13 +6,10 @@ import { botArchiveFailureToast } from "./botArchive.logic";
 import { botDeleteFailureToast } from "./botDelete.logic";
 
 /**
- * A refusal sentence the way the server writes it: the invariant's own prose, a
- * person id, and a group id. None of it may reach a person.
+ * An internal id or the invariant's vocabulary, which no copy may contain. Since
+ * TASK-384 AC4 neither toast accepts a server sentence at all, so this now pins
+ * the copy table itself rather than the toasts' handling of what they were given.
  */
-const serverSentence = (code: string) =>
-  `Orchestration command invariant failed (bot.delete): Person 'person-9f2a' is not a member of group 'group-7c1d'. [${code}]`;
-
-/** An internal id or the invariant's vocabulary, which no copy may contain. */
 const INTERNAL_PROSE = /person-9f2a|group-7c1d|invariant/i;
 
 /**
@@ -35,18 +32,14 @@ describe("refusal parity across the roster toasts", () => {
 
   it("never prints an id or the invariant prose, for any code, from either toast", () => {
     for (const code of CommandRefusalCodes) {
-      const message = serverSentence(code);
-
       const deleted = botDeleteFailureToast({
         refusal: code,
-        message,
         botName: "Ada",
         bossSpaceName: "Bookkeeping",
       });
 
       const archived = botArchiveFailureToast({
         refusal: code,
-        message,
         botName: "Ada",
         bossSpaceName: "Bookkeeping",
       });
@@ -67,7 +60,6 @@ describe("refusal parity across the roster toasts", () => {
       expect(
         botDeleteFailureToast({
           refusal: code,
-          message: serverSentence(code),
           botName: "Ada",
           bossSpaceName: null,
         }).description,
@@ -75,7 +67,6 @@ describe("refusal parity across the roster toasts", () => {
       expect(
         botArchiveFailureToast({
           refusal: code,
-          message: serverSentence(code),
           botName: "Ada",
           bossSpaceName: "Bookkeeping",
         }).description,
@@ -83,16 +74,17 @@ describe("refusal parity across the roster toasts", () => {
     }
   });
 
-  it("keeps the server's sentence for a code no client knows yet", () => {
-    // The other half of the contract: a newer server's refusal still reads
-    // instead of collapsing to a generic line the person cannot act on.
+  it("says the same generic line for a code no client knows yet, on both toasts", () => {
+    // TASK-384 AC4: a newer server's refusal code is not news this build can
+    // word, so both surfaces say their own generic line rather than printing
+    // server prose. The parity is what keeps web and mobile from drifting.
     expect(
-      botDeleteFailureToast({
-        refusal: "unknown",
-        message: "This bot still answers a call.",
-        botName: "Ada",
-        bossSpaceName: null,
-      }).description,
-    ).toBe("This bot still answers a call.");
+      botDeleteFailureToast({ refusal: "unknown", botName: "Ada", bossSpaceName: null })
+        .description,
+    ).toBe("The command failed.");
+    expect(
+      botArchiveFailureToast({ refusal: "unknown", botName: "Ada", bossSpaceName: null })
+        .description,
+    ).toBe("The command failed.");
   });
 });

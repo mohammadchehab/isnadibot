@@ -125,7 +125,6 @@ describe("botDeleteFailureToast", () => {
     expect(
       botDeleteFailureToast({
         refusal: "bot-is-group-boss",
-        message: "Orchestration command invariant failed (bot.delete): Bot 35db651c is the boss.",
         botName: "Ada",
         bossSpaceName: "Bookkeeping",
       }),
@@ -140,7 +139,6 @@ describe("botDeleteFailureToast", () => {
     expect(
       botDeleteFailureToast({
         refusal: "bot-is-group-boss",
-        message: "",
         botName: "Ada",
         bossSpaceName: null,
       }),
@@ -156,7 +154,6 @@ describe("botDeleteFailureToast", () => {
     const toast = botDeleteFailureToast(
       {
         refusal: "bot-is-group-boss",
-        message: "",
         botName: "Ada",
         bossSpaceName: "Bookkeeping",
       },
@@ -173,8 +170,6 @@ describe("botDeleteFailureToast", () => {
     // toast printed that sentence verbatim, group id included.
     const toast = botDeleteFailureToast({
       refusal: "group-would-be-undersized",
-      message:
-        "Orchestration command invariant failed (bot.delete): Group 'grp-9f2' requires at least two active bots.",
       botName: "Ada",
       bossSpaceName: null,
     });
@@ -190,14 +185,9 @@ describe("botDeleteFailureToast", () => {
 
   it("never shows the invariant sentence for a boss refusal", () => {
     // The audit's defect: the old toast printed error.message verbatim, ids and
-    // all. A refusal the client can name is rewritten, whatever the server said.
-    const invariant =
-      "Orchestration command invariant failed (bot.delete): Bot '35db651c-1a2b' is the boss of group 'b5542e55-9c3d'.";
-
     for (const bossSpaceName of ["Bookkeeping", null]) {
       const toast = botDeleteFailureToast({
         refusal: "bot-is-group-boss",
-        message: invariant,
         botName: "Ada",
         bossSpaceName,
       });
@@ -208,29 +198,16 @@ describe("botDeleteFailureToast", () => {
     }
   });
 
-  it("keeps the server's own sentence for a code this client does not know", () => {
-    // The TASK-232 fallback: a newer server's refusal still reads, rather than
-    // collapsing to a generic line the user cannot act on.
+  it("gives a code this client does not know the toast's own sentence", () => {
+    // TASK-384 AC4: the refusal vocabulary is the server's, so a code this build
+    // cannot name is not news it can word. The toast says its generic line
+    // instead of printing server prose it cannot vouch for.
     expect(
-      botDeleteFailureToast({
-        refusal: "unknown",
-        message: "This bot still answers a call.",
-        botName: "Ada",
-        bossSpaceName: null,
-      }),
+      botDeleteFailureToast({ refusal: "unknown", botName: "Ada", bossSpaceName: null }),
     ).toEqual({
       title: "Could not delete Ada",
-      description: "This bot still answers a call.",
+      description: "The command failed.",
       actionLabel: null,
     });
-
-    expect(
-      botDeleteFailureToast({
-        refusal: "unknown",
-        message: "  ",
-        botName: "Ada",
-        bossSpaceName: null,
-      }).description,
-    ).toBe("The command failed.");
   });
 });

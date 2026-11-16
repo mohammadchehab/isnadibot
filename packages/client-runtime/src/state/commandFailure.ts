@@ -114,6 +114,25 @@ function serverMessage(failure: { readonly cause: Cause.Cause<unknown> }): strin
 }
 
 /**
+ * Whether the failure carried a refusal code at all — including one this build
+ * cannot name. `classifyCommandFailure` collapses "no code" and "a code I do not
+ * know" into `unknown`, and the two want opposite treatment: a refusal belongs to
+ * the refusal vocabulary and gets the surface's own sentence, while a failure with
+ * no code at all is a provider, an archive or a sandbox, whose `message` the
+ * contract designates as the sentence a client prints.
+ */
+function carriesRefusalCode(failure: { readonly cause: Cause.Cause<unknown> }): boolean {
+  const error = Cause.squash(failure.cause);
+
+  return (
+    Predicate.isObjectOrArray(error) &&
+    "refusal" in error &&
+    Predicate.isString(error.refusal) &&
+    error.refusal.length > 0
+  );
+}
+
+/**
  * The shared sentence for a refusal code, or null for a code this client does
  * not know. A surface that has more specific copy for one code — a delete that
  * can name the space a bot leads — branches before calling this. Every other
@@ -160,13 +179,17 @@ export function sessionFailureMessage(
 /**
  * The body a surface shows for a refused command, for a caller that has already
  * classified the refusal: the shared copy when the client knows the code, else
- * the server's own sentence, else `fallback`. Surfaces with more specific copy
- * for one code branch first and call this for everything else, so no surface
- * has to decide on its own which codes fall through to the server's sentence.
+ * `fallback`. Surfaces with more specific copy for one code branch first and call
+ * this for everything else, so no surface has to decide on its own which codes
+ * fall through.
+ *
+ * There is no message parameter on purpose. Once a refusal carries a code its
+ * `message` on the wire is a fixed placeholder, so it adds nothing for a code this
+ * build knows and is not the surface's sentence for one it does not. Leaving it
+ * out means this helper cannot emit server text at all.
  */
 export function commandRefusalDescription(
   refusal: CommandFailureRefusal,
-  message: string,
   options: {
     readonly t?: Translate;
     readonly fallback?: string;
@@ -174,24 +197,25 @@ export function commandRefusalDescription(
 ): string {
   const { t = englishTranslate, fallback = "The command failed." } = options;
 
-  const shared = commandRefusalMessage(refusal, t);
-
-  if (shared !== null) return shared;
-
-  return message.trim() || t(fallback);
+  return commandRefusalMessage(refusal, t) ?? t(fallback);
 }
 
 /**
  * The sentence a failed command shows. A refusal code the client knows gets
  * localized copy, because the server's own sentence for it carries internal
  * ids and invariant prose — an `environment-rights` refusal names the person's
- * id and the scope, which is why every surface used to leak it. A code this
- * client does not know keeps the server's sentence, so a newer server's refusal
- * still says something true.
+ * id and the scope, which is why every surface used to leak it. A refusal code
+ * this client does not know gets the surface's own `fallback`: the refusal
+ * vocabulary is the server's, so a code the client cannot name is not news it can
+ * word, and printing the server's sentence there is how free text reaches a screen.
  *
- * `fallback` is the surface's own wording for a failure with neither a known
- * code nor a server sentence. Without a `t` the sentence stays English, which
- * is what an untranslated surface already showed.
+ * A failure that carries no refusal code at all is a different kind of news — a
+ * provider that could not start, an archive from a newer version — and for those
+ * `message` is the sentence the contract designates the client to print, so it stays.
+ *
+ * `fallback` is the surface's own wording for a failure with neither a known code
+ * nor a usable sentence. Without a `t` the sentence stays English, which is what an
+ * untranslated surface already showed.
  */
 export function commandFailureMessage(
   failure: { readonly cause: Cause.Cause<unknown> },
@@ -205,6 +229,8 @@ export function commandFailureMessage(
   const shared = commandRefusalMessage(classifyCommandFailure(failure), t);
 
   if (shared !== null) return shared;
+
+  if (carriesRefusalCode(failure)) return t(fallback);
 
   return serverMessage(failure) ?? t(fallback);
 }

@@ -9,7 +9,7 @@ import type {
   ServerConfig,
   SubscriptionProviderStatus,
 } from "@isnadi/contracts";
-import { commandRefusalOf, squashAtomCommandFailure } from "@isnadi/client-runtime/state/runtime";
+import { commandRefusalOf } from "@isnadi/client-runtime/state/runtime";
 import { effectiveHopBudget } from "@isnadi/shared/groupHopBudget";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -93,7 +93,7 @@ export function useThreadComposerSettings(input: {
   );
 
   const deleteThreadBot = useCallback(async (): Promise<DeleteBotFailure | null> => {
-    if (!bot) return { refusal: "unknown", message: t("The command failed.") };
+    if (!bot) return { refusal: "unknown" };
 
     const result = await deleteBot({
       environmentId: environmentId,
@@ -101,13 +101,9 @@ export function useThreadComposerSettings(input: {
     });
 
     if (!Predicate.isTagged(result, "Failure")) return null;
-    const error = squashAtomCommandFailure(result);
 
-    return {
-      refusal: commandRefusalOf(result),
-      message: error instanceof Error ? error.message : t("The command failed."),
-    };
-  }, [bot, deleteBot, environmentId, t]);
+    return { refusal: commandRefusalOf(result) };
+  }, [bot, deleteBot, environmentId]);
 
   const settingsRouteSession = useMemo<ExistingThreadSettingsRouteSession>(
     () => ({

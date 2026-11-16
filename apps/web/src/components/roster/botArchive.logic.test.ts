@@ -50,14 +50,8 @@ describe("classifyBotArchiveFailure", () => {
 
 describe("botArchiveFailureToast", () => {
   it("names the boss refusal in words, with no bot id or group id", () => {
-    // The live defect: archiving a team lead fell through to the invariant
-    // sentence, two internal ids on the roster's most-used menu.
-    const invariant =
-      "Orchestration command invariant failed (bot.archive): Bot '35db651c-1a2b' is the boss of group 'b5542e55-9c3d'.";
-
     const toast = botArchiveFailureToast({
       refusal: "bot-is-group-boss",
-      message: invariant,
       botName: "Ada",
       bossSpaceName: "Bookkeeping",
     });
@@ -75,7 +69,6 @@ describe("botArchiveFailureToast", () => {
     expect(
       botArchiveFailureToast({
         refusal: "bot-is-group-boss",
-        message: "",
         botName: "Ada",
         bossSpaceName: null,
       }),
@@ -88,20 +81,15 @@ describe("botArchiveFailureToast", () => {
   it("reads the same sentence as the delete toast for the same refusal", () => {
     // Delete carried this branch and archive did not, so the two siblings drifted
     // and only delete spoke in words. The title still names the action while the
-    // space is unknown; the reason is one sentence in both.
-    const invariant = "Orchestration command invariant failed: Bot 'b1' is the boss of group 'g1'.";
-
     for (const bossSpaceName of ["Bookkeeping", null]) {
       const archived = botArchiveFailureToast({
         refusal: "bot-is-group-boss",
-        message: invariant,
         botName: "Ada",
         bossSpaceName,
       });
 
       const deleted = botDeleteFailureToast({
         refusal: "bot-is-group-boss",
-        message: invariant,
         botName: "Ada",
         bossSpaceName,
       });
@@ -114,7 +102,6 @@ describe("botArchiveFailureToast", () => {
     const toast = botArchiveFailureToast(
       {
         refusal: "bot-is-group-boss",
-        message: "",
         botName: "Ada",
         bossSpaceName: "Bookkeeping",
       },
@@ -130,8 +117,6 @@ describe("botArchiveFailureToast", () => {
     // toast printed that sentence verbatim, group id included.
     const toast = botArchiveFailureToast({
       refusal: "group-would-be-undersized",
-      message:
-        "Orchestration command invariant failed (bot.archive): Group 'grp-9f2' requires at least two active bots.",
       botName: "Ada",
       bossSpaceName: null,
     });
@@ -144,12 +129,8 @@ describe("botArchiveFailureToast", () => {
   });
 
   it("never shows a group id, whatever the server said", () => {
-    const invariant =
-      "Orchestration command invariant failed (bot.archive): Group 'grp-9f2' requires at least two active bots.";
-
     const toast = botArchiveFailureToast({
       refusal: "group-would-be-undersized",
-      message: invariant,
       botName: "Ada",
       bossSpaceName: null,
     });
@@ -165,7 +146,6 @@ describe("botArchiveFailureToast", () => {
     const toast = botArchiveFailureToast(
       {
         refusal: "group-would-be-undersized",
-        message: "",
         botName: "Ada",
         bossSpaceName: null,
       },
@@ -178,28 +158,15 @@ describe("botArchiveFailureToast", () => {
     );
   });
 
-  it("keeps the server's own sentence for a code this client does not know", () => {
-    // The TASK-232 fallback: a newer server's refusal still reads, rather than
-    // collapsing to a generic line the user cannot act on.
+  it("gives a code this client does not know the toast's own sentence", () => {
+    // TASK-384 AC4: the refusal vocabulary is the server's, so a code this build
+    // cannot name is not news it can word. The toast says its generic line
+    // instead of printing server prose it cannot vouch for.
     expect(
-      botArchiveFailureToast({
-        refusal: "unknown",
-        message: "This bot still answers a call.",
-        botName: "Ada",
-        bossSpaceName: null,
-      }),
+      botArchiveFailureToast({ refusal: "unknown", botName: "Ada", bossSpaceName: null }),
     ).toEqual({
       title: "Could not archive Ada",
-      description: "This bot still answers a call.",
+      description: "The command failed.",
     });
-
-    expect(
-      botArchiveFailureToast({
-        refusal: "unknown",
-        message: "  ",
-        botName: "Ada",
-        bossSpaceName: null,
-      }).description,
-    ).toBe("The command failed.");
   });
 });

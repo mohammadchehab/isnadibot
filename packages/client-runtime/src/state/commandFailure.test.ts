@@ -534,21 +534,41 @@ describe("commandFailureMessage", () => {
     expect(new Set(sentences).size).toBe(3);
   });
 
-  it("keeps the server sentence for a code it does not know", () => {
+  it("gives a refusal code it cannot name the surface's own sentence", () => {
+    // The refusal vocabulary belongs to the server, so a code this build cannot
+    // name is not news it can word. The server's `message` is not shown: for a
+    // refusal it is a fixed placeholder, and where it is not, printing it is how
+    // free text and the ids inside it reach a screen.
     expect(
-      commandFailureMessage(failed({ refusal: "quota-exceeded", message: "Quota reached." })),
-    ).toBe("Quota reached.");
+      commandFailureMessage(failed({ refusal: "quota-exceeded", message: "Quota reached." }), {
+        fallback: "The bot could not be updated.",
+      }),
+    ).toBe("The bot could not be updated.");
 
-    // A thread-state code this client predates must still say something true
-    // rather than guess at copy: the sentence survives verbatim.
     expect(
       commandFailureMessage(
         failed({
           refusal: "thread-state-unheard-of",
           message: "Thread 'thread-7f3a' is not a group chat, so it has no hop budget.",
         }),
+        { fallback: "The bot could not be updated." },
       ),
-    ).toBe("Thread 'thread-7f3a' is not a group chat, so it has no hop budget.");
+    ).toBe("The bot could not be updated.");
+  });
+
+  it("keeps the server's sentence for a failure that carries no refusal at all", () => {
+    // The false-positive control for the test above: a provider or archive error is
+    // not speaking the refusal vocabulary, and its `message` is the sentence the
+    // contract designates the client to print — host, port and path included.
+    expect(
+      commandFailureMessage(
+        failed({
+          _tag: "PortabilityArchiveError",
+          operation: "apply",
+          message: "This archive was written by a newer version of the app.",
+        }),
+      ),
+    ).toBe("This archive was written by a newer version of the app.");
   });
 
   it("falls back to the surface's own sentence when the server sent none", () => {

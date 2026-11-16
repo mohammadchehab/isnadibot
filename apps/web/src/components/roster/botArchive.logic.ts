@@ -45,14 +45,17 @@ export interface BotArchiveFailureToast {
  * left too small, and a bot that leads one. The code lets the client say each in
  * words instead. Every other code the client knows takes the shared sentence, so
  * the authorization refusals that name a person id and a group id no longer
- * print them here either. A code this client does not know keeps the server's
- * own sentence, the same fallback delete and group delete use, so a newer
- * server's refusal still says something true.
+ * print them here either. A code this client does not know takes the surface's
+ * own fallback, the same one delete and group delete use: the refusal vocabulary
+ * is the server's, so a code this build cannot name is not news it can word.
+ *
+ * There is no `message` on the input on purpose. Once a refusal carries a code
+ * the wire `message` is a fixed placeholder, so taking it would let a caller pass
+ * server text that is then ignored.
  */
 export function botArchiveFailureToast(
   input: {
     readonly refusal: BotArchiveRefusal;
-    readonly message: string;
     readonly botName: string;
     readonly bossSpaceName: string | null;
   },
@@ -85,6 +88,6 @@ export function botArchiveFailureToast(
 
   return {
     title: t("Could not archive {name}", { name: input.botName }),
-    description: commandRefusalDescription(input.refusal, input.message, { t }),
+    description: commandRefusalDescription(input.refusal, { t }),
   };
 }

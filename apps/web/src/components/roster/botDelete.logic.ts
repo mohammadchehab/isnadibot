@@ -82,13 +82,16 @@ export interface BotDeleteFailureToast {
  * more than the shared sentence can. Every other code the client knows takes
  * the shared sentence, so the authorization refusals that name a person id and
  * a group id no longer print them on the roster menu. A code this client does
- * not know keeps the server's own sentence, so a newer server's refusal still
- * says something true.
+ * not know takes the surface's own fallback: the refusal vocabulary is the
+ * server's, so a code this build cannot name is not news it can word.
+ *
+ * There is no `message` on the input on purpose. Once a refusal carries a code
+ * the wire `message` is a fixed placeholder, so taking it would let a caller pass
+ * server text that is then ignored.
  */
 export function botDeleteFailureToast(
   input: {
     readonly refusal: BotDeleteRefusal;
-    readonly message: string;
     readonly botName: string;
     readonly bossSpaceName: string | null;
   },
@@ -120,7 +123,7 @@ export function botDeleteFailureToast(
 
   return {
     title: t("Could not delete {name}", { name: input.botName }),
-    description: commandRefusalDescription(input.refusal, input.message, { t }),
+    description: commandRefusalDescription(input.refusal, { t }),
     actionLabel: null,
   };
 }
