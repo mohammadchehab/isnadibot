@@ -13,10 +13,13 @@ const EXPECTED_IDS =
     " ",
   );
 
-const INSTALLABLE_IDS: readonly string[] = [];
+const INSTALLABLE_IDS =
+  "context zernio hoplite ahrefs apify apollo atlassian attio cloudflare coda computer-use customer-io datadog exa executor firecrawl github intercom linear mobbin netlify notion paddle paper parallel-search paypal pipedrive posthog railway render semrush sentry sequenzy stripe tavily typefully webflow".split(
+    " ",
+  );
 
 describe("milestone 13 plugin lifecycle matrix", () => {
-  it("keeps verified plugins installable and every unverified plugin blocked", () => {
+  it("keeps every approved or unverified recipe connectable and approval closed", () => {
     const directory = loadDirectoryCatalog();
     const installable = loadCatalog();
     const byId = new Map(directory.map((plugin) => [plugin.id, plugin]));
@@ -61,7 +64,12 @@ describe("milestone 13 plugin lifecycle matrix", () => {
         });
       }
 
-      expect(isInstallablePlugin(plugin)).toBe(false);
+      // Only a vendor that has not approved access stays closed; an unverified
+      // recipe is connectable, because connecting is how it gets verified.
+      // Gmail is the exception: it has no transport of its own to install.
+      expect(isInstallablePlugin(plugin)).toBe(
+        plugin.catalogStatus === "verification-pending" && plugin.kind !== "mcp-unavailable",
+      );
     }
 
     expect(byId.get("typefully")).toMatchObject({

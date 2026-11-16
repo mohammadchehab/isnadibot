@@ -8,12 +8,12 @@ type PluginManifestInstallability = Pick<
 >;
 
 type InstallableManifestFields = {
-  readonly catalogStatus: "available";
-  readonly transport: Exclude<PluginManifest["transport"], { readonly type: "unavailable" }>;
-  readonly connection: Exclude<
-    PluginManifest["connection"],
-    { readonly type: "approval-pending" | "verification-pending" }
+  readonly catalogStatus: Exclude<
+    PluginManifest["catalogStatus"],
+    "approval-pending" | "deprecated"
   >;
+  readonly transport: Exclude<PluginManifest["transport"], { readonly type: "unavailable" }>;
+  readonly connection: Exclude<PluginManifest["connection"], { readonly type: "approval-pending" }>;
 };
 
 function pluginDirectory(manifestPath: string): string {
@@ -54,13 +54,18 @@ export function loadManifestCatalog<T>(
   return Object.freeze(plugins.toSorted(comparePluginOrder));
 }
 
+/**
+ * A verification-pending entry installs: connecting it is how its lifecycle gets
+ * verified. Only a retired entry, a missing transport recipe, or a vendor that
+ * has not approved access keeps the connect action closed.
+ */
 export function isInstallableManifest<T extends PluginManifestInstallability>(
   plugin: T,
 ): plugin is T & InstallableManifestFields {
   return (
-    plugin.catalogStatus === "available" &&
+    plugin.catalogStatus !== "approval-pending" &&
+    plugin.catalogStatus !== "deprecated" &&
     plugin.transport.type !== "unavailable" &&
-    plugin.connection.type !== "approval-pending" &&
-    plugin.connection.type !== "verification-pending"
+    plugin.connection.type !== "approval-pending"
   );
 }

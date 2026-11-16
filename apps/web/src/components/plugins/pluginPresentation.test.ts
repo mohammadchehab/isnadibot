@@ -233,22 +233,19 @@ describe("plugin presentation", () => {
   });
 
   it("uses state-correct actions without claiming a successful connection", () => {
+    // An unverified recipe is connectable: connecting it is how its lifecycle
+    // gets verified, and the card still labels it verification pending.
     expect(pluginPrimaryAction(firecrawl, undefined)).toEqual({
       label: "Connect",
-      enable: null,
-      blocker:
-        firecrawl.connection.type === "verification-pending"
-          ? firecrawl.connection.blocker
-          : undefined,
+      enable: true,
     });
     expect(pluginPrimaryAction(apiKeyPlugin, undefined)).toEqual({
       label: "Add key",
       enable: true,
     });
     expect(pluginPrimaryAction(firecrawl, server(true)).label).toBe("Disable");
-    // A pending entry keeps Disable for installed servers, even when their
-    // access needs reconnecting, but never reconnects into a connection
-    // recipe that has not passed the lifecycle.
+    // An installed entry whose access failed offers the same Reconnect any
+    // other installed entry does, so the user can recover it in place.
     expect(
       pluginPrimaryAction(firecrawl, server(true), {
         id: "mcp-builtin-firecrawl",
@@ -261,14 +258,10 @@ describe("plugin presentation", () => {
         dependentBots: [],
         dependentRoutines: [],
       }),
-    ).toEqual({ label: "Disable", enable: false });
+    ).toEqual({ label: "Reconnect", enable: true });
     expect(pluginPrimaryAction(firecrawl, server(false))).toEqual({
-      label: "Connect",
-      enable: null,
-      blocker:
-        firecrawl.connection.type === "verification-pending"
-          ? firecrawl.connection.blocker
-          : undefined,
+      label: "Reconnect",
+      enable: true,
     });
     expect(pluginConnectionLabel(firecrawl)).toBe("Verification pending");
   });
@@ -283,8 +276,7 @@ describe("plugin presentation", () => {
     expect(pluginConnectionLabel(pendingPlugin)).toBe("Approval pending");
     expect(pluginPrimaryAction(verificationPlugin, undefined)).toEqual({
       label: "Connect",
-      enable: null,
-      blocker: "The connection lifecycle still needs verification.",
+      enable: true,
     });
     expect(pluginConnectionLabel(verificationPlugin)).toBe("Verification pending");
   });

@@ -2,7 +2,7 @@ import { McpServerId, type McpServer } from "@isnadi/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import {
-  isListedIntegration,
+  isDirectoryPlugin,
   loadDirectoryCatalog,
   PLUGIN_CATEGORIES,
   type PluginDirectoryDefinition,
@@ -25,7 +25,7 @@ import { planPluginToggle, pluginMcpServerId } from "./pluginRegistry";
 
 const catalog = loadDirectoryCatalog();
 
-const listedCatalog = catalog.filter(isListedIntegration);
+const directoryCatalog = catalog.filter(isDirectoryPlugin);
 
 const firecrawlEntry = catalog.find((plugin) => plugin.id === "firecrawl");
 
@@ -140,7 +140,7 @@ describe("Plugins dialog content", () => {
     expect(PLUGIN_DIRECTORY_PANEL_CLASS_NAME).not.toContain("pt-5!");
     expect(PLUGIN_DIRECTORY_FILTERS.slice(3)).toEqual(
       PLUGIN_CATEGORIES.filter((category) =>
-        listedCatalog.some((plugin) => plugin.category === category),
+        directoryCatalog.some((plugin) => plugin.category === category),
       ),
     );
   });

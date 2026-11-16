@@ -39,11 +39,14 @@ interface DirectoryStdioPlugin extends CatalogPluginBase {
 
 type InstallableConnection = Exclude<
   PluginManifest["connection"],
-  { readonly type: "approval-pending" | "verification-pending" }
+  { readonly type: "approval-pending" }
 >;
 
 export type CatalogPluginDefinition = (DirectoryUrlPlugin | DirectoryStdioPlugin) & {
-  readonly catalogStatus: "available";
+  readonly catalogStatus: Exclude<
+    PluginManifest["catalogStatus"],
+    "approval-pending" | "deprecated"
+  >;
   readonly connection: InstallableConnection;
 };
 
@@ -155,6 +158,14 @@ export function loadDirectoryCatalog<T = (typeof catalogModules)[string]>(
 
 export function isInstallablePlugin(plugin: PluginDirectoryDefinition): plugin is PluginDefinition {
   return isInstallableManifest(plugin) && plugin.kind !== "mcp-unavailable";
+}
+
+/**
+ * The directory shows every entry that has not been retired, so a pending
+ * lifecycle reads as a pending connection rather than a missing plugin.
+ */
+export function isDirectoryPlugin(plugin: PluginDirectoryDefinition): boolean {
+  return plugin.catalogStatus !== "deprecated";
 }
 
 export function loadCatalog<T = (typeof catalogModules)[string]>(

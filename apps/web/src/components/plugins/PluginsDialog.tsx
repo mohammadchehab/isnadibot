@@ -13,7 +13,6 @@ import {
 import { useChangedSinceMount } from "../../hooks/useChangedSinceMount";
 import { useEffect, useState } from "react";
 import {
-  integrationsShListing,
   isInstallablePlugin,
   type PluginDirectoryDefinition,
   type PluginSkill,
@@ -58,7 +57,7 @@ import {
   PluginSearchField,
   PluginsPageHeader,
 } from "./PluginDirectoryLayout";
-import { FULL_PLUGIN_CATALOG, LISTED_PLUGIN_CATALOG } from "./pluginDirectoryCatalog";
+import { FULL_PLUGIN_CATALOG, PLUGIN_DIRECTORY_CATALOG } from "./pluginDirectoryCatalog";
 import { CustomMcpServers, PluginsCatalog, RemovedBuiltinServers } from "./PluginsCatalog";
 import { PluginDetails } from "./PluginDetails";
 import { runPluginEnablePlan } from "./pluginConnection";
@@ -185,7 +184,7 @@ function PluginsDialogForEnvironment({
     resolvePluginDialogServers(servers);
 
   const sections = buildPluginSections({
-    plugins: LISTED_PLUGIN_CATALOG,
+    plugins: PLUGIN_DIRECTORY_CATALOG,
     query,
     filter,
     installedPluginIds: new Set(installedPlugins.map((plugin) => plugin.id)),
@@ -457,10 +456,7 @@ function PluginsDialogForEnvironment({
               if (server) void removeServer(server);
             }}
             onViewDocumentation={() =>
-              openExternal(
-                integrationsShListing(selectedPlugin.id) ?? selectedPlugin.documentationUrl,
-                t("Could not open integration guide"),
-              )
+              openExternal(selectedPlugin.documentationUrl, t("Could not open integration guide"))
             }
             onViewSource={() => openExternal(selectedPlugin.sourceUrl, t("Could not open source"))}
             onOpenSkill={openPluginSkill}

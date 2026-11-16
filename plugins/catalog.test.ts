@@ -67,7 +67,45 @@ const EXPECTED_DIRECTORY_IDS = [
   "zernio",
 ] as const;
 
-const EXPECTED_INSTALLABLE_IDS = [] as const;
+const EXPECTED_INSTALLABLE_IDS = [
+  "context",
+  "zernio",
+  "hoplite",
+  "ahrefs",
+  "apify",
+  "apollo",
+  "atlassian",
+  "attio",
+  "cloudflare",
+  "coda",
+  "computer-use",
+  "customer-io",
+  "datadog",
+  "exa",
+  "executor",
+  "firecrawl",
+  "github",
+  "intercom",
+  "linear",
+  "mobbin",
+  "netlify",
+  "notion",
+  "paddle",
+  "paper",
+  "parallel-search",
+  "paypal",
+  "pipedrive",
+  "posthog",
+  "railway",
+  "render",
+  "semrush",
+  "sentry",
+  "sequenzy",
+  "stripe",
+  "tavily",
+  "typefully",
+  "webflow",
+] as const;
 
 function manifest(id: string) {
   return parsePluginManifestJson(
@@ -103,7 +141,7 @@ describe("plugin catalog loader", () => {
     ).toMatchObject({ id: "pending-vendor", kind: "mcp-unavailable" });
   });
 
-  it("shows pending URL entries without making them installable", () => {
+  it("installs a verification-pending URL entry and keeps approval-pending closed", () => {
     const context = manifest("context");
 
     const pending = {
@@ -136,7 +174,8 @@ describe("plugin catalog loader", () => {
       { id: "pending-vendor", kind: "mcp-url", catalogStatus: "approval-pending" },
     ]);
     const pendingPlugin = directory[1];
-    expect(isInstallablePlugin(directory[0]!)).toBe(false);
+    // Connecting a verification-pending entry is how its lifecycle gets verified.
+    expect(isInstallablePlugin(directory[0]!)).toBe(true);
     expect(isInstallablePlugin(pendingPlugin!)).toBe(false);
 
     if (pendingPlugin?.catalogStatus !== "approval-pending") {
@@ -146,7 +185,7 @@ describe("plugin catalog loader", () => {
     expectTypeOf(pendingPlugin).not.toMatchTypeOf<PluginDefinition>();
 
     const installable = loadCatalog(modules, assets);
-    expect(installable.map((plugin) => plugin.id)).toEqual([]);
+    expect(installable.map((plugin) => plugin.id)).toEqual(["context"]);
     expect(
       resolveCatalogInstallations(
         [
@@ -171,7 +210,7 @@ describe("plugin catalog loader", () => {
     ]);
   });
 
-  it("loads the complete directory with only verified recipes installable", () => {
+  it("loads the complete directory with every non-pending recipe installable", () => {
     const directory = loadDirectoryCatalog();
     const catalog = loadCatalog();
     expect(directory.map((plugin) => plugin.id).toSorted()).toEqual(EXPECTED_DIRECTORY_IDS);
@@ -282,7 +321,10 @@ describe("plugin catalog loader", () => {
         });
       }
 
-      expect(isInstallablePlugin(plugin)).toBe(false);
+      if (plugin.catalogStatus === "approval-pending") {
+        expect(isInstallablePlugin(plugin)).toBe(false);
+      }
+
       expect(new Set(plugin.approvals)).toEqual(
         new Set(
           plugin.permissions.flatMap((permission) =>
@@ -291,6 +333,10 @@ describe("plugin catalog loader", () => {
         ),
       );
     }
+
+    // Every unverified recipe is connectable except the brokered Gmail entry,
+    // which has no transport of its own to install.
+    expect(pending.filter(isInstallablePlugin)).toHaveLength(37);
   });
 
   it("keeps official vendor endpoints visible while their connection blockers remain", () => {
@@ -307,7 +353,9 @@ describe("plugin catalog loader", () => {
         url,
         connection: { type: status, blocker: expect.stringMatching(/\S/) },
       });
-      expect(plugin && isInstallablePlugin(plugin)).toBe(false);
+      // A vendor that has not approved access stays closed; an unverified
+      // recipe stays open so the lifecycle can be verified.
+      expect(plugin && isInstallablePlugin(plugin)).toBe(status === "verification-pending");
     }
   });
 
