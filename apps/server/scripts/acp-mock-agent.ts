@@ -204,6 +204,17 @@ const program = Effect.gen(function* () {
               content: { type: "text", text: "late after cancel" },
             },
           });
+
+          // A second notification behind the late chunk. The runtime handles both on one ordered
+          // queue, so a test that sees this one logged knows the chunk above has been handled
+          // already, without having to guess how many ticks that took.
+          writeJsonRpcNotification("session/update", {
+            sessionId: cancelledSessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: { type: "text", text: "marker: late update handled" },
+            },
+          });
         });
       }
     }),

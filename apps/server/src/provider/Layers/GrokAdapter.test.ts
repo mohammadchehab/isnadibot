@@ -210,11 +210,18 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
       const adapter = yield* makeTestAdapter(wrapperPath);
 
       const runtimeEvents: ProviderRuntimeEvent[] = [];
+      const sessionExited = yield* Deferred.make<void>();
 
       const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
         Effect.sync(() => {
           runtimeEvents.push(event);
-        }),
+        }).pipe(
+          Effect.andThen(
+            event.type === "session.exited"
+              ? Deferred.succeed(sessionExited, undefined).pipe(Effect.asVoid)
+              : Effect.void,
+          ),
+        ),
       ).pipe(Effect.forkChild);
 
       yield* adapter.startSession({
@@ -241,25 +248,31 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         }),
       );
 
-      for (let yieldAttempt = 0; yieldAttempt < 4; yieldAttempt += 1) {
-        yield* Effect.yieldNow;
-      }
+      const readySessions = yield* adapter.listSessions();
+      const readySession = readySessions.find((session) => session.threadId === threadId);
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      assert.equal(readySession?.status, "ready");
+      assert.isUndefined(readySession?.activeTurnId);
+
+      // `session.exited` is published after the failure path settled the prompt, so consuming it
+      // proves the event stream saw everything that path emitted. A fixed number of yields instead
+      // guessed how many ticks delivery needs, and a guess that lands early makes the "no
+      // turn.completed" assertion below pass without testing anything.
+      yield* adapter.stopSession(threadId);
+      assert.isTrue(
+        yield* awaitReceipt(sessionExited),
+        "the session.exited receipt never arrived after stopping the failed session",
+      );
 
       const turnCompletedEvent = runtimeEvents.find(
         (event): event is Extract<ProviderRuntimeEvent, { type: "turn.completed" }> =>
           event.type === "turn.completed",
       );
 
-      const readySessions = yield* adapter.listSessions();
-      const readySession = readySessions.find((session) => session.threadId === threadId);
-
-      assert.equal(error._tag, "ProviderAdapterRequestError");
       assert.isUndefined(turnCompletedEvent);
-      assert.equal(readySession?.status, "ready");
-      assert.isUndefined(readySession?.activeTurnId);
 
       yield* Fiber.interrupt(runtimeEventsFiber);
-      yield* adapter.stopSession(threadId);
     }),
   );
 });
