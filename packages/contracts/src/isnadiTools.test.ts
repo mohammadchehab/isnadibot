@@ -901,4 +901,20 @@ describe("Sensitive path classification", () => {
       expect(isnadiToolRequiresApproval(read, { localFullAccess: true }, { path })).toBe(false);
     }
   });
+
+  // The rule is blunt on purpose. Since #284 this denylist is the only gate on a
+  // delegated read, so it over-refuses rather than under-refuses: a plain file whose
+  // name merely contains a credential word is refused, and so is any hidden segment.
+  // These are the cost of AC2's `*token*` and `*secret*`; naming them keeps a later
+  // reader from narrowing the rule to "fix" them.
+  it("refuses a plain file that only looks like a credential store", () => {
+    for (const path of [
+      "/home/me/project/src/tokenizer.ts",
+      "/home/me/project/src/tokenizer.json",
+      "/home/me/project/docs/secrets-management.md",
+      "/home/me/project/.gitignore",
+    ]) {
+      expect(isnadiToolApprovalForInput(read, { path })).toBe("secrets");
+    }
+  });
 });
