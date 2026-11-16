@@ -181,6 +181,13 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         readModel,
         actor: { kind: "bot", botId: command.botId },
       });
+    case "work-item.dispatcher-failed":
+      return yield* decideWorkItems({
+        command,
+        commandId: command.commandId,
+        readModel,
+        actor: { kind: "bot", botId: command.botId },
+      });
     case "mcp-server.create":
     case "mcp-server.update":
     case "mcp-server.instructions.set":

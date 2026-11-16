@@ -129,6 +129,7 @@ export function itemForCommand(
       case "work-item.close":
       case "work-item.reopen":
       case "work-item.claim":
+      case "work-item.dispatcher-failed":
         return `work-item:${command.workItemId}`;
       case "work-item.bot-act":
         return `work-item:${command.command.workItemId}`;

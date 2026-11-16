@@ -14,6 +14,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationGroup,
+  type OrchestrationLatestTurnState,
   type OrchestrationReadModel,
   type OrchestrationThread,
   type OrchestrationThreadShell,
@@ -82,6 +83,7 @@ export const workItem = (input: {
   readonly ownerBotId?: BotId;
   readonly groupId?: GroupId;
   readonly createdAt?: string;
+  readonly attempts?: number;
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
   groupId: input.groupId ?? GROUP_ID,
@@ -90,6 +92,7 @@ export const workItem = (input: {
   kind: "task",
   state: input.state ?? "queued",
   ...(input.ownerBotId === undefined ? {} : { ownerBotId: input.ownerBotId }),
+  ...(input.attempts === undefined ? {} : { attempts: input.attempts }),
   createdAt: input.createdAt ?? NOW,
   updatedAt: NOW,
 });
@@ -106,7 +109,8 @@ const dispatcherTurnThread = (
   threadId: ThreadId,
   workItemId: string,
   botId: BotId,
-  state: "running" | "completed",
+  state: OrchestrationLatestTurnState,
+  extra: { readonly errorMessage?: string; readonly unavailability?: string } = {},
 ): OrchestrationThread => ({
   ...botThread(botId, threadId),
   latestTurn: {
@@ -117,6 +121,7 @@ const dispatcherTurnThread = (
     completedAt: state === "running" ? null : LATER,
     assistantMessageId: null,
     trigger: { kind: "dispatcher", workItemId: WorkItemId.make(workItemId) },
+    ...extra,
   },
 });
 
@@ -130,6 +135,52 @@ export const runningDispatcherTurn = (threadId: ThreadId, workItemId: string, bo
 /** The same chat once that turn reports terminal, which is what releases the item. */
 export const settledDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) =>
   dispatcherTurnThread(threadId, workItemId, botId, "completed");
+
+/** The same chat after that turn failed: the bot never got anywhere with the item. */
+export const failedDispatcherTurn = (
+  threadId: ThreadId,
+  workItemId: string,
+  botId: BotId,
+  errorMessage = "provider exited",
+) => dispatcherTurnThread(threadId, workItemId, botId, "error", { errorMessage });
+
+/** The same chat after a person stopped the turn: the bot did not fail, it was taken back. */
+export const interruptedDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) =>
+  dispatcherTurnThread(threadId, workItemId, botId, "interrupted");
+
+/**
+ * The same chat while the turn is genuinely alive: the session is running and holds the turn, so
+ * nothing about it is a death and the dispatcher has to leave the item alone.
+ */
+export const liveDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) => ({
+  ...dispatcherTurnThread(threadId, workItemId, botId, "running"),
+  session: {
+    threadId,
+    status: "running" as const,
+    providerName: "codex",
+    runtimeMode: DEFAULT_RUNTIME_MODE,
+    activeTurnId: TurnId.make(`turn-${workItemId}`),
+    lastError: null,
+    updatedAt: LATER,
+  },
+});
+
+/**
+ * The same chat when the provider process went away without the turn ever reporting: the turn
+ * still reads as running, but its session has left the live statuses with nothing active.
+ */
+export const crashedDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) => ({
+  ...dispatcherTurnThread(threadId, workItemId, botId, "running"),
+  session: {
+    threadId,
+    status: "error" as const,
+    providerName: "codex",
+    runtimeMode: DEFAULT_RUNTIME_MODE,
+    activeTurnId: null,
+    lastError: "provider exited",
+    updatedAt: LATER,
+  },
+});
 
 export const keepBusyGroup = (
   input: {

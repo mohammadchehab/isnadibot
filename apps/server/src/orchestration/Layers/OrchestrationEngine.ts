@@ -152,6 +152,7 @@ function commandToAggregateRef(command: OrchestrationCommand): CommandAggregateR
         aggregateId: command.command.workItemId,
       };
     case "work-item.claim":
+    case "work-item.dispatcher-failed":
       return {
         aggregateKind: "work-item",
         aggregateId: command.workItemId,
