@@ -3,7 +3,6 @@ import {
   newestChatByBotId,
   type CapacityBot,
   type CapacityRow,
-  type CapacityWorkItem,
 } from "@isnadi/client-runtime/fleet/capacity";
 import type { BotStatus, BotStatusDelegation } from "@isnadi/shared/botStatus";
 import {
@@ -12,9 +11,11 @@ import {
   type OrchestrationThreadShell,
   type ScopedThreadRef,
   type ThreadId,
+  type WorkItemSummary,
 } from "@isnadi/contracts";
 import { MoreHorizontalIcon } from "lucide-react";
-import { useMemo, type ComponentProps } from "react";
+import { Predicate } from "effect";
+import { useMemo, useState, type ComponentProps } from "react";
 
 import { useI18n } from "../../i18n";
 import {
@@ -24,11 +25,15 @@ import {
 import { useThreadActivities } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
+import { useAtomCommand } from "../../state/use-atom-command";
+import { workItemEnvironment } from "../../state/workItems";
 import { useOpenChat } from "../chat/useOpenChat";
 import { BOT_STATUS_LABEL } from "../roster/botStatusPresentation";
 import type { Group } from "../roster/types";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { toastManager } from "../ui/toast";
+import { workItemFailureToast } from "./workItemFailure.logic";
 
 // SAFETY: the empty ID is an inactive-query sentinel; no environment request is sent for it.
 const NO_ENVIRONMENT = "" as EnvironmentId;
@@ -54,13 +59,18 @@ function TeamRow({
   environmentId,
   row,
   chatId,
+  blocked,
 }: {
   readonly environmentId: EnvironmentId | null;
   readonly row: CapacityRow;
   readonly chatId: ThreadId | null;
+  /** The blocked item this bot owns, when it holds one; the way out of `held`. */
+  readonly blocked: WorkItemSummary | null;
 }) {
   const { t } = useI18n();
   const openChat = useOpenChat();
+  const unblock = useAtomCommand(workItemEnvironment.unblock, { reportFailure: false });
+  const [resuming, setResuming] = useState(false);
 
   const ref = useMemo<ScopedThreadRef | null>(
     () =>
@@ -92,6 +102,30 @@ function TeamRow({
     void openChat({ environmentId, threadId: chatId });
   };
 
+  const isHeld = row.status === "held";
+
+  // The reason follows the bot's held state, not the card the row happens to
+  // show: a bot can hold an older in-progress card and a newer blocked one, and
+  // the row shows the older. Reading the note off the held state is what keeps
+  // it beside the Resume, so a row never offers the way out without saying why.
+  const blockedNote = isHeld ? (blocked?.blockedOn?.note ?? null) : null;
+
+  const resume = async () => {
+    if (environmentId === null || blocked === null || resuming) return;
+
+    setResuming(true);
+
+    const result = await unblock({ environmentId, input: { workItemId: blocked.id } });
+
+    setResuming(false);
+
+    if (Predicate.isTagged(result, "Failure")) {
+      toastManager.add(
+        workItemFailureToast({ cause: result.cause, title: t("Could not update the card") }, t),
+      );
+    }
+  };
+
   return (
     <tr className="border-t border-border/60" data-bot-id={row.botId} data-status={row.status}>
       <th scope="row" className="py-2 pe-3 text-start align-top font-medium">
@@ -115,6 +149,8 @@ function TeamRow({
         {item !== null && item.extra > 0 ? (
           <span className="ms-1 tabular-nums">{`+${item.extra}`}</span>
         ) : null}
+        {/* A held row says what it is waiting on, in the words the block recorded. */}
+        {blockedNote === null ? null : <span className="block text-xs">{blockedNote}</span>}
       </td>
       <td
         className="py-2 pe-3 align-top text-sm tabular-nums text-muted-foreground"
@@ -131,6 +167,20 @@ function TeamRow({
           {row.status === "asking" && chatId !== null && environmentId !== null ? (
             <Button size="sm" variant="outline" onClick={openAskingChat}>
               {t("Open")}
+            </Button>
+          ) : null}
+          {/* A held bot that owns a blocked card gets the way out; one waiting on a
+              delegated child owns no card, so it gets none. */}
+          {isHeld && blocked !== null ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={resuming}
+              onClick={() => {
+                void resume();
+              }}
+            >
+              {t("Resume")}
             </Button>
           ) : null}
           <Button size="icon-sm" variant="ghost" aria-label={t("Bot actions")}>
@@ -169,9 +219,22 @@ export function SpaceTeamTable({ group }: { group: Group }) {
 
     const chatIds = new Set(chats.map((chat) => chat.id));
 
-    const workItems: ReadonlyArray<CapacityWorkItem> = (snapshot.workItems ?? []).filter(
+    const workItems: ReadonlyArray<WorkItemSummary> = (snapshot.workItems ?? []).filter(
       (item) => item.ownerBotId !== undefined && memberIds.has(item.ownerBotId),
     );
+
+    // The blocked card each held bot owns, first one per bot. A held bot may own
+    // none: waiting on a delegated child blocks nothing, and that row has no way
+    // out to offer, so it is absent here rather than null.
+    const blockedByBotId = new Map<string, WorkItemSummary>();
+
+    for (const item of workItems) {
+      if (item.state !== "blocked" || item.ownerBotId === undefined) continue;
+
+      if (blockedByBotId.has(item.ownerBotId)) continue;
+
+      blockedByBotId.set(item.ownerBotId, item);
+    }
 
     const delegations: ReadonlyArray<BotStatusDelegation> = snapshot.delegations.filter(
       (delegation) => chatIds.has(delegation.parentThreadId),
@@ -188,7 +251,7 @@ export function SpaceTeamTable({ group }: { group: Group }) {
       queuedByBotId: new Map<string, number>(),
     });
 
-    return { ...built, newestChat: newestChatByBotId(chats) };
+    return { ...built, newestChat: newestChatByBotId(chats), blockedByBotId };
   }, [group, snapshot]);
 
   const bossName = capacity?.rows.find((row) => row.isBoss)?.name ?? null;
@@ -236,6 +299,7 @@ export function SpaceTeamTable({ group }: { group: Group }) {
                 key={row.botId}
                 environmentId={environmentId}
                 chatId={capacity.newestChat.get(row.botId)?.id ?? null}
+                blocked={capacity.blockedByBotId.get(row.botId) ?? null}
                 row={row}
               />
             ))}
