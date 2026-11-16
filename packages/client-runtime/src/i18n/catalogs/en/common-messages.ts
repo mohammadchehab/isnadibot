@@ -193,7 +193,7 @@ export const commonMessagesCatalog = {
   "{summary}: {detail}": "{summary}: {detail}",
   "“{name}” was canceled": "“{name}” was canceled",
   "“{name}” failed": "“{name}” failed",
-  "“{name}” finished": "“{name}” finished",
+  "The {job} routine ran at {time}.": "The {job} routine ran at {time}.",
   "{count} min": "{count} min",
   "Tune the shared power policy and the background intervals that feed it.":
     "Tune the shared power policy and the background intervals that feed it.",

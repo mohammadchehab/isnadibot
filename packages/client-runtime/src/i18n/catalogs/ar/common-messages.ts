@@ -200,7 +200,7 @@ export const commonMessagesCatalog = {
   "{summary}: {detail}": "{summary}: {detail}",
   "“{name}” was canceled": "أُلغي «{name}»",
   "“{name}” failed": "فشل «{name}»",
-  "“{name}” finished": "انتهى «{name}»",
+  "The {job} routine ran at {time}.": "تم تشغيل المهمة الدورية «{job}» في {time}.",
   "{count} min": "{count} دقيقة",
   "Tune the shared power policy and the background intervals that feed it.":
     "اضبط سياسة الطاقة المشتركة والفواصل الزمنية في الخلفية التي تغذيها.",

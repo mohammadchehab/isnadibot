@@ -179,7 +179,7 @@ export const commonMessagesCatalog = {
   "{summary}: {detail}": "{summary}：{detail}",
   "“{name}” was canceled": "“{name}”已取消",
   "“{name}” failed": "“{name}”失败",
-  "“{name}” finished": "“{name}”已完成",
+  "The {job} routine ran at {time}.": "例行任务“{job}”已于 {time} 运行",
   "{count} min": "{count} 分钟",
   "Tune the shared power policy and the background intervals that feed it.":
     "调整共享的电源策略，以及为其提供数据的后台间隔。",
