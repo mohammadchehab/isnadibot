@@ -209,6 +209,51 @@ export const keepBusySet = (sequence: number, keepBusy: boolean) =>
     payload: { groupId: GROUP_ID, keepBusy, updatedAt: NOW },
   }) satisfies OrchestrationEvent;
 
+/**
+ * The roster events that decide who the pick may choose from. None of them touches an item, so
+ * each one is the only thing that can wake a group whose queue was left waiting.
+ */
+export const memberAssigned = (sequence: number, botId: BotId) =>
+  ({
+    ...base(sequence, "group.member-assigned"),
+    type: "group.member-assigned",
+    payload: {
+      groupId: GROUP_ID,
+      member: { kind: "bot" as const, botId, role: "specialist" as const },
+      updatedAt: NOW,
+    },
+  }) satisfies OrchestrationEvent;
+
+export const memberUnassigned = (sequence: number, botId: BotId) =>
+  ({
+    ...base(sequence, "group.member-unassigned"),
+    type: "group.member-unassigned",
+    payload: { groupId: GROUP_ID, botId, updatedAt: NOW },
+  }) satisfies OrchestrationEvent;
+
+export const bossSet = (sequence: number, bossBotId: BotId, previousBossBotId: BotId | null) =>
+  ({
+    ...base(sequence, "group.boss-set"),
+    type: "group.boss-set",
+    payload: {
+      groupId: GROUP_ID,
+      bossBotId,
+      previousBossBotId,
+      previousBossRole: previousBossBotId === null ? null : ("specialist" as const),
+      updatedAt: NOW,
+    },
+  }) satisfies OrchestrationEvent;
+
+/** A restore names only the bot, so the group has to come from the read model. */
+export const botRestored = (sequence: number, botId: BotId) =>
+  ({
+    ...base(sequence, "bot.restored"),
+    aggregateKind: "bot" as const,
+    aggregateId: botId,
+    type: "bot.restored",
+    payload: { botId, updatedAt: NOW },
+  }) satisfies OrchestrationEvent;
+
 export const workItemCreated = (sequence: number, item: WorkItem) =>
   ({
     ...base(sequence, "work-item.created"),
