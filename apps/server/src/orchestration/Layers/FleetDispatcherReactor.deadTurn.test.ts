@@ -31,6 +31,7 @@ import {
   liveDispatcherTurn,
   run,
   sessionSet,
+  settledDispatcherTurn,
   workItem,
 } from "../test-support/FleetDispatcherFixtures.ts";
 import { DISPATCH_RETRY_DELAY } from "./FleetDispatcherReactor.ts";
@@ -78,6 +79,29 @@ const afterReap = (
     updatedAt: NOW,
   };
 };
+
+/**
+ * The item after the reactor's plain release, as the decider would leave it: `work-item.assign`
+ * with no owner puts the item back in the queue, drops the owner and counts no attempt.
+ */
+const projectReleases =
+  (model: Ref.Ref<OrchestrationReadModel>): OnCommand =>
+  (command, outcome) =>
+    outcome === "rejected" || command.type !== "work-item.assign" || command.ownerBotId !== null
+      ? Effect.void
+      : Ref.update(model, (current) => ({
+          ...current,
+          workItems: (current.workItems ?? []).map(
+            (item): WorkItem =>
+              item.id === command.workItemId
+                ? {
+                    ...Struct.omit(item, ["ownerBotId", "attempts"]),
+                    state: "queued",
+                    updatedAt: NOW,
+                  }
+                : item,
+          ),
+        }));
 
 /** Stands in for the projector: moves the read model on for the one command this card adds. */
 const projectReaps =
@@ -343,6 +367,63 @@ describe("FleetDispatcherReactor dead dispatcher turns (TASK-240)", () => {
           yield* reactor.drainThrough(1);
 
           expect(h.dispatched).toEqual([]);
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+});
+
+describe("FleetDispatcherReactor completed dispatcher turns (TASK-408)", () => {
+  it.effect("releases an item whose dispatcher turn completed without a death or a delay", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* run(h, ({ reactor, receipts }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+          yield* receipts;
+
+          yield* Ref.set(
+            h.model,
+            teamModel({
+              turnThread: settledDispatcherTurn(BOT_THREAD, "item-1", SPECIALIST_ID),
+              // One genuine death already counted. Two in a row is what blocks the card, so a
+              // completed turn that reported a death would block this item outright.
+              item: workItem({
+                id: "item-1",
+                state: "assigned",
+                ownerBotId: SPECIALIST_ID,
+                attempts: 1,
+              }),
+            }),
+          );
+          yield* Ref.set(h.onCommand, projectReleases(h.model));
+
+          // The turn reported done and its session left the live statuses.
+          yield* PubSub.publish(h.events, sessionSet(1, BOT_THREAD, "ready"));
+          yield* reactor.drainThrough(1);
+
+          // The release is the plain one a person's unassign uses. `work-item.dispatcher-failed` is
+          // not dispatched at all, and that command is what counts the attempt and, on the second
+          // one in a row, blocks the card — so a completed turn can neither count nor block.
+          expect(h.dispatched.map((command) => command.type)).toEqual([
+            "work-item.assign",
+            "work-item.claim",
+            "thread.turn.start",
+          ]);
+          expect(h.dispatched[0]).toMatchObject({ workItemId: "item-1", ownerBotId: null });
+
+          // Handed straight back out, the way an interrupted item is: no retry delay to sit out.
+          expect(yield* receipts).not.toContainEqual(
+            expect.objectContaining({ kind: "skipped", reason: "retry-pending" }),
+          );
+
+          const item = (yield* Ref.get(h.model)).workItems?.find(
+            (candidate) => candidate.id === "item-1",
+          );
+
+          expect(item).toMatchObject({ state: "queued" });
+          expect(item?.ownerBotId).toBeUndefined();
         }),
       );
     }).pipe(Effect.scoped),

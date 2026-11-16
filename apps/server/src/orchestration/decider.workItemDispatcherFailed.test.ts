@@ -191,6 +191,25 @@ it.layer(NodeServices.layer)("work item dispatcher-failed decider (TASK-240)", (
     }),
   );
 
+  it.effect("names the bot whose turn it was, not the bot that owns the item now", () =>
+    Effect.gen(function* () {
+      // The card was re-assigned moments before the reap, so the item's owner is the specialist
+      // while the turn that ended ran in the other specialist's chat.
+      const events = yield* decide(
+        dispatcherFailed({ cause: "interrupted" }),
+        [assigned()],
+        [botThread(OTHER_SPECIALIST_ID, "thread-bot-specialist")],
+      );
+
+      const message = events[1]?.payload;
+
+      if (message === undefined || !("text" in message)) return expect.fail("expected a chat line");
+
+      expect(message.text).toContain(`${OTHER_SPECIALIST_ID}'s turn`);
+      expect(message.text).not.toContain(`${SPECIALIST_ID}'s turn`);
+    }),
+  );
+
   it.effect("keys the chat line on the turn, so a later turn posts its own", () =>
     Effect.gen(function* () {
       const first = yield* decide(dispatcherFailed({ cause: "interrupted" }), [assigned()]);
