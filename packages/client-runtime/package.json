@@ -144,6 +144,10 @@
       "types": "./src/space/standup.ts",
       "default": "./src/space/standup.ts"
     },
+    "./space/settings": {
+      "types": "./src/space/settings.ts",
+      "default": "./src/space/settings.ts"
+    },
     "./routines": {
       "types": "./src/routines.ts",
       "default": "./src/routines.ts"

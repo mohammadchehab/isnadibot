@@ -3,105 +3,46 @@ import { describe, expect, it } from "vite-plus/test";
 import { spaceSettingsState, type SpaceSettingsTranslator } from "./spaceSettings.logic";
 
 /**
- * A translator that marks every key it sees, so a caller that forgets to pass
- * the UI's `t` shows up as English and fails the test rather than shipping.
+ * The web page reads the shared rules through this module (decision-106). The
+ * rules themselves are tested where they live, in
+ * `packages/client-runtime/src/space/settings.test.ts`; this file proves the
+ * path the web components import still answers the way it did before the move.
  */
-const markingTranslate = (message: string, params?: Record<string, string | number>) =>
-  Object.entries(params ?? {}).reduce(
-    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
-    `t:${message}`,
-  );
+const translator: SpaceSettingsTranslator = {
+  t: (message, params) =>
+    Object.entries(params ?? {}).reduce(
+      (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+      message,
+    ),
+  plural: (count, forms) =>
+    (count === 1 ? (forms.one ?? forms.other) : forms.other).replaceAll("{count}", String(count)),
+};
 
-/** `plural` resolves its own form and injects `{count}`, so only the count shows here. */
-const markingPlural: SpaceSettingsTranslator["plural"] = (count, forms) =>
-  (count === 1 ? (forms.one ?? forms.other) : forms.other).replaceAll("{count}", String(count));
+describe("the web binding to the shared space-settings rules", () => {
+  it("still says an empty space has no boss to pick", () => {
+    const settings = spaceSettingsState({ members: [], bossBotId: null }, translator);
 
-const translator: SpaceSettingsTranslator = { t: markingTranslate, plural: markingPlural };
-
-const state = (members: ReadonlyArray<{ id: string; name: string }>, bossBotId: string | null) =>
-  spaceSettingsState({ members, bossBotId }, translator);
-
-const layla = { id: "bot-layla", name: "Layla" };
-
-const tracker = { id: "bot-tracker", name: "Tracker" };
-
-const scout = { id: "bot-scout", name: "Scout" };
-
-const patch = { id: "bot-patch", name: "Patch" };
-
-describe("spaceSettingsState — empty space", () => {
-  it("says so in one line and offers no boss to pick", () => {
-    const settings = state([], null);
-
-    expect(settings.memberCount).toBe(0);
-    expect(settings.bossName).toBeNull();
-    expect(settings.statusLine).toBe("t:No bots yet");
+    expect(settings.statusLine).toBe("No bots yet");
     expect(settings.bossDisabled).toBe(true);
-    expect(settings.bossPlaceholder).toBe("t:No bots yet");
-    expect(settings.bossHint).toBe("t:Add a bot to this space first.");
-  });
-
-  it("keeps keep-busy off, because there is nobody to hand work to", () => {
-    const settings = state([], null);
-
     expect(settings.keepBusyDisabled).toBe(true);
-    expect(settings.keepBusyHint).toBe("t:Needs two bots — one to work, one to hand off to.");
   });
-});
 
-describe("spaceSettingsState — one bot", () => {
-  it("names the only bot as the boss and still keeps keep-busy off", () => {
-    const settings = state([layla], layla.id);
+  it("still names the boss and leaves both rows live when the space can hand work out", () => {
+    const settings = spaceSettingsState(
+      {
+        members: [
+          { id: "bot-tracker", name: "Tracker" },
+          { id: "bot-scout", name: "Scout" },
+        ],
+        bossBotId: "bot-tracker",
+      },
+      translator,
+    );
 
-    expect(settings.statusLine).toBe("t:1 bot · Layla is the boss");
+    expect(settings.statusLine).toBe("2 bots · Tracker is the boss");
     expect(settings.bossDisabled).toBe(false);
-    expect(settings.bossName).toBe("Layla");
-    expect(settings.bossHint).toBe("t:The only bot in this space.");
-    expect(settings.keepBusyDisabled).toBe(true);
-    expect(settings.keepBusyHint).toBe("t:Needs two bots — one to work, one to hand off to.");
-  });
-
-  it("asks for a boss when the one bot was never given the role", () => {
-    const settings = state([layla], null);
-
-    expect(settings.statusLine).toBe("t:1 bot · No boss yet");
-    expect(settings.bossPlaceholder).toBe("t:Choose a boss");
-    expect(settings.bossHint).toBe("t:The only bot in this space.");
-  });
-});
-
-describe("spaceSettingsState — a space that can hand work out", () => {
-  it("names the boss in the status line and leaves both rows without a hint", () => {
-    const settings = state([tracker, scout, patch, layla], tracker.id);
-
-    expect(settings.statusLine).toBe("t:4 bots · Tracker is the boss");
-    expect(settings.bossName).toBe("Tracker");
     expect(settings.bossHint).toBeNull();
     expect(settings.keepBusyDisabled).toBe(false);
     expect(settings.keepBusyHint).toBeNull();
-  });
-
-  it("counts in the plural for every member", () => {
-    expect(state([tracker, scout], tracker.id).statusLine).toBe("t:2 bots · Tracker is the boss");
-  });
-});
-
-describe("spaceSettingsState — bots but no boss", () => {
-  it("says why keep-busy cannot move, and that cards wait", () => {
-    const settings = state([tracker, scout, patch], null);
-
-    expect(settings.statusLine).toBe("t:3 bots · No boss yet");
-    expect(settings.bossPlaceholder).toBe("t:Choose a boss");
-    expect(settings.bossHint).toBe("t:Cards wait in the queue until a boss is chosen.");
-    expect(settings.keepBusyDisabled).toBe(true);
-    expect(settings.keepBusyHint).toBe("t:Cards wait in the queue until a boss is chosen.");
-  });
-
-  it("treats a boss who left the space as no boss, not as a nameless one", () => {
-    const settings = state([scout, patch], layla.id);
-
-    expect(settings.bossName).toBeNull();
-    expect(settings.statusLine).toBe("t:2 bots · No boss yet");
-    expect(settings.keepBusyDisabled).toBe(true);
   });
 });
