@@ -104,12 +104,11 @@ function TeamRow({
 
   const isHeld = row.status === "held";
 
-  // The reason belongs to the card the row is showing. A bot can hold a blocked
-  // card and an in-progress one at once, and the row shows the earlier of the two.
-  const blockedNote =
-    isHeld && blocked !== null && blocked.id === item?.id
-      ? (blocked.blockedOn?.note ?? null)
-      : null;
+  // The reason follows the bot's held state, not the card the row happens to
+  // show: a bot can hold an older in-progress card and a newer blocked one, and
+  // the row shows the older. Reading the note off the held state is what keeps
+  // it beside the Resume, so a row never offers the way out without saying why.
+  const blockedNote = isHeld ? (blocked?.blockedOn?.note ?? null) : null;
 
   const resume = async () => {
     if (environmentId === null || blocked === null || resuming) return;

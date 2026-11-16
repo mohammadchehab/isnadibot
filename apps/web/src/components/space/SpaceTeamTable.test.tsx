@@ -209,4 +209,53 @@ describe("space team table", () => {
     expect(markup.match(/>Resume</g)).toHaveLength(1);
     expect(markup.match(/aria-label="Bot actions"/g)).toHaveLength(2);
   });
+
+  it("says why a held row waits when its block names the newer of its two cards", () => {
+    mocks.snapshot = makeShellSnapshot({
+      bots: [
+        { id: "bot-boss", name: "Leo bot" },
+        { id: "bot-engineer", name: "Engineer" },
+      ],
+      threads: [],
+      workItems: [
+        {
+          id: "item-active",
+          groupId: "group-fleet",
+          title: "Wire the team table",
+          kind: "task",
+          briefPreview: "",
+          state: "in-progress",
+          ownerBotId: "bot-engineer",
+          createdAt: "2026-11-13T09:00:00.000Z",
+          updatedAt: "2026-11-13T09:00:00.000Z",
+        },
+        {
+          id: "item-blocked",
+          groupId: "group-fleet",
+          title: "Post the Product Designer opening",
+          kind: "task",
+          briefPreview: "",
+          state: "blocked",
+          ownerBotId: "bot-engineer",
+          blockedFrom: "assigned",
+          blockedOn: {
+            by: "bot",
+            botId: "bot-engineer",
+            note: "Needs sign-in",
+          },
+          createdAt: "2026-11-13T10:00:00.000Z",
+          updatedAt: "2026-11-13T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const markup = render();
+
+    // The row is held on the newer card while it shows the older one, so the
+    // reason and the way out must still arrive together.
+    expect(markup).toContain('data-slot="badge">Held</span>');
+    expect(markup).toContain("Wire the team table");
+    expect(markup).toContain("Needs sign-in");
+    expect(markup.match(/>Resume</g)).toHaveLength(1);
+  });
 });
