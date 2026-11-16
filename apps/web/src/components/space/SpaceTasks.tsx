@@ -81,7 +81,6 @@ export function SpaceTasks({
   variant?: "page" | "overview";
 }) {
   const showDescription = variant === "page";
-  const columnWidth = variant === "page" ? "w-64" : "w-39";
   const { t, formatNumber } = useI18n();
   const environmentId = usePrimaryEnvironmentId();
   const snapshot = useEnvironmentSnapshot();
@@ -242,7 +241,7 @@ export function SpaceTasks({
           {t("Add item")}
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+      <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto p-4">
         {WORK_ITEM_BOARD_COLUMNS.map((column) => {
           const cards = board[column];
 
@@ -250,13 +249,11 @@ export function SpaceTasks({
             <section
               key={column}
               aria-label={columnTitle(column, t)}
-              className={`flex shrink-0 flex-col gap-2 rounded-lg bg-muted/40 p-2 ${columnWidth}`}
+              className="flex w-39 shrink-0 flex-col gap-2 rounded-lg border border-border bg-card p-2"
             >
               <h3 className="flex items-center justify-between gap-2 px-1 text-xs font-medium text-muted-foreground">
                 <span>{columnTitle(column, t)}</span>
-                <Badge size="sm" variant="quiet">
-                  {formatNumber(cards.length)}
-                </Badge>
+                <span className="text-11px">{formatNumber(cards.length)}</span>
               </h3>
               {cards.map((card) => (
                 <TaskCard
@@ -331,7 +328,7 @@ function TaskCard({
   return (
     <Card className="min-w-0 gap-2 p-3">
       <div className="flex items-start justify-between gap-1">
-        <bdi className="min-w-0 text-sm font-medium">{card.title}</bdi>
+        <bdi className="min-w-0 text-xs font-medium">{card.title}</bdi>
         <Menu>
           <MenuTrigger
             render={
@@ -377,10 +374,10 @@ function TaskCard({
         </Badge>
       ) : null}
       {blockedNote === undefined ? null : (
-        <bdi className="line-clamp-2 text-xs text-muted-foreground">{blockedNote}</bdi>
+        <bdi className="line-clamp-2 text-11px text-muted-foreground">{blockedNote}</bdi>
       )}
       {assignedBy ? (
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="truncate text-11px text-muted-foreground">
           {t("Assigned by {name}", { name: assignedBy.name })}
         </span>
       ) : null}
@@ -388,10 +385,10 @@ function TaskCard({
         {owner ? (
           <>
             <BotAvatarView avatar={owner.avatar} name={owner.name} className="size-5" />
-            <bdi className="truncate text-xs text-muted-foreground">{owner.name}</bdi>
+            <bdi className="truncate text-11px text-muted-foreground">{owner.name}</bdi>
           </>
         ) : (
-          <span className="truncate text-xs text-muted-foreground">{t("No owner")}</span>
+          <span className="truncate text-11px text-muted-foreground">{t("No owner")}</span>
         )}
       </div>
     </Card>
