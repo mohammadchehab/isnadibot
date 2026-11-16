@@ -3,7 +3,8 @@ import type { BotId, EnvironmentId, ScopedThreadRef, ThreadId, TurnId } from "@i
 import { useCallback } from "react";
 
 import { useI18n } from "../../i18n";
-import { useThreadShells } from "../../state/entities";
+import { newMessageId } from "../../lib/utils";
+import { readThreadShell, useThreadShells } from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useOpenChat } from "../chat/useOpenChat";
@@ -13,11 +14,12 @@ import {
   type BotControlTarget,
   buildBotClearInput,
   buildBotInterruptInput,
-  buildBotSteerInput,
+  buildSteerTurnInput,
   collectClearableSessions,
   collectRunningTurns,
 } from "./botControls.logic";
 import { requestComposerFocus } from "./composerFocus";
+import { useRosterStore } from "./rosterStore";
 import { commandFailureMessage } from "@isnadi/client-runtime/state/runtime";
 
 interface InterruptRequest {
@@ -61,7 +63,7 @@ export function useBotControlCommands() {
   const { t } = useI18n();
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
   const stopSession = useAtomCommand(threadEnvironment.stopSession, { reportFailure: false });
-  const steer = useSteerCommand();
+  const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
 
   const interruptThread = useCallback(
     async ({ environmentId, threadId, turnId }: InterruptRequest): Promise<boolean> => {
@@ -134,23 +136,51 @@ export function useBotControlCommands() {
     [clearThread],
   );
 
-  /** Opens a bot's chat on a running turn and puts the caret in its composer. */
-  const steerBot = useCallback(
-    async (ref: ScopedThreadRef, shell: BotControllableShell | null): Promise<boolean> => {
-      const input = buildBotSteerInput(shell);
+  /**
+   * Sends a correction into the chat's running turn without opening it. The
+   * chat keeps its own model and modes; only the user's words are new.
+   */
+  const sendSteer = useCallback(
+    async (ref: ScopedThreadRef, text: string): Promise<boolean> => {
+      const createdAt = new Date().toISOString();
+      const shell = readThreadShell(ref);
 
-      if (input === null) return false;
-
-      return steer({
-        environmentId: ref.environmentId,
-        threadId: input.threadId,
-        botId: input.botId,
+      const input = buildSteerTurnInput({
+        shell,
+        text,
+        messageId: newMessageId(),
+        createdAt,
       });
+
+      if (input === null || shell === null) return false;
+
+      const result = await startTurn({ environmentId: ref.environmentId, input });
+
+      if (Predicate.isTagged(result, "Failure")) {
+        toastManager.add({
+          type: "error",
+          title: t("Could not steer the bot"),
+          description: commandFailureMessage(result, { t }),
+        });
+
+        return false;
+      }
+
+      // The roster row's preview reads this, so the steer shows up where it was sent.
+      if (shell.botId != null) {
+        useRosterStore.getState().recordLastMessage(shell.botId, {
+          text: text.trim(),
+          at: createdAt,
+          threadId: shell.id,
+        });
+      }
+
+      return true;
     },
-    [steer],
+    [startTurn, t],
   );
 
-  return { interruptThread, clearThread, interruptBot, clearBot, steerBot };
+  return { interruptThread, clearThread, interruptBot, clearBot, sendSteer };
 }
 
 /**

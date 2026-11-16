@@ -398,6 +398,7 @@ export const rosterCatalog = {
   "{count} idle to clear": "{count} idle to clear",
   "Could not interrupt the bot": "Could not interrupt the bot",
   "Could not clear the bot's context": "Could not clear the bot's context",
+  "Could not steer the bot": "Could not steer the bot",
   "Interrupted {count} bot": "Interrupted {count} bot",
   "Interrupted {count} bots": "Interrupted {count} bots",
   "Interrupted {done} of {count} bot": "Interrupted {done} of {count} bot",
@@ -407,6 +408,11 @@ export const rosterCatalog = {
   "Cleared {done} of {count} bot context": "Cleared {done} of {count} bot context",
   "Cleared {done} of {count} bot contexts": "Cleared {done} of {count} bot contexts",
   Steer: "Steer",
+  "Steer {name}": "Steer {name}",
+  "Send to {name}": "Send to {name}",
+  "Correction to {name}": "Correction to {name}",
+  "{name} reads this before its next step. It doesn't stop the current card.":
+    "{name} reads this before its next step. It doesn't stop the current card.",
   "Send a correction to {name}": "Send a correction to {name}",
   "Opens the chat and puts the caret in the composer":
     "Opens the chat and puts the caret in the composer",

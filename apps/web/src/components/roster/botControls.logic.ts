@@ -1,12 +1,16 @@
+import type { StartThreadTurnInput } from "@isnadi/client-runtime/state/threads";
 import type {
   BotId,
   EnvironmentId,
+  MessageId,
   OrchestrationSession,
   OrchestrationSessionStatus,
   OrchestrationThreadShell,
   ThreadId,
   TurnId,
 } from "@isnadi/contracts";
+
+import { buildBotTurnStartInput } from "./botThreadRuntime.logic";
 
 /** The parts of a thread shell the bot controls read. */
 export type BotControllableShell = Pick<
@@ -122,6 +126,36 @@ export function buildBotSteerInput(shell: BotControllableShell | null): BotSteer
   if (!resolveBotControlAvailability(shell).steer) return null;
 
   return { threadId: shell.id, botId };
+}
+
+/**
+ * A steer the dialog can send: a user message into the chat's running turn,
+ * carrying the chat's own model and modes so a correction cannot quietly move
+ * the bot onto settings the turn it corrects is not running with.
+ */
+export function buildSteerTurnInput(input: {
+  readonly shell: OrchestrationThreadShell | null;
+  readonly text: string;
+  readonly messageId: MessageId;
+  readonly createdAt: string;
+}): StartThreadTurnInput | null {
+  const steer = buildBotSteerInput(input.shell);
+  const text = input.text.trim();
+
+  if (steer === null || input.shell === null || text.length === 0) return null;
+
+  return buildBotTurnStartInput({
+    botId: steer.botId,
+    threadId: steer.threadId,
+    projectId: input.shell.projectId,
+    title: input.shell.title,
+    message: { messageId: input.messageId, role: "user", text, attachments: [] },
+    modelSelection: input.shell.modelSelection,
+    runtimeMode: input.shell.runtimeMode,
+    interactionMode: input.shell.interactionMode,
+    createdAt: input.createdAt,
+    createThread: false,
+  });
 }
 
 /** One thread a fleet-wide control acts on. */
