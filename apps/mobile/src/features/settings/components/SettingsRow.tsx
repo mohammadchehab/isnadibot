@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 import { SymbolView } from "../../../components/AppSymbol";
 
 import { AppText as Text } from "../../../components/AppText";
+import { cn } from "../../../lib/cn";
 import { useThemeColor } from "../../../lib/useThemeColor";
 import type { SettingsLegalDocumentTarget, SettingsSheetTarget } from "./settings-sheet-targets";
 
@@ -14,6 +15,12 @@ export function SettingsRow(props: {
   readonly disabled?: boolean;
   readonly icon: SymbolName;
   readonly label: string;
+  /**
+   * A second line under the label, for a reason the control cannot act yet.
+   * It takes the value's width down with it, so a long value cannot squeeze
+   * the line into a tall column of wrapped text.
+   */
+  readonly subtitle?: string;
   readonly value?: string;
   readonly target?: SettingsSheetTarget;
   readonly fullScreenTarget?: SettingsLegalDocumentTarget;
@@ -32,20 +39,33 @@ export function SettingsRow(props: {
       }
     >
       <SymbolView name={props.icon} size={22} tintColor={icon} type="monochrome" weight="regular" />
-      <Text className="shrink-0 text-lg text-foreground" numberOfLines={1}>
-        {props.label}
-      </Text>
-      <View className="min-w-0 flex-1 items-end">
-        {props.value ? (
-          <Text
-            className="max-w-45 text-right text-base text-foreground-muted"
-            ellipsizeMode="middle"
-            numberOfLines={1}
-          >
-            {props.value}
+      {props.subtitle ? (
+        <View className="min-w-0 flex-1">
+          <Text className="text-lg text-foreground" numberOfLines={1}>
+            {props.label}
           </Text>
-        ) : null}
-      </View>
+          <Text className="text-sm text-foreground-muted">{props.subtitle}</Text>
+        </View>
+      ) : (
+        <>
+          <Text className="shrink-0 text-lg text-foreground" numberOfLines={1}>
+            {props.label}
+          </Text>
+          <View className="min-w-0 flex-1" />
+        </>
+      )}
+      {props.value ? (
+        <Text
+          className={cn(
+            "text-right text-base text-foreground-muted",
+            props.subtitle ? "max-w-30" : "max-w-45",
+          )}
+          ellipsizeMode="middle"
+          numberOfLines={1}
+        >
+          {props.value}
+        </Text>
+      ) : null}
       <SymbolView
         name="chevron.right"
         size={16}

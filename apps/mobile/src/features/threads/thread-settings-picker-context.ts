@@ -1,6 +1,7 @@
 import type { EnvironmentId, ThreadId } from "@isnadi/contracts";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createContext, use } from "react";
+import type { SpaceSettingsRouteParams } from "../space/space-settings-routes";
 import type {
   ThreadSettingsSessionProps,
   ThreadSettingsSubmenuPage,
@@ -14,6 +15,9 @@ export type ThreadSettingsPickerStackParams = {
     readonly threadId: ThreadId;
   };
   ThreadSettingsRoutines: NonNullable<ThreadSettingsSessionProps["routinesRef"]>;
+  /** The chat's space, pushed from the sheet's own "Space" row. */
+  SpaceSettings: SpaceSettingsRouteParams;
+  SpaceSettingsBoss: SpaceSettingsRouteParams;
 };
 
 export type ThreadSettingsPickerPresentation = {

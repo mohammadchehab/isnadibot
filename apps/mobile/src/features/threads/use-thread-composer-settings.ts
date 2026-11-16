@@ -143,6 +143,10 @@ export function useThreadComposerSettings(input: {
         : {}),
       ...(selectedThread.groupId
         ? {
+            spaceRef: {
+              environmentId,
+              groupId: selectedThread.groupId,
+            },
             hopBudget: {
               value: effectiveHopBudget(selectedThread.hopBudget),
               onChange: async (hopBudget: GroupHopBudget) =>

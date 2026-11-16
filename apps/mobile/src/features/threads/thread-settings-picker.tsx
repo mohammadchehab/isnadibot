@@ -7,6 +7,8 @@ import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { NativeStackScreenOptions, nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
+import { SpaceSettingsBossScreen } from "../space/space-settings-boss-screen";
+import { SpaceSettingsRouteScreen } from "../space/space-settings-screen";
 import { ThreadMemoryScreen } from "./ThreadMemoryScreen";
 import { ThreadRoutinesScreen } from "./ThreadRoutinesScreen";
 import {
@@ -91,6 +93,16 @@ export function ThreadSettingsPickerNavigator(props: ThreadSettingsPickerPresent
           name="ThreadSettingsChoice"
           component={ThreadSettingsChoiceScreen}
           options={({ route }) => ({ title: route.params.title })}
+        />
+        <ThreadSettingsPickerStack.Screen
+          name="SpaceSettings"
+          component={SpaceSettingsRouteScreen}
+          options={{ title: t("Space settings") }}
+        />
+        <ThreadSettingsPickerStack.Screen
+          name="SpaceSettingsBoss"
+          component={SpaceSettingsBossScreen}
+          options={{ title: t("Boss") }}
         />
       </ThreadSettingsPickerStack.Navigator>
     </ThreadSettingsPickerPresentationContext.Provider>
