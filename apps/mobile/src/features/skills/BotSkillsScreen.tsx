@@ -133,7 +133,7 @@ export function BotSkillsScreen() {
           ) : (
             <>
               <BotSkillsGroupLabel label={t("On for this bot")} />
-              <View>
+              <View className="gap-3">
                 {rows.map((row) => (
                   <BotSkillSwitchRow
                     key={row.skillId}
