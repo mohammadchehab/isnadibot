@@ -533,6 +533,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/ChannelSendApproval.tsx",
     "apps/web/src/components/roster/DecisionsGroup.tsx",
     "apps/web/src/components/roster/DelegationCard.tsx",
+    "apps/web/src/components/roster/DelegationDescendantApproval.tsx",
     "apps/web/src/components/roster/DelegationDetail.tsx",
     "apps/web/src/components/roster/DurableMemoryPanels.tsx",
     "apps/web/src/components/roster/FleetCapacityView.tsx",

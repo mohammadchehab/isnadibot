@@ -10,6 +10,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   delegationActions,
   delegationElapsedMs,
+  descendantDelegations,
   isDelegationSuperseded,
   presentDelegation,
   threadDelegations,
@@ -189,6 +190,57 @@ describe("threadDelegations", () => {
     });
     const working = makeDelegation(running);
     expect(threadDelegations([done, working], PARENT_THREAD_ID).waitingOnChildren).toBe(true);
+  });
+});
+
+describe("descendantDelegations", () => {
+  const GRANDCHILD_THREAD_ID = ThreadId.make("thread-grandchild");
+
+  const grandchild = {
+    ...makeDelegation(
+      {
+        ...running,
+        childThreadId: GRANDCHILD_THREAD_ID,
+        childTurnId: TurnId.make("turn-grandchild"),
+      },
+      CHILD_THREAD_ID,
+    ),
+    delegationId: DelegationId.make("delegation-grandchild"),
+    parentDelegationId: DelegationId.make("delegation-parent"),
+    depth: 2,
+  };
+
+  it("finds the work a chat's own delegates started", () => {
+    const direct = makeDelegation(running);
+
+    expect(descendantDelegations([direct, grandchild], PARENT_THREAD_ID)).toEqual([
+      direct,
+      grandchild,
+    ]);
+    expect(descendantDelegations([direct, grandchild], CHILD_THREAD_ID)).toEqual([grandchild]);
+  });
+
+  it("follows the chain past one level and stops at the record it already saw", () => {
+    const greatGrandchild = {
+      ...makeDelegation(running, GRANDCHILD_THREAD_ID),
+      delegationId: DelegationId.make("delegation-great-grandchild"),
+      depth: 3,
+    };
+
+    expect(
+      descendantDelegations([grandchild, greatGrandchild], CHILD_THREAD_ID).map(
+        (delegation) => delegation.delegationId,
+      ),
+    ).toEqual([grandchild.delegationId, greatGrandchild.delegationId]);
+
+    const looping = { ...grandchild, parentThreadId: GRANDCHILD_THREAD_ID };
+    expect(descendantDelegations([looping], GRANDCHILD_THREAD_ID)).toEqual([looping]);
+  });
+
+  it("ignores a delegation whose chat has not started yet", () => {
+    const queued = { ...grandchild, phase: { _tag: "Queued" } } as const;
+
+    expect(descendantDelegations([queued], CHILD_THREAD_ID)).toEqual([queued]);
   });
 });
 

@@ -388,6 +388,7 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
                       variant="group"
                       delegation={item.delegation}
                       delegations={delegations}
+                      environmentDelegations={snapshot?.delegations ?? []}
                       childBot={activeBotById(item.delegation.childBotId)}
                       parentBot={activeBotById(item.delegation.parentBotId)}
                     />

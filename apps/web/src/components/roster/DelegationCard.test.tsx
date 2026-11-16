@@ -22,6 +22,8 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const mocks = vi.hoisted(() => ({
   activities: [] as OrchestrationThreadActivity[],
+  // Activity feeds of other chats, by thread id: a grandchild's feed lives here.
+  activitiesByThread: {} as Record<string, OrchestrationThreadActivity[]>,
   cancel: vi.fn(),
   retry: vi.fn(),
   respond: vi.fn(),
@@ -32,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   recordChatPath: vi.fn(),
   setState: vi.fn(),
   thread: null as OrchestrationThreadShell | null,
+  bots: [] as Bot[],
   // When set, external stores subscribe like a mounted component would.
   clockCleanups: null as Array<() => void> | null,
 }));
@@ -80,7 +83,10 @@ vi.mock("../../state/environments", () => ({
 }));
 
 vi.mock("../../state/entities", () => ({
-  useThreadActivities: () => mocks.activities,
+  useThreadActivities: (ref: { threadId: string } | null) =>
+    ref && ref.threadId in mocks.activitiesByThread
+      ? mocks.activitiesByThread[ref.threadId]
+      : mocks.activities,
   useThreadMessages: () => [],
   useThreadShell: () => mocks.thread,
 }));
@@ -109,12 +115,20 @@ vi.mock("../../state/threads", () => ({
 
 vi.mock("../ui/toast", () => ({ toastManager: { add: mocks.toast } }));
 
-vi.mock("./rosterStore", () => ({
-  useRosterStore: { getState: () => ({ recordChatPath: mocks.recordChatPath }) },
-}));
+vi.mock("./rosterStore", () => {
+  const state = () => ({ bots: mocks.bots, recordChatPath: mocks.recordChatPath });
+
+  return {
+    useRosterStore: Object.assign(
+      <T,>(selector: (value: ReturnType<typeof state>) => T): T => selector(state()),
+      { getState: state },
+    ),
+  };
+});
 
 import { BotApprovalPrompt } from "./BotApprovalPrompt";
 import { DelegationCard, delegationUsageTokens } from "./DelegationCard";
+import { DelegationDescendantApproval } from "./DelegationDescendantApproval";
 import { DelegationDetail } from "./DelegationDetail";
 import { delegationClockState } from "./delegationClock";
 import { visitElements } from "../test-support/reactTree";
@@ -158,6 +172,15 @@ const childBot: Bot = {
   archivedAt: null,
   createdAt: "2026-08-31T00:00:00.000Z",
   updatedAt: "2026-08-31T00:00:00.000Z",
+};
+
+/** The bot the child chat delegated to. */
+const grandchildBot: Bot = {
+  ...childBot,
+  id: "bot-grandchild",
+  name: "Pip",
+  title: "Writer",
+  avatar: { kind: "dither", seed: "pip" },
 };
 
 const childThread = {
@@ -258,6 +281,43 @@ function delegation(state: IsnadiDelegationState, overrides: TestProps = {}) {
   });
 }
 
+/** The work the delegated chat itself delegated; its card belongs to that chat's feed. */
+function grandchildDelegation(): IsnadiDelegationRecord {
+  return delegation("running", {
+    delegationId: "delegation-depth-2",
+    parentDelegationId: "delegation-running",
+    parentBotId: "bot-child",
+    childBotId: "bot-grandchild",
+    parentThreadId: "thread-child",
+    parentTurnId: "turn-child",
+    ancestorBotIds: ["bot-parent", "bot-child"],
+    depth: 2,
+    phase: {
+      _tag: "Running",
+      childThreadId: "thread-grandchild",
+      childTurnId: "turn-grandchild",
+      startedAt: "2026-08-31T00:00:20.000Z",
+      progress: null,
+    },
+  });
+}
+
+/** The approval the grandchild raises while the child chat waits on it. */
+const grandchildApprovalRequested: OrchestrationThreadActivity = {
+  id: EventId.make("approval-shell-2"),
+  tone: "approval",
+  kind: "approval.requested",
+  summary: "Approval requested",
+  payload: {
+    requestId: "shell-2",
+    requestType: "dynamic_tool_call",
+    toolName: "Write",
+    detail: "Allow Write?",
+  },
+  turnId: TurnId.make("turn-grandchild"),
+  createdAt: "2026-08-31T00:00:35.000Z",
+};
+
 function usage(turnId: string, totalProcessedTokens: number): OrchestrationThreadActivity {
   return {
     id: EventId.make(`usage-${turnId}`),
@@ -344,7 +404,9 @@ function detailElement(bot: Bot | null = childBot, onOpenChange = vi.fn()) {
 describe("DelegationCard", () => {
   beforeEach(() => {
     mocks.activities = [usage("other-turn", 99_999), usage("turn-child", 1_234)];
+    mocks.activitiesByThread = {};
     mocks.thread = childThread;
+    mocks.bots = [parentBot, childBot];
     mocks.cancel.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
     mocks.retry.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
     mocks.respond.mockReset().mockResolvedValue({ _tag: "Success", value: { sequence: 1 } });
@@ -780,6 +842,52 @@ describe("DelegationCard", () => {
       input: {
         threadId: ThreadId.make("thread-child"),
         requestId: "shell-1",
+        decision: "accept",
+      },
+    });
+  });
+
+  it("shows the approval a delegated chat's own delegate raised, two levels down", () => {
+    mocks.activitiesByThread = { "thread-grandchild": [grandchildApprovalRequested] };
+    mocks.bots = [parentBot, childBot, grandchildBot];
+
+    const markup = renderToStaticMarkup(
+      <DelegationCard
+        delegation={delegation("running")}
+        delegations={[]}
+        environmentDelegations={[delegation("running"), grandchildDelegation()]}
+        childBot={childBot}
+        parentBot={parentBot}
+      />,
+    );
+
+    // The grandchild's card lives in the child chat's feed, and that chat is
+    // unreachable too, so this card is the last surface that can answer it.
+    expect(markup).toContain('data-testid="bot-approval-prompt"');
+    // The card's header names the chat in between, so the prompt names its asker.
+    expect(markup).toContain("Pip needs an answer");
+  });
+
+  it("answers the grandchild's chat, not the child's, when approved here", async () => {
+    mocks.activitiesByThread = { "thread-grandchild": [grandchildApprovalRequested] };
+    mocks.bots = [parentBot, childBot, grandchildBot];
+
+    const prompt = visitElements(
+      DelegationDescendantApproval({ delegation: grandchildDelegation() }) as TestValue,
+      (element) => element.type === BotApprovalPrompt,
+    );
+
+    const onRespond = prompt?.props.onRespond as
+      | ((decision: ProviderApprovalDecision) => Promise<boolean | void>)
+      | undefined;
+
+    await onRespond?.("accept");
+
+    expect(mocks.respond).toHaveBeenCalledWith({
+      environmentId: EnvironmentId.make("environment-1"),
+      input: {
+        threadId: ThreadId.make("thread-grandchild"),
+        requestId: "shell-2",
         decision: "accept",
       },
     });

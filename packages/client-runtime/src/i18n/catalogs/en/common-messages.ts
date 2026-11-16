@@ -120,6 +120,7 @@ export const commonMessagesCatalog = {
   "Result delivered to {name}": "Result delivered to {name}",
   "Delegation to {name}": "Delegation to {name}",
   "{parent} asked {child}": "{parent} asked {child}",
+  "{name} needs an answer": "{name} needs an answer",
   "{count} open": "{count} open",
   "Next: {action}": "Next: {action}",
   "Opening page…": "Opening page…",

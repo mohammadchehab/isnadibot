@@ -109,6 +109,49 @@ export function threadDelegations(
 }
 
 /**
+ * Every delegation started by this chat or by any chat it started, transitively.
+ * The contract caps delegation depth, so the walk is short, but it follows the
+ * chain rather than assuming exactly one more level.
+ *
+ * A nested delegation's card belongs to the feed of the chat that started it,
+ * and that chat is not listed in the roster, so the card one level up is the
+ * last surface that can show or answer it.
+ */
+export function descendantDelegations(
+  delegations: ReadonlyArray<IsnadiDelegationRecord>,
+  threadId: ThreadId,
+): ReadonlyArray<IsnadiDelegationRecord> {
+  const found: IsnadiDelegationRecord[] = [];
+  const seenDelegationIds = new Set<string>();
+  const seenThreads = new Set<ThreadId>([threadId]);
+  let parents: ReadonlyArray<ThreadId> = [threadId];
+
+  while (parents.length > 0) {
+    const next: ThreadId[] = [];
+
+    for (const delegation of delegations) {
+      if (!parents.includes(delegation.parentThreadId)) continue;
+
+      if (seenDelegationIds.has(delegation.delegationId)) continue;
+
+      seenDelegationIds.add(delegation.delegationId);
+      found.push(delegation);
+
+      const childThreadId = presentDelegation(delegation).childThreadId;
+
+      if (childThreadId !== null && !seenThreads.has(childThreadId)) {
+        seenThreads.add(childThreadId);
+        next.push(childThreadId);
+      }
+    }
+
+    parents = next;
+  }
+
+  return found;
+}
+
+/**
  * Whether a later record already retries this one. The decider refuses a
  * second retry of the same record, so a superseded card offers no Try again.
  */

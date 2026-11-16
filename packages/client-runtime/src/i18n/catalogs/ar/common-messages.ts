@@ -121,6 +121,7 @@ export const commonMessagesCatalog = {
   "Result delivered to {name}": "سُلّمت النتيجة إلى {name}",
   "Delegation to {name}": "التفويض إلى {name}",
   "{parent} asked {child}": "{parent} طلب من {child}",
+  "{name} needs an answer": "{name} بحاجة إلى إجابة",
   "{count} open": "{count} مفتوح",
   "Next: {action}": "التالي: {action}",
   "Opening page…": "جارٍ فتح الصفحة…",
