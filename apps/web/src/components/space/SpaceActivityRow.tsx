@@ -13,7 +13,7 @@ import { Button } from "../ui/button";
 /** The state word's ink. The word carries the state, not the row. */
 const STATE_INK: Record<IsnadiDelegationState, string> = {
   queued: "text-muted-foreground",
-  running: "text-muted-foreground",
+  running: "text-info",
   blocked: "text-warning",
   failed: "text-destructive",
   completed: "text-success",
@@ -73,7 +73,7 @@ function MetaLine({
   const { t } = useI18n();
 
   return (
-    <span className="mt-0.5 flex items-center gap-1.5 text-11px">
+    <span className="flex items-center gap-1.5 text-11px">
       <span className={ink}>{word}</span>
       <span aria-hidden className="text-muted-foreground">
         ·
@@ -124,7 +124,7 @@ export function SpaceActivityRow({
         waiting={needsYou(state)}
         dotClass={state === "failed" ? "bg-destructive" : "bg-warning"}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.75">
         <bdi className="truncate text-xs font-medium">{name}</bdi>
         <bdi className="text-xs">{sentence}</bdi>
         {/* Only the row waiting on the reader carries an action; finished and live work is
@@ -174,13 +174,13 @@ export function SpaceChatActivityRow({
         waiting={decision}
         dotClass="bg-warning"
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.75">
         <bdi className="truncate text-xs font-medium">{name}</bdi>
         <bdi className="truncate text-xs">{title}</bdi>
         {decision ? (
           <MetaLine ink="text-warning" word={t("Waiting on you")} time={time} onReview={onReview} />
         ) : (
-          <span className="mt-0.5 text-11px text-muted-foreground">{time}</span>
+          <span className="text-11px text-muted-foreground">{time}</span>
         )}
       </div>
     </li>
