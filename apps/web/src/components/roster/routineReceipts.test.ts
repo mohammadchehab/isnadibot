@@ -106,7 +106,20 @@ describe("deriveRoutineReceipts", () => {
   });
 
   it("derives durable creation, enablement, start, and completion rows", () => {
-    expect(deriveRoutineReceipts(routine.targetThreadId, [routine], [run])).toEqual([
+    const formatted: Date[] = [];
+
+    // The completed row carries the run's own instant in its sentence (E13e `2169:2578`),
+    // so the clock is stubbed to the frame's words and the instant it was handed is asserted.
+    const clock = {
+      ...createTranslator("en"),
+      formatDate: (value: Date | number) => {
+        formatted.push(new Date(value));
+
+        return "9:01 AM";
+      },
+    };
+
+    expect(deriveRoutineReceipts(routine.targetThreadId, [routine], [run], clock)).toEqual([
       {
         id: "routine-created:routine-1",
         createdAt: "2026-09-19T08:00:00.000Z",
@@ -122,10 +135,11 @@ describe("deriveRoutineReceipts", () => {
       {
         id: "routine-run-finished:run-1",
         createdAt: "2026-09-19T09:01:00.000Z",
-        text: "“Daily digest” finished: 2 files changed",
+        text: "The Daily digest routine ran at 9:01 AM: 2 files changed",
         tone: "success",
       },
     ]);
+    expect(formatted.map((value) => value.toISOString())).toEqual(["2026-09-19T09:01:00.000Z"]);
   });
 
   it("shows a started row while a run is in flight", () => {

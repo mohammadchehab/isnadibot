@@ -33,7 +33,7 @@ export function useBotLandingTimeline(input: {
   readonly activities?: ReadonlyArray<OrchestrationThreadActivity>;
 }) {
   const { activities, entries, snapshot, threadRef } = input;
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
 
   const routineRunHistory = useEnvironmentQuery(
     threadRef
@@ -167,7 +167,7 @@ export function useBotLandingTimeline(input: {
               threadRef.threadId,
               [...(snapshot?.routines ?? []), ...(snapshot?.routineReceiptSources ?? [])],
               mergeRoutineRunHistory(currentHistory.runs, snapshot?.routineRuns ?? []),
-              { t },
+              { t, formatDate },
             ),
             ...deriveFleetReceipts(activities ?? [], { t }),
           ]
@@ -180,6 +180,7 @@ export function useBotLandingTimeline(input: {
       currentHistory.runs,
       activities,
       t,
+      formatDate,
     ],
   );
 

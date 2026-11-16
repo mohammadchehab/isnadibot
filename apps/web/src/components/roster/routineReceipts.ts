@@ -36,7 +36,7 @@ export function mergeBotConversationTimeline(
   );
 }
 
-type ReceiptTranslator = Pick<ReturnType<typeof createTranslator>, "t">;
+type ReceiptTranslator = Pick<ReturnType<typeof createTranslator>, "t" | "formatDate">;
 
 export function mergeRoutineRunHistory(
   history: ReadonlyArray<RoutineRun>,
@@ -52,12 +52,14 @@ export function deriveRoutineReceipts(
   threadId: ThreadId,
   routines: ReadonlyArray<Routine | RoutineReceiptSource>,
   runs: ReadonlyArray<RoutineRun>,
-  { t }: ReceiptTranslator = englishTranslator,
+  { t, formatDate }: ReceiptTranslator = englishTranslator,
 ): RoutineReceipt[] {
   const withDetail = (summary: string, detail: string | undefined) => {
     const trimmed = detail?.trim();
 
-    return trimmed ? t("{summary}: {detail}", { summary, detail: trimmed }) : summary;
+    return trimmed
+      ? t("{summary}: {detail}", { summary: routineReceiptLabelText(summary), detail: trimmed })
+      : summary;
   };
 
   const threadRoutines = routines.filter((routine) => routine.targetThreadId === threadId);
@@ -120,15 +122,25 @@ export function deriveRoutineReceipts(
           ...(archived ? { archived: true } : {}),
         });
         break;
-      case "completed":
+      case "completed": {
+        // The frame draws the run's time inside the sentence as well as on the row's
+        // own clock (E13e `2169:2578`), so both read the one instant the row is
+        // ordered by and neither can drift from the other.
+        const completedAt = run.completedAt ?? run.updatedAt;
+        const ranAt = formatDate(new Date(completedAt), { hour: "numeric", minute: "2-digit" });
+
         receipts.push({
           id: `routine-run-finished:${run.id}`,
-          createdAt: run.completedAt ?? run.updatedAt,
-          text: withDetail(t("“{name}” finished", { name: routine.job }), run.result?.summary),
+          createdAt: completedAt,
+          text: withDetail(
+            t("The {job} routine ran at {time}.", { job: routine.job, time: ranAt }),
+            run.result?.summary,
+          ),
           tone: "success",
           ...(archived ? { archived: true } : {}),
         });
         break;
+      }
     }
   }
 
