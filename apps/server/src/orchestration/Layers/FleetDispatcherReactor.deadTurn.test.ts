@@ -20,6 +20,7 @@ import {
 } from "../test-support/GroupDeciderFixtures.ts";
 import {
   BOT_THREAD,
+  LATER,
   NOW,
   type OnCommand,
   crashedDispatcherTurn,
@@ -32,6 +33,7 @@ import {
   run,
   sessionSet,
   settledDispatcherTurn,
+  userTurnAfterClaim,
   workItem,
 } from "../test-support/FleetDispatcherFixtures.ts";
 import { DISPATCH_RETRY_DELAY } from "./FleetDispatcherReactor.ts";
@@ -424,6 +426,81 @@ describe("FleetDispatcherReactor completed dispatcher turns (TASK-408)", () => {
 
           expect(item).toMatchObject({ state: "queued" });
           expect(item?.ownerBotId).toBeUndefined();
+        }),
+      );
+    }).pipe(Effect.scoped),
+  );
+});
+
+describe("FleetDispatcherReactor reaps a turn a user message replaced (TASK-407)", () => {
+  it.effect(
+    "reaps the claim when the owner bot's latest turn began after the item was assigned",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* harness;
+
+        yield* run(h, ({ reactor, receipts }) =>
+          Effect.gen(function* () {
+            yield* reactor.drain;
+            yield* receipts;
+
+            // The user typed in the bot's chat while the dispatcher's turn start was still pending:
+            // the user's start overwrote it, so the turn that ran has no dispatcher trigger. The
+            // claim is still the bot's, and the turn began after the item was assigned.
+            yield* Ref.set(
+              h.model,
+              teamModel({
+                turnThread: userTurnAfterClaim(BOT_THREAD, SPECIALIST_ID, "error"),
+                item: workItem({ id: "item-1", state: "assigned", ownerBotId: SPECIALIST_ID }),
+              }),
+            );
+            yield* Ref.set(h.onCommand, projectReaps(h.model));
+
+            yield* PubSub.publish(h.events, sessionSet(1, BOT_THREAD, "error"));
+            yield* reactor.drainThrough(1);
+
+            expect(h.dispatched.map((command) => command.type)).toEqual([
+              "work-item.dispatcher-failed",
+            ]);
+            expect(h.dispatched[0]).toMatchObject({
+              workItemId: "item-1",
+              threadId: BOT_THREAD,
+              turnId: "turn-user",
+              cause: "dead",
+            });
+          }),
+        );
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("leaves a turn alone that began before the item was assigned", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* run(h, ({ reactor }) =>
+        Effect.gen(function* () {
+          yield* reactor.drain;
+
+          // The chat's latest turn is one the bot ran before it took this item. It says nothing
+          // about the claim, so it is not the claim's turn and nothing is reaped. The check is an
+          // ordering, so a turn that starts after the assignment is what makes it the claim's.
+          yield* Ref.set(
+            h.model,
+            teamModel({
+              turnThread: userTurnAfterClaim(BOT_THREAD, SPECIALIST_ID, "error", NOW),
+              item: workItem({
+                id: "item-1",
+                state: "assigned",
+                ownerBotId: SPECIALIST_ID,
+                updatedAt: LATER,
+              }),
+            }),
+          );
+
+          yield* PubSub.publish(h.events, sessionSet(1, BOT_THREAD, "error"));
+          yield* reactor.drainThrough(1);
+
+          expect(h.dispatched).toEqual([]);
         }),
       );
     }).pipe(Effect.scoped),

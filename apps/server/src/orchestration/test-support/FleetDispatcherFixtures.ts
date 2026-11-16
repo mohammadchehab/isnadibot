@@ -6,6 +6,7 @@ import {
   DEFAULT_RUNTIME_MODE,
   EventId,
   GroupId,
+  MessageId,
   ProjectId,
   ProviderInstanceId,
   ThreadId,
@@ -84,6 +85,7 @@ export const workItem = (input: {
   readonly ownerBotId?: BotId;
   readonly groupId?: GroupId;
   readonly createdAt?: string;
+  readonly updatedAt?: string;
   readonly attempts?: number;
 }): WorkItem => ({
   id: WorkItemId.make(input.id),
@@ -95,7 +97,7 @@ export const workItem = (input: {
   ...(input.ownerBotId === undefined ? {} : { ownerBotId: input.ownerBotId }),
   ...(input.attempts === undefined ? {} : { attempts: input.attempts }),
   createdAt: input.createdAt ?? NOW,
-  updatedAt: NOW,
+  updatedAt: input.updatedAt ?? NOW,
 });
 
 /** A bot that has left `GROUP_ID` for another one, and the chat its dispatcher turn ran in. */
@@ -136,6 +138,32 @@ export const runningDispatcherTurn = (threadId: ThreadId, workItemId: string, bo
 /** The same chat once that turn reports terminal, which is what releases the item. */
 export const settledDispatcherTurn = (threadId: ThreadId, workItemId: string, botId: BotId) =>
   dispatcherTurnThread(threadId, workItemId, botId, "completed");
+
+/**
+ * A chat whose latest turn is the user's own, requested after the item was handed to the bot.
+ *
+ * This is what a second `thread.turn.start` in a chat leaves behind (TASK-407): the thread holds
+ * one pending turn start, the user's start overwrites the dispatcher's before any turn row exists,
+ * and the turn that actually runs carries no dispatcher trigger. The claim is still the bot's, so
+ * the only thing left to prove it is the ordering — this turn began after the item was assigned.
+ */
+export const userTurnAfterClaim = (
+  threadId: ThreadId,
+  botId: BotId,
+  state: OrchestrationLatestTurnState,
+  requestedAt: string = LATER,
+): OrchestrationThread => ({
+  ...botThread(botId, threadId),
+  latestTurn: {
+    turnId: TurnId.make("turn-user"),
+    state,
+    requestedAt,
+    startedAt: requestedAt,
+    completedAt: state === "running" ? null : LATEST,
+    assistantMessageId: null,
+    trigger: { kind: "user", messageId: MessageId.make("message-user") },
+  },
+});
 
 /** The same chat after that turn failed: the bot never got anywhere with the item. */
 export const failedDispatcherTurn = (

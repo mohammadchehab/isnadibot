@@ -959,12 +959,36 @@ function turnEndCause(
 }
 
 /**
+ * Whether a chat's latest turn is the one this item's claim ran, rather than a turn the chat had
+ * before the claim or a dispatcher turn for some other item.
+ *
+ * A dispatcher turn says so outright: its trigger names the item. The turn that replaced it cannot,
+ * because a second `thread.turn.start` in the same chat overwrites the thread's one pending turn
+ * start before any turn row exists — the dispatcher's turn is then never created at all, and the
+ * user's turn runs in its place with no dispatcher trigger. That turn still began after the item
+ * was assigned, which is the only ordering the read model can prove. It is an ordering and not a
+ * window: nothing here assumes how long a turn takes before it reports, because the gap between a
+ * turn ending and the reaper seeing it is not constant (TASK-407 measured 79 ms and 30.3 s in one
+ * run).
+ */
+function turnWorksClaim(item: WorkItem, turn: OrchestrationLatestTurn): boolean {
+  const trigger = turn.trigger;
+
+  if (trigger?.kind === "dispatcher") return trigger.workItemId === item.id;
+
+  return turn.requestedAt >= item.updatedAt;
+}
+
+/**
  * Every dispatcher turn in the group that is over while its item is still assigned.
  *
- * The turn is found by its trigger, not by the item's chat: `work-item.claim` never sets
- * `threadId`, so an item the dispatcher claimed usually has no chat to key on. A chat whose latest
- * turn is not this item's dispatcher turn has moved on, which means the bot is alive and there is
- * nothing to reap — so a newer turn in that chat is the guard, not an oversight.
+ * The turn is found among the owner bot's own chats, not by the item's `threadId`:
+ * `work-item.claim` never sets it, so an item the dispatcher claimed has no chat to key on. Only
+ * the bot that holds the item can have been working it, so reading its chats is also what keeps the
+ * reap honest about the turn it names.
+ *
+ * A chat whose latest turn is not this claim's turn has moved on, which means the bot is alive and
+ * there is nothing to reap — so a newer turn in that chat is the guard, not an oversight.
  */
 export function endDispatcherClaims(
   readModel: OrchestrationReadModel,
@@ -976,13 +1000,18 @@ export function endDispatcherClaims(
     if (item.groupId !== groupId || item.state !== "assigned" || item.ownerBotId === undefined)
       continue;
 
+    const ownerBotId = item.ownerBotId;
+
     const thread = readModel.threads.find((candidate) => {
-      const trigger = candidate.latestTurn?.trigger;
+      const turn = candidate.latestTurn;
 
       return (
+        candidate.botId === ownerBotId &&
         candidate.deletedAt === null &&
-        trigger?.kind === "dispatcher" &&
-        trigger.workItemId === item.id
+        candidate.archivedAt === null &&
+        turn !== null &&
+        turn !== undefined &&
+        turnWorksClaim(item, turn)
       );
     });
 
