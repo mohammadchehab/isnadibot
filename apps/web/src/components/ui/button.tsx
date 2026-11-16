@@ -77,13 +77,18 @@ const buttonVariants = cva(
         /**
          * The round twin of `icon`, held at 36px at every width. A composer
          * action slot stands in for the send button beside it, which is a
-         * constant 36, so this size does not step down on a pointer device.
+         * constant 36, so this size does not step down at the `sm` breakpoint.
          */
         "icon-round": "size-9 rounded-full",
         "icon-lg": "size-10 sm:size-9",
         "icon-micro":
           "size-5 rounded-sm p-0 before:rounded-[calc(var(--radius-sm)-1px)] [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8 sm:size-7",
+        /**
+         * The round twin of `icon-sm`, stepping with it from 32px to 28px. Its
+         * one caller is the hang-up button in a compact call bar, which sits
+         * beside controls of the same small size.
+         */
         "icon-sm-round": "size-8 rounded-full sm:size-7",
         "icon-xl":
           "size-11 sm:size-10 [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
