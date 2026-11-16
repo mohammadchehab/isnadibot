@@ -13,6 +13,7 @@ import {
   WsRpcGroup,
 } from "@isnadi/contracts";
 import { runImageProviderHealthTest } from "./image-generation/service.ts";
+import { describeMcpAuthenticationFailure } from "./provider/McpAuthenticationFailure.ts";
 import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as SessionStore from "./auth/SessionStore.ts";
 
@@ -142,7 +143,7 @@ export const createWsAuthHandlers = ({
                 ? cause
                 : new McpServerAuthenticationError({
                     mcpServerId,
-                    reason: "The MCP server could not be reached.",
+                    reason: describeMcpAuthenticationFailure(cause),
                   }),
             ),
             Effect.catchTag("McpServerAuthenticationError", (error) => Queue.fail(queue, error)),

@@ -2,7 +2,12 @@ import type * as Schema from "effect/Schema";
 import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";
 import * as NodePath from "node:path";
-import { InMemoryOAuthStorage, MCPOAuthClientProvider } from "@mastra/mcp";
+import {
+  getCallbackUrlCandidates,
+  InMemoryOAuthStorage,
+  InternalMastraMCPClient,
+  MCPOAuthClientProvider,
+} from "@mastra/mcp";
 import { auth } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -23,7 +28,14 @@ const commonJsClient = requirePackage(
 ) as typeof import("@modelcontextprotocol/client");
 
 const runtimes = [
-  { name: "ESM", InMemoryOAuthStorage, MCPOAuthClientProvider, auth },
+  {
+    name: "ESM",
+    InMemoryOAuthStorage,
+    InternalMastraMCPClient,
+    MCPOAuthClientProvider,
+    auth,
+    getCallbackUrlCandidates,
+  },
   { name: "CommonJS", ...commonJsMcp, auth: commonJsClient.auth },
 ];
 
@@ -204,6 +216,94 @@ describe.each(runtimes)("@mastra/mcp OAuth registration scopes ($name)", (runtim
       expect(fixture.onRedirectToAuthorization).not.toHaveBeenCalled();
     },
   );
+});
+
+function refusingRegistrationFixture(runtime: (typeof runtimes)[number]) {
+  const requests: string[] = [];
+
+  const fetchFn: typeof fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+
+    if (url === resourceUrl) {
+      return new Response(null, {
+        status: 401,
+        headers: { "WWW-Authenticate": `Bearer resource_metadata="${resourceUrl}/metadata"` },
+      });
+    }
+
+    if (url === `${resourceUrl}/metadata`) {
+      return Response.json({ resource: resourceUrl, authorization_servers: [issuer] });
+    }
+
+    if (url === `${issuer}/.well-known/oauth-authorization-server`) {
+      return Response.json({
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        registration_endpoint: `${issuer}/register`,
+        response_types_supported: ["code"],
+        code_challenge_methods_supported: ["S256"],
+      });
+    }
+
+    if (url === `${issuer}/register`) {
+      return Response.json(
+        { error: "invalid_client_metadata", error_description: "Maximum 10 redirect_uris allowed" },
+        { status: 400 },
+      );
+    }
+
+    return new Response("Not found", { status: 404 });
+  };
+
+  const provider = new runtime.MCPOAuthClientProvider({
+    redirectUrl,
+    clientMetadata: {
+      redirect_uris: [redirectUrl],
+      client_name: "Isnadi redirect cap test",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+    },
+    storage: new runtime.InMemoryOAuthStorage(),
+    onRedirectToAuthorization: () => {},
+  });
+
+  const client = new runtime.InternalMastraMCPClient({
+    name: "redirect-uri-cap",
+    server: { url: new URL(resourceUrl), fetch: fetchFn, authProvider: provider },
+  });
+
+  return { client, requests };
+}
+
+describe.each(runtimes)("@mastra/mcp redirect URI cap ($name)", (runtime) => {
+  it("advertises no more redirect URIs than the smallest known registration cap", () => {
+    const candidates = runtime.getCallbackUrlCandidates(new URL(redirectUrl));
+
+    expect(candidates.map((candidate) => candidate.port)).toEqual([
+      "1458",
+      "1459",
+      "1460",
+      "1461",
+      "1462",
+      "1463",
+      "1464",
+      "1465",
+      "1466",
+      "1467",
+    ]);
+  });
+
+  it("reports a refused registration instead of retrying the transport", async () => {
+    const { client, requests } = refusingRegistrationFixture(runtime);
+
+    await expect(client.connect()).rejects.toThrow(
+      "Dynamic Client Registration rejected (HTTP 400)",
+    );
+    expect(requests.filter((url) => url === resourceUrl)).toHaveLength(1);
+  });
 });
 
 describe("@mastra/mcp OAuth issuer patch", () => {
