@@ -16,7 +16,10 @@ import {
 import { useMemo } from "react";
 
 import { useI18n } from "../../i18n";
-import { deriveLatestContextWindowSnapshot } from "../../lib/contextWindow";
+import {
+  deriveLatestContextWindowSnapshot,
+  formatContextWindowTokens,
+} from "../../lib/contextWindow";
 import { useThreadActivities } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
@@ -53,10 +56,20 @@ function TeamRow({
 
   const activities = useThreadActivities(ref);
 
-  const contextPercent =
-    chatId === null
+  const context = chatId === null ? null : deriveLatestContextWindowSnapshot(activities);
+
+  // The frames draw the reading as "82k of 200k" rather than a percentage: it is the
+  // form in which "hands off after this card" reads as a size (designer ruling).
+  const usedTokens = context?.usedTokens ?? null;
+  const maxTokens = context?.maxTokens ?? null;
+  const usedPercentage = context?.usedPercentage ?? null;
+
+  const contextLabel =
+    usedTokens === null
       ? null
-      : (deriveLatestContextWindowSnapshot(activities)?.usedPercentage ?? null);
+      : maxTokens === null
+        ? formatContextWindowTokens(usedTokens)
+        : `${formatContextWindowTokens(usedTokens)} of ${formatContextWindowTokens(maxTokens)}`;
 
   const item = row.item;
 
@@ -73,7 +86,8 @@ function TeamRow({
         </span>
       </th>
       <td className={cn("py-2 pe-3 align-top text-sm", BOT_STATUS_TONE[row.status])}>
-        {t(BOT_STATUS_LABEL[row.status])}
+        {/* Two E13 frames name the person being asked, so the table says "Asking you". */}
+        {row.status === "asking" ? t("Asking you") : t(BOT_STATUS_LABEL[row.status])}
       </td>
       <td className="min-w-0 py-2 pe-3 align-top text-sm text-muted-foreground">
         {item === null ? "—" : <bdi className="truncate">{item.title}</bdi>}
@@ -83,11 +97,11 @@ function TeamRow({
       </td>
       <td
         className="py-2 pe-3 align-top text-sm tabular-nums text-muted-foreground"
-        {...(contextPercent === null
+        {...(usedPercentage === null
           ? {}
-          : { title: t("Context used: {percent}%", { percent: Math.round(contextPercent) }) })}
+          : { title: t("Context used: {percent}%", { percent: Math.round(usedPercentage) }) })}
       >
-        {contextPercent === null ? "—" : `${Math.round(contextPercent)}%`}
+        {contextLabel === null ? "—" : contextLabel}
       </td>
       {/* The frame keeps this cell for a row action; it is empty until one exists. */}
       <td className="py-2 align-top" />

@@ -133,9 +133,10 @@ describe("space team table", () => {
     expect(markup).toContain("Boss");
     expect(markup).toContain("Busy");
     expect(markup).toContain("Wire the team table");
-    expect(markup).toContain("21%");
+    // The frames draw the reading as a size, not a percentage.
+    expect(markup).toContain("21k of 100k");
 
     // The boss has no chat and no item, so it reads as two em dashes and no number.
-    expect(markup).not.toContain("0%");
+    expect(markup).not.toContain("0k of");
   });
 });
