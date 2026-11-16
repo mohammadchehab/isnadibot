@@ -136,7 +136,12 @@ export function ExperimentalSidebar() {
             <CircleDotIcon />
             <span>{t("Decisions")}</span>
             {decisions.length > 0 ? (
-              <SidebarMenuBadge>{decisionCount(decisions)}</SidebarMenuBadge>
+              <SidebarMenuBadge>
+                <span aria-hidden="true">{decisionCount(decisions)}</span>
+                <span className="sr-only">
+                  {t("{count} chats waiting on you", { count: decisions.length })}
+                </span>
+              </SidebarMenuBadge>
             ) : null}
           </SidebarMenuButton>
 

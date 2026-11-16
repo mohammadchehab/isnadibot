@@ -1,6 +1,15 @@
 export const rosterCatalog = {
   Decisions: "القرارات",
   "Nothing waiting on you": "لا شيء ينتظرك",
+  "When a bot needs an approval or an answer, it shows up here.":
+    "عندما يحتاج أحد البوتات إلى موافقتك أو إجابتك، سيظهر هنا.",
+  "Loading decisions": "جارٍ تحميل القرارات",
+  "{count} chats waiting on you": "{count} محادثات تنتظرك",
+  "{count} chats waiting on you#zero": "لا محادثات تنتظرك ({count})",
+  "{count} chats waiting on you#one": "{count} محادثة تنتظرك",
+  "{count} chats waiting on you#two": "محادثتان تنتظرانك ({count})",
+  "{count} chats waiting on you#few": "{count} محادثات تنتظرك",
+  "{count} chats waiting on you#many": "{count} محادثة تنتظرك",
   "Show all ({count})": "عرض الكل ({count})",
   "Run bots in a persistent Linux VM. Public previews are enabled by default.":
     "شغّل البوتات في جهاز افتراضي Linux دائم. المعاينات العامة مفعلة افتراضيا.",
