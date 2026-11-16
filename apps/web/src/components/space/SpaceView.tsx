@@ -6,6 +6,7 @@ import { GroupMemberStack } from "../roster/GroupMemberStack";
 import { useGroupDetailsOpen } from "../roster/detailsPanelOpen";
 import { useRosterStore } from "../roster/rosterStore";
 import type { Group } from "../roster/types";
+import { Badge } from "../ui/badge";
 import { Empty, EmptyHeader } from "../ui/empty";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "../ui/tabs";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
@@ -35,6 +36,9 @@ export function SpaceView({
   const { t } = useI18n();
   const bots = useRosterStore((state) => state.bots);
   const [detailsPanelOpen] = useGroupDetailsOpen();
+  // A space a bot made says so. The creator is resolved by id so a deleted bot still
+  // labels the space, falling back to the house wording the refusal copy already uses.
+  const creatorBot = bots.find((bot) => bot.id === group.createdByBotId);
   const [actionsHost, setActionsHost] = useState<HTMLDivElement | null>(null);
 
   return (
@@ -54,6 +58,11 @@ export function SpaceView({
           <span className="min-w-0 truncate text-sm font-medium">
             <bdi>{group.name}</bdi>
           </span>
+          {group.createdByBotId ? (
+            <Badge size="sm" variant="outline">
+              {creatorBot ? t("Made by {name}", { name: creatorBot.name }) : t("Made by a bot")}
+            </Badge>
+          ) : null}
         </div>
         <TabsList aria-label={t("Space")} variant="top-bar">
           <TabsTab value="overview" variant="top-bar">

@@ -83,6 +83,12 @@ export interface Group {
    * the roster mirrors it verbatim.
    */
   fleetTemplateId?: string | null;
+  /**
+   * The bot that created this space; null when a person did. Optional here for
+   * the same reason as the two fields above: hand-written group literals stay
+   * valid, while the server always sends it and the roster mirrors it verbatim.
+   */
+  createdByBotId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
