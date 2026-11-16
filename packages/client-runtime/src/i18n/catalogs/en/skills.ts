@@ -85,4 +85,7 @@ export const skillsCatalog = {
   "What the bot will be told": "What the bot will be told",
   "Approving pins this commit. If the folder changes, Isnadi asks again before a bot uses it.":
     "Approving pins this commit. If the folder changes, Isnadi asks again before a bot uses it.",
+  "What bots in this space can do. Turn one on for a bot in its chat.":
+    "What bots in this space can do. Turn one on for a bot in its chat.",
+  "needs your approval": "needs your approval",
 } as const;

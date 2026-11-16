@@ -11,6 +11,7 @@ import { createStaticNavigation } from "@react-navigation/native";
 import { RegistryContext } from "@effect/atom-react";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { MobilePolicyNotice } from "./features/settings/MobilePolicyNotice";
+import { registerSkillRegistryFixture } from "./features/skills/registerSkillRegistryFixture";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
 import { IncomingShareProvider } from "./features/sharing/IncomingShareProvider";
 import { ReplyPlaybackProvider } from "./features/replyPlayback/ReplyPlaybackProvider";
@@ -27,6 +28,8 @@ import { useMobileNavigationTheme } from "./lib/useMobileNavigationTheme";
 import { MobileLanguageProvider } from "./lib/i18n";
 
 import "../global.css";
+
+registerSkillRegistryFixture();
 
 if (process.env.EXPO_PUBLIC_SHOWCASE === "1") {
   prepareNativeShowcaseCapture();

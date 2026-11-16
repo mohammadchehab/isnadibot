@@ -15,6 +15,7 @@ import { BotUsageRouteScreen } from "./features/usage/BotUsageRouteScreen";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsProviderHealthRouteScreen } from "./features/settings/SettingsProviderHealthRouteScreen";
+import { SettingsSkillsRouteScreen } from "./features/skills/SettingsSkillsRouteScreen";
 import { GLASS_HEADER_OPTIONS } from "./stack-header-options";
 
 function SettingsNavigationLayout({
@@ -38,6 +39,7 @@ function SettingsNavigationLayout({
       SettingsUsage: t("Usage"),
       SettingsBotUsage: t("Bot usage"),
       SettingsProviderHealth: undefined,
+      SettingsSkills: t("Settings"),
     } as const),
   );
 
@@ -130,6 +132,13 @@ const SettingsContentStack = createNativeStackNavigator({
       linking: "provider-health",
       options: {
         title: "Settings",
+      },
+    }),
+    SettingsSkills: createNativeStackScreen({
+      screen: SettingsSkillsRouteScreen,
+      linking: "skills",
+      options: {
+        title: "Skills",
       },
     }),
   },
