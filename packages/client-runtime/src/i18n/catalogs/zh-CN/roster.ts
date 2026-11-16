@@ -459,4 +459,6 @@ export const rosterCatalog = {
   "Needs two bots — one to work, one to hand off to.": "需要两个机器人——一个执行，一个交接。",
   "{count} · No boss yet": "{count} · 尚无负责人",
   "{count} · {boss} is the boss": "{count} · {boss} 是负责人",
+  "{bot} was idle, so the board gave it “{item}”.": "{bot} 空闲了，于是看板把「{item}」交给了它。",
+  "Everyone is idle and the board is empty.": "所有机器人都空闲，看板也没有待办。",
 } as const;

@@ -685,11 +685,15 @@ describe("FleetDispatcherReactor", () => {
             "work-item.claim",
             "thread.create",
             "thread.turn.start",
+            "thread.activity.append",
           ]);
           expect(h.dispatched[1]).toMatchObject({
             botId: SPECIALIST_ID,
             projectId: ProjectId.make("project-2"),
           });
+
+          // The hand-out lands in the chat that woke the group (TASK-447).
+          expect(h.dispatched[3]).toMatchObject({ threadId: SPACE_THREAD });
           expect(yield* receipts).toMatchObject([
             {
               type: "fleet.dispatch.decided",

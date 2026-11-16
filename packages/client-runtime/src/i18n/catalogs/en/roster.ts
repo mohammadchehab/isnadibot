@@ -479,4 +479,7 @@ export const rosterCatalog = {
     "Needs two bots — one to work, one to hand off to.",
   "{count} · No boss yet": "{count} · No boss yet",
   "{count} · {boss} is the boss": "{count} · {boss} is the boss",
+  "{bot} was idle, so the board gave it “{item}”.":
+    "{bot} was idle, so the board gave it “{item}”.",
+  "Everyone is idle and the board is empty.": "Everyone is idle and the board is empty.",
 } as const;

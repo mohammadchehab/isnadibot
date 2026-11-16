@@ -122,6 +122,32 @@ export const WorkItem = Schema.Struct({
 
 export type WorkItem = typeof WorkItem.Type;
 
+/**
+ * Thread activity kinds the fleet dispatcher leaves in a group's chat, so the
+ * chat says what the board did while nobody was typing in it. The payload
+ * carries the data and the client writes the sentence around it, the way a
+ * routine receipt translates its own sentence and keeps the routine's name
+ * verbatim.
+ */
+export const FLEET_DISPATCH_CLAIM_ACTIVITY = "fleet.dispatch.claim";
+
+export const FLEET_DISPATCH_IDLE_ACTIVITY = "fleet.dispatch.idle";
+
+/** Who was handed what: the row reads "{botName} was idle, so the board gave it "{itemTitle}"." */
+export const FleetDispatchClaimPayload = Schema.Struct({
+  botId: BotId,
+  botName: TrimmedNonEmptyString,
+  workItemId: WorkItemId,
+  itemTitle: WorkItemTitle,
+});
+
+export type FleetDispatchClaimPayload = typeof FleetDispatchClaimPayload.Type;
+
+/** An idle note carries nothing; it is news about the queue, not about an item. */
+export const FleetDispatchIdlePayload = Schema.Struct({});
+
+export type FleetDispatchIdlePayload = typeof FleetDispatchIdlePayload.Type;
+
 export const WORK_ITEM_PREVIEW_LIMIT = 280;
 
 /** The first {@link WORK_ITEM_PREVIEW_LIMIT} characters of a brief, cut at a word boundary with an ellipsis. */
