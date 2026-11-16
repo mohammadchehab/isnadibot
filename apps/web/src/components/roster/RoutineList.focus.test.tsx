@@ -16,6 +16,7 @@ import { RoutineDetail, RoutinePanel } from "./RoutinePanel";
 
 const routine: RoutineAdapterItem = {
   id: "routine-1",
+  botId: "bot-1",
   name: "Morning brief",
   prompt: "Summarize the inbox.",
   projectId: "project-1",
@@ -60,7 +61,7 @@ describe("RoutinePanel focus targets", () => {
   });
 
   it("moves focus in on open and back to the originating row on return", () => {
-    const source = NodeFS.readFileSync(new URL("./RoutinePanel.tsx", import.meta.url), "utf8");
+    const source = NodeFS.readFileSync(new URL("./RoutineList.tsx", import.meta.url), "utf8");
 
     expect(source).toContain('querySelector<HTMLElement>("[data-routine-back]")?.focus()');
     expect(source).toContain('querySelectorAll<HTMLElement>("[data-routine-row]")');

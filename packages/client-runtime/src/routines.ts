@@ -60,6 +60,8 @@ export interface RoutineAdapterRun {
 /** A routine as clients render it: names resolved, runs attached newest first. */
 export interface RoutineAdapterItem {
   readonly id: string;
+  /** The bot the routine belongs to and reports to. */
+  readonly botId: string;
   readonly name: string;
   readonly prompt: string;
   readonly projectId: string;
@@ -169,6 +171,7 @@ export function toRoutinePanelItem(
 
   return {
     id: routine.id,
+    botId: routine.botId,
     name: routine.job,
     prompt: routine.procedure,
     projectId: routine.projectId,
@@ -208,10 +211,36 @@ export interface BotRoutineSource {
   readonly mcpServers?: readonly McpServer[] | undefined;
 }
 
-export type BotRoutinesView =
+export type RoutinesView =
   | { readonly kind: "loading" }
   | { readonly kind: "unavailable" }
   | { readonly kind: "ready"; readonly routines: readonly RoutineAdapterItem[] };
+
+/**
+ * Every live routine in the environment. The Routines page lists them across bots;
+ * the per-bot panel narrows this down with `botRoutinesView`.
+ */
+export function environmentRoutinesView(
+  snapshot: BotRoutineSource | null | undefined,
+): RoutinesView {
+  if (!snapshot) return { kind: "loading" };
+
+  if (snapshot.routines === undefined) return { kind: "unavailable" };
+
+  return {
+    kind: "ready",
+    routines: snapshot.routines
+      .filter((routine) => routine.lifecycle !== "deleted")
+      .map((routine) =>
+        toRoutinePanelItem(
+          routine,
+          snapshot.routineRuns ?? [],
+          snapshot.skillAssignments ?? [],
+          snapshot.mcpServers ?? [],
+        ),
+      ),
+  };
+}
 
 /**
  * One bot's live routines. A snapshot without a routines list comes from an environment
@@ -220,7 +249,7 @@ export type BotRoutinesView =
 export function botRoutinesView(
   snapshot: BotRoutineSource | null | undefined,
   botId: BotId | string,
-): BotRoutinesView {
+): RoutinesView {
   if (!snapshot) return { kind: "loading" };
 
   if (snapshot.routines === undefined) return { kind: "unavailable" };
