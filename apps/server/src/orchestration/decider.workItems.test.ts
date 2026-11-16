@@ -202,11 +202,17 @@ it.layer(NodeServices.layer)("work item decider", (it) => {
           workItemId: ITEM_ID,
           ownerBotId: null,
         }),
-        [makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID })],
+        [makeItem({ state: "assigned", ownerBotId: SPECIALIST_ID, attempts: 1 })],
       );
 
       expect(changed(events)).toMatchObject({ state: "queued" });
       expect(changed(events).ownerBotId).toBeUndefined();
+
+      // The release is neutral, which is why the fleet dispatcher ends a completed turn with it
+      // (TASK-408): no attempt is counted against the item, and the chat is told nothing, so a
+      // turn that finished cannot read as one that died.
+      expect(changed(events).attempts).toBeUndefined();
+      expect(events.filter((event) => event.type === "thread.message-sent")).toEqual([]);
     }),
   );
 

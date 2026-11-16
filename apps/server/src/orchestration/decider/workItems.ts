@@ -474,7 +474,12 @@ export const decideWorkItems = Effect.fn("decideWorkItems")(function* ({
 
       if (thread === undefined || thread.deletedAt !== null) return assigned;
 
-      const botName = readModel.bots.find((bot) => bot.id === command.botId)?.name ?? command.botId;
+      // The turn belonged to the chat's bot, which is not always the item's owner: a card
+      // re-assigned moments before the reap still ends the turn the previous owner was running.
+      // The line names the bot whose turn it was, so it never attributes a death to a bot that had
+      // only just picked the item up. A chat with no bot of its own falls back to the owner.
+      const turnBotId = thread.botId ?? command.botId;
+      const botName = readModel.bots.find((bot) => bot.id === turnBotId)?.name ?? turnBotId;
 
       const how = command.cause === "interrupted" ? "was interrupted" : "died";
 
