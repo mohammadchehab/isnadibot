@@ -95,17 +95,20 @@ function TableHead({
   );
 }
 
+/** `compact` sets the cell at 11px, for the footer notes the frames draw. */
 function TableCell({
   className,
   presentation,
+  size = "default",
   ...props
-}: React.ComponentProps<"td"> & { presentation?: "muted" }) {
+}: React.ComponentProps<"td"> & { presentation?: "muted"; size?: "default" | "compact" }) {
   return (
     <td
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pe-0",
         presentation === "muted" && "text-muted-foreground",
+        size === "compact" && "text-11px",
         className,
       )}
       {...props}
