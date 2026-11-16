@@ -3,6 +3,7 @@ import {
   MessageId,
   isIsnadiDelegationResultPending,
   isThreadWaitingOnChildren,
+  type DelegationId,
   type OrchestrationEvent,
   type OrchestrationThread,
 } from "@isnadi/contracts";
@@ -40,7 +41,7 @@ const makeDelegationWakeReactor = Effect.gen(function* () {
   const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
   const crypto = yield* Crypto.Crypto;
 
-  const wake = (thread: OrchestrationThread) =>
+  const wake = (thread: OrchestrationThread, delegationIds: ReadonlyArray<DelegationId>) =>
     crypto.randomUUIDv4.pipe(
       Effect.flatMap((uuid) =>
         DateTime.now.pipe(
@@ -65,8 +66,21 @@ const makeDelegationWakeReactor = Effect.gen(function* () {
           ),
         ),
       ),
-      // A refusal (archived bot, vanished chat, turn already started) means no wake is owed.
-      Effect.catchIf(isInvariantError, () => Effect.void),
+      // This catch covers the whole invariant class, so a benign lifecycle no-op (an archived bot,
+      // a vanished chat, a turn that already started) arrives here exactly like an authorization
+      // refusal. `failure` names the arm and its code, and that code is the only thing that tells
+      // them apart: a refused wake becomes no event, no receipt and no counter, so without this
+      // line it leaves no trace at all.
+      Effect.catchIf(isInvariantError, (error) =>
+        Effect.logInfo("delegation wake was refused", {
+          threadId: thread.id,
+          delegationIds,
+          bossSessionStatus: thread.session?.status ?? "none",
+          commandType: error.commandType,
+          failure: error.failure,
+          detail: error.detail,
+        }),
+      ),
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.failCause(cause)
@@ -78,22 +92,30 @@ const makeDelegationWakeReactor = Effect.gen(function* () {
     );
 
   // A boss is owed a wake when results are pending, nothing it delegated is still open, and it is
-  // not mid-turn (a live turn acknowledges them itself when the next one starts).
+  // not mid-turn (a live turn acknowledges them itself when the next one starts). The pending
+  // delegations travel with the wake, so a refusal can name the work it was about.
   const sweep = projectionSnapshotQuery.getCommandReadModel().pipe(
     Effect.flatMap((readModel) => {
-      const due = readModel.threads.filter(
-        (thread) =>
-          thread.deletedAt === null &&
-          (thread.session === null || !isLiveSessionStatus(thread.session.status)) &&
-          readModel.delegations.some(
-            (delegation) =>
-              delegation.parentThreadId === thread.id &&
-              isIsnadiDelegationResultPending(delegation),
-          ) &&
-          !isThreadWaitingOnChildren(readModel.delegations, thread.id),
-      );
+      const due = readModel.threads.flatMap((thread) => {
+        if (thread.deletedAt !== null) return [];
 
-      return Effect.forEach(due, wake, { discard: true });
+        if (thread.session !== null && isLiveSessionStatus(thread.session.status)) return [];
+
+        if (isThreadWaitingOnChildren(readModel.delegations, thread.id)) return [];
+
+        const pending = readModel.delegations.filter(
+          (delegation) =>
+            delegation.parentThreadId === thread.id && isIsnadiDelegationResultPending(delegation),
+        );
+
+        if (pending.length === 0) return [];
+
+        return [{ thread, delegationIds: pending.map((delegation) => delegation.delegationId) }];
+      });
+
+      return Effect.forEach(due, ({ thread, delegationIds }) => wake(thread, delegationIds), {
+        discard: true,
+      });
     }),
     Effect.catchCause((cause) =>
       Cause.hasInterruptsOnly(cause)
