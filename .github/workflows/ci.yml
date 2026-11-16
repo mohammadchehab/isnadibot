@@ -325,4 +325,5 @@ jobs:
           check desktop "$expected_heavy"
           check server "$expected_heavy"
           check native "$expected_heavy"
+          check mobile "$expected_heavy"
           exit "$status"
