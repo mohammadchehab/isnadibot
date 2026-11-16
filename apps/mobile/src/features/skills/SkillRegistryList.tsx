@@ -90,7 +90,7 @@ function SkillGroupBlock({
 
   return (
     <View className="gap-0.5">
-      <Text className="text-3xs font-t3-bold uppercase tracking-label text-foreground-muted">
+      <Text className="text-3xs font-t3-bold tracking-label text-foreground-muted">
         {group.needsApproval ? `${label} · ${t("needs your approval")}` : label}
       </Text>
       {group.skills.map((skill) => (

@@ -87,6 +87,5 @@ export const skillsCatalog = {
     "الموافقة تثبّت هذا الالتزام. إذا تغيّر المجلد، يسأل إسنادي مرة أخرى قبل أن يستخدمه بوت.",
   "What bots in this space can do. Turn one on for a bot in its chat.":
     "ما يمكن للبوتات فعله في هذه المساحة. فعِّل مهارة لبوت من محادثته.",
-  "Add a skill": "إضافة مهارة",
   "needs your approval": "يحتاج موافقتك",
 } as const;

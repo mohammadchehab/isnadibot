@@ -85,6 +85,5 @@ export const skillsCatalog = {
     "批准会固定此提交。如果文件夹发生变化，Isnadi 会在机器人使用前再次询问。",
   "What bots in this space can do. Turn one on for a bot in its chat.":
     "机器人在这台空间里能做什么。在它的聊天里为某个机器人开启技能。",
-  "Add a skill": "添加技能",
   "needs your approval": "需要你的批准",
 } as const;
