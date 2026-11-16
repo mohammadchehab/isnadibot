@@ -152,6 +152,7 @@ export const BotRosterRow = memo(function BotRosterRow({
   canMoveDown,
   onNudge,
   onArchive,
+  onSteer,
   sortable,
 }: {
   bot: Bot;
@@ -167,6 +168,8 @@ export const BotRosterRow = memo(function BotRosterRow({
   canMoveDown: boolean;
   onNudge: (item: RosterItemRef, delta: -1 | 1) => void;
   onArchive: (bot: Bot) => void;
+  /** Opens the steer dialog for the chat whose turn is running. */
+  onSteer: (bot: Bot, ref: ScopedThreadRef) => void;
   sortable: SortableRosterRowBag;
 }) {
   const { t, formatDate } = useI18n();
@@ -184,7 +187,7 @@ export const BotRosterRow = memo(function BotRosterRow({
 
   const unread = useBotRosterUnread(bot.id, chatRef, chatOpen);
   const controls = resolveBotControlAvailability(chatShell);
-  const { interruptBot, clearBot, steerBot } = useBotControlCommands();
+  const { interruptBot, clearBot } = useBotControlCommands();
 
   return (
     <li
@@ -306,7 +309,7 @@ export const BotRosterRow = memo(function BotRosterRow({
             <MenuItem
               disabled={!controls.steer || chatRef === null}
               onClick={() => {
-                if (chatRef !== null) void steerBot(chatRef, chatShell);
+                if (chatRef !== null) onSteer(bot, chatRef);
               }}
             >
               <CornerDownRightIcon />

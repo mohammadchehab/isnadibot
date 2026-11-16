@@ -1,10 +1,14 @@
 import {
   BotId,
   EnvironmentId,
+  MessageId,
+  ProjectId,
+  ProviderInstanceId,
   ThreadId,
   TurnId,
   type OrchestrationSession,
   type OrchestrationSessionStatus,
+  type OrchestrationThreadShell,
 } from "@isnadi/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -12,6 +16,7 @@ import {
   buildBotClearInput,
   buildBotInterruptInput,
   buildBotSteerInput,
+  buildSteerTurnInput,
   collectClearableSessions,
   collectRunningTurns,
   isBotTurnRunning,
@@ -201,5 +206,50 @@ describe("collectClearableSessions", () => {
         scoped({ session: session("ready"), archivedAt: "2026-11-13T09:00:00.000Z" }),
       ]),
     ).toEqual([]);
+  });
+});
+
+function fullShell(overrides: Partial<OrchestrationThreadShell> = {}): OrchestrationThreadShell {
+  return {
+    id: THREAD,
+    projectId: ProjectId.make("project-1"),
+    botId: BOT,
+    title: "Ship the release",
+    modelSelection: { instanceId: ProviderInstanceId.make("claude"), model: "claude-opus-5" },
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    session: session("running", TURN),
+    archivedAt: null,
+    ...overrides,
+  } as OrchestrationThreadShell;
+}
+
+describe("buildSteerTurnInput", () => {
+  it("sends the correction into the running turn with the chat's own settings", () => {
+    expect(
+      buildSteerTurnInput({
+        shell: fullShell(),
+        text: "  Keep it under 120 words.  ",
+        messageId: MessageId.make("message-1"),
+        createdAt: "2026-11-16T18:00:00.000Z",
+      }),
+    ).toMatchObject({
+      threadId: THREAD,
+      message: { role: "user", text: "Keep it under 120 words.", attachments: [] },
+      modelSelection: { model: "claude-opus-5" },
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      createdAt: "2026-11-16T18:00:00.000Z",
+    });
+  });
+
+  it("is null with nothing to say, no chat, or no turn running", () => {
+    const base = { messageId: MessageId.make("message-1"), createdAt: "2026-11-16T18:00:00.000Z" };
+
+    expect(buildSteerTurnInput({ ...base, shell: fullShell(), text: "   " })).toBeNull();
+    expect(buildSteerTurnInput({ ...base, shell: null, text: "Go on" })).toBeNull();
+    expect(
+      buildSteerTurnInput({ ...base, shell: fullShell({ session: null }), text: "Go on" }),
+    ).toBeNull();
   });
 });

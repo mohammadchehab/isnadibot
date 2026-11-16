@@ -33,6 +33,7 @@ import { SidebarContent, SidebarGroup } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
 import { DEFAULT_BOT_RUNTIME_MODE } from "./botSandbox";
 import { NewBotDialog } from "./NewBotDialog";
+import { SteerBotDialog, type SteerTarget } from "./SteerBotDialog";
 import {
   buildRosterListItems,
   filterRosterBots,
@@ -277,6 +278,7 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
 
   const [newBotOpen, setNewBotOpen] = useState(false);
   const [archivingBot, setArchivingBot] = useState<Bot | null>(null);
+  const [steeringBot, setSteeringBot] = useState<SteerTarget | null>(null);
   const [pendingArchivedBotId, setPendingArchivedBotId] = useState<string | null>(null);
   // Archiving is the one close that cannot go back where it came from: the row
   // menu button focus was on leaves with the row. The confirm names its survivor
@@ -577,6 +579,9 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
                                           canMoveDown={canMoveDown}
                                           onNudge={nudgeRosterItem}
                                           onArchive={setArchivingBot}
+                                          onSteer={(bot, ref) =>
+                                            setSteeringBot({ name: bot.name, ref })
+                                          }
                                           sortable={bag}
                                         />
                                       );
@@ -725,6 +730,12 @@ export default function BotRosterSidebar({ chrome = "full" }: { chrome?: "full" 
           </AlertDialogPopup>
         ) : null}
       </AlertDialog>
+      <SteerBotDialog
+        target={steeringBot}
+        onOpenChange={(open) => {
+          if (!open) setSteeringBot(null);
+        }}
+      />
       {chrome === "panel" ? (
         <SidebarStatusStack className="shrink-0 p-2" />
       ) : (
