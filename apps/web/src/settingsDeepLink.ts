@@ -39,6 +39,7 @@ const destinations: Readonly<
   connections: { section: "connections", label: "Connections" },
   "bot-inbox": { section: "advanced", label: "Advanced > Bot inbox", targetId: "errors" },
   diagnostics: { section: "diagnostics", label: "Diagnostics" },
+  skills: { section: "skills", label: "Skills" },
 };
 
 export interface SettingsDeepLinkDestination {

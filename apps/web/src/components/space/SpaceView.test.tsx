@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { registerSkillRegistrySource } from "@isnadi/client-runtime/skills";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type { Bot, Group } from "../roster/types";
 
@@ -68,6 +69,15 @@ function render(tab: SpaceTab, subject: Group = group) {
 
 beforeEach(() => {
   mocks.bots = [scout];
+  // A platform with a registry source, the way web and desktop register one.
+  registerSkillRegistrySource({
+    subscribe: () => () => undefined,
+    getSnapshot: () => ({ state: "ready", skills: [], unavailableConnectors: [] }),
+  });
+});
+
+afterEach(() => {
+  registerSkillRegistrySource(null);
 });
 
 describe("SpaceView", () => {
