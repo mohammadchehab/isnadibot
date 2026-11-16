@@ -94,7 +94,10 @@ queued item has no thread yet, may wait for days, and may be reassigned.
 ### The dispatcher (TASK-86)
 
 `FleetDispatcherReactor` is a queue-backed reactor next to `GroupResponderQueueReactor`. It reacts to
-`TurnProcessingQuiescedReceipt` for a bot in a group, and to `work-item.*` events.
+`TurnProcessingQuiescedReceipt` for a bot in a group, to `work-item.*` events, to a new chat
+(`thread.created`), to **Keep busy** being switched on, and to a roster change that changes who the pick
+can choose from: a bot joining or leaving the group, a boss change, and a bot being restored. Archiving a
+bot wakes nobody, since it only takes a candidate away.
 
 When a bot goes idle (no running turn, nothing pending, no item in progress):
 
