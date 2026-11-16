@@ -27,12 +27,11 @@ import { useEnvironmentSnapshot } from "../../state/environmentSnapshot";
 import { useEnvironmentQuery } from "../../state/query";
 import { workItemEnvironment } from "../../state/workItems";
 import { useOpenChat } from "../chat/useOpenChat";
-import { BotAvatarView } from "../roster/BotAvatarView";
-import { delegationStateLabel } from "../roster/DelegationDetail";
 import type { Bot, Group } from "../roster/types";
 import { useLocalDay } from "../roster/useLocalDay";
 import { useRosterStore } from "../roster/rosterStore";
 import { Button } from "../ui/button";
+import { SpaceActivityRow, SpaceChatActivityRow } from "./SpaceActivityRow";
 import { SpaceStandup } from "./SpaceStandup";
 import { SpaceTasks } from "./SpaceTasks";
 import { SpaceTeamTable } from "./SpaceTeamTable";
@@ -147,7 +146,8 @@ export function SpaceOverview({ group }: { group: Group }) {
     [group, snapshot],
   );
 
-  const updated = relativeRunTime(spaceUpdatedAt(group, decisions, activity), Date.now(), i18n);
+  const now = Date.now();
+  const updated = relativeRunTime(spaceUpdatedAt(group, decisions, activity), now, i18n);
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.id, bot])), [bots]);
 
   // The board's line names the boss the way the Team table's does, so it reads the roster.
@@ -242,78 +242,40 @@ export function SpaceOverview({ group }: { group: Group }) {
             {rows.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("Nothing here yet")}</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-border/60">
+              <ul className="flex flex-col gap-1">
                 {rows.map((row) => {
                   if (row.kind === "delegation") {
-                    const presentation = presentDelegation(row.delegation);
-                    const bot = botsById.get(row.delegation.childBotId);
-                    const childThreadId = presentation.childThreadId;
+                    // Queued delegations have no child yet, and there is no chat to open
+                    // without a connected environment.
+                    const childThreadId = presentDelegation(row.delegation).childThreadId;
 
                     return (
-                      <li
+                      <SpaceActivityRow
                         key={`delegation-${row.delegation.delegationId}`}
-                        className="flex items-center gap-2 py-2"
-                      >
-                        {bot ? (
-                          <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
-                        ) : null}
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          {bot ? (
-                            <span className="truncate text-xs text-muted-foreground">
-                              <bdi>{bot.name}</bdi>
-                            </span>
-                          ) : null}
-                          <bdi className="truncate text-sm">{row.delegation.task}</bdi>
-                          {/* The state and the time share the meta line under the task, so
-                              neither takes width from the task the row exists to show. */}
-                          <span className="truncate text-xs text-muted-foreground">
-                            {[
-                              delegationStateLabel(presentation.state, t),
-                              relativeRunTime(row.at, Date.now(), i18n),
-                            ].join(" · ")}
-                          </span>
-                        </div>
-                        {/* Queued delegations have no child yet, and there is no chat to open
-                            without a connected environment. */}
-                        {childThreadId === null || environmentId === null ? null : (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => open({ environmentId, threadId: childThreadId })}
-                          >
-                            {t("Open")}
-                          </Button>
-                        )}
-                      </li>
+                        delegation={row.delegation}
+                        bot={botsById.get(row.delegation.childBotId)}
+                        now={now}
+                        onReview={
+                          childThreadId === null || environmentId === null
+                            ? null
+                            : () => open({ environmentId, threadId: childThreadId })
+                        }
+                      />
                     );
                   }
 
-                  const shell = row.shell;
-                  const bot = botOf(shell);
-                  const decision = waiting.get(shell.id);
+                  const decision = waiting.get(row.shell.id);
 
                   return (
-                    <li key={shell.id} className="flex items-center gap-2 py-2">
-                      {bot ? (
-                        <BotAvatarView avatar={bot.avatar} name={bot.name} className="size-6" />
-                      ) : null}
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        {bot ? (
-                          <span className="truncate text-xs text-muted-foreground">
-                            <bdi>{bot.name}</bdi>
-                          </span>
-                        ) : null}
-                        <bdi className="truncate text-sm">{shell.title}</bdi>
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {relativeRunTime(shell.updatedAt, Date.now(), i18n)}
-                      </span>
-                      {decision ? (
-                        <Button size="xs" variant="outline" onClick={() => openDecision(decision)}>
-                          {t("Review")}
-                        </Button>
-                      ) : null}
-                    </li>
+                    <SpaceChatActivityRow
+                      key={row.shell.id}
+                      title={row.shell.title}
+                      bot={botOf(row.shell)}
+                      updatedAt={row.shell.updatedAt}
+                      now={now}
+                      decision={decision !== undefined}
+                      onReview={decision ? () => openDecision(decision) : null}
+                    />
                   );
                 })}
               </ul>

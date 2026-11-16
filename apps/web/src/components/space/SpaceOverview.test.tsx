@@ -248,7 +248,7 @@ describe("SpaceOverview", () => {
     const html = render();
 
     expect(html).toContain("avatar:Ada");
-    expect(html).toContain("<bdi>Ada</bdi>");
+    expect(html).toContain(">Ada</bdi>");
     expect(html).toContain("chat one");
   });
 
@@ -309,18 +309,34 @@ describe("SpaceOverview", () => {
     expect(html).toContain("avatar:Grace");
     // The state shares the meta line with the time rather than sitting in the row's
     // fixed-width right-hand zone, where it would take width from the task.
-    expect(html).toContain("running · ");
+    expect(html).toContain('data-delegation-state="running"');
+    expect(html).toContain(">running</span>");
     // Its child chat is the same work, so it does not get a second row.
     expect(html).not.toContain("Child chat the delegation ran");
     // The chat that started it is still listed.
     expect(html).toContain("Build the todo app");
   });
 
-  it("offers Open on a delegation that has a child chat", () => {
+  it("offers Review on the row waiting on the reader, and nothing on finished work", () => {
     mocks.bots = [ada, grace];
     mocks.threads = [
       { id: "thread-1", title: "chat one", updatedAt: "2026-11-03T10:00:00.000Z", waiting: false },
     ];
+    mocks.delegations = [
+      delegationRecord({
+        _tag: "Blocked",
+        childThreadId: CHILD_THREAD,
+        childTurnId: CHILD_TURN,
+        startedAt: "2026-11-03T10:30:00.000Z",
+        reason: "Sign in to careers.example.com.",
+      }),
+    ];
+
+    const blocked = render();
+
+    expect(blocked).toContain("Waiting on you");
+    expect(blocked).toContain("Review");
+
     mocks.delegations = [
       delegationRecord({
         _tag: "Completed",
@@ -333,10 +349,10 @@ describe("SpaceOverview", () => {
       }),
     ];
 
-    expect(render()).toContain("Open");
+    expect(render()).not.toContain("Review");
   });
 
-  it("leaves Open off a queued delegation, which has no child chat yet", () => {
+  it("leaves Review off a queued delegation, which has nothing to answer yet", () => {
     mocks.bots = [ada, grace];
     mocks.threads = [
       { id: "thread-1", title: "chat one", updatedAt: "2026-11-03T10:00:00.000Z", waiting: false },
@@ -346,7 +362,7 @@ describe("SpaceOverview", () => {
     const html = render();
 
     expect(html).toContain("queued");
-    expect(html).not.toContain("Open");
+    expect(html).not.toContain("Review");
   });
 
   it("offers Review only on a waiting row", () => {
