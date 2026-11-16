@@ -18,6 +18,7 @@ import {
 } from "@isnadi/contracts";
 import { grokTurnCompletionForPromptEpoch } from "./GrokAdapter.ts";
 import {
+  awaitReceipt,
   makeMockGrokWrapper,
   waitForFileContent,
   readJsonLines,
@@ -238,11 +239,21 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
       const adapter = yield* makeTestAdapter(wrapperPath);
 
       const runtimeEvents: ProviderRuntimeEvent[] = [];
+      const cancelledTerminal = yield* Deferred.make<void>();
+      const followUpTerminal = yield* Deferred.make<void>();
 
       const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
         Effect.sync(() => {
           runtimeEvents.push(event);
-        }),
+        }).pipe(
+          Effect.andThen(
+            event.type === "turn.completed" && String(event.threadId) === String(threadId)
+              ? event.payload.state === "cancelled"
+                ? Deferred.succeed(cancelledTerminal, undefined)
+                : Deferred.succeed(followUpTerminal, undefined)
+              : Effect.void,
+          ),
+        ),
       ).pipe(Effect.forkChild);
 
       yield* adapter.startSession({
@@ -264,9 +275,13 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         attachments: [],
       });
 
-      for (let yieldAttempt = 0; yieldAttempt < 8; yieldAttempt += 1) {
-        yield* Effect.yieldNow;
-      }
+      // Wait for the cancelled terminal the assertions below read rather than betting on a fixed
+      // number of yields: the count guesses how many ticks delivery needs, and on a loaded runner
+      // that guess is the flake.
+      assert.isTrue(
+        yield* awaitReceipt(cancelledTerminal),
+        "the cancelled turn.completed never arrived after Stop unblocked the silent prompt",
+      );
 
       const cancelledEvents = runtimeEvents.filter(
         (event): event is Extract<ProviderRuntimeEvent, { type: "turn.completed" }> =>
@@ -281,23 +296,25 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
       assert.equal(readySession?.status, "ready");
       assert.isUndefined(readySession?.activeTurnId);
 
-      const followUpEventsBefore = runtimeEvents.length;
       yield* adapter.sendTurn({
         threadId,
         input: "continue after stop",
         attachments: [],
       });
 
-      for (let yieldAttempt = 0; yieldAttempt < 8; yieldAttempt += 1) {
-        yield* Effect.yieldNow;
-      }
+      assert.isTrue(
+        yield* awaitReceipt(followUpTerminal),
+        "the follow-up turn never completed after Stop unblocked the silent prompt",
+      );
 
-      const followUpCompletedEvents = runtimeEvents
-        .slice(followUpEventsBefore)
-        .filter(
-          (event): event is Extract<ProviderRuntimeEvent, { type: "turn.completed" }> =>
-            event.type === "turn.completed" && String(event.threadId) === String(threadId),
-        );
+      // The first turn is the only cancelled one, so every completed terminal here belongs to the
+      // follow-up; slicing by array length would depend on the order events happen to land in.
+      const followUpCompletedEvents = runtimeEvents.filter(
+        (event): event is Extract<ProviderRuntimeEvent, { type: "turn.completed" }> =>
+          event.type === "turn.completed" &&
+          String(event.threadId) === String(threadId) &&
+          event.payload.state === "completed",
+      );
 
       assert.lengthOf(followUpCompletedEvents, 1);
       assert.equal(followUpCompletedEvents[0]?.payload.state, "completed");
@@ -412,22 +429,39 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
     Effect.gen(function* () {
       const threadId = ThreadId.make("grok-drop-late-cancelled-notifications");
 
+      const tempDir = yield* Effect.promise(() =>
+        NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "grok-acp-late-cancel-")),
+      );
+
+      const requestLogPath = NodePath.join(tempDir, "requests.ndjson");
+
       const wrapperPath = yield* Effect.promise(() =>
         makeMockGrokWrapper({
-          T3_ACP_HANG_PROMPT_FOREVER: "1",
+          // Only the first prompt hangs, so the follow-up turn below can answer: it is the receipt
+          // that proves the late update was handled, and a prompt that hangs forever can never be it.
+          T3_ACP_HANG_FIRST_PROMPT_FOREVER: "1",
           T3_ACP_EMIT_LATE_UPDATE_AFTER_CANCEL: "1",
+          T3_ACP_REQUEST_LOG_PATH: requestLogPath,
         }),
       );
 
       const lateNativeUpdate = yield* Deferred.make<void>();
+      const lateMarkerHandled = yield* Deferred.make<void>();
 
       const adapter = yield* makeTestAdapter(wrapperPath, {
         nativeEventLogger: {
           filePath: "memory://grok-cancelled-native-events",
-          write: <Input>(record: Input) =>
-            JSON.stringify(record).includes("late after cancel")
-              ? Deferred.succeed(lateNativeUpdate, undefined).pipe(Effect.asVoid)
-              : Effect.void,
+          write: <Input>(record: Input) => {
+            const text = JSON.stringify(record);
+
+            if (text.includes("late after cancel")) {
+              return Deferred.succeed(lateNativeUpdate, undefined).pipe(Effect.asVoid);
+            }
+
+            return text.includes("marker: late update handled")
+              ? Deferred.succeed(lateMarkerHandled, undefined).pipe(Effect.asVoid)
+              : Effect.void;
+          },
           close: () => Effect.void,
         },
       });
@@ -461,13 +495,23 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         .pipe(Effect.forkChild);
 
       const turnId = yield* Deferred.await(turnStarted).pipe(Effect.timeout("2 seconds"));
+      // Stop only cancels a prompt the runtime has actually dispatched. Cancelling before that
+      // settles the turn locally, so the mock never sees a prompt and the late update below would
+      // follow a turn that was never cancelled in the runtime it is meant to arrive from.
+      yield* waitForFileContent(requestLogPath, 80, '"method":"session/prompt"');
       yield* adapter.interruptTurn(threadId, turnId).pipe(Effect.timeout("2 seconds"));
       yield* Fiber.join(sendTurnFiber).pipe(Effect.timeout("2 seconds"));
       yield* Deferred.await(lateNativeUpdate).pipe(Effect.timeout("2 seconds"));
 
-      for (let yieldAttempt = 0; yieldAttempt < 8; yieldAttempt += 1) {
-        yield* Effect.yieldNow;
-      }
+      // The late update is now inside the adapter's notification handler. The runtime handles those
+      // notifications on one queue, in order, so the marker the mock sends behind the late chunk is
+      // a receipt that the chunk itself has been handled: a chunk that was published instead of
+      // dropped would have been published before the marker was logged. A fixed number of yields
+      // only guessed that the handler had got that far, and on a loaded runner it had not.
+      assert.isTrue(
+        yield* awaitReceipt(lateMarkerHandled),
+        "the marker behind the late update was never handled, so nothing proves the late update was",
+      );
 
       const cancelledIndex = runtimeEvents.findIndex(
         (event) =>
@@ -485,14 +529,28 @@ it.layer(grokAdapterTestLayer)("GrokAdapterLive", (it) => {
         "turn.plan.updated",
       ]);
 
+      // Scoped to the cancelled turn: the follow-up turn's own output is legitimate.
       const outputAfterCancellation = runtimeEvents
         .slice(cancelledIndex + 1)
         .filter(
-          (event) => String(event.threadId) === String(threadId) && turnOutputTypes.has(event.type),
+          (event) =>
+            String(event.threadId) === String(threadId) &&
+            String(event.turnId) === String(turnId) &&
+            turnOutputTypes.has(event.type),
+        );
+
+      // Whatever turn the adapter might attribute it to, the late chunk's own text must never
+      // reach the stream. This is the behaviour under test, and it does not depend on how the
+      // adapter resolved the notification's turn.
+      const lateChunkAfterCancellation = runtimeEvents
+        .slice(cancelledIndex + 1)
+        .filter(
+          (event) => event.type === "content.delta" && event.payload.delta === "late after cancel",
         );
 
       assert.isAtLeast(cancelledIndex, 0);
       assert.deepEqual(outputAfterCancellation, []);
+      assert.deepEqual(lateChunkAfterCancellation, []);
 
       yield* Fiber.interrupt(runtimeEventsFiber);
       yield* adapter.stopSession(threadId);
