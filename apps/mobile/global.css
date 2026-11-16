@@ -60,6 +60,18 @@
       --color-danger-border: rgba(239, 68, 68, 0.12);
       --color-danger-foreground: #b91c1c;
 
+      /* Status families: surface, stroke, text. Same shape as danger, so a
+         pale fill and a text hue never share a prefix meaning two things. */
+      --color-success: #ecfdf5;
+      --color-success-border: rgba(16, 185, 129, 0.12);
+      --color-success-foreground: #047857;
+      --color-warning: #fffbeb;
+      --color-warning-border: rgba(245, 158, 11, 0.12);
+      --color-warning-foreground: #92400e;
+      --color-info: #f0f9ff;
+      --color-info-border: rgba(56, 189, 248, 0.12);
+      --color-info-foreground: #0369a1;
+
       /* Inputs */
       --color-input: #ffffff;
       --color-input-border: rgba(0, 0, 0, 0.1);
@@ -162,6 +174,18 @@
       --color-danger: rgba(239, 68, 68, 0.14);
       --color-danger-border: rgba(248, 113, 113, 0.18);
       --color-danger-foreground: #fca5a5;
+
+      /* Status families: surface, stroke, text. Same shape as danger, so a
+         pale fill and a text hue never share a prefix meaning two things. */
+      --color-success: rgba(16, 185, 129, 0.14);
+      --color-success-border: rgba(52, 211, 153, 0.18);
+      --color-success-foreground: #34d399;
+      --color-warning: rgba(245, 158, 11, 0.14);
+      --color-warning-border: rgba(251, 191, 36, 0.18);
+      --color-warning-foreground: #fbbf24;
+      --color-info: rgba(56, 189, 248, 0.14);
+      --color-info-border: rgba(56, 189, 248, 0.18);
+      --color-info-foreground: #38bdf8;
 
       /* Inputs */
       --color-input: #141414;
