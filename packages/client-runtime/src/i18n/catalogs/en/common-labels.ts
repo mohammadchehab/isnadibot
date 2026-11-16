@@ -225,6 +225,7 @@ export const commonLabelsCatalog = {
   "Choose a reaction": "Choose a reaction",
   Copy: "Copy",
   "Could not approve procedure": "Could not approve procedure",
+  "Could not answer the approval": "Could not answer the approval",
   "Could not cancel delegation": "Could not cancel delegation",
   "Could not load errors": "Could not load errors",
   "Bot is picking up the result": "Bot is picking up the result",

@@ -1,18 +1,35 @@
 import { makeMobileBot } from "../../lib/mobile-fixtures.test-support";
 import { BotId, DelegationId, ThreadId, TurnId } from "@isnadi/contracts";
-import type { IsnadiDelegationRecord, OrchestrationBot } from "@isnadi/contracts";
+import type {
+  ApprovalRequestId,
+  IsnadiDelegationRecord,
+  OrchestrationBot,
+} from "@isnadi/contracts";
+import type { PendingApproval } from "../../lib/threadActivity";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { delegationActions } from "@isnadi/client-runtime/delegation-presentation";
 import { ThreadDelegationCard } from "./ThreadDelegationCard";
 
 type PhasesTable = Record<string, IsnadiDelegationRecord["phase"]>;
 
+type ChildApprovalResponder = NonNullable<
+  Parameters<typeof ThreadDelegationCard>[0]["onRespondToChildApproval"]
+>;
+
+// Static markup drops event handlers, so the press handlers are captured as
+// they are passed and replayed by the tests that need to press something.
+const presses = vi.hoisted(() => [] as Array<() => void>);
+
 vi.mock("react-native", () => ({
   Text: "span",
   View: "div",
-  Pressable: "button",
+  Pressable: (props: { readonly onPress?: () => void; readonly children?: ReactNode }) => {
+    presses.push(() => props.onPress?.());
+
+    return createElement("button", null, props.children);
+  },
 }));
 
 vi.mock("../../components/AppText", () => ({
@@ -241,6 +258,112 @@ describe("ThreadDelegationCard", () => {
 
       expect(html).not.toContain("Let it finish");
       expect(html).not.toContain(">Cancel<");
+    });
+  });
+
+  describe("the delegated chat's approval", () => {
+    const runningPhase = {
+      _tag: "Running",
+      childThreadId: ThreadId.make("thread-child"),
+      childTurnId: null,
+      startedAt: "2026-09-25T10:00:30.000Z",
+      progress: null,
+    } as const;
+
+    const childApproval: PendingApproval = {
+      requestId: "req-shell" as ApprovalRequestId,
+      requestKind: "command",
+      createdAt: "2026-09-25T10:01:00.000Z",
+      detail: "Run `npm test` in the workspace",
+      appName: "Shell",
+    };
+
+    const rendered = (
+      phase: IsnadiDelegationRecord["phase"],
+      approval: PendingApproval | null,
+      onRespondToChildApproval?: ChildApprovalResponder,
+    ) =>
+      markup(
+        createElement(ThreadDelegationCard, {
+          delegation: delegation(phase),
+          childBot: bot("bot-child", "Scout"),
+          parentBot: bot("bot-parent", "Boss"),
+          childApproval: approval,
+          onRespondToChildApproval: onRespondToChildApproval ?? (async () => undefined),
+        }),
+      );
+
+    beforeEach(() => {
+      presses.length = 0;
+    });
+
+    it("shows the approval the delegated chat is parked on", () => {
+      const html = rendered(runningPhase, childApproval);
+
+      expect(html).toContain("delegation-child-approval");
+      expect(html).toContain("Approval needed");
+      expect(html).toContain("Shell");
+      expect(html).toContain("Allow once");
+      expect(html).toContain("Decline");
+    });
+
+    it("shows nothing when the delegated chat is not waiting on anything", () => {
+      expect(rendered(runningPhase, null)).not.toContain("delegation-child-approval");
+    });
+
+    it("drops a stale approval once the delegation has finished", () => {
+      const html = rendered(
+        {
+          _tag: "Completed",
+          childThreadId: ThreadId.make("thread-child"),
+          childTurnId: null,
+          startedAt: "2026-09-25T10:00:30.000Z",
+          completedAt: "2026-09-25T10:05:00.000Z",
+          result: {
+            summary: "Done.",
+            childThreadId: ThreadId.make("thread-child"),
+            childTurnId: null,
+          },
+          acknowledgedAt: null,
+        },
+        childApproval,
+      );
+
+      expect(html).not.toContain("delegation-child-approval");
+      expect(html).not.toContain("Allow once");
+    });
+
+    it("answers with the request id and decision the user pressed", () => {
+      const onRespond = vi.fn(async () => undefined);
+
+      rendered(runningPhase, childApproval, onRespond);
+
+      // The approval is the only pressable on a card rendered without actions,
+      // so the first captured press is "Allow once".
+      expect(presses).toHaveLength(3);
+      presses[0]!();
+
+      expect(onRespond).toHaveBeenCalledWith("req-shell", "accept");
+    });
+
+    it("keeps the card's own controls reachable while an approval is pending", () => {
+      const record = delegation(runningPhase);
+
+      const html = markup(
+        createElement(ThreadDelegationCard, {
+          delegation: record,
+          childBot: bot("bot-child", "Scout"),
+          parentBot: bot("bot-parent", "Boss"),
+          actions: delegationActions(record, [record]),
+          onAction: () => Promise.resolve(),
+          childApproval,
+          onRespondToChildApproval: async () => undefined,
+        }),
+      );
+
+      expect(html).toContain("delegation-child-approval");
+      expect(html).toContain(">Let it finish</span>");
+      expect(html).toContain(">Cancel</span>");
     });
   });
 });

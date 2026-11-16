@@ -225,6 +225,7 @@ export const commonLabelsCatalog = {
   "Choose a reaction": "选择回应",
   Copy: "复制",
   "Could not approve procedure": "无法批准任务内容",
+  "Could not answer the approval": "无法回应审批",
   "Could not cancel delegation": "无法取消委派",
   "Could not load errors": "无法加载错误",
   "Bot is picking up the result": "机器人正在处理结果",

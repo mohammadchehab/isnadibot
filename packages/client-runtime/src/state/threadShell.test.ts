@@ -163,6 +163,33 @@ describe("latest owner thread atoms", () => {
   });
 });
 
+describe("delegated chats", () => {
+  it("keeps a delegation's child chat out of the shell list", () => {
+    const parent = thread("a-1", "2026-06-01T00:00:00.000Z", { botId: "a" });
+
+    const child = {
+      ...thread("a-1-child", "2026-06-01T00:00:01.000Z", { botId: "a" }),
+      parentThreadId: ThreadId.make("a-1"),
+    } as OrchestrationThreadShell;
+
+    const snapshotAtom = Atom.make<OrchestrationShellSnapshot | null>(snapshot([parent, child]));
+
+    const atoms = createEnvironmentThreadShellAtoms({
+      catalogValueAtom: Atom.make(EMPTY_ENVIRONMENT_CATALOG_STATE),
+      snapshotAtom: () => snapshotAtom,
+    });
+
+    const registry = AtomRegistry.make();
+
+    // Child work shows as a card in the parent chat and is never listed as a
+    // chat of its own. `threadShellsAtom` is built from this list, so the
+    // delegation card is the only surface that can answer a child's approval.
+    expect(registry.get(atoms.environmentThreadRefsAtom(ENVIRONMENT_ID))).toEqual([
+      { environmentId: ENVIRONMENT_ID, threadId: "a-1" },
+    ]);
+  });
+});
+
 describe("decisions atom", () => {
   const pending = (id: string, updatedAt: string, flags: Partial<OrchestrationThreadShell>) =>
     ({ ...thread(id, updatedAt, { botId: "a" }), ...flags }) as OrchestrationThreadShell;
