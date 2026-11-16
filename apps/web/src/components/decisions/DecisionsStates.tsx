@@ -27,8 +27,8 @@ export function DecisionsLoading() {
         >
           <span className="size-10 shrink-0 rounded-full bg-muted" />
           <span className="flex min-w-0 flex-1 flex-col gap-2">
-            <span className="h-3 w-35 max-w-full rounded-xs bg-muted" />
-            <span className="h-2.5 w-80 max-w-full rounded-xs bg-muted" />
+            <span className="h-3 w-35 max-w-full rounded-sm bg-muted" />
+            <span className="h-2.5 w-80 max-w-full rounded-sm bg-muted" />
           </span>
         </div>
       ))}
