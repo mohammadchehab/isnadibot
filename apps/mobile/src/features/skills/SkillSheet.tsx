@@ -61,7 +61,7 @@ export function SkillSheet({
           >
             {children}
           </ScrollView>
-          {footer}
+          <View className="pt-1">{footer}</View>
         </View>
       </View>
     </Modal>

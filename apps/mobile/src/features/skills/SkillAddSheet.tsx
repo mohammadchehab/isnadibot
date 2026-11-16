@@ -156,7 +156,7 @@ export function SkillAddSheet({
         />
       }
     >
-      <View className="gap-1">
+      <View className="gap-0.5">
         <SkillSheetLabel>{t("From a provider")}</SkillSheetLabel>
         {providerSkills.map((skill) => (
           <SkillProviderRow
@@ -169,7 +169,7 @@ export function SkillAddSheet({
           />
         ))}
       </View>
-      <View className="gap-1">
+      <View className="gap-0.5">
         <SkillSheetLabel>{t("Add to")}</SkillSheetLabel>
         {SCOPES.map((option) => (
           <SkillScopeRow
