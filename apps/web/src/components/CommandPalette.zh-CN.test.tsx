@@ -11,7 +11,8 @@ vi.mock("@effect/atom-react", () => ({ useAtomValue: () => [] }));
 // Rendered outside a router: no route, so no space, so no team group.
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => () => undefined,
-  useParams: ({ select }: { select: (params: Record<string, never>) => unknown }) => select({}),
+  useParams: ({ select }: { select: (params: Record<string, never>) => string | null }) =>
+    select({}),
 }));
 
 vi.mock("../hooks/useTheme", () => ({
