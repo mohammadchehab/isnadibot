@@ -315,10 +315,13 @@ export function createTurnLifecycle(deps: {
 
       // A handoff made in an earlier turn cuts this bot's context at the message
       // before that turn. Read it once per admission so a reused session never
-      // assembles the context of a turn that ended before the cut.
-      const contextCut = pending.toolSession.botId
-        ? await deps.readBotContextCut(threadId, pending.toolSession.botId)
-        : undefined;
+      // assembles the context of a turn that ended before the cut. Only memory
+      // assembly reads it, so a turn without memory skips the read and keeps
+      // admission free of a database round trip.
+      const contextCut =
+        memoryAccess && pending.toolSession.botId
+          ? await deps.readBotContextCut(threadId, pending.toolSession.botId)
+          : undefined;
 
       const contextCutState = contextCut ? { contextCut } : {};
 
@@ -346,14 +349,12 @@ export function createTurnLifecycle(deps: {
           await active.session.state.set({
             ...stateWithoutMemory,
             ...groupState,
-            ...contextCutState,
             persistentMemoryContext: pending.delegationResults,
           });
-        } else if (persistentMemoryContext || pending.group || contextCut) {
+        } else if (persistentMemoryContext || pending.group) {
           await active.session.state.set({
             ...stateWithoutMemory,
             ...groupState,
-            ...contextCutState,
           });
         }
 

@@ -2,7 +2,7 @@ import type { OrchestrationCommand, OrchestrationReadModel } from "@isnadi/contr
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
-import { OrchestrationCommandInvariantError, pendingRefusalInvariantError } from "../Errors.ts";
+import { OrchestrationCommandInvariantError, refusedInvariantError } from "../Errors.ts";
 import type { OrchestrationDispatchActor } from "../Services/OrchestrationEngine.ts";
 import { requireThread } from "../commandInvariants.ts";
 import {
@@ -46,14 +46,13 @@ export const decideThreadContext = Effect.fn("decideThreadContext")(function* ({
   });
 
   // A direct chat has exactly one bot, so a cut for any other bot would write a
-  // row nothing reads while the client reports a reset that never happens.
+  // row nothing reads while the client reports a reset that never happens. A
+  // client naming another bot is looking at a chat it no longer sees.
   if (thread.groupId === null && thread.botId !== command.botId) {
-    return yield* pendingRefusalInvariantError({
+    return yield* refusedInvariantError({
       commandType: command.type,
       detail: `Bot '${command.botId}' is not the bot of direct chat '${command.threadId}'.`,
-      reason:
-        "The cut is keyed by (chat, bot) and a direct chat holds one bot, so a client that names another one is working from a chat it no longer sees.",
-      ticket: "TASK-84",
+      refusal: "stale-view",
     });
   }
 
@@ -68,12 +67,10 @@ export const decideThreadContext = Effect.fn("decideThreadContext")(function* ({
       );
 
       if (cutIndex < 0) {
-        return yield* pendingRefusalInvariantError({
+        return yield* refusedInvariantError({
           commandType: command.type,
           detail: `Message '${command.sinceMessageId}' is not in chat '${command.threadId}'.`,
-          reason:
-            "The chat no longer holds the message the reset would cut at, which is what a client sees when a revert lands between drawing the menu and tapping it.",
-          ticket: "TASK-84",
+          refusal: "stale-view",
         });
       }
 
