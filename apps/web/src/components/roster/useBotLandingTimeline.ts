@@ -29,9 +29,10 @@ export function useBotLandingTimeline(input: {
   /** Resolves the bot a handoff names, or `null` when the roster does not know it. */
   readonly botName: (botId: string) => string | null;
   /**
-   * The chat's thread activities, when the surface shows what the board did on
-   * its own. A group chat passes them; a bot's own chat does not, so its rows
-   * stay the bot's work and the routines it ran.
+   * The chat's thread activities, which carry the rows the snapshot cannot: what
+   * the board did on its own in a group chat, and the handoff rows in either
+   * chat. The board dispatches in a group's chat, so a bot's own chat draws only
+   * the handoff rows from these.
    */
   readonly activities?: ReadonlyArray<OrchestrationThreadActivity>;
 }) {
