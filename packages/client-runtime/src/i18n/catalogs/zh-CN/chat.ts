@@ -462,4 +462,19 @@ export const chatCatalog = {
   "Hand off": "交接",
   "Hand off {bot}…": "让 {bot} 交接…",
   "Could not hand off": "无法交接",
+  "Could not undo the hand off": "无法撤销交接",
+  "You asked {bot} to hand off. It wrote a note and started a new context from it.":
+    "你请 {bot} 交接。它写下了一份交接笔记，并以此开启了新的上下文。",
+  "{bot} started its next turn, so Undo is closed. The note stays in the chat.":
+    "{bot} 已开始下一轮，因此无法撤销。交接笔记仍留在聊天中。",
+  "Hand off did not happen. {bot}’s turn ended without writing a note, so its context is unchanged.":
+    "交接没有发生。{bot} 的这一轮结束时没有写交接笔记，因此其上下文保持不变。",
+  "Hand off was interrupted, so nothing reset. The note stays in the chat.":
+    "交接被打断，因此没有重置任何内容。交接笔记仍留在聊天中。",
+  Undo: "撤销",
+  Hide: "隐藏",
+  Card: "卡片",
+  Branch: "分支",
+  "Waiting on": "等待",
+  "Don’t": "不要",
 } as const;

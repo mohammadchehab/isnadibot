@@ -2,7 +2,7 @@
 
 exports[`discovered interface message coverage > covers static calls and finite label sources without translating identifiers 1`] = `
 {
-  "directMessageCount": 2077,
+  "directMessageCount": 2084,
   "expressions": {
     "apps/mobile/src/components/DictationControls.tsx": [
       "announcements[status]);",
@@ -579,6 +579,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/GroupHopBudgetControl.tsx",
     "apps/web/src/components/roster/GroupResponderQueue.tsx",
     "apps/web/src/components/roster/GroupThreadLanding.tsx",
+    "apps/web/src/components/roster/HandoffNoteCard.tsx",
     "apps/web/src/components/roster/MemoryApprovalPrompt.tsx",
     "apps/web/src/components/roster/NewBotDialog.tsx",
     "apps/web/src/components/roster/NewGroupDialog.tsx",
@@ -607,6 +608,7 @@ exports[`discovered interface message coverage > covers static calls and finite 
     "apps/web/src/components/roster/useBotThreadRuntime.ts",
     "apps/web/src/components/roster/useCreateGroup.ts",
     "apps/web/src/components/roster/useGroupThreadRuntime.ts",
+    "apps/web/src/components/roster/useHandoffReceipts.ts",
     "apps/web/src/components/roster/useMessageReactionUpdater.ts",
     "apps/web/src/components/roster/useRoutineActions.ts",
     "apps/web/src/components/roster/useThreadPendingUserInput.ts",

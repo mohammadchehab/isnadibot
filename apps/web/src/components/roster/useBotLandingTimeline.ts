@@ -15,24 +15,28 @@ import { serverEnvironment } from "../../state/server";
 import type { BotConversationEntry } from "./botConversationPresentation";
 import { deriveFleetReceipts } from "./fleetReceipts";
 import { deriveRoutineReceipts, mergeRoutineRunHistory } from "./routineReceipts";
+import { useHandoffReceipts } from "./useHandoffReceipts";
 
 /**
- * Merges a bot chat's messages, routine run notes, and delegations into one ordered
- * timeline. Routine run history pages in older notes on request and refreshes when the
- * snapshot shows a run for this chat changed.
+ * Merges a bot chat's messages, routine run notes, handoff rows, and delegations
+ * into one ordered timeline. Routine run history pages in older notes on request
+ * and refreshes when the snapshot shows a run for this chat changed.
  */
 export function useBotLandingTimeline(input: {
   readonly threadRef: ScopedThreadRef | null;
   readonly snapshot: OrchestrationShellSnapshot | null;
   readonly entries: ReadonlyArray<BotConversationEntry>;
+  /** Resolves the bot a handoff names, or `null` when the roster does not know it. */
+  readonly botName: (botId: string) => string | null;
   /**
-   * The chat's thread activities, when the surface shows what the board did on
-   * its own. A group chat passes them; a bot's own chat does not, so its rows
-   * stay the bot's work and the routines it ran.
+   * The chat's thread activities, which carry the rows the snapshot cannot: what
+   * the board did on its own in a group chat, and the handoff rows in either
+   * chat. The board dispatches in a group's chat, so a bot's own chat draws only
+   * the handoff rows from these.
    */
   readonly activities?: ReadonlyArray<OrchestrationThreadActivity>;
 }) {
-  const { activities, entries, snapshot, threadRef } = input;
+  const { activities, botName, entries, snapshot, threadRef } = input;
   const { t, formatDate } = useI18n();
 
   const routineRunHistory = useEnvironmentQuery(
@@ -159,6 +163,13 @@ export function useBotLandingTimeline(input: {
     }
   }, [threadRef?.threadId, routineRunRevision, routineRunHistory.refresh]);
 
+  const handoff = useHandoffReceipts({
+    threadRef,
+    activities: activities ?? [],
+    entries,
+    botName,
+  });
+
   const routineReceipts = useMemo(
     () =>
       threadRef
@@ -170,6 +181,7 @@ export function useBotLandingTimeline(input: {
               { t, formatDate },
             ),
             ...deriveFleetReceipts(activities ?? [], { t }),
+            ...handoff.items,
           ]
         : [],
     [
@@ -179,6 +191,7 @@ export function useBotLandingTimeline(input: {
       snapshot?.routineRuns,
       currentHistory.runs,
       activities,
+      handoff.items,
       t,
       formatDate,
     ],
@@ -223,6 +236,7 @@ export function useBotLandingTimeline(input: {
   return {
     timelineItems,
     delegations,
+    handoffActions: { hide: handoff.hide, undo: handoff.undo },
     // The whole environment's list, so a card can reach the work its own child
     // chat started — `delegations` above holds only this chat's.
     environmentDelegations: snapshot?.delegations ?? [],
