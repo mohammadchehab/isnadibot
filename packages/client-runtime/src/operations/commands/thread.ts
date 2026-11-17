@@ -39,6 +39,10 @@ export type SetThreadHopBudgetInput = CommandInput<"thread.hop-budget.set">;
 
 export type SetThreadInteractionModeInput = CommandInput<"thread.interaction-mode.set">;
 
+export type RequestThreadHandoffInput = CommandInput<"thread.handoff.request">;
+
+export type UndoThreadContextResetInput = CommandInput<"thread.context.reset.undo">;
+
 export type SetThreadMessageReactionInput = Omit<
   CommandInput<"thread.message.reaction.set">,
   "updatedAt"
@@ -202,6 +206,31 @@ export const setThreadInteractionMode: (input: SetThreadInteractionModeInput) =>
     return yield* dispatch({
       ...input,
       type: "thread.interaction-mode.set",
+      commandId: metadata.commandId,
+      createdAt: metadata.createdAt,
+    });
+  });
+
+export const requestThreadHandoff: (input: RequestThreadHandoffInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.requestThreadHandoff",
+)(function* (input) {
+  const metadata = yield* timestampedCommandMetadata(input);
+
+  return yield* dispatch({
+    ...input,
+    type: "thread.handoff.request",
+    commandId: metadata.commandId,
+    createdAt: metadata.createdAt,
+  });
+});
+
+export const undoThreadContextReset: (input: UndoThreadContextResetInput) => CommandEffect =
+  Effect.fn("EnvironmentCommands.undoThreadContextReset")(function* (input) {
+    const metadata = yield* timestampedCommandMetadata(input);
+
+    return yield* dispatch({
+      ...input,
+      type: "thread.context.reset.undo",
       commandId: metadata.commandId,
       createdAt: metadata.createdAt,
     });

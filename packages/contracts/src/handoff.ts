@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { BotId, TrimmedString } from "./baseSchemas.ts";
+import { BotId, EventId, TrimmedString, TurnId } from "./baseSchemas.ts";
 
 /** One field of a handoff doc. The six rows the chat renders are the six fields. */
 export const HANDOFF_DOC_FIELD_MAX_LENGTH = 2000;
@@ -49,3 +49,53 @@ export type HandoffActivityPayload = typeof HandoffActivityPayload.Type;
  * so the chat can say so instead of the reset silently not landing.
  */
 export const HANDOFF_NOT_APPLIED_ACTIVITY_KIND = "handoff.not-applied";
+
+/**
+ * The activity kind the server appends when a requested handoff did happen: the
+ * note is in the chat and that bot's context now starts after the cut. It is the
+ * chat's own record of the reset, because the cut itself is a server-side
+ * projection the clients never see.
+ */
+export const HANDOFF_APPLIED_ACTIVITY_KIND = "handoff.applied";
+
+/**
+ * What an applied handoff carries: whose cut it was, the turn that wrote the
+ * note, and the note's own activity so the chat can tie the two together.
+ */
+export const HandoffAppliedActivityPayload = Schema.Struct({
+  botId: BotId,
+  turnId: TurnId,
+  handoffActivityId: EventId,
+});
+
+export type HandoffAppliedActivityPayload = typeof HandoffAppliedActivityPayload.Type;
+
+/**
+ * Why a requested handoff reset nothing. `no-note` is a turn that ended without
+ * calling the tool; `turn-not-completed` is a note whose turn was interrupted or
+ * errored before the cut could land; `reset-refused` is a completed note whose
+ * cut the chat could no longer take, because a revert moved the message it
+ * landed after.
+ */
+export const HandoffNotAppliedReason = Schema.Literals([
+  "no-note",
+  "turn-not-completed",
+  "reset-refused",
+]);
+
+export type HandoffNotAppliedReason = typeof HandoffNotAppliedReason.Type;
+
+export const HandoffNotAppliedActivityPayload = Schema.Struct({
+  botId: BotId,
+  turnId: TurnId,
+  reason: HandoffNotAppliedReason,
+});
+
+export type HandoffNotAppliedActivityPayload = typeof HandoffNotAppliedActivityPayload.Type;
+
+/**
+ * The prefix on the server's own "hand off now" message. The brief is a user-role
+ * message like any other, so a client tells it apart by this prefix and keeps it
+ * out of the transcript the user reads.
+ */
+export const HANDOFF_REQUEST_MESSAGE_PREFIX = "handoff:";

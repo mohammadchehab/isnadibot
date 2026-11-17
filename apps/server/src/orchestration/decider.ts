@@ -24,6 +24,7 @@ import { decideThreadTurns } from "./decider/threadTurns.ts";
 import { decideThreadMessages } from "./decider/threadMessages.ts";
 import { decideThreadObservations } from "./decider/threadObservations.ts";
 import { decideThreadContext } from "./decider/threadContext.ts";
+import { decideThreadHandoff } from "./decider/threadHandoff.ts";
 import {
   type PlannedOrchestrationEvent,
   type DecideOrchestrationCommandResult,
@@ -110,6 +111,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "thread.user-input.respond":
     case "thread.context.reset":
     case "thread.context.reset.undo":
+    case "thread.handoff.request":
     case "thread.checkpoint.revert":
     case "thread.session.stop": {
       const thread = yield* requireThread({ readModel, command, threadId: command.threadId });
@@ -285,6 +287,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "thread.context.reset":
     case "thread.context.reset.undo":
       return yield* decideThreadContext({
+        command,
+        readModel,
+        ...(actor !== undefined ? { actor } : {}),
+      });
+    case "thread.handoff.request":
+      return yield* decideThreadHandoff({
         command,
         readModel,
         ...(actor !== undefined ? { actor } : {}),

@@ -22,11 +22,13 @@ import {
   type SetThreadRuntimeModeInput,
   type PinThreadInput,
   type ReorderPinnedThreadInput,
+  type RequestThreadHandoffInput,
   type SettleThreadInput,
   type SnoozeThreadInput,
   type StartThreadTurnInput,
   type StopThreadSessionInput,
   type UnarchiveThreadInput,
+  type UndoThreadContextResetInput,
   type UnpinThreadInput,
   type UnsettleThreadInput,
   type UnsnoozeThreadInput,
@@ -54,6 +56,8 @@ import {
   unsettleThread,
   unsnoozeThread,
   updateThreadMetadata,
+  requestThreadHandoff,
+  undoThreadContextReset,
 } from "../operations/commands.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 
@@ -71,6 +75,7 @@ export type {
   SetThreadRuntimeModeInput,
   PinThreadInput,
   ReorderPinnedThreadInput,
+  RequestThreadHandoffInput,
   SettleThreadInput,
   SnoozeThreadInput,
   StartThreadTurnInput,
@@ -181,6 +186,18 @@ export function createThreadEnvironmentAtoms<R, E>(
     setInteractionMode: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:set-interaction-mode",
       execute: (input: SetThreadInteractionModeInput) => setThreadInteractionMode(input),
+      scheduler,
+      concurrency,
+    }),
+    requestHandoff: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:request-handoff",
+      execute: (input: RequestThreadHandoffInput) => requestThreadHandoff(input),
+      scheduler,
+      concurrency,
+    }),
+    undoContextReset: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:undo-context-reset",
+      execute: (input: UndoThreadContextResetInput) => undoThreadContextReset(input),
       scheduler,
       concurrency,
     }),

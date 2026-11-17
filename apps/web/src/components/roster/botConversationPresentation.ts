@@ -1,6 +1,6 @@
 import { channelProviderLabel as sharedChannelProviderLabel } from "@isnadi/client-runtime/channel-presentation";
 import { formatDate } from "@isnadi/client-runtime/i18n";
-import type { OrchestrationMessage } from "@isnadi/contracts";
+import { HANDOFF_REQUEST_MESSAGE_PREFIX, type OrchestrationMessage } from "@isnadi/contracts";
 import type { RosterPresence } from "./roster.logic";
 
 export const channelProviderLabel = sharedChannelProviderLabel;
@@ -177,6 +177,19 @@ export function buildBotConversationEntries(
 }
 
 /**
+ * Prompts the server writes in the user's voice: a routine's trigger and a
+ * hand-off brief start turns the user did not type, so the transcript hides
+ * them and shows the work they caused.
+ */
+function isServerAuthoredPrompt(message: OrchestrationMessage): boolean {
+  if (message.role !== "user") return false;
+
+  const id = String(message.id);
+
+  return id.startsWith("routine:") || id.startsWith(HANDOFF_REQUEST_MESSAGE_PREFIX);
+}
+
+/**
  * Bot chat shows each user message and one final assistant answer per turn.
  * Provider progress and intermediate assistant records stay behind the working
  * status so one provider turn cannot appear as several bot replies.
@@ -190,7 +203,7 @@ export function visibleBotChatMessages(
   let lastUserIndex = -1;
 
   messages.forEach((message, index) => {
-    if (message.role === "user" && String(message.id).startsWith("routine:")) return;
+    if (isServerAuthoredPrompt(message)) return;
 
     if (message.role === "user") {
       precedingUserId = message.id;
@@ -206,7 +219,7 @@ export function visibleBotChatMessages(
   precedingUserId = "before-first-user";
 
   return messages.filter((message, index) => {
-    if (message.role === "user" && String(message.id).startsWith("routine:")) return false;
+    if (isServerAuthoredPrompt(message)) return false;
 
     if (message.role === "user") {
       precedingUserId = message.id;

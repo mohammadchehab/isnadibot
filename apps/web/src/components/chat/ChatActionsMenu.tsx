@@ -36,6 +36,7 @@ import {
 } from "../../state/entities";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { useUiStateStore } from "../../uiStateStore";
+import { useRosterStore } from "../roster/rosterStore";
 import { AppIcon } from "../ui/app-icon";
 import { Button } from "../ui/button";
 import {
@@ -49,6 +50,8 @@ import {
 import { Input } from "../ui/input";
 import {
   Menu,
+  MenuGroup,
+  MenuGroupLabel,
   MenuItem,
   MenuPopup,
   MenuSeparator,
@@ -58,12 +61,60 @@ import {
   MenuTrigger,
 } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { resolveChatMenuState } from "./chatActions.logic";
+import {
+  resolveChatMenuState,
+  resolveHandoffTargets,
+  type HandoffTargets,
+} from "./chatActions.logic";
 import {
   buildChatPaletteActions,
   type NewChatControl,
   snoozePresetLabel,
 } from "./chatPaletteActions";
+
+/**
+ * The Hand off entries the frames draw: one flat row in a chat with a single
+ * bot, and a labelled row per member in a group. A chat with nothing to hand
+ * off keeps the menu it had before this entry existed.
+ */
+function HandoffMenuEntries({
+  targets,
+  onHandoff,
+}: {
+  readonly targets: HandoffTargets;
+  readonly onHandoff: (botId: string) => void;
+}) {
+  const { t } = useI18n();
+
+  if (targets.kind === "none") return null;
+
+  if (targets.kind === "solo") {
+    return (
+      <>
+        <MenuSeparator />
+        <MenuItem onClick={() => onHandoff(targets.bot.botId)}>
+          <RefreshCwIcon />
+          {t("Hand off {bot}…", { bot: targets.bot.name })}
+        </MenuItem>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MenuSeparator />
+      <MenuGroup>
+        <MenuGroupLabel>{t("Hand off")}</MenuGroupLabel>
+        {targets.bots.map((bot) => (
+          <MenuItem key={bot.botId} onClick={() => onHandoff(bot.botId)}>
+            <RefreshCwIcon />
+            {bot.name}
+          </MenuItem>
+        ))}
+      </MenuGroup>
+    </>
+  );
+}
 
 /**
  * The open chat's state and its menu in the chat header: rename, regenerate
@@ -85,6 +136,8 @@ export function ChatActionsMenu({
   const nowMinute = useNowMinute();
   const now = `${nowMinute}:00.000Z`;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const rosterBots = useRosterStore((state) => state.bots);
+  const rosterGroups = useRosterStore((state) => state.groups);
 
   const lastVisitedAt = useUiStateStore((state) =>
     threadRef ? state.threadLastVisitedAtById[scopedThreadKey(threadRef)] : undefined,
@@ -109,6 +162,15 @@ export function ChatActionsMenu({
           })
         : null,
     [lastVisitedAt, now, shell, threadRef],
+  );
+
+  // Who this chat can hand off: its one bot, or a group's members in order.
+  const handoffTargets = useMemo(
+    () =>
+      shell
+        ? resolveHandoffTargets({ shell, groups: rosterGroups, bots: rosterBots })
+        : ({ kind: "none" } as const),
+    [rosterBots, rosterGroups, shell],
   );
 
   const snoozeLabel = (id: SnoozePresetId) => snoozePresetLabel(id, t);
@@ -290,6 +352,10 @@ export function ChatActionsMenu({
               </MenuItem>
             )
           ) : null}
+          <HandoffMenuEntries
+            targets={handoffTargets}
+            onHandoff={(botId) => void actions.handoff(threadRef, botId)}
+          />
           <MenuItem disabled={!state.canMarkUnread} onClick={() => actions.markUnread(threadRef)}>
             <CircleDotIcon />
             {t("Mark unread")}

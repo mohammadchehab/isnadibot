@@ -1,10 +1,18 @@
-import type { OrchestrationThreadShell } from "@isnadi/contracts";
+import {
+  AuthSessionId,
+  BotId,
+  GroupId,
+  type GroupMembership,
+  type OrchestrationThreadShell,
+} from "@isnadi/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import type { Bot, Group } from "../roster/types";
 import {
   type ChatActionSupport,
   hasUnseenCompletion,
   resolveChatMenuState,
+  resolveHandoffTargets,
   shouldForgetChatPath,
   watchChatVisits,
 } from "./chatActions.logic";
@@ -289,5 +297,85 @@ describe("shouldForgetChatPath", () => {
     expect(shouldForgetChatPath("/env-1/thread-1", removed)).toBe(true);
     expect(shouldForgetChatPath("/env-1/thread-2", removed)).toBe(false);
     expect(shouldForgetChatPath(undefined, removed)).toBe(false);
+  });
+});
+
+// Only the fields the resolver reads; the roster fills the rest from the server.
+function rosterBot(id: string, name: string, archivedAt: string | null = null): Bot {
+  return { id, name, archivedAt } as Bot;
+}
+
+function member(botId: string, role: "boss" | "specialist" = "specialist"): GroupMembership {
+  return { kind: "bot", botId: BotId.make(botId), role };
+}
+
+function groupWith(members: ReadonlyArray<GroupMembership>): Group {
+  return { id: "group-1", name: "Studio", bossBotId: null, members } as Group;
+}
+
+describe("resolveHandoffTargets", () => {
+  it("offers the one bot of a direct chat as a flat row", () => {
+    expect(
+      resolveHandoffTargets({
+        shell: { botId: BotId.make("bot-1"), groupId: null },
+        groups: [],
+        bots: [rosterBot("bot-1", "Tailor")],
+      }),
+    ).toEqual({ kind: "solo", bot: { botId: "bot-1", name: "Tailor" } });
+  });
+
+  it("lists a group's bots in membership order, leaving its people out", () => {
+    expect(
+      resolveHandoffTargets({
+        shell: { botId: null, groupId: GroupId.make("group-1") },
+        groups: [
+          groupWith([
+            member("bot-2", "boss"),
+            { kind: "person", personId: AuthSessionId.make("person-1"), displayName: "Ada" },
+            member("bot-1"),
+          ]),
+        ],
+        bots: [rosterBot("bot-1", "Tailor"), rosterBot("bot-2", "Wren")],
+      }),
+    ).toEqual({
+      kind: "group",
+      bots: [
+        { botId: "bot-2", name: "Wren" },
+        { botId: "bot-1", name: "Tailor" },
+      ],
+    });
+  });
+
+  it("never offers a bot that was archived", () => {
+    expect(
+      resolveHandoffTargets({
+        shell: { botId: null, groupId: GroupId.make("group-1") },
+        groups: [groupWith([member("bot-1"), member("bot-2")])],
+        bots: [
+          rosterBot("bot-1", "Tailor", "2026-09-27T09:30:00.000Z"),
+          rosterBot("bot-2", "Wren"),
+        ],
+      }),
+    ).toEqual({ kind: "group", bots: [{ botId: "bot-2", name: "Wren" }] });
+
+    expect(
+      resolveHandoffTargets({
+        shell: { botId: BotId.make("bot-1"), groupId: null },
+        groups: [],
+        bots: [rosterBot("bot-1", "Tailor", "2026-09-27T09:30:00.000Z")],
+      }),
+    ).toEqual({ kind: "none" });
+  });
+
+  it("keeps the menu as it was when there is nobody to hand off to", () => {
+    expect(
+      resolveHandoffTargets({
+        shell: { botId: null, groupId: GroupId.make("group-9") },
+        groups: [groupWith([member("bot-1")])],
+        bots: [rosterBot("bot-1", "Tailor")],
+      }),
+    ).toEqual({ kind: "none" });
+
+    expect(resolveHandoffTargets({ shell: {}, groups: [], bots: [] })).toEqual({ kind: "none" });
   });
 });

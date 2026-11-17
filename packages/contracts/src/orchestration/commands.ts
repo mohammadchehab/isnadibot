@@ -92,6 +92,7 @@ import {
   ThreadSessionStopCommand,
   ThreadContextResetCommand,
   ThreadContextResetUndoCommand,
+  ThreadHandoffRequestCommand,
   DelegationCancelCommand,
   DelegationRetryCommand,
   ThreadMessageReactionSetCommand,
@@ -151,6 +152,7 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadSessionStopCommand,
   ThreadContextResetCommand,
   ThreadContextResetUndoCommand,
+  ThreadHandoffRequestCommand,
   DelegationCancelCommand,
   DelegationRetryCommand,
 ]);
@@ -221,6 +223,7 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadSessionStopCommand,
   ThreadContextResetCommand,
   ThreadContextResetUndoCommand,
+  ThreadHandoffRequestCommand,
   DelegationCancelCommand,
   DelegationRetryCommand,
 ]);

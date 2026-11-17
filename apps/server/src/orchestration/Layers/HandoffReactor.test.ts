@@ -3,11 +3,11 @@ import { it } from "@effect/vitest";
 import {
   BotId,
   EventId,
+  HANDOFF_APPLIED_ACTIVITY_KIND,
   HANDOFF_NOT_APPLIED_ACTIVITY_KIND,
   MessageId,
   ThreadId,
   TurnId,
-  type HandoffDoc,
 } from "@isnadi/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -18,6 +18,7 @@ import * as Ref from "effect/Ref";
 import { describe, expect } from "vite-plus/test";
 
 import { ServerActivation } from "../../serverActivation.ts";
+import { refusedInvariantError } from "../Errors.ts";
 import { HandoffReactor } from "../Services/HandoffReactor.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
 import {
@@ -35,20 +36,15 @@ const TURN = TurnId.make("turn-handoff");
 
 const BEFORE_TURN = MessageId.make("message-before-turn");
 
-const DOC: HandoffDoc = {
-  item: "Ship the handoff engine.",
-  branch: "feature/task-84-handoff-engine",
-  done: "The reactor dispatches the cut.",
-  nextStep: "Write the tests.",
-  waitingOn: "",
-  doNot: "Do not merge.",
-};
+const NOTE = EventId.make("handoff:1");
 
-const handoffTurn = (sinceMessageId: MessageId | null): ProjectionHandoffTurn => ({
-  activityId: EventId.make("handoff:1"),
+const handoffTurn = (
+  input: Partial<ProjectionHandoffTurn> & Pick<ProjectionHandoffTurn, "sinceMessageId">,
+): ProjectionHandoffTurn => ({
+  activityId: NOTE,
   botId: BOT_ID,
-  doc: DOC,
-  sinceMessageId,
+  requested: true,
+  ...input,
 });
 
 type Harness = Effect.Success<typeof harness>;
@@ -80,99 +76,148 @@ const run = <A, E>(
     ),
   );
 
+/** Runs one turn end through the reactor, so every test differs only in the turn it reports. */
+const endTurn = (
+  h: Harness,
+  turn: Option.Option<ProjectionHandoffTurn>,
+  status: "ready" | "error" = "ready",
+) =>
+  Effect.gen(function* () {
+    const ref = yield* Ref.make(turn);
+
+    yield* run(h, ref, (reactor) =>
+      Effect.gen(function* () {
+        yield* PubSub.publish(h.events, sessionSet(1, THREAD, "running", TURN));
+        yield* PubSub.publish(h.events, sessionSet(2, THREAD, status));
+        yield* reactor.drainThrough(2);
+      }),
+    );
+  }).pipe(Effect.scoped);
+
 describe("HandoffReactor (TASK-84)", () => {
-  it.effect("cuts the bot's context at the message before a completed handoff turn", () =>
+  it.effect("cuts a requested hand off at the message before the turn, and records it", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const turn = yield* Ref.make<Option.Option<ProjectionHandoffTurn>>(
-        Option.some(handoffTurn(BEFORE_TURN)),
+      yield* endTurn(h, Option.some(handoffTurn({ sinceMessageId: BEFORE_TURN })));
+
+      expect(h.dispatched.map((command) => command.type)).toEqual([
+        "thread.context.reset",
+        "thread.activity.append",
+      ]);
+      expect(h.dispatched[0]).toMatchObject({
+        commandId: "server:handoff:turn-handoff",
+        threadId: THREAD,
+        botId: BOT_ID,
+        sinceMessageId: BEFORE_TURN,
+        handoffActivityId: NOTE,
+      });
+      expect(h.dispatched[1]).toMatchObject({
+        commandId: "server:handoff-applied:turn-handoff",
+        threadId: THREAD,
+        activity: {
+          id: "handoff-applied:turn-handoff",
+          kind: HANDOFF_APPLIED_ACTIVITY_KIND,
+          turnId: TURN,
+          payload: { botId: BOT_ID, turnId: TURN, handoffActivityId: NOTE },
+        },
+      });
+    }),
+  );
+
+  it.effect("cuts a note the bot wrote on its own, with no row to undo", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* endTurn(
+        h,
+        Option.some(handoffTurn({ sinceMessageId: BEFORE_TURN, requested: false })),
       );
 
-      yield* run(h, turn, (reactor) =>
-        Effect.gen(function* () {
-          yield* PubSub.publish(h.events, sessionSet(1, THREAD, "running", TURN));
-          yield* PubSub.publish(h.events, sessionSet(2, THREAD, "ready"));
-          yield* reactor.drainThrough(2);
-
-          expect(h.dispatched.map((command) => command.type)).toEqual(["thread.context.reset"]);
-          expect(h.dispatched[0]).toMatchObject({
-            commandId: "server:handoff:turn-handoff",
-            threadId: THREAD,
-            botId: BOT_ID,
-            sinceMessageId: BEFORE_TURN,
-            handoffActivityId: "handoff:1",
-          });
-        }),
-      );
-    }).pipe(Effect.scoped),
+      expect(h.dispatched.map((command) => command.type)).toEqual(["thread.context.reset"]);
+    }),
   );
 
   it.effect("says the hand off did not happen when the turn errors, and resets nothing", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const turn = yield* Ref.make<Option.Option<ProjectionHandoffTurn>>(
-        Option.some(handoffTurn(BEFORE_TURN)),
-      );
+      yield* endTurn(h, Option.some(handoffTurn({ sinceMessageId: BEFORE_TURN })), "error");
 
-      yield* run(h, turn, (reactor) =>
-        Effect.gen(function* () {
-          yield* PubSub.publish(h.events, sessionSet(1, THREAD, "running", TURN));
-          yield* PubSub.publish(h.events, sessionSet(2, THREAD, "error"));
-          yield* reactor.drainThrough(2);
-
-          expect(h.dispatched.map((command) => command.type)).toEqual(["thread.activity.append"]);
-          expect(h.dispatched[0]).toMatchObject({
-            commandId: "server:handoff-not-applied:turn-handoff",
-            threadId: THREAD,
-            activity: {
-              id: "handoff-not-applied:turn-handoff",
-              kind: HANDOFF_NOT_APPLIED_ACTIVITY_KIND,
-              turnId: TURN,
-              payload: { turnId: TURN, state: "error" },
-            },
-          });
-        }),
-      );
-    }).pipe(Effect.scoped),
+      expect(h.dispatched.map((command) => command.type)).toEqual(["thread.activity.append"]);
+      expect(h.dispatched[0]).toMatchObject({
+        commandId: "server:handoff-not-applied:turn-handoff",
+        threadId: THREAD,
+        activity: {
+          id: "handoff-not-applied:turn-handoff",
+          kind: HANDOFF_NOT_APPLIED_ACTIVITY_KIND,
+          turnId: TURN,
+          payload: { botId: BOT_ID, turnId: TURN, reason: "turn-not-completed" },
+        },
+      });
+    }),
   );
 
-  it.effect("does nothing for a turn that wrote no note", () =>
+  it.effect("says the hand off did not happen when a requested turn wrote no note", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const turn = yield* Ref.make<Option.Option<ProjectionHandoffTurn>>(Option.none());
-
-      yield* run(h, turn, (reactor) =>
-        Effect.gen(function* () {
-          yield* PubSub.publish(h.events, sessionSet(1, THREAD, "running", TURN));
-          yield* PubSub.publish(h.events, sessionSet(2, THREAD, "ready"));
-          yield* reactor.drainThrough(2);
-
-          expect(h.dispatched).toEqual([]);
-        }),
+      yield* endTurn(
+        h,
+        Option.some(handoffTurn({ sinceMessageId: BEFORE_TURN, activityId: null })),
       );
-    }).pipe(Effect.scoped),
+
+      expect(h.dispatched.map((command) => command.type)).toEqual(["thread.activity.append"]);
+      expect(h.dispatched[0]).toMatchObject({
+        activity: { payload: { botId: BOT_ID, turnId: TURN, reason: "no-note" } },
+      });
+    }),
   );
 
-  it.effect("does not cut a chat the handoff turn opened", () =>
+  it.effect("does nothing for a turn nobody asked to hand off that wrote no note", () =>
     Effect.gen(function* () {
       const h = yield* harness;
 
-      const turn = yield* Ref.make<Option.Option<ProjectionHandoffTurn>>(
-        Option.some(handoffTurn(null)),
-      );
+      yield* endTurn(h, Option.none());
 
-      yield* run(h, turn, (reactor) =>
-        Effect.gen(function* () {
-          yield* PubSub.publish(h.events, sessionSet(1, THREAD, "running", TURN));
-          yield* PubSub.publish(h.events, sessionSet(2, THREAD, "ready"));
-          yield* reactor.drainThrough(2);
+      expect(h.dispatched).toEqual([]);
+    }),
+  );
 
-          expect(h.dispatched).toEqual([]);
+  it.effect("records the hand off of a chat the turn opened, without cutting anything", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* endTurn(h, Option.some(handoffTurn({ sinceMessageId: null })));
+
+      expect(h.dispatched.map((command) => command.type)).toEqual(["thread.activity.append"]);
+      expect(h.dispatched[0]).toMatchObject({
+        activity: { kind: HANDOFF_APPLIED_ACTIVITY_KIND, turnId: TURN },
+      });
+    }),
+  );
+
+  it.effect("says nothing reset when the chat can no longer take the cut", () =>
+    Effect.gen(function* () {
+      const h = yield* harness;
+
+      yield* Ref.set(h.rejection, {
+        type: "thread.context.reset",
+        error: refusedInvariantError({
+          commandType: "thread.context.reset",
+          detail: "Message 'message-before-turn' is not in chat 'thread-bot-specialist'.",
+          refusal: "stale-view",
         }),
-      );
-    }).pipe(Effect.scoped),
+      });
+
+      yield* endTurn(h, Option.some(handoffTurn({ sinceMessageId: BEFORE_TURN })));
+
+      // The refused reset never reaches the recorded dispatches, so the one row
+      // left is the chat's own account of what happened.
+      expect(h.dispatched.map((command) => command.type)).toEqual(["thread.activity.append"]);
+      expect(h.dispatched[0]).toMatchObject({
+        activity: { payload: { botId: BOT_ID, turnId: TURN, reason: "reset-refused" } },
+      });
+    }),
   );
 });

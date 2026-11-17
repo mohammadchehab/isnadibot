@@ -385,6 +385,20 @@ export const ThreadContextResetUndoCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+/**
+ * Asks one bot of a chat to hand its context over. The server writes the brief
+ * and starts the turn, so the instruction the bot reads is never composed by a
+ * client; when that turn ends, the server cuts the bot's context after the note
+ * or says in the chat that the hand off did not happen.
+ */
+export const ThreadHandoffRequestCommand = Schema.Struct({
+  type: Schema.Literal("thread.handoff.request"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  botId: BotId,
+  createdAt: IsoDateTime,
+});
+
 export const DelegationCancelCommand = Schema.Struct({
   type: Schema.Literal("delegation.cancel"),
   commandId: CommandId,

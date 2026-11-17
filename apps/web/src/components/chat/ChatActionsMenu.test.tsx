@@ -1,8 +1,17 @@
 import { Predicate } from "effect";
-import { EnvironmentId, type OrchestrationThreadShell, ThreadId } from "@isnadi/contracts";
+import {
+  BotId,
+  EnvironmentId,
+  GroupId,
+  type GroupMembership,
+  type OrchestrationThreadShell,
+  ThreadId,
+} from "@isnadi/contracts";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
+import type { Bot, Group } from "../roster/types";
 
 type Item = { disabled?: boolean; onClick?: () => void; variant?: string };
 
@@ -11,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   visited: {} as Record<string, string>,
   items: new Map<string, Item>(),
   subTriggers: new Map<string, Item>(),
+  groupLabels: [] as string[],
+  roster: { bots: [] as ReadonlyArray<Bot>, groups: [] as ReadonlyArray<Group> },
   actions: {
     rename: vi.fn(),
     regenerateTitle: vi.fn(),
@@ -24,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     archive: vi.fn(),
     unarchive: vi.fn(),
     delete: vi.fn(),
+    handoff: vi.fn(),
   },
 }));
 
@@ -54,6 +66,10 @@ vi.mock("../../hooks/useChatActions", () => ({ useChatActions: () => mocks.actio
 
 vi.mock("../../hooks/useNowMinute", () => ({ useNowMinute: () => "2026-09-27T12:00" }));
 
+vi.mock("../roster/rosterStore", () => ({
+  useRosterStore: <T,>(select: (state: typeof mocks.roster) => T) => select(mocks.roster),
+}));
+
 vi.mock("../../uiStateStore", () => ({
   useUiStateStore: <T,>(
     select: (state: {
@@ -66,6 +82,12 @@ vi.mock("../../uiStateStore", () => ({
 vi.mock("../ui/menu", () => ({
   Menu: ({ children }: { children: ReactNode }) => children,
   MenuPopup: ({ children }: { children: ReactNode }) => children,
+  MenuGroup: ({ children }: { children: ReactNode }) => children,
+  MenuGroupLabel: ({ children }: { children: ReactNode }) => {
+    mocks.groupLabels.push(textOf(children));
+
+    return null;
+  },
   MenuSub: ({ children }: { children: ReactNode }) => children,
   MenuSubPopup: ({ children }: { children: ReactNode }) => children,
   MenuSeparator: () => null,
@@ -126,12 +148,27 @@ function shell(overrides: Partial<OrchestrationThreadShell> = {}): Orchestration
 function render(props: Parameters<typeof ChatActionsMenu>[0] = { threadRef }): string {
   mocks.items.clear();
   mocks.subTriggers.clear();
+  mocks.groupLabels.length = 0;
 
   return renderToStaticMarkup(<ChatActionsMenu {...props} />);
 }
 
+// Only the fields the menu reads; the roster fills the rest from the server.
+function rosterBot(id: string, name: string, archivedAt: string | null = null): Bot {
+  return { id, name, archivedAt } as Bot;
+}
+
+function member(botId: string, role: "boss" | "specialist" = "specialist"): GroupMembership {
+  return { kind: "bot", botId: BotId.make(botId), role };
+}
+
+function groupWith(members: ReadonlyArray<GroupMembership>): Group {
+  return { id: "group-1", name: "Studio", bossBotId: null, members } as Group;
+}
+
 beforeEach(() => {
   mocks.shell = shell();
+  mocks.roster = { bots: [], groups: [] };
   mocks.visited = {
     [`${threadRef.environmentId}:${threadRef.threadId}`]: "2026-09-27T10:01:00.000Z",
   };
@@ -257,6 +294,59 @@ describe("ChatActionsMenu", () => {
     };
     render();
     expect(mocks.items.get("Mark unread")?.disabled).toBe(true);
+  });
+
+  it("asks the chat's one bot to hand off, right under Pin chat", () => {
+    mocks.shell = shell({ botId: BotId.make("bot-1") });
+    mocks.roster = { bots: [rosterBot("bot-1", "Tailor")], groups: [] };
+    render();
+
+    expect(menuLabels()).toEqual([
+      "Rename chat",
+      "Regenerate title",
+      "Pin chat",
+      "Hand off Tailor…",
+      "Mark unread",
+      "Settle chat",
+      "Archive chat",
+      "Delete chat",
+    ]);
+
+    click("Hand off Tailor…");
+    expect(mocks.actions.handoff).toHaveBeenCalledExactlyOnceWith(threadRef, "bot-1");
+  });
+
+  it("labels the group's bots so the user picks who takes over", () => {
+    mocks.shell = shell({ groupId: GroupId.make("group-1") });
+    mocks.roster = {
+      bots: [rosterBot("bot-1", "Tailor"), rosterBot("bot-2", "Wren")],
+      groups: [groupWith([member("bot-1"), member("bot-2")])],
+    };
+    render();
+
+    expect(mocks.groupLabels).toEqual(["Hand off"]);
+    expect(menuLabels()).toContain("Tailor");
+    expect(menuLabels()).toContain("Wren");
+
+    click("Wren");
+    expect(mocks.actions.handoff).toHaveBeenCalledExactlyOnceWith(threadRef, "bot-2");
+  });
+
+  it("leaves the hand off entry out when the bot is gone", () => {
+    mocks.shell = shell({ botId: BotId.make("bot-1") });
+    mocks.roster = { bots: [rosterBot("bot-1", "Tailor", "2026-09-27T11:00:00.000Z")], groups: [] };
+    render();
+
+    expect(menuLabels()).toEqual([
+      "Rename chat",
+      "Regenerate title",
+      "Pin chat",
+      "Mark unread",
+      "Settle chat",
+      "Archive chat",
+      "Delete chat",
+    ]);
+    expect(mocks.groupLabels).toEqual([]);
   });
 
   it("starts a new chat with the bot only once the current chat has messages", () => {
