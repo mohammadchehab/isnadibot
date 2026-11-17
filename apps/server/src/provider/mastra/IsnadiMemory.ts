@@ -139,18 +139,6 @@ function dropThroughCut<Message extends { readonly id: string }>(
   return index === -1 ? messages : messages.slice(index + 1);
 }
 
-/**
- * Whether the thread's observations were made from messages after the cut. The
- * record carries one cursor for the whole thread and no per-chunk source, so a
- * record last written at or before the cut describes only messages the bot has
- * forgotten and none of it enters its context.
- */
-function observedAfterCut(record: { readonly lastObservedAt?: Date }, resetAt: string): boolean {
-  return (
-    record.lastObservedAt !== undefined && record.lastObservedAt.getTime() > Date.parse(resetAt)
-  );
-}
-
 /** The group this turn runs in, or undefined for a direct chat. */
 export function controllerGroup(
   requestContext: RequestContext | undefined,
@@ -257,7 +245,13 @@ export class IsnadiPassiveObservationalMemoryProcessor implements Processor<"obs
     }
 
     const record = await this.engine.getOrCreateRecord(context.threadId, context.resourceId);
-    const observationsApply = !cut || observedAfterCut(record, cut.resetAt);
+
+    // The thread's observation record is cumulative with a single cursor and no
+    // per-chunk source, so nothing in it can be shown to describe messages after the
+    // cut: after a handoff, every observation in it may belong to a message the bot
+    // was told to forget. The rule for an observation nobody can attribute is
+    // "excluded", so a cut leaves this bot with no observations at all.
+    const observationsApply = cut === undefined;
 
     const chunks = observationsApply
       ? await this.engine.buildContextSystemMessages({ ...context, record })

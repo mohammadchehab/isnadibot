@@ -127,42 +127,27 @@ describe("a bot's context after a handoff (TASK-84)", () => {
     expect(messageList.getSystemMessages("isnadi-handoff")).toEqual([]);
   });
 
-  it("leaves out observations made before the cut", async () => {
-    const { processor, buildContextSystemMessages } = makeProcessor({
-      history: [],
-      lastObservedAt: new Date("2026-08-31T20:00:00.000Z"),
-      chunks: ["the bot asked about the old branch"],
-    });
+  it("leaves out observations whatever the observer's cursor says, because none of it is attributable to after the cut", async () => {
+    for (const lastObservedAt of [
+      new Date("2026-08-31T20:00:00.000Z"),
+      new Date("2026-08-31T20:00:20.000Z"),
+    ]) {
+      const { processor, buildContextSystemMessages } = makeProcessor({
+        history: [],
+        lastObservedAt,
+        chunks: ["the bot is writing the tests"],
+      });
 
-    const messageList = new MessageList({ threadId: "thread-1", resourceId: "thread-1" });
+      const messageList = new MessageList({ threadId: "thread-1", resourceId: "thread-1" });
 
-    await processor.processInputStep({
-      stepNumber: 0,
-      messageList,
-      requestContext: requestContext(contextCut("a1")),
-    } as never);
+      await processor.processInputStep({
+        stepNumber: 0,
+        messageList,
+        requestContext: requestContext(contextCut("a1")),
+      } as never);
 
-    expect(buildContextSystemMessages).not.toHaveBeenCalled();
-    expect(messageList.getSystemMessages("observational-memory")).toEqual([]);
-  });
-
-  it("keeps observations the observer made after the cut", async () => {
-    const { processor } = makeProcessor({
-      history: [],
-      lastObservedAt: new Date("2026-08-31T20:00:20.000Z"),
-      chunks: ["the bot is writing the tests"],
-    });
-
-    const messageList = new MessageList({ threadId: "thread-1", resourceId: "thread-1" });
-
-    await processor.processInputStep({
-      stepNumber: 0,
-      messageList,
-      requestContext: requestContext(contextCut("a1")),
-    } as never);
-
-    expect(systemText(messageList, "observational-memory")).toContain(
-      "the bot is writing the tests",
-    );
+      expect(buildContextSystemMessages).not.toHaveBeenCalled();
+      expect(messageList.getSystemMessages("observational-memory")).toEqual([]);
+    }
   });
 });
