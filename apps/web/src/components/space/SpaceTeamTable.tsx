@@ -10,10 +10,8 @@ import {
   type EnvironmentId,
   type OrchestrationThreadShell,
   type ScopedThreadRef,
-  type ThreadId,
   type WorkItemSummary,
 } from "@isnadi/contracts";
-import { MoreHorizontalIcon } from "lucide-react";
 import { Predicate } from "effect";
 import { useMemo, useState, type ComponentProps } from "react";
 
@@ -30,10 +28,16 @@ import { workItemEnvironment } from "../../state/workItems";
 import { useOpenChat } from "../chat/useOpenChat";
 import { BotAvatarView } from "../roster/BotAvatarView";
 import { BOT_STATUS_LABEL } from "../roster/botStatusPresentation";
+import { bossGroupOf } from "../roster/botDelete.logic";
+import { resolveBotControlAvailability } from "../roster/botControls.logic";
+import { SteerBotDialog, type SteerTarget } from "../roster/SteerBotDialog";
 import type { Group } from "../roster/types";
+import { useBotControlCommands } from "../roster/useBotControls";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
+import { TeamArchiveDialog, type TeamArchiveTarget } from "./TeamArchiveDialog";
+import { TeamRowMenu } from "./TeamRowMenu";
 import { workItemFailureToast } from "./workItemFailure.logic";
 
 // SAFETY: the empty ID is an inactive-query sentinel; no environment request is sent for it.
@@ -59,19 +63,30 @@ const STATUS_BADGE_VARIANT: Readonly<Record<BotStatus, ComponentProps<typeof Bad
 function TeamRow({
   environmentId,
   row,
-  chatId,
+  chat,
   blocked,
+  bossSpaceName,
+  onSteer,
+  onArchive,
 }: {
   readonly environmentId: EnvironmentId | null;
   readonly row: CapacityRow;
-  readonly chatId: ThreadId | null;
+  /** The bot's newest chat: the turn its menu acts on, and the one its context reading comes from. */
+  readonly chat: OrchestrationThreadShell | null;
   /** The blocked item this bot owns, when it holds one; the way out of `held`. */
   readonly blocked: WorkItemSummary | null;
+  /** The space this bot leads, when it leads one; only the archive refusal names it. */
+  readonly bossSpaceName: string | null;
+  readonly onSteer: (target: SteerTarget) => void;
+  readonly onArchive: (target: TeamArchiveTarget) => void;
 }) {
   const { t } = useI18n();
   const openChat = useOpenChat();
   const unblock = useAtomCommand(workItemEnvironment.unblock, { reportFailure: false });
+  const { interruptBot } = useBotControlCommands();
   const [resuming, setResuming] = useState(false);
+
+  const chatId = chat?.id ?? null;
 
   const ref = useMemo<ScopedThreadRef | null>(
     () =>
@@ -104,6 +119,9 @@ function TeamRow({
   };
 
   const isHeld = row.status === "held";
+
+  // What this row's menu may offer: the chat's own answer, not the status word.
+  const controls = resolveBotControlAvailability(chat);
 
   // The reason follows the bot's held state, not the card the row happens to
   // show: a bot can hold an older in-progress card and a newer blocked one, and
@@ -167,8 +185,8 @@ function TeamRow({
         {contextLabel === null ? "—" : contextLabel}
       </td>
       {/* The frame gives every row its action cell: an open on the row that is asking,
-          then the row menu's trigger. The menu itself is E13b's. Its 28px controls
-          take 12px of padding so the row stays the frame's 53, not 61. */}
+          then the row menu's trigger (E13b `2546:3758`). Its 28px controls take 12px
+          of padding so the row stays the frame's 53, not 61. */}
       <td className="py-3 align-top">
         <span className="flex items-center justify-end gap-1">
           {row.status === "asking" && chatId !== null && environmentId !== null ? (
@@ -190,9 +208,23 @@ function TeamRow({
               {t("Resume")}
             </Button>
           ) : null}
-          <Button size="icon-sm" variant="ghost" aria-label={t("Bot actions")}>
-            <MoreHorizontalIcon aria-hidden />
-          </Button>
+          <TeamRowMenu
+            bot={{
+              name: row.name,
+              isBoss: row.isBoss,
+              canSteer: controls.steer,
+              canInterrupt: controls.interrupt,
+            }}
+            onSteer={() => {
+              if (ref !== null) onSteer({ name: row.name, ref });
+            }}
+            onInterrupt={() => {
+              if (ref !== null) void interruptBot(ref, chat);
+            }}
+            onArchive={() => {
+              onArchive({ botId: row.botId, name: row.name, bossSpaceName });
+            }}
+          />
         </span>
       </td>
     </tr>
@@ -263,6 +295,11 @@ export function SpaceTeamTable({ group }: { group: Group }) {
 
   const bossName = capacity?.rows.find((row) => row.isBoss)?.name ?? null;
 
+  // One steer and one archive dialog for the whole table: a row opens it by
+  // naming its target, and closing it clears the target.
+  const [steering, setSteering] = useState<SteerTarget | null>(null);
+  const [archiving, setArchiving] = useState<TeamArchiveTarget | null>(null);
+
   return (
     <section className="flex min-w-0 flex-col gap-3" data-testid="space-team">
       {/* decision-73 keeps this header to the title and its one line: no action button. */}
@@ -305,14 +342,30 @@ export function SpaceTeamTable({ group }: { group: Group }) {
               <TeamRow
                 key={row.botId}
                 environmentId={environmentId}
-                chatId={capacity.newestChat.get(row.botId)?.id ?? null}
+                chat={capacity.newestChat.get(row.botId) ?? null}
                 blocked={capacity.blockedByBotId.get(row.botId) ?? null}
+                bossSpaceName={bossGroupOf([group], row.botId)?.name ?? null}
                 row={row}
+                onSteer={setSteering}
+                onArchive={setArchiving}
               />
             ))}
           </tbody>
         </table>
       )}
+      <SteerBotDialog
+        target={steering}
+        onOpenChange={(open) => {
+          if (!open) setSteering(null);
+        }}
+      />
+      <TeamArchiveDialog
+        target={archiving}
+        environmentId={environmentId}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+      />
     </section>
   );
 }
