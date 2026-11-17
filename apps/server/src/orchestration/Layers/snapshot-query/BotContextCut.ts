@@ -35,7 +35,6 @@ export function createBotContextCut({ sql }: { readonly sql: SqlClient.SqlClient
       readonly resetAt: string;
       readonly payload: string | null;
       readonly repliesAfterCut: number;
-      readonly inGroup: number;
     }>`
       SELECT
         context.since_message_id AS "sinceMessageId",
@@ -46,12 +45,9 @@ export function createBotContextCut({ sql }: { readonly sql: SqlClient.SqlClient
           SELECT COUNT(*) FROM projection_thread_messages AS message
           WHERE message.thread_id = context.thread_id
             AND message.role = 'assistant'
+            AND message.responding_bot_id = context.bot_id
             AND julianday(message.created_at) >= julianday(context.reset_at)
-        ) AS "repliesAfterCut",
-        (
-          SELECT COUNT(*) FROM projection_threads AS thread
-          WHERE thread.thread_id = context.thread_id AND thread.group_id IS NOT NULL
-        ) AS "inGroup"
+        ) AS "repliesAfterCut"
       FROM projection_thread_bot_context AS context
       LEFT JOIN projection_thread_activities AS activity
         ON activity.activity_id = context.handoff_activity_id
@@ -70,9 +66,11 @@ export function createBotContextCut({ sql }: { readonly sql: SqlClient.SqlClient
           sinceSequence: row.sinceSequence,
           resetAt: row.resetAt,
           handoffDoc: handoffDocOf(row.payload),
-          // A group chat cannot say which member answered, so only a direct chat
-          // can tell that the bot has already read its note.
-          docSpent: row.inGroup === 0 && row.repliesAfterCut > 0,
+          // A reply of this bot after the cut means its next turn has started,
+          // which is where its note leaves the context and stays visible in the
+          // chat only. A group spends the note on the same rule: another
+          // member's reply is not this bot's turn.
+          docSpent: row.repliesAfterCut > 0,
         });
       }),
     );

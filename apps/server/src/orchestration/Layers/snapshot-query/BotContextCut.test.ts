@@ -50,14 +50,14 @@ const seed = (input: { readonly groupId: string | null }) =>
     `;
   });
 
-const addReply = (messageId: string, createdAt: string) =>
+const addReply = (messageId: string, createdAt: string, botId: BotId = BOT_ID) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`
       INSERT INTO projection_thread_messages (
-        message_id, thread_id, role, text, is_streaming, created_at, updated_at
+        message_id, thread_id, role, text, is_streaming, created_at, updated_at, responding_bot_id
       )
-      VALUES (${messageId}, ${THREAD_ID}, 'assistant', 'done', 0, ${createdAt}, ${createdAt})
+      VALUES (${messageId}, ${THREAD_ID}, 'assistant', 'done', 0, ${createdAt}, ${createdAt}, ${botId})
     `;
   });
 
@@ -85,15 +85,27 @@ it.layer(Layer.mergeAll(NodeSqliteClient.layerMemory()))("bot context cut", (it)
     }),
   );
 
-  it.effect("a group chat keeps the note, because no row says which member replied", () =>
+  it.effect("a group chat keeps the note while another member is the one replying", () =>
     Effect.gen(function* () {
       yield* seed({ groupId: "group-1" });
-      yield* addReply("message-4", AFTER_CUT);
 
       const cut = Option.getOrThrow(yield* readCut);
-
       assert.isFalse(cut.docSpent);
       assert.deepEqual(cut.handoffDoc?.item, "TASK-84");
+
+      // Another member's turn is not this bot's next turn, so its note stays.
+      yield* addReply("message-4", AFTER_CUT, BotId.make("bot-other"));
+      assert.isFalse(Option.getOrThrow(yield* readCut).docSpent);
+    }),
+  );
+
+  it.effect("a group chat spends the note once this bot replies after the cut", () =>
+    Effect.gen(function* () {
+      yield* seed({ groupId: "group-1" });
+      yield* addReply("message-4", AFTER_CUT, BotId.make("bot-other"));
+      yield* addReply("message-5", AFTER_CUT);
+
+      assert.isTrue(Option.getOrThrow(yield* readCut).docSpent);
     }),
   );
 });
