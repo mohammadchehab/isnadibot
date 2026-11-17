@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { TrimmedString } from "./baseSchemas.ts";
+import { BotId, TrimmedString } from "./baseSchemas.ts";
 
 /** One field of a handoff doc. The six rows the chat renders are the six fields. */
 export const HANDOFF_DOC_FIELD_MAX_LENGTH = 2000;
@@ -29,6 +29,20 @@ export type HandoffDoc = typeof HandoffDoc.Type;
 
 /** The activity kind a handoff doc is appended to the chat as. */
 export const HANDOFF_ACTIVITY_KIND = "handoff";
+
+/** The tool a bot calls to write a handoff doc. */
+export const ISNADI_HANDOFF_TOOL_NAME = "handoff";
+
+/**
+ * What a handoff activity carries: the note, and the bot whose context it cuts,
+ * so the reset lands on the bot that wrote it even in a group chat.
+ */
+export const HandoffActivityPayload = Schema.Struct({
+  botId: BotId,
+  doc: HandoffDoc,
+});
+
+export type HandoffActivityPayload = typeof HandoffActivityPayload.Type;
 
 /**
  * The activity kind the server appends when a requested handoff did not happen,

@@ -8,6 +8,7 @@ import {
 import {
   type IsnadiConversationMemorySnapshot,
   type BotPersonalityTone,
+  type HandoffDoc,
   type IsnadiCreateRoutineInput as IsnadiCreateRoutineInputValue,
 } from "@isnadi/contracts";
 import * as Duration from "effect/Duration";
@@ -35,7 +36,22 @@ export interface IsnadiMastraState {
   readonly mcpInstructions?: string;
   /** Set for group chats; rebuilt every turn. */
   readonly group?: GroupConversationState;
+  /**
+   * Where this bot's context starts in this chat, with the note it wrote. Set
+   * every turn from the projection so a reused session never keeps a stale cut.
+   */
+  readonly contextCut?: IsnadiHandoffContext;
   readonly modelOptions?: IsnadiModelOptions;
+}
+
+/** One bot's context cut in one chat, as the model context is assembled from it. */
+export interface IsnadiHandoffContext {
+  /** The message the bot's context starts after. */
+  readonly sinceMessageId: string;
+  /** The six rows the bot wrote, prepended before memory. */
+  readonly doc: HandoffDoc;
+  /** When the cut was made. Observations last written before it are excluded. */
+  readonly resetAt: string;
 }
 
 export type IsnadiMastraSession = Session<IsnadiMastraState>;
@@ -110,6 +126,11 @@ export interface IsnadiMastraHarnessOptions {
     threadId: string,
     input: IsnadiCreateRoutineInputValue,
   ) => Promise<IsnadiToolResult>;
+  /**
+   * Records the note a bot wrote when it hands its context over. The reset itself
+   * lands after the turn ends, so the tool only reports whether the note landed.
+   */
+  readonly handoff?: (threadId: string, doc: HandoffDoc) => Promise<IsnadiHandoffToolResult>;
   readonly listRoutines?: (threadId: string) => Promise<IsnadiRoutineListResult>;
   readonly deleteRoutines?: (
     threadId: string,
@@ -126,6 +147,11 @@ export interface IsnadiMastraHarnessOptions {
     readonly error: Error;
   }) => Promise<void> | void;
 }
+
+/** What the handoff tool tells the bot: the note is kept, or why it is not. */
+export type IsnadiHandoffToolResult =
+  | { readonly status: "recorded" }
+  | { readonly status: "refused"; readonly message: string };
 
 export type IsnadiControllerHarness = IsnadiMastraHarness<IsnadiControllerSession>;
 
@@ -182,6 +208,7 @@ export type IsnadiMastraToolOptions = Pick<
   | "syncThreadToolApproval"
   | "toolRuntime"
   | "createRoutine"
+  | "handoff"
   | "listRoutines"
   | "deleteRoutines"
 >;

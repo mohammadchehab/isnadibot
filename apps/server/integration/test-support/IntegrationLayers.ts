@@ -39,6 +39,7 @@ import * as ThreadPlanProgress from "../../src/orchestration/ThreadPlanProgress.
 import { RuntimeReceiptBusTest } from "../../src/orchestration/Layers/RuntimeReceiptBus.ts";
 import { GroupResponderQueueReactor } from "../../src/orchestration/Services/GroupResponderQueueReactor.ts";
 import { DelegationWakeReactor } from "../../src/orchestration/Services/DelegationWakeReactor.ts";
+import { HandoffReactor } from "../../src/orchestration/Services/HandoffReactor.ts";
 import { FleetDispatcherReactor } from "../../src/orchestration/Services/FleetDispatcherReactor.ts";
 import { OrchestrationReactorLive } from "../../src/orchestration/Layers/OrchestrationReactor.ts";
 import { ProviderCommandReactorLive } from "../../src/orchestration/Layers/ProviderCommandReactor.ts";
@@ -221,6 +222,13 @@ export function createIntegrationLayers({
     ),
     Layer.provideMerge(
       Layer.succeed(DelegationWakeReactor, {
+        start: () => Effect.void,
+        drain: Effect.void,
+        drainThrough: () => Effect.void,
+      }),
+    ),
+    Layer.provideMerge(
+      Layer.succeed(HandoffReactor, {
         start: () => Effect.void,
         drain: Effect.void,
         drainThrough: () => Effect.void,
