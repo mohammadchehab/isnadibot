@@ -222,6 +222,7 @@ export function createHarness(deps: {
         if (!Option.isSome(deps.orchestrationEngine)) {
           return { status: "refused" as const, message: "This environment cannot hand off." };
         }
+
         const active = deps.sessions.get(threadId);
         const turnId = active?.activeTurn?.turnId;
         const botId = active?.toolSession.botId;
