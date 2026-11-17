@@ -76,6 +76,8 @@ import { useEnableBotAutoReview, useRosterLoadState } from "./useServerRoster";
 import { RosterLoadStatus } from "./RosterLoadStatus";
 import { deriveWorkLogEntries, pluginSearchResultForWorkEntry } from "../../session-logic";
 import { activeThreadRuntimeWarning } from "./threadRuntimeWarning.logic";
+import { HandoffNoteCard } from "./HandoffNoteCard";
+import { isHandoffNote } from "./handoffReceipts";
 import { RoutineReceiptRow } from "./RoutineReceiptRow";
 import { useBotLandingTimeline } from "./useBotLandingTimeline";
 import { resolveRoutedBot } from "./rosterRouteSelection";
@@ -251,13 +253,25 @@ export function BotThreadLanding({
     [messages, today, todayLabel, locale],
   );
 
+  const botName = useCallback(
+    (id: string) => bots.find((candidate) => candidate.id === id)?.name ?? null,
+    [bots],
+  );
+
   const {
     timelineItems,
     delegations,
     environmentDelegations,
     waitingOnChildren,
     olderRoutineNotes,
-  } = useBotLandingTimeline({ threadRef: runtime.linkedThreadRef, snapshot, entries });
+    handoffActions,
+  } = useBotLandingTimeline({
+    threadRef: runtime.linkedThreadRef,
+    snapshot,
+    entries,
+    botName,
+    activities,
+  });
 
   const arrivedMessageIds = useMessageArrivals(
     { owner: botId, thread: runtime.linkedThreadRef?.threadId ?? null },
@@ -434,10 +448,18 @@ export function BotThreadLanding({
                 timelineItems.map((item, timelineIndex) => (
                   <Fragment key={item.key}>
                     {Predicate.isTagged(item, "Receipt") ? (
-                      <RoutineReceiptRow
-                        receipt={item.receipt}
-                        {...(onOpenRoutines ? { onOpenRoutines } : {})}
-                      />
+                      isHandoffNote(item.receipt) ? (
+                        <HandoffNoteCard doc={item.receipt.doc} />
+                      ) : (
+                        <RoutineReceiptRow
+                          receipt={item.receipt}
+                          onUndoHandoff={(undoBotId) =>
+                            void handoffActions.undo(item.receipt.id, undoBotId)
+                          }
+                          onHide={() => handoffActions.hide(item.receipt.id)}
+                          {...(onOpenRoutines ? { onOpenRoutines } : {})}
+                        />
+                      )
                     ) : Predicate.isTagged(item, "Delegation") ? (
                       <DelegationCard
                         delegation={item.delegation}

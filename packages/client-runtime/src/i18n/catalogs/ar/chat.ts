@@ -518,4 +518,19 @@ export const chatCatalog = {
   "Hand off": "تسليم المهمة",
   "Hand off {bot}…": "تسليم المهمة إلى {bot}…",
   "Could not hand off": "تعذّر تسليم المهمة",
+  "Could not undo the hand off": "تعذّر التراجع عن التسليم",
+  "You asked {bot} to hand off. It wrote a note and started a new context from it.":
+    "طلبت من {bot} تسليم المهمة. كتب ملاحظة وبدأ سياقًا جديدًا منها.",
+  "{bot} started its next turn, so Undo is closed. The note stays in the chat.":
+    "بدأ {bot} دوره التالي، لذا لم يعد التراجع ممكنًا. تبقى الملاحظة في المحادثة.",
+  "Hand off did not happen. {bot}’s turn ended without writing a note, so its context is unchanged.":
+    "لم يتم تسليم المهمة. انتهى دور {bot} دون كتابة ملاحظة، لذا لم يتغير سياقه.",
+  "Hand off was interrupted, so nothing reset. The note stays in the chat.":
+    "قُوطعت عملية التسليم، لذا لم تتم إعادة تعيين أي شيء. تبقى الملاحظة في المحادثة.",
+  Undo: "تراجع",
+  Hide: "إخفاء",
+  Card: "البطاقة",
+  Branch: "الفرع",
+  "Waiting on": "بانتظار",
+  "Don’t": "لا تفعل",
 } as const;

@@ -1,6 +1,8 @@
 import { responderQueueNames } from "@isnadi/client-runtime/responder-queue";
 import { Predicate } from "effect";
 import { useBotLandingTimeline } from "./useBotLandingTimeline";
+import { HandoffNoteCard } from "./HandoffNoteCard";
+import { isHandoffNote } from "./handoffReceipts";
 import { RoutineReceiptRow } from "./RoutineReceiptRow";
 import { pendingMemoryApprovals } from "@isnadi/client-runtime/durable-memory";
 import { useAtomValue } from "@effect/atom-react";
@@ -294,15 +296,22 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
   // come along too: the board hands work out while nobody is typing, and those
   // hand-outs are what the chat says happened. Called above the `!group` return so
   // the hook order does not depend on the roster load.
+  const botName = useCallback(
+    (id: string) => bots.find((candidate) => candidate.id === id)?.name ?? null,
+    [bots],
+  );
+
   const {
     timelineItems: timeline,
     delegations,
     waitingOnChildren,
     olderRoutineNotes,
+    handoffActions,
   } = useBotLandingTimeline({
     threadRef: runtime.linkedThreadRef,
     snapshot,
     entries,
+    botName,
     activities,
   });
 
@@ -415,7 +424,20 @@ export function GroupThreadLanding({ groupId }: { readonly groupId: string }) {
                   // E13e draws this row as icon, text and time only, so it stays a
                   // note here rather than the link a bot chat makes it: the group
                   // route has no Routines panel to open.
-                  return <RoutineReceiptRow key={item.key} receipt={item.receipt} />;
+                  if (isHandoffNote(item.receipt)) {
+                    return <HandoffNoteCard key={item.key} doc={item.receipt.doc} />;
+                  }
+
+                  return (
+                    <RoutineReceiptRow
+                      key={item.key}
+                      receipt={item.receipt}
+                      onUndoHandoff={(undoBotId) =>
+                        void handoffActions.undo(item.receipt.id, undoBotId)
+                      }
+                      onHide={() => handoffActions.hide(item.receipt.id)}
+                    />
+                  );
                 }
 
                 if (!Predicate.isTagged(item, "Message")) return null;

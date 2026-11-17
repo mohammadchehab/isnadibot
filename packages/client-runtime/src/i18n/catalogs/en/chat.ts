@@ -476,4 +476,19 @@ export const chatCatalog = {
   "Hand off": "Hand off",
   "Hand off {bot}…": "Hand off {bot}…",
   "Could not hand off": "Could not hand off",
+  "Could not undo the hand off": "Could not undo the hand off",
+  "You asked {bot} to hand off. It wrote a note and started a new context from it.":
+    "You asked {bot} to hand off. It wrote a note and started a new context from it.",
+  "{bot} started its next turn, so Undo is closed. The note stays in the chat.":
+    "{bot} started its next turn, so Undo is closed. The note stays in the chat.",
+  "Hand off did not happen. {bot}’s turn ended without writing a note, so its context is unchanged.":
+    "Hand off did not happen. {bot}’s turn ended without writing a note, so its context is unchanged.",
+  "Hand off was interrupted, so nothing reset. The note stays in the chat.":
+    "Hand off was interrupted, so nothing reset. The note stays in the chat.",
+  Undo: "Undo",
+  Hide: "Hide",
+  Card: "Card",
+  Branch: "Branch",
+  "Waiting on": "Waiting on",
+  "Don’t": "Don’t",
 } as const;

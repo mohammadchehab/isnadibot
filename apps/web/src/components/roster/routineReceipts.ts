@@ -1,6 +1,6 @@
 import { createTranslator } from "@isnadi/client-runtime/i18n";
 import { withoutErrorStack } from "@isnadi/shared/errorText";
-import type { Routine, RoutineReceiptSource, RoutineRun, ThreadId } from "@isnadi/contracts";
+import type { BotId, Routine, RoutineReceiptSource, RoutineRun, ThreadId } from "@isnadi/contracts";
 import type { BotConversationEntry } from "./botConversationPresentation";
 
 export interface RoutineReceipt {
@@ -9,6 +9,14 @@ export interface RoutineReceipt {
   readonly text: string;
   readonly tone: "info" | "success" | "error";
   readonly archived?: true;
+  /**
+   * A handoff outcome: the glyph the row draws, and the bot whose reset it can
+   * still undo. Undo is closed (`null`) once that bot has started its next turn.
+   */
+  readonly handoff?: {
+    readonly icon: "refresh" | "alert";
+    readonly undoBotId: BotId | null;
+  };
 }
 
 export function mergeBotConversationTimeline(
