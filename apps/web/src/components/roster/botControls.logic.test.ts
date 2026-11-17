@@ -105,6 +105,17 @@ describe("resolveBotControlAvailability", () => {
     });
   });
 
+  it("interrupts a running group chat but does not steer it", () => {
+    const groupChat: BotControllableShell = { ...RUNNING, botId: null };
+
+    expect(resolveBotControlAvailability(groupChat)).toEqual({
+      interrupt: true,
+      steer: false,
+      clear: false,
+    });
+    expect(buildBotSteerInput(groupChat)).toBeNull();
+  });
+
   it("clears every settled session", () => {
     for (const status of ["idle", "ready", "interrupted", "stopped", "error"] as const) {
       expect(resolveBotControlAvailability(shell({ status }))).toEqual({
