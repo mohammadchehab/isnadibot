@@ -43,7 +43,15 @@ export function TeamRowMenu({
     <Menu>
       <MenuTrigger
         render={
-          <Button size="icon-sm" variant="ghost" aria-label={t("Bot actions")}>
+          // A row with nothing to offer — an idle boss, which has no turn to steer or
+          // interrupt and no archive — keeps the frame's trigger but cannot open an
+          // empty popup (designer D1).
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t("Bot actions")}
+            disabled={items.length === 0}
+          >
             <MoreHorizontalIcon aria-hidden />
           </Button>
         }
