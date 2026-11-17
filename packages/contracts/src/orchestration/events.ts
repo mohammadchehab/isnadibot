@@ -89,6 +89,8 @@ import {
   ThreadProposedPlanUpsertedPayload,
   ThreadTurnDiffCompletedPayload,
   ThreadActivityAppendedPayload,
+  ThreadContextResetPayload,
+  ThreadContextResetUndonePayload,
   DelegationCreatedPayload,
   DelegationUpdatedPayload,
   DelegationRetryRequestedPayload,
@@ -512,6 +514,16 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.activity-appended"),
     payload: ThreadActivityAppendedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.context-reset"),
+    payload: ThreadContextResetPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.context-reset-undone"),
+    payload: ThreadContextResetUndonePayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

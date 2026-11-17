@@ -1,4 +1,5 @@
 import { IsnadiModelOptions } from "../ReasoningOptions.ts";
+import { HandoffDoc } from "@isnadi/contracts";
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -22,7 +23,11 @@ import {
   recallForResponder,
   tagRespondingBot,
 } from "./IsnadiGroupConversation.ts";
-import { type IsnadiMastraHarnessOptions, type IsnadiMastraState } from "./IsnadiHarnessTypes.ts";
+import {
+  type IsnadiMastraHarnessOptions,
+  type IsnadiHandoffContext,
+  type IsnadiMastraState,
+} from "./IsnadiHarnessTypes.ts";
 import { DEFAULT_MODEL_ID, resolveIsnadiMastraModel } from "./IsnadiModels.ts";
 
 export function createIsnadiObserveHooks(
@@ -76,6 +81,63 @@ const decodeModelOptions = Schema.decodeUnknownOption(IsnadiModelOptions);
 const decodeGroupState = Schema.decodeUnknownOption(
   Schema.Struct({ group: GroupConversationState }),
 );
+
+const decodeContextCut = Schema.decodeUnknownOption(
+  Schema.Struct({
+    contextCut: Schema.Struct({
+      sinceMessageId: Schema.String,
+      resetAt: Schema.String,
+      doc: HandoffDoc,
+    }),
+  }),
+);
+
+/** The six rows a handoff note is rendered as, in the order the chat shows them. */
+const HANDOFF_DOC_ROWS: readonly (readonly [keyof HandoffDoc, string])[] = [
+  ["item", "Card"],
+  ["branch", "Branch"],
+  ["done", "Done"],
+  ["nextStep", "Next"],
+  ["waitingOn", "Waiting on"],
+  ["doNot", "Don't"],
+];
+
+/** The note a bot left for itself, as the first thing its context says. */
+export function renderHandoffDoc(doc: HandoffDoc): string {
+  return [
+    "<handoff-note>",
+    "Your context was handed off from an earlier turn. This is what that turn left you:",
+    ...HANDOFF_DOC_ROWS.flatMap(([field, label]) =>
+      doc[field] === "" ? [] : [`${label}: ${doc[field]}`],
+    ),
+    "</handoff-note>",
+  ].join("\n");
+}
+
+/** The cut an earlier handoff made in this bot's context, when there is one. */
+export function controllerContextCut(
+  requestContext: RequestContext | undefined,
+): IsnadiHandoffContext | undefined {
+  const state = requestContext ? controllerContext(requestContext)?.state : undefined;
+
+  return Option.getOrUndefined(
+    Option.map(decodeContextCut(state), (decoded) => decoded.contextCut),
+  );
+}
+
+/**
+ * Drop everything the bot had forgotten: the cut names the last message before the
+ * handoff turn, so that message and everything older leave its context. A cut the
+ * recalled window no longer reaches drops nothing.
+ */
+function dropThroughCut<Message extends { readonly id: string }>(
+  messages: readonly Message[],
+  sinceMessageId: string,
+): readonly Message[] {
+  const index = messages.findIndex((message) => message.id === sinceMessageId);
+
+  return index === -1 ? messages : messages.slice(index + 1);
+}
 
 /** The group this turn runs in, or undefined for a direct chat. */
 export function controllerGroup(
@@ -167,21 +229,40 @@ export class IsnadiPassiveObservationalMemoryProcessor implements Processor<"obs
 
     const recent = selectRecentConversation(history.messages, { requiredMessageIds });
 
+    const cut = controllerContextCut(args.requestContext);
+
+    // A handed-off bot opens on its own note, then reads the chat from its cut.
+    args.messageList.clearSystemMessages("isnadi-handoff");
+
+    if (cut?.doc) args.messageList.addSystem(renderHandoffDoc(cut.doc), "isnadi-handoff");
+
     const group = controllerGroup(args.requestContext);
+    const conversation = cut ? dropThroughCut(recent, cut.sinceMessageId) : recent;
 
     // A group shares one history; each responder reads the other bots' turns as quoted speech.
-    for (const message of group ? recallForResponder(recent, group) : recent) {
+    for (const message of group ? recallForResponder(conversation, group) : conversation) {
       if (message.role !== "system") args.messageList.add(message, "memory");
     }
 
     const record = await this.engine.getOrCreateRecord(context.threadId, context.resourceId);
-    const chunks = await this.engine.buildContextSystemMessages({ ...context, record });
+
+    // The thread's observation record is cumulative with a single cursor and no
+    // per-chunk source, so nothing in it can be shown to describe messages after the
+    // cut: after a handoff, every observation in it may belong to a message the bot
+    // was told to forget. The rule for an observation nobody can attribute is
+    // "excluded", so a cut leaves this bot with no observations at all.
+    const observationsApply = cut === undefined;
+
+    const chunks = observationsApply
+      ? await this.engine.buildContextSystemMessages({ ...context, record })
+      : undefined;
+
     args.messageList.clearSystemMessages("observational-memory");
 
     for (const chunk of chunks ?? []) args.messageList.addSystem(chunk, "observational-memory");
     args.messageList.clearSystemMessages("om-continuation");
 
-    if (record.activeObservations) {
+    if (observationsApply && record.activeObservations) {
       args.messageList.addSystem(
         `<system-reminder>${OBSERVATION_CONTINUATION_HINT}</system-reminder>`,
         "om-continuation",

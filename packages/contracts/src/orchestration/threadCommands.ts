@@ -5,6 +5,7 @@ import {
   AuthSessionId,
   BotId,
   CommandId,
+  EventId,
   GroupId,
   IsoDateTime,
   MessageId,
@@ -349,6 +350,39 @@ export const ThreadSessionStopCommand = Schema.Struct({
   // closes the race a post-settle snapshot read cannot: commands are decided
   // serially against the authoritative read model.
   onlyIfSettled: Schema.optional(Schema.Boolean),
+});
+
+/**
+ * Advances one bot's context epoch in a chat: everything before `sinceMessageId`
+ * leaves that bot's model context, and `handoffActivityId` names the note the
+ * chat keeps showing. Only that bot is affected — in a group chat every other
+ * bot reads the chat exactly as before.
+ *
+ * The server dispatches this when a handoff turn completes, never mid-turn. It
+ * is a client command too, so a remote client can reset a bot whose note already
+ * exists.
+ */
+export const ThreadContextResetCommand = Schema.Struct({
+  type: Schema.Literal("thread.context.reset"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  botId: BotId,
+  sinceMessageId: MessageId,
+  handoffActivityId: Schema.optional(EventId),
+  createdAt: IsoDateTime,
+});
+
+/**
+ * Puts the bot back on its previous cut. It does not put the note back into the
+ * bot's context: after an undo the note stays in the chat, and the bot forgets
+ * everything before the cut it had before the reset.
+ */
+export const ThreadContextResetUndoCommand = Schema.Struct({
+  type: Schema.Literal("thread.context.reset.undo"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  botId: BotId,
+  createdAt: IsoDateTime,
 });
 
 export const DelegationCancelCommand = Schema.Struct({

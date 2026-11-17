@@ -4,6 +4,9 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { StandardSchemaWithJSON } from "@mastra/core/schema";
 import { createTool, type NeedsApprovalFn } from "@mastra/core/tools";
 import {
+  HANDOFF_DOC_FIELD_MAX_LENGTH,
+  HandoffDoc,
+  ISNADI_HANDOFF_TOOL_NAME,
   ISNADI_PRODUCT_FEEDBACK_TOOL_NAME,
   ISNADI_CREATE_ROUTINE_TOOL_NAME,
   IsnadiCreateRoutineInput,
@@ -60,6 +63,47 @@ export const productFeedbackToolInputSchema: StandardSchemaWithJSON<ProductFeedb
     },
   };
 
+export const decodeHandoffDoc = Schema.decodeUnknownExit(HandoffDoc, {
+  onExcessProperty: "error",
+});
+
+/** The six rows of a handoff note, as the model sees them. */
+export const handoffDocJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    item: { type: "string", maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH },
+    branch: { type: "string", maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH },
+    done: { type: "string", maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH },
+    nextStep: {
+      type: "string",
+      minLength: 1,
+      maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH,
+    },
+    waitingOn: { type: "string", maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH },
+    doNot: { type: "string", maxLength: HANDOFF_DOC_FIELD_MAX_LENGTH },
+  },
+  required: ["nextStep"],
+} as const;
+
+export const handoffToolInputSchema: StandardSchemaWithJSON<HandoffDoc> = {
+  "~standard": {
+    version: 1,
+    vendor: "isnadi-effect",
+    validate: (value) => {
+      const decoded = decodeHandoffDoc(value);
+
+      return Exit.isSuccess(decoded)
+        ? { value: decoded.value }
+        : { issues: [{ message: "Invalid handoff note." }] };
+    },
+    jsonSchema: {
+      input: () => handoffDocJsonSchema,
+      output: () => handoffDocJsonSchema,
+    },
+  },
+};
+
 export const productFeedbackTool = createTool({
   id: ISNADI_PRODUCT_FEEDBACK_TOOL_NAME,
   description:
@@ -98,6 +142,17 @@ export async function resolveIsnadiTools(
               },
             ),
           ),
+      })
+    : undefined;
+
+  const handoffTool = options.handoff
+    ? createTool({
+        id: ISNADI_HANDOFF_TOOL_NAME,
+        description:
+          "Write the six-row note that hands this chat over to a fresh context. Call it when the chat has grown long or the user asks for a handoff, then answer the user in one short message. The context is cut at this turn once it ends, so anything worth keeping must be in the note. nextStep is required; the other rows take an empty string when there is nothing to say.",
+        inputSchema: handoffToolInputSchema,
+        requireApproval: false,
+        execute: async (doc) => options.handoff!(threadId, doc),
       })
     : undefined;
 
@@ -188,6 +243,7 @@ export async function resolveIsnadiTools(
     ...createIsnadiMastraTools(threadId, options.toolRuntime),
     [ISNADI_PRODUCT_FEEDBACK_TOOL_NAME]: productFeedbackTool,
     ...(routineTool ? { [ISNADI_CREATE_ROUTINE_TOOL_NAME]: routineTool } : {}),
+    ...(handoffTool ? { [ISNADI_HANDOFF_TOOL_NAME]: handoffTool } : {}),
     ...(listRoutinesTool ? { [ISNADI_LIST_ROUTINES_TOOL_NAME]: listRoutinesTool } : {}),
     ...(deleteRoutinesTool ? { [ISNADI_DELETE_ROUTINES_TOOL_NAME]: deleteRoutinesTool } : {}),
   };

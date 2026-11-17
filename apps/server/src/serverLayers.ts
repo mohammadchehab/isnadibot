@@ -33,6 +33,7 @@ import { ProviderCommandReactorLive } from "./orchestration/Layers/ProviderComma
 import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.ts";
 import { GroupResponderQueueReactorLive } from "./orchestration/Layers/GroupResponderQueueReactor.ts";
 import { DelegationWakeReactorLive } from "./orchestration/Layers/DelegationWakeReactor.ts";
+import { HandoffReactorLive } from "./orchestration/Layers/HandoffReactor.ts";
 import { FleetDispatcherReactorLive } from "./orchestration/Layers/FleetDispatcherReactor.ts";
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
 import { ProviderRegistryLive } from "./provider/Layers/ProviderRegistry.ts";
@@ -128,6 +129,7 @@ export const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(GroupResponderQueueReactorLive),
   Layer.provideMerge(FleetDispatcherReactorLive),
   Layer.provideMerge(DelegationWakeReactorLive),
+  Layer.provideMerge(HandoffReactorLive),
   Layer.provideMerge(RuntimeReceiptBusLive),
   // Channel transports live in this runtime's scope. Ingestion, startup, commands,
   // and the webhook route all resolve the same instance.

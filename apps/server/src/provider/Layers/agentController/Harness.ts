@@ -18,9 +18,12 @@ import {
   RoutineId,
   TurnId,
   type BotId,
+  type HandoffActivityPayload,
+  type HandoffDoc,
   type IsnadiCreateRoutineInput,
   type ProviderRuntimeEvent,
   ThreadId,
+  HANDOFF_ACTIVITY_KIND,
   ISNADI_CREATE_ROUTINE_TOOL_NAME,
 } from "@isnadi/contracts";
 
@@ -211,6 +214,44 @@ export function createHarness(deps: {
             createdAt: droppedAt,
           }),
         );
+      },
+      // The note is recorded now; the cut itself lands when the turn ends, so a
+      // turn that never completes never leaves the bot with a context it cannot
+      // read. The activity is the record of what the reset will keep.
+      handoff: async (threadId: string, doc: HandoffDoc) => {
+        if (!Option.isSome(deps.orchestrationEngine)) {
+          return { status: "refused" as const, message: "This environment cannot hand off." };
+        }
+
+        const active = deps.sessions.get(threadId);
+        const turnId = active?.activeTurn?.turnId;
+        const botId = active?.toolSession.botId;
+
+        if (!turnId || !botId) {
+          return { status: "refused" as const, message: "A handoff needs a running turn." };
+        }
+
+        const activityId = EventId.make(`handoff:${NodeCrypto.randomUUID()}`);
+        const createdAt = nowIso();
+        await deps.runPromise(
+          deps.orchestrationEngine.value.dispatch({
+            type: "thread.activity.append",
+            commandId: CommandId.make(`server:handoff:${activityId}`),
+            threadId: ThreadIdBrand(threadId),
+            activity: {
+              id: activityId,
+              tone: "info",
+              kind: HANDOFF_ACTIVITY_KIND,
+              summary: "Handoff note",
+              payload: { botId, doc } satisfies HandoffActivityPayload,
+              turnId: TurnId.make(turnId),
+              createdAt,
+            },
+            createdAt,
+          }),
+        );
+
+        return { status: "recorded" as const };
       },
       ...(routineDispatcher
         ? {

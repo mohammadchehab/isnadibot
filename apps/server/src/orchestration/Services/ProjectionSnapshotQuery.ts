@@ -10,7 +10,9 @@ import type {
   IsnadiDelegationRecord,
   BotId,
   CheckpointRef,
+  EventId,
   GroupId,
+  HandoffDoc,
   MessageId,
   OrchestrationBot,
   OrchestrationCheckpointSummary,
@@ -92,6 +94,33 @@ export interface ProjectionThreadDetailQuery {
   readonly activityKinds?: ReadonlyArray<string>;
 }
 
+/** One bot's context cut in one chat, as the server reads it back. */
+export interface ProjectionBotContextCut {
+  /** The message the bot's context starts after. */
+  readonly sinceMessageId: MessageId;
+  /** That message's 1-based position in the chat. */
+  readonly sinceSequence: number;
+  /** When the cut was made; observations last written before it are excluded. */
+  readonly resetAt: string;
+  /** The note the cut was made from, when it has one. */
+  readonly handoffDoc: HandoffDoc | null;
+  /**
+   * Whether the chat already answered the bot after the cut. The note is read
+   * once: a direct chat spends it on the bot's next reply, and a group chat keeps
+   * it until the bot replies there, since no row says which member wrote a reply.
+   */
+  readonly docSpent: boolean;
+}
+
+/** The note a bot wrote during one turn, and where that turn's cut would land. */
+export interface ProjectionHandoffTurn {
+  readonly activityId: EventId;
+  readonly botId: BotId;
+  readonly doc: HandoffDoc;
+  /** The last message before the turn; null when the turn opened the chat. */
+  readonly sinceMessageId: MessageId | null;
+}
+
 export interface ProjectionTurnStartMessage {
   readonly message: OrchestrationMessage;
   readonly hasOtherUserMessages: boolean;
@@ -111,6 +140,22 @@ export interface ProjectionSnapshotQueryShape {
     readonly threadId: ThreadId;
     readonly messageId: MessageId;
   }) => Effect.Effect<Option.Option<OrchestrationMessage>, ProjectionRepositoryError>;
+  /**
+   * Read one bot's context cut in one chat. None means the bot reads the whole
+   * chat, which is what every bot did before a handoff.
+   */
+  readonly getBotContextCut?: (input: {
+    readonly threadId: ThreadId;
+    readonly botId: BotId;
+  }) => Effect.Effect<Option.Option<ProjectionBotContextCut>, ProjectionRepositoryError>;
+  /**
+   * Read the note a turn wrote, when it wrote one, with the message its cut would
+   * land after. None means the turn handed nothing off.
+   */
+  readonly getHandoffTurn?: (input: {
+    readonly threadId: ThreadId;
+    readonly turnId: TurnId;
+  }) => Effect.Effect<Option.Option<ProjectionHandoffTurn>, ProjectionRepositoryError>;
   /**
    * Read the lightweight command snapshot used to bootstrap the in-memory
    * orchestration engine without hydrating message/activity/checkpoint bodies.

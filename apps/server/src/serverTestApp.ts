@@ -39,6 +39,7 @@ import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngi
 
 import { GroupResponderQueueReactor } from "./orchestration/Services/GroupResponderQueueReactor.ts";
 import { DelegationWakeReactor } from "./orchestration/Services/DelegationWakeReactor.ts";
+import { HandoffReactor } from "./orchestration/Services/HandoffReactor.ts";
 import { FleetDispatcherReactor } from "./orchestration/Services/FleetDispatcherReactor.ts";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor.ts";
 
@@ -543,6 +544,11 @@ export const buildAppUnderTest = (options?: {
             drainThrough: () => Effect.void,
           }),
           Layer.mock(DelegationWakeReactor)({
+            start: () => Effect.void,
+            drain: Effect.void,
+            drainThrough: () => Effect.void,
+          }),
+          Layer.mock(HandoffReactor)({
             start: () => Effect.void,
             drain: Effect.void,
             drainThrough: () => Effect.void,

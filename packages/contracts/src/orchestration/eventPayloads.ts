@@ -6,6 +6,7 @@ import {
   AuthSessionId,
   BotId,
   CheckpointRef,
+  EventId,
   FleetRoleId,
   FleetTemplateId,
   GroupId,
@@ -138,6 +139,8 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
+  "thread.context-reset",
+  "thread.context-reset-undone",
   "delegation.created",
   "delegation.updated",
   "delegation.retry-requested",
@@ -620,6 +623,31 @@ export const ThreadTurnDiffCompletedPayload = Schema.Struct({
 export const ThreadActivityAppendedPayload = Schema.Struct({
   threadId: ThreadId,
   activity: OrchestrationThreadActivity,
+});
+
+/**
+ * One bot's context epoch moved. `sinceSequence` is the cut's position among the
+ * chat's messages when the reset was decided, so a bot's context can be
+ * assembled without re-deriving it from message ids alone.
+ */
+export const ThreadContextResetPayload = Schema.Struct({
+  threadId: ThreadId,
+  botId: BotId,
+  sinceMessageId: MessageId,
+  sinceSequence: NonNegativeInt,
+  handoffActivityId: Schema.NullOr(EventId),
+  resetAt: IsoDateTime,
+});
+
+/**
+ * A reset was undone: the bot is back on the cut it had before, with no note.
+ * The restored cut itself is the projection's to resolve — it is the only place
+ * the cut the reset replaced is kept.
+ */
+export const ThreadContextResetUndonePayload = Schema.Struct({
+  threadId: ThreadId,
+  botId: BotId,
+  undoneAt: IsoDateTime,
 });
 
 export const DelegationCreatedPayload = Schema.Struct({

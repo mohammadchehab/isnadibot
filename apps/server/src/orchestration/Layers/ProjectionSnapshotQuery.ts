@@ -23,6 +23,7 @@ import { createShellSnapshots } from "./snapshot-query/ShellSnapshots.ts";
 import { createLookups } from "./snapshot-query/Lookups.ts";
 import { createThreadDetail } from "./snapshot-query/ThreadDetail.ts";
 import { createCommandContext } from "./snapshot-query/CommandContext.ts";
+import { createBotContextCut } from "./snapshot-query/BotContextCut.ts";
 
 const makeProjectionSnapshotQuery = Effect.gen(function* () {
   const projectionMcpServerRepository = yield* ProjectionMcpServerRepository;
@@ -224,9 +225,12 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     commandMessageRepository,
   });
 
+  const { getBotContextCut } = createBotContextCut({ sql });
+
   return {
     getThreadCommandContext,
     getCommandMessage,
+    getBotContextCut,
     getCommandReadModel,
     getSnapshot,
     getShellSnapshot,
