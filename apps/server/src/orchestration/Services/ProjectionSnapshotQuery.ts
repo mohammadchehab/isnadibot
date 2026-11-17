@@ -104,6 +104,12 @@ export interface ProjectionBotContextCut {
   readonly resetAt: string;
   /** The note the cut was made from, when it has one. */
   readonly handoffDoc: HandoffDoc | null;
+  /**
+   * Whether the chat already answered the bot after the cut. The note is read
+   * once: a direct chat spends it on the bot's next reply, and a group chat keeps
+   * it until the bot replies there, since no row says which member wrote a reply.
+   */
+  readonly docSpent: boolean;
 }
 
 /** The note a bot wrote during one turn, and where that turn's cut would land. */

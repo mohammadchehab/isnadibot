@@ -41,7 +41,15 @@ import { createConversation } from "./agentController/Conversation.ts";
 
 import { createMcpManager } from "@mastra/code-sdk/mcp/index";
 
-import { TurnId, type ProviderRuntimeEvent, type RuntimeMode, ThreadId } from "@isnadi/contracts";
+import type { IsnadiHandoffContext } from "../mastra/IsnadiHarnessTypes.ts";
+
+import {
+  TurnId,
+  type BotId,
+  type ProviderRuntimeEvent,
+  type RuntimeMode,
+  ThreadId,
+} from "@isnadi/contracts";
 
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -138,6 +146,31 @@ const make = (options?: AgentControllerLiveOptions) =>
 
     // A turn waits on the user while any tool approval, question, or routine review
     // it opened is unanswered, or an accepted routine is still being created.
+    const readBotContextCut = async (
+      threadId: ThreadId,
+      botId: BotId,
+    ): Promise<IsnadiHandoffContext | undefined> => {
+      const readCut = Option.isSome(projectionSnapshotQuery)
+        ? projectionSnapshotQuery.value.getBotContextCut
+        : undefined;
+
+      if (!readCut) return undefined;
+
+      const cut = await runPromise(readCut({ threadId, botId }));
+
+      if (Option.isNone(cut)) return undefined;
+
+      const value = cut.value;
+
+      // The note is read once. An undone cut has no note at all, and one the bot
+      // has already answered in a direct chat keeps the cut but drops the note.
+      return {
+        sinceMessageId: value.sinceMessageId,
+        resetAt: value.resetAt,
+        ...(value.handoffDoc && !value.docSpent ? { doc: value.handoffDoc } : {}),
+      };
+    };
+
     const {
       turnStillWaiting,
       cancelPendingApproval,
@@ -188,6 +221,7 @@ const make = (options?: AgentControllerLiveOptions) =>
       get entityMemoryContext() {
         return entityMemoryContext;
       },
+      readBotContextCut,
       legacyProviderBridge,
       get startPendingTurn() {
         return startPendingTurn;

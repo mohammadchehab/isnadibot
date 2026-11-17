@@ -34,12 +34,24 @@ export function createBotContextCut({ sql }: { readonly sql: SqlClient.SqlClient
       readonly sinceSequence: number;
       readonly resetAt: string;
       readonly payload: string | null;
+      readonly repliesAfterCut: number;
+      readonly inGroup: number;
     }>`
       SELECT
         context.since_message_id AS "sinceMessageId",
         context.since_sequence AS "sinceSequence",
         context.reset_at AS "resetAt",
-        activity.payload_json AS "payload"
+        activity.payload_json AS "payload",
+        (
+          SELECT COUNT(*) FROM projection_thread_messages AS message
+          WHERE message.thread_id = context.thread_id
+            AND message.role = 'assistant'
+            AND julianday(message.created_at) >= julianday(context.reset_at)
+        ) AS "repliesAfterCut",
+        (
+          SELECT COUNT(*) FROM projection_threads AS thread
+          WHERE thread.thread_id = context.thread_id AND thread.group_id IS NOT NULL
+        ) AS "inGroup"
       FROM projection_thread_bot_context AS context
       LEFT JOIN projection_thread_activities AS activity
         ON activity.activity_id = context.handoff_activity_id
@@ -58,6 +70,9 @@ export function createBotContextCut({ sql }: { readonly sql: SqlClient.SqlClient
           sinceSequence: row.sinceSequence,
           resetAt: row.resetAt,
           handoffDoc: handoffDocOf(row.payload),
+          // A group chat cannot say which member answered, so only a direct chat
+          // can tell that the bot has already read its note.
+          docSpent: row.inGroup === 0 && row.repliesAfterCut > 0,
         });
       }),
     );

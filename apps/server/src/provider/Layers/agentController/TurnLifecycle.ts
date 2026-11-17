@@ -25,6 +25,7 @@ import { type IsnadiBotStateRuntime } from "../../IsnadiBotStateRuntime.ts";
 import { IsnadiMemoryTurnHarness, type IsnadiMemoryTurn } from "../../IsnadiMemoryTurnHarness.ts";
 import { type IsnadiDelegationChildOutcome } from "../../IsnadiDelegationRuntime.ts";
 import type { IsnadiWorkerRuntime } from "../../IsnadiWorkerRuntime.ts";
+import type { IsnadiHandoffContext } from "../../mastra/IsnadiHarnessTypes.ts";
 
 import type { PendingWaiters } from "../../PendingWaiters.ts";
 import {
@@ -112,6 +113,11 @@ export function createTurnLifecycle(deps: {
   readonly mastraReservationKey: (threadId: ThreadId, turnId: TurnId) => string;
   readonly mastraMemoryTurns: Map<string, IsnadiMemoryTurn>;
   readonly entityMemoryContext: (access: IsnadiMemoryThreadAccess | undefined) => Promise<string>;
+  /** The cut an earlier handoff made in this bot's context, when there is one. */
+  readonly readBotContextCut: (
+    threadId: ThreadId,
+    botId: BotId,
+  ) => Promise<IsnadiHandoffContext | undefined>;
   readonly legacyProviderBridge: LegacyProviderBridge["Service"];
   readonly startPendingTurn: (active: ActiveSession, pending: PendingTurn) => void;
   readonly queueTurnMemory: (threadId: ThreadId, active: ActiveSession, turn: ActiveTurn) => void;
@@ -307,6 +313,15 @@ export function createTurnLifecycle(deps: {
       if (settings) active.privateBotMemory = settings.privateBotMemory;
       active.memoryAccess = memoryAccess;
 
+      // A handoff made in an earlier turn cuts this bot's context at the message
+      // before that turn. Read it once per admission so a reused session never
+      // assembles the context of a turn that ended before the cut.
+      const contextCut = pending.toolSession.botId
+        ? await deps.readBotContextCut(threadId, pending.toolSession.botId)
+        : undefined;
+
+      const contextCutState = contextCut ? { contextCut } : {};
+
       if (!memoryAccess) {
         // Memory was turned off after the turn was queued: drop the memory
         // tool handler so the bot cannot read or change facts. A delegated
@@ -321,6 +336,7 @@ export function createTurnLifecycle(deps: {
         const {
           persistentMemoryContext,
           group: _priorGroup,
+          contextCut: _priorContextCut,
           ...stateWithoutMemory
         } = active.session.state.get();
 
@@ -330,10 +346,15 @@ export function createTurnLifecycle(deps: {
           await active.session.state.set({
             ...stateWithoutMemory,
             ...groupState,
+            ...contextCutState,
             persistentMemoryContext: pending.delegationResults,
           });
-        } else if (persistentMemoryContext || pending.group) {
-          await active.session.state.set({ ...stateWithoutMemory, ...groupState });
+        } else if (persistentMemoryContext || pending.group || contextCut) {
+          await active.session.state.set({
+            ...stateWithoutMemory,
+            ...groupState,
+            ...contextCutState,
+          });
         }
 
         if (active.admittingTurn?.turnId !== turnId) return;
@@ -381,6 +402,7 @@ export function createTurnLifecycle(deps: {
           const {
             persistentMemoryContext: _priorMemoryContext,
             group: _priorGroup,
+            contextCut: _priorContextCut,
             ...stateWithoutMemory
           } = currentState;
 
@@ -397,6 +419,7 @@ export function createTurnLifecycle(deps: {
           await active.session.state.set({
             ...stateWithoutMemory,
             ...(pending.group ? { group: pending.group } : {}),
+            ...contextCutState,
             ...(persistentMemoryContext ? { persistentMemoryContext } : {}),
           });
 

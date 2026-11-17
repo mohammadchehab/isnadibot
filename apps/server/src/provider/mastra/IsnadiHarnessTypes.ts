@@ -48,8 +48,8 @@ export interface IsnadiMastraState {
 export interface IsnadiHandoffContext {
   /** The message the bot's context starts after. */
   readonly sinceMessageId: string;
-  /** The six rows the bot wrote, prepended before memory. */
-  readonly doc: HandoffDoc;
+  /** The six rows the bot wrote, prepended before memory until it has read them. */
+  readonly doc?: HandoffDoc;
   /** When the cut was made. Observations last written before it are excluded. */
   readonly resetAt: string;
 }
