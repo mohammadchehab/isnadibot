@@ -53,6 +53,7 @@ export const ORCHESTRATION_PROJECTOR_NAMES = {
   threadTurns: "projection.thread-turns",
   checkpoints: "projection.checkpoints",
   pendingApprovals: "projection.pending-approvals",
+  botContexts: "projection.bot-contexts",
 } as const;
 
 export type ProjectorName =

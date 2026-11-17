@@ -23,6 +23,7 @@ import { decideThreadVisibility } from "./decider/threadVisibility.ts";
 import { decideThreadTurns } from "./decider/threadTurns.ts";
 import { decideThreadMessages } from "./decider/threadMessages.ts";
 import { decideThreadObservations } from "./decider/threadObservations.ts";
+import { decideThreadContext } from "./decider/threadContext.ts";
 import {
   type PlannedOrchestrationEvent,
   type DecideOrchestrationCommandResult,
@@ -107,6 +108,8 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "thread.turn.interrupt":
     case "thread.approval.respond":
     case "thread.user-input.respond":
+    case "thread.context.reset":
+    case "thread.context.reset.undo":
     case "thread.checkpoint.revert":
     case "thread.session.stop": {
       const thread = yield* requireThread({ readModel, command, threadId: command.threadId });
@@ -275,6 +278,13 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     case "thread.message.reaction.set":
     case "thread.proposed-plan.upsert":
       return yield* decideThreadMessages({
+        command,
+        readModel,
+        ...(actor !== undefined ? { actor } : {}),
+      });
+    case "thread.context.reset":
+    case "thread.context.reset.undo":
+      return yield* decideThreadContext({
         command,
         readModel,
         ...(actor !== undefined ? { actor } : {}),

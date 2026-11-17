@@ -4,6 +4,8 @@ export * from "./background.ts";
 
 export * from "./isnadiTools.ts";
 
+export * from "./handoff.ts";
+
 export * from "./isnadiDelegation.ts";
 
 export * from "./isnadiWorkers.ts";
