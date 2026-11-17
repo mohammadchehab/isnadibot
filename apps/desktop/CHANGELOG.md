@@ -1,5 +1,18 @@
 ## @isnadi/desktop@0.0.41
 
+## 0.1.0
+
+### Patch Changes
+
+- [#329](https://github.com/mohammadchehab/isnadibot/pull/329) [`5009c59`](https://github.com/mohammadchehab/isnadibot/commit/5009c596d2d46d1232e403ec28435f50133ecd64) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - Stopping a remote Isnadi server no longer reports a timeout for a server that already stopped. On a busy machine the exited server can linger as a process its parent has not reaped yet, which the stop check read as still running: the stop then kept its ownership files and told you it had timed out.
+
+- Updated dependencies [[`7b0f760`](https://github.com/mohammadchehab/isnadibot/commit/7b0f760bf87a9321d969f8e2d6241a6ab81ea334), [`9e2060e`](https://github.com/mohammadchehab/isnadibot/commit/9e2060e21ecbbf4655cbe725846fe6f02983f951)]:
+  - @isnadi/contracts@0.1.0
+  - @isnadi/client-runtime@0.0.7
+  - @isnadi/shared@0.0.7
+  - @isnadi/ssh@0.0.7
+  - @isnadi/tailscale@0.0.7
+
 ## 0.0.2
 
 ### Patch Changes
