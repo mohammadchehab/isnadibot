@@ -1,5 +1,13 @@
 ## @isnadi/contracts@0.0.41
 
+## 0.1.0
+
+### Patch Changes
+
+- [#300](https://github.com/mohammadchehab/isnadibot/pull/300) [`7b0f760`](https://github.com/mohammadchehab/isnadibot/commit/7b0f760bf87a9321d969f8e2d6241a6ab81ea334) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A delegated bot can no longer read a credential file in a folder you granted it. Hidden names such as `.npmrc` and `.ssh`, and names such as `id_rsa`, `*.pem`, `credentials.json`, `terraform.tfstate` or its `.backup` copy, now need your approval, and a delegation that cannot ask anyone refuses them with a reason.
+
+- [#311](https://github.com/mohammadchehab/isnadibot/pull/311) [`9e2060e`](https://github.com/mohammadchehab/isnadibot/commit/9e2060e21ecbbf4655cbe725846fe6f02983f951) Thanks [@mohammadchehab](https://github.com/mohammadchehab)! - A delegated read no longer reaches a keystore or a credential file whose name carries no dot. Key bundles such as `.p12`, `.pfx`, `.jks`, `.p8`, `.ppk`, `.kdbx` and `auth.json`, and the dotless `netrc`, `npmrc` and `kubeconfig`, now ask for approval like the credential files we already refused.
+
 ## 0.0.2
 
 ## 0.0.1

@@ -1,5 +1,12 @@
 # @isnadi/shared
 
+## 0.0.7
+
+### Patch Changes
+
+- Updated dependencies [[`7b0f760`](https://github.com/mohammadchehab/isnadibot/commit/7b0f760bf87a9321d969f8e2d6241a6ab81ea334), [`9e2060e`](https://github.com/mohammadchehab/isnadibot/commit/9e2060e21ecbbf4655cbe725846fe6f02983f951)]:
+  - @isnadi/contracts@0.1.0
+
 ## 0.0.6
 
 ### Patch Changes
