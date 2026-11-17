@@ -475,6 +475,8 @@ export const rosterCatalog = {
   "Everyone is idle and the board is empty.": "所有机器人都空闲，看板也没有待办。",
   "Team · {name}": "团队 · {name}",
   "Steer {name}…": "纠正 {name}…",
+  "Interrupt now": "立即中断",
+  "Archive {name}…": "归档 {name}…",
   "Interrupt {name} now": "立即中断 {name}",
   "Add a bot to {name}…": "向 {name} 添加机器人…",
   "Ends the turn this bot is running": "结束这个机器人正在进行的轮次",

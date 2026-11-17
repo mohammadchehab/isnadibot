@@ -176,6 +176,12 @@ describe("space team table", () => {
 
     // Every row carries the menu's trigger; the menu itself is E13b's.
     expect(markup.match(/aria-label="Bot actions"/g)).toHaveLength(2);
+    // A boss row with nothing to offer — no turn, no archive — cannot open an empty
+    // menu, so only that trigger is disabled (designer D1).
+    const triggers = markup.match(/<button[^>]*aria-label="Bot actions"[^>]*>/g) ?? [];
+    expect(triggers.filter((trigger) => / disabled(?:="")?(?=[\s>])/.test(trigger))).toHaveLength(
+      1,
+    );
     // Only the bot that is asking offers the chat where it asks.
     expect(markup).toContain('data-slot="badge">Asking you</span>');
     expect(markup.match(/>Open</g)).toHaveLength(1);

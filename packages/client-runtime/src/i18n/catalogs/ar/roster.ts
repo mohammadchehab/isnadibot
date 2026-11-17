@@ -521,6 +521,8 @@ export const rosterCatalog = {
   "Everyone is idle and the board is empty.": "الجميع خامل واللوح فارغ.",
   "Team · {name}": "الفريق · {name}",
   "Steer {name}…": "توجيه {name}…",
+  "Interrupt now": "مقاطعة الآن",
+  "Archive {name}…": "أرشفة {name}…",
   "Interrupt {name} now": "مقاطعة {name} الآن",
   "Add a bot to {name}…": "إضافة بوت إلى {name}…",
   "Ends the turn this bot is running": "ينهي الدور الذي يشغّله هذا البوت",

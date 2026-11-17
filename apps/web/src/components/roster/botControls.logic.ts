@@ -76,7 +76,10 @@ export function resolveBotControlAvailability(
 
   return {
     interrupt: running,
-    steer: running,
+    // A steer carries the bot whose turn it corrects, and a group chat has no bot
+    // of its own — its composer is keyed by the group. So only a bot's own chat is
+    // steerable; a group chat can be interrupted but not steered.
+    steer: running && (shell.botId ?? null) !== null,
     clear: session !== null && SETTLED_SESSION_STATUSES.has(session.status),
   };
 }
