@@ -177,11 +177,6 @@ export function buildBotConversationEntries(
 }
 
 /**
- * Bot chat shows each user message and one final assistant answer per turn.
- * Provider progress and intermediate assistant records stay behind the working
- * status so one provider turn cannot appear as several bot replies.
- */
-/**
  * Prompts the server writes in the user's voice: a routine's trigger and a
  * hand-off brief start turns the user did not type, so the transcript hides
  * them and shows the work they caused.
@@ -194,6 +189,11 @@ function isServerAuthoredPrompt(message: OrchestrationMessage): boolean {
   return id.startsWith("routine:") || id.startsWith(HANDOFF_REQUEST_MESSAGE_PREFIX);
 }
 
+/**
+ * Bot chat shows each user message and one final assistant answer per turn.
+ * Provider progress and intermediate assistant records stay behind the working
+ * status so one provider turn cannot appear as several bot replies.
+ */
 export function visibleBotChatMessages(
   messages: ReadonlyArray<OrchestrationMessage>,
   working = false,

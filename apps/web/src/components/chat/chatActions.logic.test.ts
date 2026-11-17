@@ -300,25 +300,9 @@ describe("shouldForgetChatPath", () => {
   });
 });
 
+// Only the fields the resolver reads; the roster fills the rest from the server.
 function rosterBot(id: string, name: string, archivedAt: string | null = null): Bot {
-  return {
-    id,
-    name,
-    title: name,
-    label: null,
-    description: null,
-    disabledMcpServerIds: [],
-    avatar: { kind: "dither", seed: id },
-    engine: null,
-    sandbox: null,
-    runtimeMode: "auto",
-    voiceEnabled: false,
-    groupId: null,
-    pinned: false,
-    archivedAt,
-    createdAt: "2026-09-27T09:00:00.000Z",
-    updatedAt: "2026-09-27T09:00:00.000Z",
-  };
+  return { id, name, archivedAt } as Bot;
 }
 
 function member(botId: string, role: "boss" | "specialist" = "specialist"): GroupMembership {
@@ -326,14 +310,7 @@ function member(botId: string, role: "boss" | "specialist" = "specialist"): Grou
 }
 
 function groupWith(members: ReadonlyArray<GroupMembership>): Group {
-  return {
-    id: "group-1",
-    name: "Studio",
-    bossBotId: null,
-    members,
-    createdAt: "2026-09-27T09:00:00.000Z",
-    updatedAt: "2026-09-27T09:00:00.000Z",
-  };
+  return { id: "group-1", name: "Studio", bossBotId: null, members } as Group;
 }
 
 describe("resolveHandoffTargets", () => {
