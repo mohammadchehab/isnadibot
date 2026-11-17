@@ -473,4 +473,7 @@ export const chatCatalog = {
   "Could not load archived chats": "Could not load archived chats",
   "Other chats": "Other chats",
   "Archived {time}": "Archived {time}",
+  "Hand off": "Hand off",
+  "Hand off {bot}…": "Hand off {bot}…",
+  "Could not hand off": "Could not hand off",
 } as const;

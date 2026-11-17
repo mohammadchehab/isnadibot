@@ -261,6 +261,11 @@ export const ResponderTrigger = Schema.Union([
   }),
   Schema.Struct({ kind: Schema.Literal("dispatcher"), workItemId: WorkItemId }),
   Schema.Struct({ kind: Schema.Literal("delegation-results") }),
+  /**
+   * The user asked this bot to hand its context over: the server wrote the brief
+   * and started the turn, so a client cannot forge one.
+   */
+  Schema.Struct({ kind: Schema.Literal("handoff"), botId: BotId }),
 ]);
 
 export type ResponderTrigger = typeof ResponderTrigger.Type;

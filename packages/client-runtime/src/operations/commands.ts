@@ -110,6 +110,8 @@ export {
   type SetThreadHopBudgetInput,
   type SetThreadInteractionModeInput,
   type SetThreadMessageReactionInput,
+  type RequestThreadHandoffInput,
+  type UndoThreadContextResetInput,
   createThread,
   deleteThread,
   archiveThread,
@@ -126,6 +128,8 @@ export {
   setThreadHopBudget,
   setThreadInteractionMode,
   setThreadMessageReaction,
+  requestThreadHandoff,
+  undoThreadContextReset,
 } from "./commands/thread.ts";
 
 export {

@@ -168,9 +168,10 @@ describe("bot conversation presentation", () => {
     ]);
   });
 
-  it("hides internal routine trigger messages", () => {
+  it("hides the prompts the server writes for itself", () => {
     const messages = [
       message("routine:run-1:message", "user", false),
+      message("handoff:command-1", "user", false),
       message("answer", "assistant", false, "turn-1"),
     ];
 

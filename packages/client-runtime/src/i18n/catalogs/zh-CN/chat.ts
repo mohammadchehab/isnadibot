@@ -459,4 +459,7 @@ export const chatCatalog = {
   "Could not load archived chats": "无法加载已归档聊天",
   "Other chats": "其他聊天",
   "Archived {time}": "归档于 {time}",
+  "Hand off": "交接",
+  "Hand off {bot}…": "让 {bot} 交接…",
+  "Could not hand off": "无法交接",
 } as const;

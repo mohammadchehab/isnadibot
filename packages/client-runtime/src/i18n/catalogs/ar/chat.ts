@@ -515,4 +515,7 @@ export const chatCatalog = {
   "Could not load archived chats": "تعذّر تحميل المحادثات المؤرشفة",
   "Other chats": "محادثات أخرى",
   "Archived {time}": "أُرشفت {time}",
+  "Hand off": "تسليم المهمة",
+  "Hand off {bot}…": "تسليم المهمة إلى {bot}…",
+  "Could not hand off": "تعذّر تسليم المهمة",
 } as const;

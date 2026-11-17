@@ -112,11 +112,17 @@ export interface ProjectionBotContextCut {
   readonly docSpent: boolean;
 }
 
-/** The note a bot wrote during one turn, and where that turn's cut would land. */
+/**
+ * What one finished turn hands the handoff reactor: whether the server asked the
+ * bot to hand off, what note it wrote, and where that turn's cut would land.
+ */
 export interface ProjectionHandoffTurn {
-  readonly activityId: EventId;
+  /** The bot whose context the note cuts: the note's own bot, else the bot the request named. */
   readonly botId: BotId;
-  readonly doc: HandoffDoc;
+  /** The turn was started by a handoff request, so its silence is owed a line in the chat. */
+  readonly requested: boolean;
+  /** The note the turn wrote; null when it wrote none. */
+  readonly activityId: EventId | null;
   /** The last message before the turn; null when the turn opened the chat. */
   readonly sinceMessageId: MessageId | null;
 }
@@ -149,8 +155,10 @@ export interface ProjectionSnapshotQueryShape {
     readonly botId: BotId;
   }) => Effect.Effect<Option.Option<ProjectionBotContextCut>, ProjectionRepositoryError>;
   /**
-   * Read the note a turn wrote, when it wrote one, with the message its cut would
-   * land after. None means the turn handed nothing off.
+   * Read what a finished turn owes the handoff reactor: the note it wrote, when
+   * it wrote one, with the message its cut would land after, and whether the
+   * server had asked it to hand off. None means the turn neither wrote a note
+   * nor was asked for one, so it owes the chat nothing.
    */
   readonly getHandoffTurn?: (input: {
     readonly threadId: ThreadId;

@@ -7,6 +7,7 @@ import {
 } from "@isnadi/client-runtime/state/runtime";
 import { pinOrderKeyBetween } from "@isnadi/client-runtime/state/thread-sort";
 import type { ScopedThreadRef } from "@isnadi/contracts";
+import { BotId } from "@isnadi/contracts";
 import { useCallback, useMemo } from "react";
 
 import { shouldForgetChatPath } from "../components/chat/chatActions.logic";
@@ -90,6 +91,7 @@ export function useChatActions() {
   });
 
   const stopSession = useAtomCommand(threadEnvironment.stopSession, { reportFailure: false });
+  const requestHandoff = useAtomCommand(threadEnvironment.requestHandoff, { reportFailure: false });
   const markThreadUnread = useUiStateStore((state) => state.markThreadUnread);
   const confirmThreadDelete = useClientSettings((settings) => settings.confirmThreadDelete);
 
@@ -178,6 +180,14 @@ export function useChatActions() {
         const completedAt = readThreadShell(threadRef)?.latestTurn?.completedAt;
         markThreadUnread(scopedThreadKey(threadRef), completedAt);
       },
+      /** Asks one bot of the chat to write its handoff note; the server resets after it. */
+      handoff: (threadRef: ScopedThreadRef, botId: string) =>
+        report(t("Could not hand off"), () =>
+          requestHandoff({
+            environmentId: threadRef.environmentId,
+            input: { threadId: threadRef.threadId, botId: BotId.make(botId) },
+          }),
+        ),
       archive: async (threadRef: ScopedThreadRef) => {
         const forgetChatPath = chatPathForgetter(threadRef);
         const archived = await report(t("Could not archive chat"), () => archive(input(threadRef)));
@@ -238,6 +248,7 @@ export function useChatActions() {
       pin,
       remove,
       report,
+      requestHandoff,
       settle,
       snooze,
       stopSession,

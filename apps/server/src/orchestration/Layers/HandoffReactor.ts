@@ -1,7 +1,11 @@
 import {
   CommandId,
   EventId,
+  HANDOFF_APPLIED_ACTIVITY_KIND,
   HANDOFF_NOT_APPLIED_ACTIVITY_KIND,
+  type BotId,
+  type HandoffNotAppliedReason,
+  type MessageId,
   type OrchestrationEvent,
   type ThreadId,
   type TurnId,
@@ -32,6 +36,18 @@ interface EndedTurn {
   readonly state: "completed" | "interrupted" | "error";
 }
 
+/**
+ * What the chat says for each reason a requested hand off reset nothing. The
+ * note is the only thing a hand off leaves behind, so every sentence says
+ * whether there is one to keep.
+ */
+const NOT_APPLIED_SUMMARY: Record<HandoffNotAppliedReason, string> = {
+  "no-note": "Hand off did not happen: the bot wrote no note, so nothing reset.",
+  "turn-not-completed": "Hand off was interrupted, so nothing reset. The note stays in the chat.",
+  "reset-refused":
+    "Hand off could not reset the context, because the chat changed. The note stays in the chat.",
+};
+
 const makeHandoffReactor = Effect.gen(function* () {
   const orchestrationEngine = yield* OrchestrationEngineService;
   const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
@@ -40,7 +56,42 @@ const makeHandoffReactor = Effect.gen(function* () {
   // that ended. The session-set that ends a turn carries no active turn.
   const lastTurnId = new Map<string, TurnId>();
 
-  const appendNotApplied = (ended: EndedTurn, detail: string) =>
+  /** Cuts one bot's context at the message before the handoff turn. */
+  const cutContext = (
+    ended: EndedTurn,
+    botId: BotId,
+    handoffActivityId: EventId,
+    sinceMessageId: MessageId,
+  ) =>
+    DateTime.now.pipe(
+      Effect.flatMap((now) =>
+        orchestrationEngine.dispatch({
+          type: "thread.context.reset",
+          // One cut per turn, so a replayed turn end lands the same cut.
+          commandId: CommandId.make(`server:handoff:${ended.turnId}`),
+          threadId: ended.threadId,
+          botId,
+          sinceMessageId,
+          handoffActivityId,
+          createdAt: DateTime.formatIso(now),
+        }),
+      ),
+      Effect.as(true),
+      // A cut the chat can no longer make (a revert removed the message the turn
+      // ended on) leaves the bot on the whole chat, which is the state it was in
+      // before the handoff. Nothing was reset, and the caller says so.
+      Effect.catchIf(isInvariantError, (error) =>
+        Effect.logInfo("handoff cut was refused", {
+          threadId: ended.threadId,
+          turnId: ended.turnId,
+          commandType: error.commandType,
+          failure: error.failure,
+          detail: error.detail,
+        }).pipe(Effect.as(false)),
+      ),
+    );
+
+  const appendNotApplied = (ended: EndedTurn, botId: BotId, reason: HandoffNotAppliedReason) =>
     DateTime.now.pipe(
       Effect.flatMap((now) => {
         const createdAt = DateTime.formatIso(now);
@@ -55,8 +106,35 @@ const makeHandoffReactor = Effect.gen(function* () {
             id: EventId.make(`handoff-not-applied:${ended.turnId}`),
             tone: "info",
             kind: HANDOFF_NOT_APPLIED_ACTIVITY_KIND,
-            summary: "Hand off was interrupted, so nothing reset. The note stays in the chat.",
-            payload: { turnId: ended.turnId, state: ended.state, detail },
+            summary: NOT_APPLIED_SUMMARY[reason],
+            payload: { botId, turnId: ended.turnId, reason },
+            turnId: ended.turnId,
+            createdAt,
+          },
+          createdAt,
+        });
+      }),
+    );
+
+  // The cut lives in a server-side projection the clients never see, so the
+  // chat's own record of it is this activity: it is what the note's row renders
+  // Undo and Hide from.
+  const appendApplied = (ended: EndedTurn, botId: BotId, handoffActivityId: EventId) =>
+    DateTime.now.pipe(
+      Effect.flatMap((now) => {
+        const createdAt = DateTime.formatIso(now);
+
+        return orchestrationEngine.dispatch({
+          type: "thread.activity.append",
+          // One line per turn, so a replayed turn end lands the same row.
+          commandId: CommandId.make(`server:handoff-applied:${ended.turnId}`),
+          threadId: ended.threadId,
+          activity: {
+            id: EventId.make(`handoff-applied:${ended.turnId}`),
+            tone: "info",
+            kind: HANDOFF_APPLIED_ACTIVITY_KIND,
+            summary: "Handed off. This bot's context starts at the note.",
+            payload: { botId, turnId: ended.turnId, handoffActivityId },
             turnId: ended.turnId,
             createdAt,
           },
@@ -73,46 +151,43 @@ const makeHandoffReactor = Effect.gen(function* () {
     return getHandoffTurn({ threadId: ended.threadId, turnId: ended.turnId }).pipe(
       Effect.flatMap(
         Option.match({
-          // The turn wrote no note, so it asked for no cut.
+          // Nobody asked for a note and none was written, so the turn owes the
+          // chat nothing.
           onNone: () => Effect.void,
           onSome: (handoff) => {
-            if (ended.state !== "completed") {
-              return appendNotApplied(ended, "The turn did not complete.");
+            const { activityId, botId, requested, sinceMessageId } = handoff;
+
+            if (activityId === null) {
+              // A turn the server asked to hand off that ended without a note. A
+              // note the bot volunteers is not a request, so its absence is not
+              // news.
+              return requested ? appendNotApplied(ended, botId, "no-note") : Effect.void;
             }
 
-            // A handoff turn that opened the chat has nothing behind it to
-            // forget, so it owes no cut either.
-            const sinceMessageId = handoff.sinceMessageId;
+            if (ended.state !== "completed") {
+              return appendNotApplied(ended, botId, "turn-not-completed");
+            }
 
-            if (sinceMessageId === null) return Effect.void;
+            // A turn that opened the chat has nothing behind it to forget: the
+            // bot's context already starts at the note.
+            const cut =
+              sinceMessageId === null
+                ? Effect.succeed(true)
+                : cutContext(ended, botId, activityId, sinceMessageId);
 
-            return DateTime.now.pipe(
-              Effect.flatMap((now) =>
-                orchestrationEngine.dispatch({
-                  type: "thread.context.reset",
-                  // One cut per turn, so a replayed turn end lands the same cut.
-                  commandId: CommandId.make(`server:handoff:${ended.turnId}`),
-                  threadId: ended.threadId,
-                  botId: handoff.botId,
-                  sinceMessageId,
-                  handoffActivityId: handoff.activityId,
-                  createdAt: DateTime.formatIso(now),
-                }),
+            return cut.pipe(
+              Effect.flatMap((landed) =>
+                // Only a requested hand off is a row the user can undo, so only
+                // that one is recorded; a note the bot wrote on its own still
+                // cuts, silently, exactly as it did before the request existed.
+                requested
+                  ? landed
+                    ? appendApplied(ended, botId, activityId)
+                    : appendNotApplied(ended, botId, "reset-refused")
+                  : Effect.void,
               ),
             );
           },
-        }),
-      ),
-      // A cut the chat can no longer make (a revert removed the message the
-      // turn ended on) leaves the bot on the whole chat, which is the state it
-      // was in before the handoff. Nothing was reset, so nothing is said.
-      Effect.catchIf(isInvariantError, (error) =>
-        Effect.logInfo("handoff cut was refused", {
-          threadId: ended.threadId,
-          turnId: ended.turnId,
-          commandType: error.commandType,
-          failure: error.failure,
-          detail: error.detail,
         }),
       ),
       Effect.catchCause((cause) =>

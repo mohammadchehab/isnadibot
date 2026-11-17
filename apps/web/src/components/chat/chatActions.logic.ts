@@ -4,7 +4,9 @@ import {
   effectiveSettled,
   effectiveSnoozed,
 } from "@isnadi/client-runtime/state/thread-settled";
-import type { OrchestrationThreadShell } from "@isnadi/contracts";
+import { isGroupBotMember, type OrchestrationThreadShell } from "@isnadi/contracts";
+
+import type { Bot, Group } from "../roster/types";
 
 export interface ChatActionSupport {
   readonly settlement: boolean;
@@ -136,4 +138,50 @@ export function shouldForgetChatPath(
   removed: { readonly environmentId: string; readonly threadId: string },
 ): boolean {
   return rememberedPath === `/${removed.environmentId}/${removed.threadId}`;
+}
+
+/** One bot the chat menu can ask to hand its context over. */
+export interface HandoffTarget {
+  readonly botId: string;
+  readonly name: string;
+}
+
+/**
+ * Who the chat menu offers to hand off, and how it lists them. A chat with one
+ * bot gets the flat row the frames draw; a group gets a labelled row per bot, in
+ * membership order. An archived bot is not working, so it is never offered, and
+ * when nothing is left the menu is the menu it was before this entry existed.
+ */
+export type HandoffTargets =
+  | { readonly kind: "none" }
+  | { readonly kind: "solo"; readonly bot: HandoffTarget }
+  | { readonly kind: "group"; readonly bots: ReadonlyArray<HandoffTarget> };
+
+export function resolveHandoffTargets(input: {
+  readonly shell: Pick<OrchestrationThreadShell, "botId" | "groupId">;
+  readonly groups: ReadonlyArray<Group>;
+  readonly bots: ReadonlyArray<Bot>;
+}): HandoffTargets {
+  const { shell, groups, bots } = input;
+  const botsById = new Map(bots.map((bot) => [bot.id, bot] as const));
+
+  const offer = (botId: string): ReadonlyArray<HandoffTarget> => {
+    const bot = botsById.get(botId);
+
+    return bot === undefined || bot.archivedAt !== null ? [] : [{ botId: bot.id, name: bot.name }];
+  };
+
+  if (shell.groupId) {
+    const group = groups.find((candidate) => candidate.id === shell.groupId);
+
+    if (group === undefined) return { kind: "none" };
+
+    const targets = group.members.filter(isGroupBotMember).flatMap((member) => offer(member.botId));
+
+    return targets.length === 0 ? { kind: "none" } : { kind: "group", bots: targets };
+  }
+
+  const [bot] = shell.botId ? offer(shell.botId) : [];
+
+  return bot === undefined ? { kind: "none" } : { kind: "solo", bot };
 }
