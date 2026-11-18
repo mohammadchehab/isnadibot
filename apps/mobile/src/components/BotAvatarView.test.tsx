@@ -16,13 +16,20 @@ vi.mock("react-native", () => ({ View: "View" }));
 
 vi.mock("react-native-svg", () => ({
   default: "Svg",
-  Mask: "Mask",
+  Circle: "Circle",
+  ClipPath: "ClipPath",
+  Defs: "Defs",
+  Ellipse: "Ellipse",
+  G: "G",
   Path: "Path",
+  RadialGradient: "RadialGradient",
   Rect: "Rect",
+  Stop: "Stop",
 }));
 
 type ElementProps = {
   children?: ReactNode;
+  fill?: string;
   source?: { uri?: string };
   style?: import("react-native").ViewStyle;
 };
@@ -46,8 +53,11 @@ function nodes(node: ReactNode): Array<{ type: unknown; props: ElementProps }> {
   });
 }
 
-function render(avatar: Parameters<typeof BotAvatarView>[0]["avatar"]) {
-  return nodes(BotAvatarView({ avatar, size: 40 }));
+function render(
+  avatar: Parameters<typeof BotAvatarView>[0]["avatar"],
+  state?: Parameters<typeof BotAvatarView>[0]["state"],
+) {
+  return nodes(BotAvatarView({ avatar, size: 40, state }));
 }
 
 const dataUrl = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
@@ -105,5 +115,16 @@ describe("BotAvatarView", () => {
 
     expect(tree.some((node) => node.type === "Image")).toBe(false);
     expect(tree.some((node) => node.type === "Svg")).toBe(true);
+  });
+
+  it("shows a blocked bot crying and a resting one grinning", () => {
+    hooks.failedPath = null;
+    const avatar = { kind: "blob", shape: "hex", color: "#2E8EFF" } as const;
+
+    const crying = (tree: ReturnType<typeof render>) =>
+      tree.some((node) => node.type === "Path" && node.props.fill === "#7FD3FF");
+
+    expect(crying(render(avatar, "blocked"))).toBe(true);
+    expect(crying(render(avatar, "idle"))).toBe(false);
   });
 });

@@ -18,8 +18,6 @@ export {
   blobShapeLabel,
   BLOB_COLORS,
   resolveBlobColor,
-  resolveBlobEyes,
-  resolveBlobOutline,
   isBotAvatarColor,
   resolveBlobRendering,
   randomBotAvatar,
@@ -54,7 +52,7 @@ type Translate = (message: string, params?: Record<string, string | number>) => 
 const englishTranslate: Translate = createTranslator("en").translate;
 
 /** What a bot is up to right now, driving the avatar animation and indicator. */
-export type RosterPresence = "idle" | "working" | "needs-you";
+export type RosterPresence = "idle" | "working" | "needs-you" | "blocked";
 
 /** Only live bot states get a light; row selection already marks the active bot. */
 export function resolveRosterIndicator(presence: RosterPresence): "needs-you" | "working" | null {
@@ -75,7 +73,8 @@ type PresenceShell = Pick<
  * input outrank a running turn: the bot is waiting on you, not working. The
  * running test mirrors the legacy sidebar's working indicator; background
  * liveness keeps the bot working while subagents or workflows run on after
- * the turn settles.
+ * the turn settles. A session that ended in an error leaves the bot blocked
+ * until its next turn.
  */
 export function resolveBotPresence(shell: PresenceShell | null): RosterPresence {
   if (shell === null) return "idle";
@@ -85,6 +84,8 @@ export function resolveBotPresence(shell: PresenceShell | null): RosterPresence 
   if (shell.session?.status === "running" && shell.session.activeTurnId != null) return "working";
 
   if (shell.backgroundLiveness === "working") return "working";
+
+  if (shell.session?.status === "error") return "blocked";
 
   return "idle";
 }

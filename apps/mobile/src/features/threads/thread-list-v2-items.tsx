@@ -498,7 +498,9 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       ? "working"
       : status === "approval" || status === "input"
         ? "needs-you"
-        : "idle";
+        : status === "failed"
+          ? "blocked"
+          : "idle";
 
   const online = status === "working" || status === "approval" || status === "input";
 

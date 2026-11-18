@@ -1,58 +1,33 @@
-import { useEffect, useId, useRef, type RefObject } from "react";
+import { createElement, useEffect, useId, useRef, type RefObject } from "react";
+import {
+  BOT_ART_LIGHT,
+  BOT_EYE_OFFSETS,
+  BOT_FACE_LAYOUT,
+  botAvatarArt,
+  type BotArtNode,
+  type BotMood,
+} from "@isnadi/client-runtime/bot-avatar-art";
 
 import { cn } from "~/lib/utils";
 import { IDLE_BEAT_LENGTH_MS, subscribeIdleBeat } from "./botAvatarIdleBeat";
 import { BotMotion, REST_FRAME, wrapOnBelt, type MotionFrame } from "./botAvatarMotion";
-import {
-  botAvatarSeed,
-  resolveBlobEyes,
-  resolveBlobOutline,
-  resolveBlobRendering,
-} from "./roster.logic";
+import { botAvatarSeed, resolveBlobRendering } from "./roster.logic";
 import type { BotAvatar, BotBlobShape } from "./types";
 
 /**
  * What a bot is doing. `working` sways, glances down at its work, and spins
- * now and then for as long as the turn runs; `idle` and `needs-you` rest still
- * and only move on hover or during the rare idle beat. The presence dot
- * carries needs-you.
+ * now and then for as long as the turn runs; the others rest still and only
+ * move on hover or during the rare idle beat. The face carries the state:
+ * idle and working grin, needs-you looks puzzled, blocked looks sad.
  */
-export type BotAnimationState = "idle" | "working" | "needs-you";
+export type BotAnimationState = "idle" | "working" | "needs-you" | "blocked";
 
-/**
- * Where the face sits on the 100×100 viewBox. It looks up and to the right;
- * bottom-heavy shapes (triangle, drop) carry it lower and smaller.
- */
-const FACE_LAYOUT: Record<BotBlobShape, { x: number; y: number; scale: number }> = {
-  circle: { x: 66, y: 40, scale: 1.1 },
-  squircle: { x: 64, y: 42, scale: 1.1 },
-  square: { x: 66, y: 40, scale: 1.1 },
-  pill: { x: 64, y: 46, scale: 1 },
-  triangle: { x: 50, y: 64, scale: 0.85 },
-  hex: { x: 64, y: 42, scale: 1.1 },
-  cloud: { x: 62, y: 50, scale: 1 },
-  drop: { x: 57, y: 62, scale: 1 },
+const MOOD: Record<BotAnimationState, BotMood> = {
+  idle: "happy",
+  working: "happy",
+  "needs-you": "confused",
+  blocked: "sad",
 };
-
-/** Flat body geometry on a 100×100 viewBox. Each shape fills the frame. */
-const BODY: Record<BotBlobShape, string> = {
-  circle: "M4 50A46 46 0 1 1 96 50A46 46 0 1 1 4 50Z",
-  squircle:
-    "M96.8 50C97.5 55.5 97.4 62 95.3 67.3C93.3 72.6 89.2 78.2 84.6 81.9C80 85.5 73.4 87.9 67.6 89.1C61.8 90.4 55.6 89.9 50 89.4C44.4 88.9 39.1 87.7 33.8 86C28.5 84.3 23 82.4 18.3 79.2C13.7 76 8.7 71.7 5.9 66.8C3.1 62 1.3 55.6 1.4 50C1.5 44.4 3.6 38.3 6.3 33.3C9 28.3 13.3 23.8 17.7 20.2C22 16.5 27.3 13.4 32.7 11.4C38.1 9.4 44.2 8.1 50 8.1C55.8 8.2 62 9.5 67.2 11.7C72.4 13.9 77.2 17.5 81.2 21.2C85.2 25 88.6 29.5 91.2 34.3C93.8 39.1 96.1 44.5 96.8 50Z",
-  square: "M30 6H70C88 6 94 12 94 30V70C94 88 88 94 70 94H30C12 94 6 88 6 70V30C6 12 12 6 30 6Z",
-  pill: "M34 19H66A31 31 0 0 1 66 81H34A31 31 0 0 1 34 19Z",
-  triangle: "M35.6 28.3Q50 2 64.4 28.3L89.9 75.1Q98 90 81 90L19 90Q2 90 10.1 75.1Z",
-  hex: "M42.2 5.5Q50 1 57.8 5.5L84.6 21Q92.4 25.5 92.4 34.5L92.4 65.5Q92.4 74.5 84.6 79L57.8 94.5Q50 99 42.2 94.5L15.4 79Q7.6 74.5 7.6 65.5L7.6 34.5Q7.6 25.5 15.4 21Z",
-  cloud:
-    "M31 80.7A20 20 0 1 1 16.7 43.4A22 22 0 0 1 53.4 22.3A19 19 0 0 1 82.3 43A20 20 0 0 1 69 80.7A24 24 0 0 1 31 80.7Z",
-  drop: "M42.6 12.4Q50 3 57.4 12.4L78.2 38.7A36 36 0 1 1 21.8 38.7Z",
-};
-
-/** The two slanted capsule eyes, relative to the face origin. */
-const EYES = [
-  { x: -13, y: 1, rotate: -16 },
-  { x: 13, y: -1, rotate: -20 },
-] as const;
 
 /** Minimum frame spacing for the working pose, about 30fps with rAF jitter headroom. */
 const WORKING_FRAME_MS = 1000 / 30 - 2;
@@ -60,15 +35,24 @@ const WORKING_FRAME_MS = 1000 / 30 - 2;
 /** Radius the face travels on when it spins around the body. */
 const BELT_RADIUS = 44;
 
+/** Where the face center sits for a motion frame. */
+function facePosition(shape: BotBlobShape, frame: MotionFrame) {
+  const face = BOT_FACE_LAYOUT[shape];
+  const pull = 0.42 * frame.pull;
+
+  return {
+    face,
+    x: face.x + (50 - face.x) * pull + frame.gazeX * face.scale,
+    y: face.y + (50 - face.y) * pull + frame.gazeY * face.scale,
+  };
+}
+
 /** Places one eye for a motion frame, or returns null while it is behind the body. */
 function eyeTransform(shape: BotBlobShape, frame: MotionFrame, index: 0 | 1) {
-  const face = FACE_LAYOUT[shape];
-  const eye = EYES[index];
-  const pull = 0.42 * frame.pull;
-  const faceX = face.x + (50 - face.x) * pull;
-  const faceY = face.y + (50 - face.y) * pull;
-  let x = faceX + (eye.x + frame.gazeX) * face.scale;
-  const y = faceY + (eye.y + frame.gazeY) * face.scale;
+  const { face, x: faceX, y: faceY } = facePosition(shape, frame);
+  const offset = BOT_EYE_OFFSETS[index];
+  let x = faceX + offset.x * face.scale;
+  const y = faceY + offset.y * face.scale;
   let width = frame.eyeWidth * face.scale;
 
   if (frame.spin !== 0) {
@@ -81,80 +65,94 @@ function eyeTransform(shape: BotBlobShape, frame: MotionFrame, index: 0 | 1) {
 
   const height = frame.eyeHeight[index] * face.scale;
 
-  return `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${eye.rotate}) scale(${width.toFixed(3)} ${height.toFixed(3)})`;
+  return `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${width.toFixed(3)} ${height.toFixed(3)})`;
+}
+
+/** Moves the mouth, brows and cheeks with the eyes, or hides them while the face spins. */
+function faceTransform(shape: BotBlobShape, frame: MotionFrame) {
+  if (frame.spin !== 0) return null;
+  const { face, x, y } = facePosition(shape, frame);
+
+  return `translate(${(x - face.x).toFixed(2)} ${(y - face.y).toFixed(2)})`;
 }
 
 function bodyTransform(frame: MotionFrame) {
   return `translate(${frame.x.toFixed(2)}%, ${frame.y.toFixed(2)}%) rotate(${frame.roll.toFixed(2)}deg) scale(1, ${frame.scaleY.toFixed(4)})`;
 }
 
-/** Two slanted capsule eyes. The motion engine rewrites their transforms. */
-function Eyes({
-  shape,
-  ink,
-  eyeRefs,
-}: {
-  shape: BotBlobShape;
-  ink: string;
-  eyeRefs: RefObject<Array<SVGRectElement | null>>;
-}) {
-  return (
-    <g className="bot-eyes" fill={ink}>
-      {([0, 1] as const).map((index) => (
-        <rect
-          key={index}
-          ref={(node) => {
-            eyeRefs.current[index] = node;
-          }}
-          x="-4.2"
-          y="-8.8"
-          width="8.4"
-          height="17.6"
-          rx="4.2"
-          transform={eyeTransform(shape, REST_FRAME, index) ?? undefined}
-        />
-      ))}
-    </g>
-  );
+function ArtNodes({ nodes }: { nodes: ReadonlyArray<BotArtNode> }) {
+  return nodes.map((node, index) => createElement(node.tag, { key: index, ...node.attrs }));
 }
 
+type FaceRefs = {
+  eyes: RefObject<Array<SVGGElement | null>>;
+  face: RefObject<SVGGElement | null>;
+};
+
 /**
- * The body and its face. Eyes are cut out of the body so the surface shows
- * through. Colors too light or dark for that to read paint the eyes on
- * instead, and light bodies add a faint outline.
+ * The stitched bot: ears and feet behind a furry body, a soft light, a sewn-on
+ * patch, and a face that shows the bot's mood. The motion engine rewrites the
+ * eye and face transforms.
  */
 function BlobFigure({
   shape,
   color,
-  eyeRefs,
+  mood,
+  refs,
 }: {
   shape: BotBlobShape;
   color: string;
-  eyeRefs: RefObject<Array<SVGRectElement | null>>;
+  mood: BotMood;
+  refs: FaceRefs;
 }) {
-  const maskId = `bot-eyes-${useId().replace(/[^\w-]/g, "")}`;
-  const d = BODY[shape];
-  const eyes = resolveBlobEyes(color);
-  const outline = resolveBlobOutline(color);
-
-  if (eyes.kind === "ink") {
-    return (
-      <>
-        {outline && <path d={d} fill="none" stroke={outline} strokeWidth="3" />}
-        <path d={d} fill={color} />
-        <Eyes shape={shape} ink={eyes.ink} eyeRefs={eyeRefs} />
-      </>
-    );
-  }
+  const id = `bot-${useId().replace(/[^\w-]/g, "")}`;
+  const art = botAvatarArt(shape, color, mood);
 
   return (
     <>
-      <mask id={maskId} maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-        {/* Mask luminance: white keeps the body visible. */}
-        <rect x="-10" y="-10" width="120" height="120" fill="var(--color-white)" />
-        <Eyes shape={shape} ink="#000" eyeRefs={eyeRefs} />
-      </mask>
-      <path d={d} fill={color} mask={`url(#${maskId})`} />
+      <defs>
+        <radialGradient
+          id={`${id}-light`}
+          cx={BOT_ART_LIGHT.cx}
+          cy={BOT_ART_LIGHT.cy}
+          r={BOT_ART_LIGHT.r}
+        >
+          {BOT_ART_LIGHT.stops.map((stop) => (
+            <stop
+              key={stop.offset}
+              offset={stop.offset}
+              stopColor={stop.color}
+              stopOpacity={stop.opacity}
+            />
+          ))}
+        </radialGradient>
+        <clipPath id={`${id}-clip`}>
+          <path d={art.body} />
+        </clipPath>
+      </defs>
+      <ArtNodes nodes={art.back} />
+      {art.outline && <path d={art.body} fill="none" stroke={art.outline} strokeWidth="3" />}
+      <path d={art.body} fill={color} />
+      <path d={art.body} fill={`url(#${id}-light)`} />
+      <g clipPath={`url(#${id}-clip)`}>
+        <ArtNodes nodes={art.patch} />
+      </g>
+      <g className="bot-eyes">
+        {([0, 1] as const).map((index) => (
+          <g
+            key={index}
+            ref={(node) => {
+              refs.eyes.current[index] = node;
+            }}
+            transform={eyeTransform(shape, REST_FRAME, index) ?? undefined}
+          >
+            <ArtNodes nodes={art.eyes[index]} />
+          </g>
+        ))}
+      </g>
+      <g ref={refs.face}>
+        <ArtNodes nodes={art.face} />
+      </g>
     </>
   );
 }
@@ -181,7 +179,8 @@ function BlobAvatar({
 }) {
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const bodyRef = useRef<HTMLSpanElement>(null);
-  const eyeRefs = useRef<Array<SVGRectElement | null>>([null, null]);
+  const eyeRefs = useRef<Array<SVGGElement | null>>([null, null]);
+  const faceRef = useRef<SVGGElement | null>(null);
   const working = state === "working";
   const workingRef = useRef(working);
   const wakeRef = useRef<() => void>(() => {});
@@ -203,15 +202,18 @@ function BlobAvatar({
     // Last values written to the DOM, so settled or repeated poses cost no style work.
     let lastBody = "";
 
-    // Switching between ink and cutout eyes replaces the eye nodes, so the cache is per node.
+    // A mood change replaces the eye nodes, so the cache is per node.
     const lastEyes: Array<{
-      node: SVGRectElement | null;
+      node: SVGGElement | null;
       transform: string | null;
       visible: boolean | null;
     }> = [
       { node: null, transform: null, visible: null },
       { node: null, transform: null, visible: null },
     ];
+
+    let lastFaceNode: SVGGElement | null = null;
+    let lastFaceTransform: string | null = null;
 
     const render = (frame: MotionFrame) => {
       const nextBody = bodyTransform(frame);
@@ -244,6 +246,24 @@ function BlobAvatar({
         if (transform && transform !== written.transform) {
           eye.setAttribute("transform", transform);
           written.transform = transform;
+        }
+      }
+
+      const face = faceRef.current;
+
+      if (face) {
+        if (lastFaceNode !== face) {
+          lastFaceNode = face;
+          lastFaceTransform = null;
+        }
+
+        const transform = faceTransform(shape, frame);
+
+        if (transform !== lastFaceTransform) {
+          face.setAttribute("visibility", transform === null ? "hidden" : "visible");
+
+          if (transform !== null) face.setAttribute("transform", transform);
+          lastFaceTransform = transform;
         }
       }
     };
@@ -361,8 +381,13 @@ function BlobAvatar({
       data-bot-state={state}
     >
       <span ref={bodyRef} className="bot-body">
-        <svg viewBox="0 0 100 100" overflow="visible" className="size-full">
-          <BlobFigure shape={shape} color={color} eyeRefs={eyeRefs} />
+        <svg viewBox="-4 -4 108 108" overflow="visible" className="size-full">
+          <BlobFigure
+            shape={shape}
+            color={color}
+            mood={MOOD[state]}
+            refs={{ eyes: eyeRefs, face: faceRef }}
+          />
         </svg>
       </span>
     </span>

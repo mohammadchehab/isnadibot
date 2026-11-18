@@ -57,10 +57,6 @@ export const DEFAULT_BLOB_SHAPE: BotBlobShape = "circle";
 
 export const DEFAULT_BLOB_COLOR = "#8E8E93";
 
-const DARK_EYES = "#161616";
-
-const LIGHT_EYES = "#FFFFFF";
-
 /** The muted presets bots were saved with before the palette went vivid. */
 const LEGACY_BLOB_COLORS = {
   "#E0645C": "#FF4A5A",
@@ -80,45 +76,6 @@ export function resolveBlobColor(value: string | null | undefined) {
   const color = value.toUpperCase();
 
   return recordLookup(LEGACY_BLOB_COLORS, color) ?? color;
-}
-
-function relativeLuminance(hexColor: string) {
-  const channels = hexColor
-    .slice(1)
-    .match(/.{2}/g)
-    ?.map((channel) => Number.parseInt(channel, 16) / 255);
-
-  if (!channels || channels.length !== 3 || channels.some(Number.isNaN)) return null;
-
-  const [red = 0, green = 0, blue = 0] = channels.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  );
-
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-/**
- * How the eyes are drawn. Most bodies cut their eyes out so the surface shows
- * through. Near-white and near-black bodies would lose cutout eyes against a
- * matching surface, so they paint them in a contrasting ink instead.
- */
-export function resolveBlobEyes(color: string): { kind: "cutout" } | { kind: "ink"; ink: string } {
-  const luminance = isBotAvatarColor(color) ? relativeLuminance(color) : null;
-
-  if (luminance === null) return { kind: "cutout" };
-
-  if (luminance > 0.6) return { kind: "ink", ink: DARK_EYES };
-
-  if (luminance < 0.02) return { kind: "ink", ink: LIGHT_EYES };
-
-  return { kind: "cutout" };
-}
-
-/** A faint edge for light bodies that would otherwise fade into a light surface. */
-export function resolveBlobOutline(color: string) {
-  const luminance = isBotAvatarColor(color) ? relativeLuminance(color) : null;
-
-  return luminance !== null && luminance > 0.7 ? "rgba(0, 0, 0, 0.14)" : null;
 }
 
 export function isBotAvatarColor<T>(value: T): value is T & string {
