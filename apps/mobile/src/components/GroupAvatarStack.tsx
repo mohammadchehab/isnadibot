@@ -1,7 +1,7 @@
 import type { OrchestrationBot } from "@isnadi/contracts";
 import { View } from "react-native";
 
-import { BotAvatarView, seededBlobAvatar } from "./BotAvatarView";
+import { BotAvatarView, seededBlobAvatar, type BotAvatarState } from "./BotAvatarView";
 
 /**
  * Overlapping two-bot avatar for group chats, matching the web roster's
@@ -13,7 +13,7 @@ export function GroupAvatarStack(props: {
   readonly seed: string;
   /** Outer box edge in px; each member avatar is ~68% of it. */
   readonly size: number;
-  readonly state?: "idle" | "working" | "needs-you";
+  readonly state?: BotAvatarState;
 }) {
   const members = props.bots.slice(0, 2);
   const avatarSize = Math.round(props.size * 0.68);

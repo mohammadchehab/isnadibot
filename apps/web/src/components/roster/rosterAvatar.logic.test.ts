@@ -7,25 +7,9 @@ import {
   randomBotAvatar,
   resolveBlobRendering,
   resolveBlobColor,
-  resolveBlobEyes,
-  resolveBlobOutline,
   BLOB_COLORS,
   BLOB_SHAPES,
 } from "./rosterAvatar.logic";
-
-describe("resolveBlobEyes", () => {
-  it("cuts eyes out of every preset", () => {
-    for (const color of BLOB_COLORS) {
-      expect(resolveBlobEyes(color)).toEqual({ kind: "cutout" });
-    }
-  });
-
-  it("paints eyes on bodies too light or too dark for a cutout to read", () => {
-    expect(resolveBlobEyes("#FFFFFF")).toEqual({ kind: "ink", ink: "#161616" });
-    expect(resolveBlobEyes("#FFF4B0")).toEqual({ kind: "ink", ink: "#161616" });
-    expect(resolveBlobEyes("#000000")).toEqual({ kind: "ink", ink: "#FFFFFF" });
-  });
-});
 
 describe("resolveBlobColor", () => {
   it("moves retired muted presets onto the vivid palette", () => {
@@ -38,16 +22,6 @@ describe("resolveBlobColor", () => {
     expect(resolveBlobColor("#FFFFFF")).toBe("#FFFFFF");
     expect(resolveBlobColor("")).toBe(DEFAULT_BLOB_COLOR);
     expect(resolveBlobColor("red")).toBe(DEFAULT_BLOB_COLOR);
-  });
-});
-
-describe("resolveBlobOutline", () => {
-  it("outlines only bodies light enough to fade into a light surface", () => {
-    expect(resolveBlobOutline("#FFFFFF")).not.toBeNull();
-
-    for (const color of [...BLOB_COLORS, "#000000", "nope"]) {
-      expect(resolveBlobOutline(color)).toBeNull();
-    }
   });
 });
 

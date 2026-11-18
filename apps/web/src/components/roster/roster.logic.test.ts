@@ -342,6 +342,13 @@ describe("resolveBotPresence", () => {
     expect(resolveBotPresence(shell({ backgroundLiveness: "monitoring" }))).toBe("idle");
   });
 
+  it("is blocked after its session ends in an error", () => {
+    expect(resolveBotPresence(shell({ status: "error" }))).toBe("blocked");
+    expect(resolveBotPresence(shell({ status: "error", hasPendingUserInput: true }))).toBe(
+      "needs-you",
+    );
+  });
+
   it("needs-you outranks a running turn", () => {
     expect(
       resolveBotPresence(

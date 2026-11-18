@@ -299,6 +299,10 @@
     "./fleet/hire": {
       "types": "./src/fleet/hireFleet.ts",
       "default": "./src/fleet/hireFleet.ts"
+    },
+    "./bot-avatar-art": {
+      "types": "./src/botAvatarArt.ts",
+      "default": "./src/botAvatarArt.ts"
     }
   },
   "scripts": {
