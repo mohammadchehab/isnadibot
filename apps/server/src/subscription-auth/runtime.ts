@@ -157,7 +157,7 @@ function withApiKeyCredential(
             options: {
               ...options,
               apiKey: credential.access,
-              baseURL: credential.baseUrl ?? "https://opencode.ai/zen/go/v1",
+              baseURL: credential.baseUrl ?? "https://opencode.ai/inference/go/v1",
             },
           },
         },

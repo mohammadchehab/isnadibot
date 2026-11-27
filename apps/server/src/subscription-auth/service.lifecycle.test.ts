@@ -666,7 +666,7 @@ describe("subscription auth storage", () => {
     await service.testHealth("opencode-go");
 
     expect(request).toHaveBeenCalledWith(
-      new URL("https://opencode.ai/zen/go/v1/usage"),
+      new URL("https://opencode.ai/inference/go/v1/usage"),
       expect.any(Object),
     );
     expect(service.statuses().find((status) => status.provider === "opencode-go")).toMatchObject({

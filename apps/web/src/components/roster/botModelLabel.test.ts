@@ -40,7 +40,7 @@ const settings: UnifiedSettings = {
 
 describe("resolveBotModelLabel", () => {
   it("names the model a bot without its own engine actually runs on", () => {
-    expect(resolveBotModelLabel(null, settings, providers)).toBe("GPT-6-Sol (default)");
+    expect(resolveBotModelLabel(null, settings, providers)).toBe("Codex · GPT-6-Sol (default)");
   });
 
   it("shows the bot's own model by display name", () => {
@@ -50,7 +50,7 @@ describe("resolveBotModelLabel", () => {
         settings,
         providers,
       ),
-    ).toBe("GPT-6-Luna");
+    ).toBe("Codex · GPT-6-Luna");
   });
 
   it("falls back to the raw slug when the provider no longer lists the model", () => {
@@ -60,7 +60,7 @@ describe("resolveBotModelLabel", () => {
         settings,
         providers,
       ),
-    ).toBe("gpt-retired");
+    ).toBe("Codex · gpt-retired");
   });
 
   it("says so when no provider can run the bot", () => {

@@ -460,7 +460,7 @@ export class SubscriptionHealthService {
         "openai-codex": "https://api.openai.com/v1",
         xai: "https://api.x.ai/v1",
         "kimi-for-coding": "https://api.kimi.com/coding/v1",
-        "opencode-go": "https://opencode.ai/zen/go/v1",
+        "opencode-go": "https://opencode.ai/inference/go/v1",
       };
 
       const url =
