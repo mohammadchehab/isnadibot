@@ -26,7 +26,7 @@ export function anthropicApiBaseUrl(baseUrl = "https://api.anthropic.com"): stri
 
 export const OPENCODE_GO_AUTH_URL = "https://opencode.ai/auth";
 
-export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
+export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/inference/go/v1/usage";
 
 export const OPENCODE_GO_USER_AGENT = "isnadibot/0.0.37";
 

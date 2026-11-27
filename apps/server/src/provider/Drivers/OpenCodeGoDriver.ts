@@ -39,6 +39,7 @@ export const OPEN_CODE_GO_MODELS = [
   "kimi-k2.5",
   "longcat-2.0",
   "deepseek-v4-pro",
+  "deepseek-v4.1-flash",
   "deepseek-v4-flash",
   "deepseek-v4-flash-vision-exp",
   "mimo-v2.5",

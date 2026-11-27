@@ -317,7 +317,7 @@ export function resolveIsnadiMastraModel(
 
     if (!resolveAccess) throw new Error("OpenCode Go subscription access is unavailable.");
 
-    return isnadiOpenCodeGoProvider(trimmed.slice("opencode-go/".length), resolveAccess);
+    return isnadiOpenCodeGoProvider(trimmed.slice("opencode-go/".length), resolveAccess, threadId);
   }
 
   if (trimmed.startsWith("custom-openai/")) {

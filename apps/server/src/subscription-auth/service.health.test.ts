@@ -241,7 +241,7 @@ describe("provider health checks", () => {
     await service.awaitHealthCheck("opencode-go");
 
     expect(request).toHaveBeenCalledWith(
-      new URL("https://opencode.ai/zen/go/v1/usage"),
+      new URL("https://opencode.ai/inference/go/v1/usage"),
       expect.objectContaining({ redirect: "error" }),
     );
     await runWithNodeServices(observer.reload());

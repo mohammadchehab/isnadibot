@@ -6,7 +6,8 @@ import { subscriptionRequestUrl } from "../subscription-auth/runtime.ts";
 
 export type IsnadiOpenCodeGoAccess = { readonly access: string; readonly baseUrl?: string };
 
-const OPEN_CODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1";
+/** Official OpenCode Go inference endpoint. */
+const OPEN_CODE_GO_BASE_URL = "https://opencode.ai/inference/go/v1";
 
 const OPEN_CODE_GO_USER_AGENT = "isnadibot/0.0.37";
 
@@ -33,6 +34,7 @@ export function buildIsnadiOpenCodeGoFetch(
   protocol: OpenCodeGoProtocol,
   getAccess: () => Promise<IsnadiOpenCodeGoAccess | undefined>,
   request: IsnadiOpenCodeGoFetch = globalThis.fetch,
+  sessionId?: string,
 ): IsnadiOpenCodeGoFetch {
   return async (input, init) => {
     const credential = await getAccess();
@@ -51,6 +53,8 @@ export function buildIsnadiOpenCodeGoFetch(
     headers.set("User-Agent", OPEN_CODE_GO_USER_AGENT);
     headers.set("x-opencode-client", "isnadibot");
 
+    if (sessionId?.trim()) headers.set("x-opencode-session", sessionId.trim());
+
     if (protocol === "anthropic") {
       headers.set("x-api-key", apiKey);
     } else {
@@ -68,13 +72,17 @@ export function buildIsnadiOpenCodeGoFetch(
 export function isnadiOpenCodeGoProvider(
   modelId: string,
   getAccess: () => Promise<IsnadiOpenCodeGoAccess | undefined>,
+  sessionId?: string,
 ): MastraModelConfig {
   const protocol = openCodeGoProtocol(modelId);
 
   // SAFETY: The request adapter implements Fetch; this SDK declaration also includes an unused Bun preconnect method.
-  const fetch = buildIsnadiOpenCodeGoFetch(protocol, getAccess, globalThis.fetch) as NonNullable<
-    NonNullable<Parameters<typeof createOpenAI>[0]>["fetch"]
-  >;
+  const fetch = buildIsnadiOpenCodeGoFetch(
+    protocol,
+    getAccess,
+    globalThis.fetch,
+    sessionId,
+  ) as NonNullable<NonNullable<Parameters<typeof createOpenAI>[0]>["fetch"]>;
 
   if (protocol === "responses") {
     return createOpenAI({

@@ -46,9 +46,12 @@ export function resolveBotModelLabel(
     ?.models.find((candidate) => candidate.slug === selection.model);
 
   const name = model ? getTriggerDisplayModelName(model) : selection.model;
+  const provider = instanceEntries.find((entry) => entry.instanceId === selection.instanceId);
+  const providerName = provider?.displayName ?? selection.instanceId;
+  const label = `${providerName} · ${name}`;
 
   const usesOwnEngine =
     engine !== null && engine.provider === selection.instanceId && engine.model === selection.model;
 
-  return usesOwnEngine ? name : t("{name} (default)", { name });
+  return usesOwnEngine ? label : `${providerName} · ${t("{name} (default)", { name })}`;
 }

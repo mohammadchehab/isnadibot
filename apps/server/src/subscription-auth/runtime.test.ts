@@ -212,7 +212,7 @@ describe("subscription runtime credentials", () => {
     const result = await runtimeEnvironment(secretsDir, "opencode-go", inherited);
     expect(JSON.parse(result.OPENCODE_CONFIG_CONTENT!).provider["opencode-go"].options).toEqual({
       apiKey: "provider-wide-key",
-      baseURL: "https://opencode.ai/zen/go/v1",
+      baseURL: "https://opencode.ai/inference/go/v1",
     });
   });
 

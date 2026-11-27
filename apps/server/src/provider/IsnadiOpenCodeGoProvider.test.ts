@@ -18,7 +18,7 @@ describe("IsnadiOpenCodeGoProvider", () => {
         protocol,
         async () => ({ access: "custom-key", baseUrl: "http://localhost:8080/v1" }),
         request,
-      )("https://opencode.ai/zen/go/v1/messages", { method: "POST", body: "{}" });
+      )("https://opencode.ai/inference/go/v1/messages", { method: "POST", body: "{}" });
       expect(request).toHaveBeenCalledWith(
         "http://localhost:8080/v1/messages",
         expect.objectContaining({ body: "{}", redirect: "error" }),
@@ -53,6 +53,7 @@ describe("IsnadiOpenCodeGoProvider", () => {
       expect(headers.get("x-api-key")).toBeNull();
       expect(headers.get("user-agent")).toBe("isnadibot/0.0.37");
       expect(headers.get("x-opencode-client")).toBe("isnadibot");
+      expect(headers.get("x-opencode-session")).toBe("thread-native-go");
 
       return new Response("{}", { status: 200 });
     });
@@ -61,7 +62,8 @@ describe("IsnadiOpenCodeGoProvider", () => {
       "chat-completions",
       async () => ({ access: "go-key" }),
       request,
-    )("https://opencode.ai/zen/go/v1/chat/completions", {
+      "thread-native-go",
+    )("https://opencode.ai/inference/go/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: "stale", "x-api-key": "stale" },
     });
@@ -76,7 +78,7 @@ describe("IsnadiOpenCodeGoProvider", () => {
         "chat-completions",
         async () => undefined,
         request,
-      )("https://opencode.ai/zen/go/v1/chat/completions"),
+      )("https://opencode.ai/inference/go/v1/chat/completions"),
     ).rejects.toThrow("not connected");
     expect(request).not.toHaveBeenCalled();
   });

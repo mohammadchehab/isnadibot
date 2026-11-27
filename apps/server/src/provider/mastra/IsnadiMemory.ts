@@ -322,6 +322,7 @@ export async function createIsnadiMastraMemory(
       controllerModelConnection(requestContext, options.getModelConnection),
       options.getSubscriptionOAuth,
       options.getSubscriptionAccessToken,
+      controllerResourceId(requestContext),
     );
 
   const memory = new Memory({
